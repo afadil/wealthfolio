@@ -169,7 +169,7 @@ function InlineAmountTooltip({
           <span
             className={cn(
               "cursor-help font-medium tabular-nums underline decoration-dotted underline-offset-4",
-              tone === "shortfall" ? "text-amber-600" : "text-foreground",
+              tone === "shortfall" ? "text-warning" : "text-foreground",
             )}
           />
         }
@@ -305,7 +305,7 @@ function HeroMetric({
       <div
         className={cn(
           "mt-1.5 text-xl font-semibold leading-none tracking-tight",
-          tone === "good" && "text-[hsl(102,32%,39%)]",
+          tone === "good" && "text-success",
           tone === "bad" && "text-destructive",
         )}
       >
@@ -409,7 +409,7 @@ function PlanResilienceHero({
                 <span
                   className={cn(
                     "whitespace-nowrap font-medium",
-                    isBaselineHealthy ? "text-[hsl(111,25%,43%)]" : "text-destructive",
+                    isBaselineHealthy ? "text-success" : "text-destructive",
                   )}
                 >
                   {status}
@@ -523,7 +523,7 @@ function severityBadgeVariant(severity: StressSeverity) {
 function impactTextClass(value: number, badWhenPositive = true) {
   if (Math.abs(value) < 1) return "text-foreground";
   const isBad = badWhenPositive ? value > 0 : value < 0;
-  return isBad ? "text-destructive" : "text-[hsl(102,32%,39%)]";
+  return isBad ? "text-destructive" : "text-success";
 }
 
 function StressIcon({ id }: { id: StressTestResult["id"] }) {
@@ -588,7 +588,7 @@ function SimulationMetric({
       <p
         className={cn(
           "mt-2 text-xl font-semibold tabular-nums leading-none",
-          tone === "good" && "text-[hsl(102,32%,39%)]",
+          tone === "good" && "text-success",
           tone === "bad" && "text-destructive",
         )}
       >
@@ -1912,7 +1912,7 @@ function AdvancedSection({
                   <span
                     className={cn(
                       "shrink-0 font-semibold",
-                      scenario.survived ? "text-[hsl(102,32%,39%)]" : "text-destructive",
+                      scenario.survived ? "text-success" : "text-destructive",
                     )}
                   >
                     {sorrOutcomeText(t, scenario, plan.currency, amountFormatting)}

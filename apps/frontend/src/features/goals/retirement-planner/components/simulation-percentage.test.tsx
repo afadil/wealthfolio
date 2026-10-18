@@ -29,7 +29,7 @@ describe("simulation reference bands", () => {
 
   it("shows 90% in the upper band when the result rounds up", () => {
     renderPercentage(0.895);
-    expect(screen.getByRole("button", { name: "90%" })).toHaveClass("dark:text-green-400");
+    expect(screen.getByRole("button", { name: "90%" })).toHaveClass("text-success");
   });
 
   it("opens on tap and explains FIRE criteria without a safety rating", async () => {

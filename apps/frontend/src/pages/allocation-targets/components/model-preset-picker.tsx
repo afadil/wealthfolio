@@ -43,9 +43,9 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const RISK_BADGE: Record<string, string> = {
-  Conservative: "bg-[#dfe8dc] text-[#4f6544] dark:bg-green-900/30 dark:text-green-300",
-  Moderate: "bg-[#eee5bf] text-[#746633] dark:bg-amber-900/30 dark:text-amber-300",
-  Aggressive: "bg-[#eadbd3] text-[#8a5b45] dark:bg-red-900/30 dark:text-red-300",
+  Conservative: "bg-success-subtle text-success-subtle-foreground",
+  Moderate: "bg-warning-subtle text-warning-subtle-foreground",
+  Aggressive: "bg-destructive-subtle text-destructive-subtle-foreground",
   "From holdings": "bg-muted text-muted-foreground",
 };
 

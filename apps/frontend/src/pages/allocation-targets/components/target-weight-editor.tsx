@@ -348,7 +348,7 @@ export function TargetWeightEditor({
             <span
               className={cn(
                 "text-right text-sm font-semibold tabular-nums",
-                isValid ? "text-green-700 dark:text-green-400" : "text-destructive",
+                isValid ? "text-success-subtle-foreground" : "text-destructive",
               )}
             >
               {(totalBps / 100).toFixed(1)}%{isValid && " ✓"}

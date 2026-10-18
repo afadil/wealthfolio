@@ -643,7 +643,7 @@ export function SidebarConfigurator({
                 />
               </div>
               {draftMode !== plannerMode && (
-                <p className="rounded-md bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-800 dark:text-amber-300">
+                <p className="bg-warning-subtle text-warning-subtle-foreground rounded-md px-3 py-2 text-xs leading-relaxed">
                   {t("goals:sidebar.plan.mode_change_prefix")}{" "}
                   {draftMode === "traditional"
                     ? t("goals:sidebar.plan.mode_change_traditional")

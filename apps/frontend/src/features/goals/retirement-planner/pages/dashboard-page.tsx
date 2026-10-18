@@ -517,10 +517,10 @@ export default function DashboardPage({
           {(() => {
             const statusAccent =
               heroHealth === "on_track"
-                ? "text-green-600"
+                ? "text-success"
                 : heroHealth === "at_risk"
-                  ? "text-amber-600"
-                  : "text-red-500";
+                  ? "text-warning"
+                  : "text-destructive";
             const goalShortfallNominal =
               targetReconciliation?.shortfallNominal ?? retirementOverview.shortfallAtGoalAge;
             const goalShortfallToday =
@@ -572,7 +572,7 @@ export default function DashboardPage({
                       {heroHealth === "on_track" ? (
                         <Badge
                           variant="default"
-                          className="text-2xs gap-1.5 bg-green-600 hover:bg-green-600"
+                          className="text-2xs bg-success hover:bg-success gap-1.5"
                         >
                           <span className="h-1.5 w-1.5 rounded-full bg-white/90" />
                           {isTraditionalMode
@@ -584,9 +584,9 @@ export default function DashboardPage({
                       ) : heroHealth === "at_risk" ? (
                         <Badge
                           variant="secondary"
-                          className="text-2xs gap-1.5 text-amber-700 dark:text-amber-400"
+                          className="text-2xs text-warning-subtle-foreground gap-1.5"
                         >
-                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                          <span className="bg-warning h-1.5 w-1.5 rounded-full" />
                           {isTraditionalMode
                             ? traditionalBadge
                             : yearsFromDesired != null
@@ -816,7 +816,7 @@ export default function DashboardPage({
                             todayValue={goalShortfallToday}
                             nominalValue={goalShortfallNominal}
                           >
-                            <span className="font-medium tabular-nums text-amber-600">
+                            <span className="text-warning font-medium tabular-nums">
                               {formatting.formatCompactAmount(goalShortfall, currency)}
                             </span>
                           </ValueModeTooltip>{" "}
@@ -921,10 +921,10 @@ export default function DashboardPage({
                       <p
                         className={`mt-4 border-t pt-4 text-xs ${
                           heroHealth === "on_track"
-                            ? "text-green-700 dark:text-green-300"
+                            ? "text-success-subtle-foreground"
                             : heroHealth === "at_risk"
-                              ? "text-amber-700 dark:text-amber-300"
-                              : "text-red-600 dark:text-red-300"
+                              ? "text-warning-subtle-foreground"
+                              : "text-destructive"
                         }`}
                       >
                         {heroGuidance}
@@ -1106,7 +1106,7 @@ export default function DashboardPage({
                         {reached && (
                           <Badge
                             variant="default"
-                            className="text-2xs h-[14px] bg-green-600 px-1.5 font-semibold tracking-wider hover:bg-green-600"
+                            className="text-2xs bg-success hover:bg-success h-[14px] px-1.5 font-semibold tracking-wider"
                           >
                             {t("goals:dashboard.milestone.done")}
                           </Badge>
@@ -1117,7 +1117,7 @@ export default function DashboardPage({
                       </div>
                       <div className="bg-muted/60 mt-2 h-[3px] overflow-hidden rounded-sm">
                         <div
-                          className={`h-full transition-[width] duration-500 ${reached ? "bg-green-600" : "bg-success"}`}
+                          className={`h-full transition-[width] duration-500 ${reached ? "bg-success" : "bg-success"}`}
                           style={{ width: `${pct * 100}%`, opacity: 0.85 }}
                         />
                       </div>
@@ -1243,7 +1243,7 @@ export default function DashboardPage({
                     )}
                     {coverageShortfallPct > 0 && (
                       <div
-                        className="h-full bg-red-500/75 transition-[width] duration-500"
+                        className="bg-destructive/75 h-full transition-[width] duration-500"
                         style={{ width: `${coverageShortfallPct}%` }}
                         title={t("goals:dashboard.coverage.unfunded_title", {
                           pct: numberFormatting.formatDecimal(coverageShortfallPct, {
@@ -1279,7 +1279,7 @@ export default function DashboardPage({
                     )}
                     {coverageShortfallPct > 0 && (
                       <span className="flex items-center gap-1.5">
-                        <span className="inline-block h-2 w-2 rounded-sm bg-red-500/75" />
+                        <span className="bg-destructive/75 inline-block h-2 w-2 rounded-sm" />
                         {t("goals:dashboard.coverage.unfunded_pct", {
                           pct: numberFormatting.formatDecimal(coverageShortfallPct, {
                             maximumFractionDigits: 0,
@@ -1469,7 +1469,7 @@ export default function DashboardPage({
                         {coverageShortfallMonthly > 0 && (
                           <div className="flex items-center justify-between gap-3 text-sm">
                             <span className="flex min-w-0 items-center gap-2">
-                              <span className="inline-block h-2 w-2 shrink-0 rounded-sm bg-red-500/75" />
+                              <span className="bg-destructive/75 inline-block h-2 w-2 shrink-0 rounded-sm" />
                               <span className="text-foreground truncate font-medium">
                                 {t("goals:dashboard.coverage.unfunded_spending")}
                               </span>

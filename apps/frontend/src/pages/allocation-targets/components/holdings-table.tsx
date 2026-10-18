@@ -27,7 +27,7 @@ const EMPTY_DRIFT_ROWS: DriftHoldingRow[] = [];
 
 function driftColor(driftBps: number): string {
   if (driftBps > 0) return "text-destructive";
-  if (driftBps < 0) return "text-blue-600 dark:text-blue-400";
+  if (driftBps < 0) return "text-info";
   return "text-muted-foreground";
 }
 

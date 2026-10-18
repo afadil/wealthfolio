@@ -108,9 +108,9 @@ export function RetirementSnapshotTable({
             const isIncomeRow = incomeStartAges.has(snap.age);
             const plannedSpending = snap.plannedExpenses ?? snap.annualExpenses;
             const rowClassName = isFireRow
-              ? "border-l-green-500 bg-green-50/70 dark:bg-green-950/20"
+              ? "border-l-success bg-success-subtle"
               : isIncomeRow
-                ? "border-l-blue-500 bg-blue-50/70 dark:bg-blue-950/20"
+                ? "border-l-info bg-info-subtle"
                 : "border-l-transparent bg-background/40";
             const phaseText = isFire ? phaseLabel : t("goals:snapshot.phase_acc");
             const mobileMetrics = [
@@ -213,9 +213,9 @@ export function RetirementSnapshotTable({
                     key={snap.age}
                     className={`border-b last:border-0 ${
                       isFireRow
-                        ? "bg-green-50 font-semibold dark:bg-green-950/20"
+                        ? "bg-success-subtle font-semibold"
                         : isIncomeRow
-                          ? "bg-blue-50 dark:bg-blue-950/20"
+                          ? "bg-info-subtle"
                           : ""
                     }`}
                   >

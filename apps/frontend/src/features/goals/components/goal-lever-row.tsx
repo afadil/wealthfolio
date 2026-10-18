@@ -196,7 +196,7 @@ export function GoalLeverRow({
         style={{ ["--lever-pct" as string]: `${pct}%` }}
       />
       {warning && (
-        <p className="mt-2 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-xs leading-snug text-amber-800 dark:text-amber-300">
+        <p className="bg-warning-subtle text-warning-subtle-foreground mt-2 rounded-md px-2.5 py-1.5 text-xs leading-snug">
           {warning}
         </p>
       )}
