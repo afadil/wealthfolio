@@ -76,15 +76,36 @@ function DropdownMenuLabel({ className, inset, ...props }: DropdownMenuLabelProp
   );
 }
 
-interface DropdownMenuItemProps extends Omit<MenuPrimitive.Item.Props, "className"> {
+interface DropdownMenuItemProps extends Omit<MenuPrimitive.Item.Props, "className" | "onSelect"> {
   className?: string;
   inset?: boolean;
   variant?: "default" | "destructive";
+  /**
+   * @deprecated Radix's callback, kept so addons built against earlier SDKs keep working.
+   * Use `onClick`, and `closeOnClick={false}` to keep the menu open.
+   */
+  onSelect?: (event: Event) => void;
 }
 
-function DropdownMenuItem({ className, inset, variant = "default", ...props }: DropdownMenuItemProps) {
+function DropdownMenuItem({
+  className,
+  inset,
+  variant = "default",
+  onSelect,
+  onClick,
+  ...props
+}: DropdownMenuItemProps) {
+  // Radix kept the menu open when onSelect called preventDefault().
+  const handleClick: MenuPrimitive.Item.Props["onClick"] = onSelect
+    ? (event) => {
+        onClick?.(event);
+        onSelect(event.nativeEvent);
+        if (event.nativeEvent.defaultPrevented) event.preventBaseUIHandler();
+      }
+    : onClick;
   return (
     <MenuPrimitive.Item
+      onClick={handleClick}
       data-slot="dropdown-menu-item"
       data-inset={inset}
       data-variant={variant}
