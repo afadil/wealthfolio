@@ -52,19 +52,19 @@ export function ProfileMenu({ collapsed = false }: { collapsed?: boolean }) {
           </>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-64 rounded-xl p-1">
+      <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-64">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="flex items-center gap-3 px-3 py-3">
             <ProfileAvatar id={profile.avatarId} className="mx-0 size-10 shrink-0 rounded-full" />
             <span className="min-w-0 truncate">{profile.name}</span>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="h-11 gap-3 rounded-lg px-3" onClick={manageProfile}>
+          <DropdownMenuItem className="h-11 gap-3" onClick={manageProfile}>
             <Icons.User className="size-4" />
             {t("profiles.settings")}
           </DropdownMenuItem>
           <DropdownMenuItem
-            className="h-11 gap-3 rounded-lg px-3"
+            className="h-11 gap-3"
             onClick={singleProfile ? addProfile : switchProfile}
           >
             {singleProfile ? <Icons.Plus className="size-4" /> : <Icons.Users className="size-4" />}
@@ -73,7 +73,7 @@ export function ProfileMenu({ collapsed = false }: { collapsed?: boolean }) {
           {profile.lockEnabled && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="h-11 gap-3 rounded-lg px-3" onClick={lockProfile}>
+              <DropdownMenuItem className="h-11 gap-3" onClick={lockProfile}>
                 <Icons.Lock className="size-4" />
                 {t("profiles.lock")}
               </DropdownMenuItem>

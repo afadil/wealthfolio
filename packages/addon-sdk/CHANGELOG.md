@@ -168,6 +168,11 @@ and this project adheres to
   `data-horizontal:` and `data-vertical:` variants match `data-orientation`, as
   in shadcn. A size set by a variant class overrides a call site's plain size
   class, so components keep sizes callers may override as plain classes.
+- `DropdownMenuContent` and `DropdownMenuSubContent` take shadcn's rounded menu
+  look: 16 px corners, a hairline ring and a large soft shadow instead of a
+  border. Items, checkbox and radio items and sub-triggers have 12 px corners
+  and roomier padding (`px-3 py-2`); `inset` indents to `pl-9.5`. Check and
+  radio indicators stay on the left.
 - In dark mode `--success-subtle-foreground` is green-200, the step the other
   status text colours use, so success text reads green rather than near-white.
 - `ActivityUpdate.asset` now has explicit patch semantics: omit it to preserve
