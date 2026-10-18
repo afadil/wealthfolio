@@ -439,12 +439,12 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
       }
     };
 
-    // The form variant has no skeleton, so a loading form selector has no trigger.
+    // A loading selector shows its skeleton (none for the form variant) instead of a trigger.
     const trigger = renderTrigger();
 
     return (
       <Popover open={open} onOpenChange={setOpen}>
-        {trigger && <PopoverTrigger render={trigger} />}
+        {isLoading ? trigger : trigger && <PopoverTrigger render={trigger} />}
         <PopoverContent
           className="p-0"
           align="start"
