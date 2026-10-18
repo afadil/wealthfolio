@@ -13,7 +13,12 @@
 //! extend the mock with real spending stubs. That work is out of scope here;
 //! today's evals focus on agent behavior that doesn't reach spending state.
 
-use std::{future::Future, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    future::Future,
+    sync::{Arc, RwLock},
+    time::{Duration, Instant},
+};
 
 use chrono::NaiveDateTime;
 use futures::StreamExt;
@@ -33,13 +38,18 @@ use crate::chat::provider_clients::{
 };
 use crate::chat::{ChatConfig, ChatService};
 use crate::env::test_env::{
-    MockAccountService, MockActivityService, MockAssetService, MockEnvironment, MockTaxonomyService,
+    MockAccountService, MockActivityService, MockAssetService, MockEnvironment,
+    MockSettingsService, MockTaxonomyService,
 };
 use crate::error::AiError;
 use crate::live_evals::schema::{
     ArgAssertion, ArgPredicate, Case, CsvImportExpectation, ResponseRubric, Severity,
 };
 use crate::live_evals::trace::ToolTrace;
+use crate::provider_model::{
+    ModelCapabilities, ModelCapabilityOverrides, AI_PROVIDER_SETTINGS_KEY,
+    AI_PROVIDER_SETTINGS_SCHEMA_VERSION,
+};
 use crate::providers::ProviderService;
 use crate::types::{ChatModelConfig, MessageAttachment, SendMessageRequest};
 
@@ -56,28 +66,182 @@ pub struct RunnerConfig {
     pub provider: String,
     pub model: String,
     pub provider_url: Option<String>,
+    /// Forces the model's thinking on or off. `None` keeps what the app
+    /// would use.
+    pub thinking: Option<bool>,
+    /// What Ollama's model list reports for a model the catalog doesn't
+    /// list. The app saves this as the model's capability overrides when the
+    /// user adds the model from that list.
+    pub listed_capabilities: Option<ModelCapabilityOverrides>,
+    pub judge: JudgeConfig,
+}
+
+/// Who grades `expected_response` rubrics.
+#[derive(Debug, Clone)]
+pub struct JudgeConfig {
+    pub provider: String,
+    /// `None`: the case's `judge_model`, else the model under test.
+    pub model: Option<String>,
+    pub provider_url: Option<String>,
 }
 
 impl RunnerConfig {
-    /// Build a config from `WF_EVAL_PROVIDER` / `WF_EVAL_MODEL` /
-    /// `WF_EVAL_PROVIDER_URL` env vars, falling back to Ollama + `default_model`.
-    pub fn from_env(default_model: &str) -> Self {
-        let provider =
-            std::env::var("WF_EVAL_PROVIDER").unwrap_or_else(|_| DEFAULT_PROVIDER.to_string());
-        let model = std::env::var("WF_EVAL_MODEL").unwrap_or_else(|_| default_model.to_string());
-        let provider_url = std::env::var("WF_EVAL_PROVIDER_URL").ok().or_else(|| {
-            if provider == "ollama" {
-                Some(DEFAULT_OLLAMA_URL.to_string())
+    /// Build a config from the `WF_EVAL_*` env vars, falling back to Ollama +
+    /// `default_model`, with the model under test as its own judge.
+    pub fn from_env(default_model: &str) -> Result<Self, String> {
+        Self::from_vars(default_model, |name| {
+            std::env::var(name).ok().filter(|value| !value.is_empty())
+        })
+    }
+
+    fn from_vars(
+        default_model: &str,
+        var: impl Fn(&str) -> Option<String>,
+    ) -> Result<Self, String> {
+        let provider = var("WF_EVAL_PROVIDER").unwrap_or_else(|| DEFAULT_PROVIDER.to_string());
+        let model = var("WF_EVAL_MODEL").unwrap_or_else(|| default_model.to_string());
+        let provider_url = var("WF_EVAL_PROVIDER_URL").or_else(|| default_provider_url(&provider));
+        let thinking = var("WF_EVAL_THINKING")
+            .map(|value| match value.to_ascii_lowercase().as_str() {
+                "on" | "true" | "1" => Ok(true),
+                "off" | "false" | "0" => Ok(false),
+                _ => Err(format!("WF_EVAL_THINKING must be on or off, got `{value}`")),
+            })
+            .transpose()?;
+
+        let judge_model = var("WF_EVAL_JUDGE_MODEL");
+        let judge_provider = match var("WF_EVAL_JUDGE_PROVIDER") {
+            Some(judge) if judge != provider && judge_model.is_none() => {
+                return Err(format!(
+                    "WF_EVAL_JUDGE_PROVIDER={judge} needs WF_EVAL_JUDGE_MODEL: \
+                     `{model}` is a {provider} model"
+                ));
+            }
+            Some(judge) => judge,
+            None => provider.clone(),
+        };
+        let judge_url = var("WF_EVAL_JUDGE_PROVIDER_URL").or_else(|| {
+            if judge_provider == provider {
+                provider_url.clone()
             } else {
-                None
+                default_provider_url(&judge_provider)
             }
         });
-        Self {
+
+        Ok(Self {
             provider,
             model,
             provider_url,
-        }
+            thinking,
+            listed_capabilities: None,
+            judge: JudgeConfig {
+                provider: judge_provider,
+                model: judge_model,
+                provider_url: judge_url,
+            },
+        })
     }
+
+    /// Read the capabilities Ollama lists for a model the catalog doesn't
+    /// cover. Without them an unlisted model runs with no tools, unlike in
+    /// the app, where adding it from the list saves them.
+    pub async fn load_listed_capabilities(&mut self) -> Result<(), String> {
+        if self.provider != "ollama" || self.is_catalog_model() {
+            return Ok(());
+        }
+        let base = self.provider_url.as_deref().unwrap_or(DEFAULT_OLLAMA_URL);
+        let url = format!("{}/api/tags", base.trim_end_matches('/'));
+        let body = reqwest::get(&url)
+            .await
+            .and_then(reqwest::Response::error_for_status)
+            .map_err(|e| format!("could not list Ollama models at {url}: {e}"))?
+            .text()
+            .await
+            .map_err(|e| format!("could not read the Ollama model list: {e}"))?;
+        self.listed_capabilities = listed_ollama_capabilities(&body, &self.model)?;
+        Ok(())
+    }
+
+    fn is_catalog_model(&self) -> bool {
+        ProviderService::new(Arc::new(MockEnvironment::new()))
+            .get_provider_catalog()
+            .iter()
+            .filter(|p| p.id == self.provider)
+            .any(|p| p.models.iter().any(|m| m.id == self.model))
+    }
+
+    /// The capabilities a chat turn runs with, after the thinking override.
+    pub fn effective_capabilities(&self) -> ModelCapabilities {
+        let mut env = MockEnvironment::new();
+        seed_provider_settings(&mut env, self);
+        let mut capabilities =
+            ProviderService::new(Arc::new(env)).get_model_capabilities(&self.provider, &self.model);
+        if let Some(thinking) = self.thinking {
+            capabilities.thinking = thinking;
+        }
+        capabilities
+    }
+}
+
+fn default_provider_url(provider: &str) -> Option<String> {
+    (provider == "ollama").then(|| DEFAULT_OLLAMA_URL.to_string())
+}
+
+/// The overrides the app saves for `model` from an Ollama `/api/tags` body.
+/// `None` when the list doesn't hold the model or doesn't say what it does.
+fn listed_ollama_capabilities(
+    body: &str,
+    model: &str,
+) -> Result<Option<ModelCapabilityOverrides>, String> {
+    #[derive(Deserialize)]
+    struct Tags {
+        models: Vec<Tag>,
+    }
+    #[derive(Deserialize)]
+    struct Tag {
+        name: String,
+        capabilities: Option<Vec<String>>,
+    }
+
+    let tags: Tags =
+        serde_json::from_str(body).map_err(|e| format!("unreadable Ollama model list: {e}"))?;
+    let latest = format!("{model}:latest");
+    Ok(tags
+        .models
+        .into_iter()
+        .find(|tag| tag.name == model || tag.name == latest)
+        .and_then(|tag| tag.capabilities)
+        .map(|listed| {
+            let has = |c: &str| listed.iter().any(|l| l == c);
+            ModelCapabilityOverrides {
+                tools: Some(has("tools")),
+                thinking: Some(has("thinking")),
+                vision: Some(has("vision")),
+                streaming: None,
+            }
+        }))
+}
+
+/// Store the provider URL and listed capabilities in the mock settings, where
+/// the chat reads them as it reads the app's saved provider settings.
+fn seed_provider_settings(env: &mut MockEnvironment, cfg: &RunnerConfig) {
+    let mut provider = serde_json::json!({ "enabled": true });
+    if let Some(url) = &cfg.provider_url {
+        provider["customUrl"] = serde_json::json!(url);
+    }
+    if let Some(capabilities) = &cfg.listed_capabilities {
+        provider["modelCapabilityOverrides"] = serde_json::json!({ &cfg.model: capabilities });
+    }
+    let settings = serde_json::json!({
+        "schemaVersion": AI_PROVIDER_SETTINGS_SCHEMA_VERSION,
+        "providers": { &cfg.provider: provider },
+    });
+    env.settings_service = Arc::new(MockSettingsService {
+        settings: RwLock::new(HashMap::from([(
+            AI_PROVIDER_SETTINGS_KEY.to_string(),
+            settings.to_string(),
+        )])),
+    });
 }
 
 /// Result of running one eval case.
@@ -88,6 +252,10 @@ pub struct CaseResult {
     pub passed: bool,
     pub failures: Vec<AssertionFailure>,
     pub trace: ToolTrace,
+    /// Time from sending the message to the end of the reply, judge excluded.
+    pub wall_time: Duration,
+    /// Chat turns run, counting retries after transport errors.
+    pub attempts: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -124,7 +292,8 @@ pub async fn run_case(case: &Case, cfg: &RunnerConfig) -> CaseResult {
     let mut last: Option<CaseResult> = None;
 
     for attempt in 1..=MAX_ATTEMPTS {
-        let result = run_case_once(case, cfg).await;
+        let mut result = run_case_once(case, cfg).await;
+        result.attempts = attempt;
 
         if result.passed || !is_transient_failure(&result) {
             return result;
@@ -165,6 +334,7 @@ fn is_transient_failure(result: &CaseResult) -> bool {
 
 async fn run_case_once(case: &Case, cfg: &RunnerConfig) -> CaseResult {
     let mut env = build_mock_environment(case);
+    seed_provider_settings(&mut env, cfg);
     // Chat reads provider keys from the secret store, as the app does.
     if let Some(key) = eval_api_key_from_env(&cfg.provider) {
         env = env.with_secret(&format!("ai_{}", cfg.provider), &key);
@@ -202,7 +372,7 @@ async fn run_case_once(case: &Case, cfg: &RunnerConfig) -> CaseResult {
         config: Some(ChatModelConfig {
             provider: Some(cfg.provider.clone()),
             model: Some(cfg.model.clone()),
-            thinking: None,
+            thinking: cfg.thinking,
         }),
         provider_id: None,
         model_id: None,
@@ -210,6 +380,7 @@ async fn run_case_once(case: &Case, cfg: &RunnerConfig) -> CaseResult {
         parent_message_id: None,
     };
 
+    let started = Instant::now();
     let stream_result = service.send_message(request).await;
     let stream = match stream_result {
         Ok(s) => s,
@@ -226,6 +397,7 @@ async fn run_case_once(case: &Case, cfg: &RunnerConfig) -> CaseResult {
     };
 
     let trace = collect_trace(stream).await;
+    let wall_time = started.elapsed();
     let mut failures = assert_trace(case, &trace);
     if !trace.had_error {
         if let Some(rubric) = &case.expected_response {
@@ -256,6 +428,8 @@ async fn run_case_once(case: &Case, cfg: &RunnerConfig) -> CaseResult {
         passed,
         failures,
         trace,
+        wall_time,
+        attempts: 1,
     }
 }
 
@@ -301,35 +475,37 @@ async fn judge_response(
     assistant_response: &str,
     cfg: &RunnerConfig,
 ) -> Result<JudgeVerdict, AiError> {
+    let provider = cfg.judge.provider.as_str();
     let provider_service = ProviderService::new(env);
     let api_key = provider_service
-        .get_api_key(&cfg.provider)?
-        .or_else(|| eval_api_key_from_env(&cfg.provider));
+        .get_api_key(provider)?
+        .or_else(|| eval_api_key_from_env(provider));
     let provider_url = cfg
+        .judge
         .provider_url
         .clone()
-        .or_else(|| provider_service.get_provider_url(&cfg.provider));
-    let model = rubric.judge_model.as_deref().unwrap_or(&cfg.model);
+        .or_else(|| provider_service.get_provider_url(provider));
+    let model = judge_model(cfg, rubric);
     let prompt = build_judge_prompt(&rubric.rubric, &case.prompt, assistant_response);
 
     let secret = api_key.clone();
-    let judge: DynModel<Completion> = match cfg.provider.as_str() {
-        "anthropic" => create_anthropic_client(api_key, &cfg.provider, provider_url)?
+    let judge: DynModel<Completion> = match provider {
+        "anthropic" => create_anthropic_client(api_key, provider, provider_url)?
             .completion(model)
             .into(),
-        "gemini" | "google" => create_gemini_client(api_key, &cfg.provider, provider_url)?
+        "gemini" | "google" => create_gemini_client(api_key, provider, provider_url)?
             .completion(model)
             .into(),
-        "groq" => create_groq_client(api_key, &cfg.provider, provider_url)?
+        "groq" => create_groq_client(api_key, provider, provider_url)?
             .completion(model)
             .into(),
         "ollama" => create_ollama_client(provider_url)?
             .native_completion(model)
             .into(),
-        "openrouter" => create_openrouter_client(api_key, &cfg.provider, provider_url)?
+        "openrouter" => create_openrouter_client(api_key, provider, provider_url)?
             .completion(model)
             .into(),
-        _ => create_openai_client(api_key, &cfg.provider, provider_url)?
+        _ => create_openai_client(api_key, provider, provider_url)?
             .chat(model)
             .into(),
     };
@@ -341,6 +517,16 @@ async fn judge_response(
         .output();
 
     parse_judge_verdict(&response)
+}
+
+/// `WF_EVAL_JUDGE_MODEL`, else the case's `judge_model`, else the model
+/// under test.
+fn judge_model<'a>(cfg: &'a RunnerConfig, rubric: &'a ResponseRubric) -> &'a str {
+    cfg.judge
+        .model
+        .as_deref()
+        .or(rubric.judge_model.as_deref())
+        .unwrap_or(&cfg.model)
 }
 
 fn build_judge_prompt(rubric: &str, user_prompt: &str, assistant_response: &str) -> String {
@@ -651,6 +837,8 @@ fn fail_case(case: &Case, failures: Vec<AssertionFailure>, trace: ToolTrace) -> 
         passed: false,
         failures,
         trace,
+        wall_time: Duration::ZERO,
+        attempts: 1,
     }
 }
 
@@ -1073,8 +1261,124 @@ mod tests {
             passed: false,
             failures: assert_trace(&case, &errored),
             trace: errored,
+            wall_time: Duration::ZERO,
+            attempts: 1,
         };
         assert!(is_transient_failure(&result), "{:?}", result.failures);
+    }
+
+    fn config(vars: &[(&str, &str)]) -> Result<RunnerConfig, String> {
+        let vars: HashMap<String, String> = vars
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        RunnerConfig::from_vars("gemma4:e4b", |name| vars.get(name).cloned())
+    }
+
+    #[test]
+    fn the_model_under_test_judges_unless_a_judge_is_set() {
+        let cfg = config(&[]).unwrap();
+        assert_eq!(
+            (cfg.provider.as_str(), cfg.model.as_str()),
+            ("ollama", "gemma4:e4b")
+        );
+        assert_eq!(cfg.thinking, None);
+        assert_eq!(cfg.judge.provider, "ollama");
+        assert_eq!(cfg.judge.provider_url.as_deref(), Some(DEFAULT_OLLAMA_URL));
+        let rubric = ResponseRubric {
+            rubric: "r".to_string(),
+            judge_model: Some("case-judge".to_string()),
+        };
+        assert_eq!(judge_model(&cfg, &rubric), "case-judge");
+        let no_case_judge = ResponseRubric {
+            judge_model: None,
+            ..rubric.clone()
+        };
+        assert_eq!(judge_model(&cfg, &no_case_judge), "gemma4:e4b");
+
+        let cfg = config(&[
+            ("WF_EVAL_PROVIDER_URL", "http://gpu:11434"),
+            ("WF_EVAL_JUDGE_MODEL", "big-local-judge"),
+            ("WF_EVAL_THINKING", "OFF"),
+        ])
+        .unwrap();
+        assert_eq!(cfg.thinking, Some(false));
+        assert_eq!(cfg.judge.provider_url.as_deref(), Some("http://gpu:11434"));
+        assert_eq!(judge_model(&cfg, &rubric), "big-local-judge");
+    }
+
+    #[test]
+    fn a_judge_on_another_provider_needs_its_own_model_and_url() {
+        let error = config(&[("WF_EVAL_JUDGE_PROVIDER", "anthropic")]).unwrap_err();
+        assert!(error.contains("WF_EVAL_JUDGE_MODEL"), "{error}");
+
+        let cfg = config(&[
+            ("WF_EVAL_JUDGE_PROVIDER", "anthropic"),
+            ("WF_EVAL_JUDGE_MODEL", "claude-haiku-5-5"),
+        ])
+        .unwrap();
+        assert_eq!(cfg.judge.provider, "anthropic");
+        assert_eq!(cfg.judge.provider_url, None);
+        assert_eq!(cfg.provider_url.as_deref(), Some(DEFAULT_OLLAMA_URL));
+
+        assert!(config(&[("WF_EVAL_THINKING", "maybe")]).is_err());
+    }
+
+    #[test]
+    fn reads_the_capabilities_ollama_lists_for_a_model() {
+        let body = r#"{"models":[
+            {"name":"sparksammy/Underdog-Saluki-27B-1.0:latest","capabilities":["tools","thinking","completion"]},
+            {"name":"gemma4:e4b","capabilities":["completion","vision","tools","thinking"]},
+            {"name":"old:7b"}
+        ]}"#;
+        let saluki = listed_ollama_capabilities(body, "sparksammy/Underdog-Saluki-27B-1.0")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (saluki.tools, saluki.thinking, saluki.vision),
+            (Some(true), Some(true), Some(false))
+        );
+        assert!(listed_ollama_capabilities(body, "old:7b")
+            .unwrap()
+            .is_none());
+        assert!(listed_ollama_capabilities(body, "missing")
+            .unwrap()
+            .is_none());
+        assert!(listed_ollama_capabilities("not json", "x").is_err());
+    }
+
+    #[test]
+    fn chat_reads_the_seeded_url_and_listed_capabilities() {
+        let mut cfg = config(&[
+            ("WF_EVAL_MODEL", "saluki:latest"),
+            ("WF_EVAL_PROVIDER_URL", "http://gpu:11434"),
+        ])
+        .unwrap();
+        // Unlisted and not in the catalog: no tools, as in the app.
+        assert!(!cfg.effective_capabilities().tools);
+        assert!(!cfg.is_catalog_model());
+
+        cfg.listed_capabilities = Some(ModelCapabilityOverrides {
+            tools: Some(true),
+            thinking: Some(true),
+            vision: Some(false),
+            streaming: None,
+        });
+        let capabilities = cfg.effective_capabilities();
+        assert!(capabilities.tools && capabilities.thinking && !capabilities.vision);
+        cfg.thinking = Some(false);
+        assert!(!cfg.effective_capabilities().thinking);
+
+        let mut env = MockEnvironment::new();
+        seed_provider_settings(&mut env, &cfg);
+        assert_eq!(
+            ProviderService::new(Arc::new(env)).get_provider_url("ollama"),
+            Some("http://gpu:11434".to_string())
+        );
+
+        let gemma = config(&[]).unwrap();
+        assert!(gemma.is_catalog_model());
+        assert!(gemma.effective_capabilities().tools);
     }
 
     #[test]

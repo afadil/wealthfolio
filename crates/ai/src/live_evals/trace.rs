@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use crate::types::AiStreamEvent;
+use crate::types::{AiStreamEvent, UsageStats};
 use serde_json::Value;
 
 /// One observed tool invocation from the agent.
@@ -35,6 +35,8 @@ pub struct ToolTrace {
     /// True if the stream emitted an error event.
     pub had_error: bool,
     pub error_message: Option<String>,
+    /// Token usage the done event reported for the turn.
+    pub usage: Option<UsageStats>,
 }
 
 impl ToolTrace {
@@ -77,8 +79,9 @@ impl ToolTrace {
                 self.had_error = true;
                 self.error_message = Some(message.clone());
             }
-            AiStreamEvent::Done { message, .. } => {
+            AiStreamEvent::Done { message, usage, .. } => {
                 self.final_text = message.content.get_text_content();
+                self.usage = usage.as_deref().cloned();
             }
             _ => {}
         }
