@@ -3,6 +3,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -203,23 +204,26 @@ export function ActivityDataGridToolbar({
             <Icons.Settings2 className="h-3.5 w-3.5" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuLabel className="text-xs">
-              {t("activity:table_toggle_columns")}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {table
-              .getAllColumns()
-              .filter((column) => TOGGLEABLE_COLUMNS.includes(column.id))
-              .map((column) => (
-                <DropdownMenuCheckboxItem
-                  key={column.id}
-                  className="text-xs"
-                  checked={column.getIsVisible()}
-                  onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                >
-                  {columnDisplayNames[column.id] || column.id}
-                </DropdownMenuCheckboxItem>
-              ))}
+            {/* A menu label must sit inside a group; it then names the group. */}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="text-xs">
+                {t("activity:table_toggle_columns")}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {table
+                .getAllColumns()
+                .filter((column) => TOGGLEABLE_COLUMNS.includes(column.id))
+                .map((column) => (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="text-xs"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                  >
+                    {columnDisplayNames[column.id] || column.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
 
