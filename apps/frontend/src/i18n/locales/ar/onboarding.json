@@ -1,0 +1,101 @@
+{
+  "appearance": {
+    "fontLabel": "الخط",
+    "fontSample": "استثمر بوضوح.",
+    "fonts": {
+      "monoDescription": "تقني ودقيق",
+      "monoLabel": "أحادي المسافة",
+      "sansDescription": "أنيق وعصري",
+      "sansLabel": "بلا زوائد",
+      "serifDescription": "كلاسيكي وراقٍ",
+      "serifLabel": "بزوائد"
+    },
+    "navigationLabel": "التنقل",
+    "subtitle": "خصّص تجربتك",
+    "themeDark": "داكن",
+    "themeDarkPreviewAlt": "معاينة السمة الداكنة",
+    "themeLabel": "السمة",
+    "themeLight": "فاتح",
+    "themeLightPreviewAlt": "معاينة السمة الفاتحة",
+    "themeSystem": "النظام",
+    "themeSystemPreviewAlt": "معاينة سمة النظام"
+  },
+  "buttons": {
+    "continue": "متابعة",
+    "getStarted": "ابدأ الآن",
+    "subscribeConnect": "اشترك واربط"
+  },
+  "connect": {
+    "features": {
+      "brokerageSync": {
+        "description": "زامِن حساباتك ومعاملاتك تلقائيًا مع قاعدة بياناتك المحلية.",
+        "title": "مزامنة الوساطة"
+      },
+      "deviceSync": {
+        "description": "حافظ على مزامنة قاعدة بياناتك عبر جميع أجهزتك مع تشفير تام بين الطرفين.",
+        "title": "مزامنة الأجهزة"
+      },
+      "householdView": {
+        "description": "شارك حسابات محددة مع عائلتك واطّلعوا معًا على عرض مُجمَّع.",
+        "title": "عرض الأسرة"
+      }
+    },
+    "learnMore": "اعرف المزيد عن Connect",
+    "optional": "اختياري",
+    "subtitle": "زامِن حساباتك لدى الوسطاء تلقائيًا مع الحفاظ على خصوصية بياناتك.",
+    "title": "Wealthfolio Connect"
+  },
+  "steps": {
+    "chooseMode": {
+      "footnote": "يمكنك استخدام أوضاع مختلفة لحسابات مختلفة.",
+      "holdings": {
+        "badge": "الأفضل للتتبع قليل الصيانة.",
+        "features": {
+          "fastSetup": "إعداد سريع وخفيف",
+          "netWorth": "صافي الثروة والتوزيع",
+          "priceBased": "أداء قائم على الأسعار",
+          "unrealizedPnl": "القيمة والأرباح والخسائر غير المحققة"
+        },
+        "limit": "القيد: لا يوجد TWR/IRR قائم على المعاملات.",
+        "note": "ملاحظة: يتطلب الحفاظ على تحديث الحيازات/المراكز.",
+        "subtitle": "تتبع القيمة",
+        "title": "الحيازات"
+      },
+      "learnMore": "اعرف المزيد",
+      "subtitle": "طريقتان لتتبع محفظتك.",
+      "transactions": {
+        "badge": "الأفضل لتحليلات الأداء الكاملة.",
+        "features": {
+          "attribution": "إسناد الأرباح والتدفقات النقدية",
+          "brokerSync": "الأفضل مع مزامنة الوسيط أو استيراد CSV",
+          "completeView": "أكثر عرض شمولاً للأداء",
+          "totalReturn": "العائد الإجمالي عبر الزمن"
+        },
+        "limit": "القيد: يتطلب تتبع جميع المعاملات.",
+        "note": "ملاحظة: تلقائي عند المزامنة مع وسيط.",
+        "subtitle": "تتبع الأداء",
+        "title": "المعاملات"
+      }
+    },
+    "preferences": {
+      "currencyLabel": "العملة",
+      "currencyRequired": "يرجى اختيار العملة الأساسية.",
+      "formattingRegionLabel": "المنطقة والتنسيقات",
+      "languageLabel": "اللغة",
+      "noCurrenciesFound": "لم يتم العثور على عملات",
+      "noLanguagesFound": "لم يتم العثور على لغات",
+      "noRegionsFound": "لم يتم العثور على مناطق",
+      "noTimezonesFound": "لم يتم العثور على مناطق زمنية",
+      "other": "أخرى",
+      "searchCurrenciesPlaceholder": "ابحث عن العملات...",
+      "searchLanguagesPlaceholder": "ابحث عن اللغات...",
+      "searchRegionsPlaceholder": "ابحث عن المناطق...",
+      "searchTimezonesPlaceholder": "ابحث عن المناطق الزمنية...",
+      "selectCurrency": "اختر العملة",
+      "selectTimezone": "اختر المنطقة الزمنية",
+      "subtitle": "بضعة تفضيلات فقط لتبدأ",
+      "timezoneLabel": "المنطقة الزمنية",
+      "timezoneRequired": "يرجى اختيار منطقة زمنية."
+    }
+  }
+}
