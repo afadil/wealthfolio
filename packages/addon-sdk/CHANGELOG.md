@@ -173,6 +173,11 @@ and this project adheres to
   border. Items, checkbox and radio items and sub-triggers have 12 px corners
   and roomier padding (`px-3 py-2`); `inset` indents to `pl-9.5`. Check and
   radio indicators stay on the left.
+- `SelectContent`, `PopoverContent`, `HoverCardContent` and `Command` take the
+  same rounded look as menus: 16 px corners, a hairline ring and a soft shadow
+  instead of a border. Select and command rows have 12 px corners and `py-2`
+  (command rows `px-3`); select rows keep `pl-2` so their text lines up with the
+  field when the list opens over it.
 - In dark mode `--success-subtle-foreground` is green-200, the step the other
   status text colours use, so success text reads green rather than near-white.
 - `ActivityUpdate.asset` now has explicit patch semantics: omit it to preserve
