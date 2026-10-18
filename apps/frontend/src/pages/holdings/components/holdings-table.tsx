@@ -281,6 +281,11 @@ export const HoldingsTable = ({
                       size="icon"
                       onClick={() => setShowConvertedValues(!showConvertedValues)}
                       className="h-8 w-8 rounded-lg"
+                      aria-label={t("holdings:show_values_in", {
+                        currency: showConvertedValues
+                          ? t("holdings:asset_currency")
+                          : t("holdings:base_currency"),
+                      })}
                     />
                   }
                 >
