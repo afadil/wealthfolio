@@ -274,11 +274,20 @@ fn usage_line(usage: &UsageTotals, trials: usize) -> String {
         per(usage.input_tokens),
         per(usage.cached_input_tokens),
         per(usage.output_tokens),
-        usage.model_calls / n,
-        usage.tool_calls / n,
+        mean(usage.model_calls, n),
+        mean(usage.tool_calls, n),
         usage.wall_ms as f64 / n as f64 / 1000.0,
         if trials > 1 { " per trial" } else { "" }
     )
+}
+
+/// `total / n`, with one decimal unless it is whole.
+fn mean(total: u64, n: u64) -> String {
+    if total.is_multiple_of(n) {
+        (total / n).to_string()
+    } else {
+        format!("{:.1}", total as f64 / n as f64)
+    }
 }
 
 fn tokens(value: u64) -> String {
@@ -396,10 +405,16 @@ fn compare_files(before_path: &Path, after_path: &Path) -> ExitCode {
         "    passed every trial: {} → {} of {} paired cases",
         c.before_passed_all, c.after_passed_all, c.paired
     );
+    // Opposite flips cancel to a float a hair below zero.
+    let diff = if c.mean_rate_diff.abs() < 1e-9 {
+        0.0
+    } else {
+        c.mean_rate_diff
+    };
     println!(
         "    mean pass rate change: {}{} (paired SE across cases)",
-        if c.mean_rate_diff >= 0.0 { "+" } else { "" },
-        percent(c.mean_rate_diff, c.rate_diff_std_err)
+        if diff >= 0.0 { "+" } else { "" },
+        percent(diff, c.rate_diff_std_err)
     );
     let list = |title: &str, sign: &str, deltas: &[CaseDelta]| {
         if deltas.is_empty() {
