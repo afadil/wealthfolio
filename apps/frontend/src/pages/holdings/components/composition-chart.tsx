@@ -62,7 +62,15 @@ const DisplayModeToggle: React.FC<{
     <Tooltip>
       <TooltipTrigger
         render={
-          <Button variant="secondary" size="icon-sm" className="rounded-full" onClick={onToggle} />
+          <Button
+            variant="secondary"
+            size="icon-sm"
+            className="rounded-full"
+            onClick={onToggle}
+            aria-label={
+              displayMode === "symbol" ? t("holdings:show_full_names") : t("holdings:show_symbols")
+            }
+          />
         }
       >
         {displayMode === "symbol" ? (

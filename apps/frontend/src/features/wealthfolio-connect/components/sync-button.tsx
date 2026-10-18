@@ -75,6 +75,14 @@ export function SyncButton({ className, showLabel = false, size = "icon" }: Sync
             onClick={() => syncBrokerData()}
             disabled={isRunning}
             className={className}
+            // Without its visible label the button is an icon; name it for screen readers.
+            aria-label={
+              showLabel
+                ? undefined
+                : isRunning
+                  ? t("connect:sync.syncingShort")
+                  : t("connect:sync.sync")
+            }
           />
         }
       >
