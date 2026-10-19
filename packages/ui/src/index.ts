@@ -22,6 +22,7 @@ export * from "./components/ui/data-table";
 export * from "./components/ui/date-picker-input";
 export * from "./components/ui/date-range-picker";
 export * from "./components/ui/dialog";
+export * from "./components/ui/direction";
 export * from "./components/ui/dropdown-menu";
 export * from "./components/ui/empty";
 // Deprecated: kept so addons built against earlier SDKs still load.

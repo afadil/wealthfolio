@@ -11,6 +11,7 @@ async function loadSandboxI18n() {
 describe("addon sandbox i18n", () => {
   beforeEach(() => {
     document.documentElement.removeAttribute("lang");
+    document.documentElement.removeAttribute("dir");
   });
 
   it("translates ui-namespaced keys instead of falling back to the raw key", async () => {
@@ -90,5 +91,20 @@ describe("addon sandbox i18n", () => {
     render(<UiConsumer />);
 
     expect(await screen.findByText("Fermer")).toBeInTheDocument();
+  });
+
+  it("takes the host's direction, falling back to the UI language's", async () => {
+    const { applySandboxDirection, initSandboxI18n, resolveSandboxDirection } =
+      await loadSandboxI18n();
+    initSandboxI18n("en");
+
+    // The host may force a direction in development, so its report wins.
+    expect(resolveSandboxDirection({ uiLocale: "en", direction: "rtl" })).toBe("rtl");
+    expect(resolveSandboxDirection({ uiLocale: "ar" })).toBe("rtl");
+    expect(resolveSandboxDirection({ uiLocale: "fr" })).toBe("ltr");
+    expect(resolveSandboxDirection({})).toBe("ltr");
+
+    applySandboxDirection("rtl");
+    expect(document.documentElement.getAttribute("dir")).toBe("rtl");
   });
 });

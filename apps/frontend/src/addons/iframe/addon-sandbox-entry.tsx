@@ -4,7 +4,7 @@ import "@/globals.css";
 import * as React from "react";
 import * as ReactDOMClient from "react-dom/client";
 import { QueryClient } from "@tanstack/react-query";
-import { FormattingProvider } from "@wealthfolio/ui";
+import { DirectionProvider, FormattingProvider } from "@wealthfolio/ui";
 import { createHostDependencyModuleUrl, isHostDependencySpecifier } from "./host-dependencies";
 import {
   clearAddonStyles,
@@ -21,8 +21,10 @@ import {
   type AddonLocalizationSnapshot,
 } from "./addon-sandbox-localization";
 import {
+  applySandboxDirection,
   initSandboxI18n,
   installAddonTranslationRuntime,
+  resolveSandboxDirection,
   setSandboxLanguage,
 } from "./addon-sandbox-i18n";
 
@@ -81,9 +83,11 @@ const init = new URLSearchParams(window.name);
 const ADDON_ID = init.get("addonId") ?? "";
 const NONCE = init.get("nonce") ?? "";
 const HOST_BASE_URL = init.get("hostBaseUrl") ?? "";
+const initDirection = init.get("direction");
 let sandboxLocalization: AddonLocalizationSnapshot = {
   locale: init.get("locale") || "en-US",
   uiLocale: init.get("uiLocale") || undefined,
+  direction: initDirection === "rtl" || initDirection === "ltr" ? initDirection : undefined,
   timezone: init.get("timezone") || undefined,
 };
 const localizationListeners = new Set<() => void>();
@@ -108,6 +112,7 @@ const root = rootElement;
 // Bootstrap i18next before any addon (and its `@wealthfolio/ui` components)
 // render, seeded from the bootstrap params so there is no flash of raw keys.
 initSandboxI18n(sandboxLocalization.uiLocale);
+applySandboxDirection(resolveSandboxDirection(sandboxLocalization));
 installAddonTranslationRuntime(ADDON_ID);
 
 function post(type: string, payload: Record<string, unknown> = {}) {
@@ -162,6 +167,7 @@ function updateSandboxLocalization(localization?: AddonLocalizationSnapshot) {
   if (isSameAddonLocalization(sandboxLocalization, localization)) return;
   sandboxLocalization = localization;
   setSandboxLanguage(localization.uiLocale);
+  applySandboxDirection(resolveSandboxDirection(localization));
   for (const listener of localizationListeners) listener();
 }
 
@@ -175,14 +181,16 @@ function SandboxFormattingProvider({ children }: { children: React.ReactNode }) 
   );
 
   return (
-    <FormattingProvider
-      locale={localization.locale}
-      uiLocale={localization.uiLocale}
-      timezone={localization.timezone}
-      currencyFormattingRegions={localization.currencyFormattingRegions}
-    >
-      {children}
-    </FormattingProvider>
+    <DirectionProvider direction={resolveSandboxDirection(localization)}>
+      <FormattingProvider
+        locale={localization.locale}
+        uiLocale={localization.uiLocale}
+        timezone={localization.timezone}
+        currencyFormattingRegions={localization.currencyFormattingRegions}
+      >
+        {children}
+      </FormattingProvider>
+    </DirectionProvider>
   );
 }
 
