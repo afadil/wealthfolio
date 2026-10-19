@@ -128,7 +128,7 @@ export function ActivityOperations<TData>({
       type="button"
       className={cn(
         "hover:bg-muted flex items-center justify-center rounded-md transition-colors",
-        touch ? "-mr-1 h-7 w-7 shrink-0" : hoverReveal ? "h-7 w-7" : "h-8 w-8 border",
+        touch ? "-me-1 h-7 w-7 shrink-0" : hoverReveal ? "h-7 w-7" : "h-8 w-8 border",
         // Stays put once the menu is open, or it would vanish the moment the
         // pointer moved off the row and onto the menu itself.
         !touch && hoverReveal && cn("data-popup-open:opacity-100", HOVER_SLOT),
@@ -164,7 +164,7 @@ export function ActivityOperations<TData>({
                     )}
                     onClick={item.onClick}
                   >
-                    <item.icon className="mr-2 h-4 w-4" />
+                    <item.icon className="me-2 h-4 w-4" />
                     {item.label}
                   </DropdownMenuItem>
                 ))}

@@ -1,4 +1,4 @@
-import { ReactElement, ReactNode, useEffect, useRef, useState } from "react";
+import { ComponentProps, ReactElement, ReactNode, useEffect, useRef, useState } from "react";
 import { Button, type ButtonProps } from "../ui/button";
 import { Icons } from "../ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -15,7 +15,8 @@ interface ActionConfirmProps {
   confirmButtonVariant?: ButtonProps["variant"];
   cancelButtonText?: string;
   pendingText?: string;
-  side?: "top" | "right" | "bottom" | "left";
+  /** `inline-start` / `inline-end` follow the reading direction. */
+  side?: ComponentProps<typeof PopoverContent>["side"];
 }
 
 export const ActionConfirm = ({

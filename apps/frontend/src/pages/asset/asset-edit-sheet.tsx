@@ -414,9 +414,9 @@ function SymbolMappingRow({
                       ...symbolField,
                       value: (symbolField.value as string | undefined) ?? "",
                     }}
-                    className="h-9 pr-8"
+                    className="h-9 pe-8"
                   />
-                  <span className="absolute right-2 flex items-center">
+                  <span className="absolute end-2 flex items-center">
                     {validationStatus === "loading" && (
                       <span data-testid="symbol-validation-loading">
                         <Spinner className="text-muted-foreground h-3.5 w-3.5" />
@@ -1320,7 +1320,7 @@ export function AssetEditSheet({
                             size="sm"
                             onClick={() => appendOverride({ provider: "YAHOO", symbol: "" })}
                           >
-                            <Icons.Plus className="mr-1 h-3 w-3" />
+                            <Icons.Plus className="me-1 h-3 w-3" />
                             {t("asset:editSheet.add")}
                           </Button>
                         </div>
@@ -1342,10 +1342,10 @@ export function AssetEditSheet({
                             <table className="w-full">
                               <thead>
                                 <tr className="bg-muted/50 border-b">
-                                  <th className="text-muted-foreground px-4 py-2 text-left text-xs font-medium">
+                                  <th className="text-muted-foreground px-4 py-2 text-start text-xs font-medium">
                                     {t("asset:editSheet.provider")}
                                   </th>
-                                  <th className="text-muted-foreground px-4 py-2 text-left text-xs font-medium">
+                                  <th className="text-muted-foreground px-4 py-2 text-start text-xs font-medium">
                                     {t("asset:editSheet.symbol")}
                                   </th>
                                   <th className="w-10"></th>

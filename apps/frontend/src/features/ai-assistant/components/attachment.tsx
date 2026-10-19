@@ -176,7 +176,7 @@ const ComposerFileAttachment: FC = () => {
 
   return (
     <div
-      className="aui-attachment-file-chip bg-muted/60 border-border/70 hover:bg-muted flex h-11 max-w-[18rem] cursor-pointer items-center gap-2 rounded-xl border py-1.5 pl-2.5 pr-8 text-left transition-colors"
+      className="aui-attachment-file-chip bg-muted/60 border-border/70 hover:bg-muted flex h-11 max-w-[18rem] cursor-pointer items-center gap-2 rounded-xl border py-1.5 pe-8 ps-2.5 text-start transition-colors"
       role="button"
       id="attachment-tile"
       aria-label={t("ai:attachment.fileAttachment", { name })}
@@ -266,8 +266,8 @@ const AttachmentRemove: FC<AttachmentRemoveProps> = ({ variant = "tile" }) => {
         className={cn(
           "aui-attachment-tile-remove text-muted-foreground hover:[&_svg]:text-destructive hover:bg-white! absolute rounded-full bg-white opacity-100 shadow-sm [&_svg]:text-black",
           variant === "chip"
-            ? "right-1.5 top-1/2 size-5 -translate-y-1/2"
-            : "right-1.5 top-1.5 size-3.5",
+            ? "end-1.5 top-1/2 size-5 -translate-y-1/2"
+            : "end-1.5 top-1.5 size-3.5",
         )}
         side="top"
       >

@@ -56,7 +56,7 @@ export function CancelConfirmationDialog({
         <AlertDialogFooter>
           <AlertDialogCancel>{t("activity:import.dialog.continueImporting")}</AlertDialogCancel>
           <Button variant="destructive" onClick={handleConfirm}>
-            <Icons.X className="mr-2 h-4 w-4" />
+            <Icons.X className="me-2 h-4 w-4" />
             {t("activity:import.dialog.cancelImport")}
           </Button>
         </AlertDialogFooter>

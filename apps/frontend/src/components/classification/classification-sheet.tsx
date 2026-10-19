@@ -92,7 +92,7 @@ export function ClassificationSheet({
           </div>
         </SheetHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="min-h-0 flex-1 overflow-y-auto pe-1">
           <div className="space-y-8 pb-8 pt-4">
             {/* Loading State */}
             {isLoading && <ClassificationSkeleton />}

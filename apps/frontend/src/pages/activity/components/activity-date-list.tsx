@@ -235,7 +235,7 @@ function ActivityDateListItem({
         <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] gap-x-3">
           <p className="truncate text-base font-semibold leading-5">{displaySymbol}</p>
           {activity.activityType !== ActivityType.SPLIT ? (
-            <p className="text-right text-base font-semibold leading-5">
+            <p className="text-end text-base font-semibold leading-5">
               {formatting.formatAmount(displayValue, activity.currency)}
             </p>
           ) : (
@@ -256,7 +256,7 @@ function ActivityDateListItem({
             ) : null}
           </div>
           {activity.activityType !== ActivityType.SPLIT ? (
-            <p className="text-muted-foreground text-right text-sm leading-5">{quantityLabel}</p>
+            <p className="text-muted-foreground text-end text-sm leading-5">{quantityLabel}</p>
           ) : null}
         </div>
       </div>

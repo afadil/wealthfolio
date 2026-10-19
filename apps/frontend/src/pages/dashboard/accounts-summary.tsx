@@ -331,7 +331,7 @@ const AccountSummaryComponent = React.memo(
             !isLoadingValuation &&
             accountId && (
               <div className="flex items-center justify-center">
-                <Icons.ChevronRight className="text-muted-foreground h-5 w-5 shrink-0" />
+                <Icons.ChevronRight className="text-muted-foreground h-5 w-5 shrink-0 rtl:rotate-180" />
               </div>
             )
           )}
@@ -581,7 +581,7 @@ export const AccountsSummary = React.memo(
                   ? "dashboard:portfolio_filter.manage"
                   : "dashboard:add_first_account",
               )}
-              <Icons.ChevronRight className="h-3 w-3" />
+              <Icons.ChevronRight className="h-3 w-3 rtl:rotate-180" />
             </Link>
           </div>
         );

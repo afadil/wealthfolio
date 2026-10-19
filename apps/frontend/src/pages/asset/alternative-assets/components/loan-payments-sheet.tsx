@@ -133,7 +133,7 @@ export function LoanPaymentsSheet({
                       disabled={busy != null}
                       onClick={() => change(allocation.activityId, { type: "unlink" })}
                     >
-                      {busy === allocation.activityId && <Spinner className="mr-1 size-3" />}
+                      {busy === allocation.activityId && <Spinner className="me-1 size-3" />}
                       {t("asset:loanPayments.unlink")}
                     </Button>
                   </span>
@@ -178,7 +178,7 @@ export function LoanPaymentsSheet({
                           change(activity.id, { type: "link", loanId, appliesTo: dueDate })
                         }
                       >
-                        {busy === activity.id && <Spinner className="mr-1 size-3" />}
+                        {busy === activity.id && <Spinner className="me-1 size-3" />}
                         {t("asset:loanPayments.link")}
                       </Button>
                     </span>

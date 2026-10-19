@@ -52,7 +52,7 @@ export function IconPicker({ value, onChange, accent, compact = false }: IconPic
               <CategoryIcon icon={value ?? null} className="h-4 w-4 shrink-0" />
               <span
                 className={cn(
-                  "flex-1 truncate text-left",
+                  "flex-1 truncate text-start",
                   value ? "text-foreground" : "text-muted-foreground/70",
                 )}
               >
@@ -72,7 +72,7 @@ export function IconPicker({ value, onChange, accent, compact = false }: IconPic
             className="h-8 text-xs"
             autoFocus
           />
-          <div className="grid max-h-64 grid-cols-8 gap-1 overflow-y-auto pr-1">
+          <div className="grid max-h-64 grid-cols-8 gap-1 overflow-y-auto pe-1">
             {filtered.map((name) => {
               const isActive = name === value;
               return (

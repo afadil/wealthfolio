@@ -49,13 +49,13 @@ export function ConnectEmptyState() {
               )}
             >
               {t("connect:emptyState.getStarted")}
-              <Icons.ExternalLink className="ml-1.5 h-4 w-4" />
+              <Icons.ExternalLink className="ms-1.5 h-4 w-4" />
             </ExternalLink>
             <Link
               to="/settings/connect"
               className={cn(buttonVariants({ variant: "outline" }), "w-full sm:w-auto")}
             >
-              <Icons.User className="mr-1.5 h-4 w-4" />
+              <Icons.User className="me-1.5 h-4 w-4" />
               {t("connect:emptyState.loginToAccount")}
             </Link>
           </div>

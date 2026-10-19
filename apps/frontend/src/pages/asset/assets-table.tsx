@@ -112,7 +112,7 @@ export function AssetsTable({
               type="button"
               data-testid={`security-${asset.instrumentType}-${asset.displayCode}`}
               onClick={() => navigate(`/holdings/${encodeURIComponent(asset.id)}`)}
-              className="hover:bg-muted/60 focus-visible:ring-ring group flex w-full items-center gap-2.5 rounded-md py-1 text-left transition"
+              className="hover:bg-muted/60 focus-visible:ring-ring group flex w-full items-center gap-2.5 rounded-md py-1 text-start transition"
             >
               <TickerAvatar
                 symbol={avatarSymbol}
@@ -226,7 +226,7 @@ export function AssetsTable({
           <DataTableColumnHeader
             column={column}
             title={t("asset:table.quote")}
-            className="text-right"
+            className="text-end"
           />
         ),
         size: 130,
@@ -239,7 +239,7 @@ export function AssetsTable({
 
           if (!quote) {
             return (
-              <div className="text-right">
+              <div className="text-end">
                 <div className="flex items-center justify-end gap-1.5">
                   <Tooltip>
                     <TooltipTrigger
@@ -261,7 +261,7 @@ export function AssetsTable({
           }
 
           return (
-            <div className="text-right">
+            <div className="text-end">
               <div className="flex items-center justify-end gap-1.5">
                 {stale ? (
                   <Tooltip>
@@ -425,7 +425,7 @@ export function AssetsTable({
               <TableRow>
                 <TableHead>{t("asset:table.security")}</TableHead>
                 <TableHead>{t("asset:table.market")}</TableHead>
-                <TableHead className="text-right">{t("asset:table.quote")}</TableHead>
+                <TableHead className="text-end">{t("asset:table.quote")}</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>

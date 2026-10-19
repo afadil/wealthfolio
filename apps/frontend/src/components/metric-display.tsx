@@ -108,7 +108,7 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
             <Button
               variant="ghost"
               size="icon"
-              className="text-muted-foreground hover:text-foreground absolute right-2 top-2 hidden h-4 w-4 rounded-full p-0 md:inline-flex"
+              className="text-muted-foreground hover:text-foreground absolute end-2 top-2 hidden h-4 w-4 rounded-full p-0 md:inline-flex"
             />
           }
         >
@@ -260,7 +260,7 @@ export const MetricInfoPopoverBody: React.FC<{
                 : t("common:component.calculation_notes", { count: warningItems.length })}
             </span>
           </div>
-          <ul className="text-muted-foreground max-h-[60vh] space-y-2 overflow-y-auto pr-1 leading-relaxed">
+          <ul className="text-muted-foreground max-h-[60vh] space-y-2 overflow-y-auto pe-1 leading-relaxed">
             {warningItems.map((warning, index) => (
               <li key={`${warning}-${index}`} className="flex gap-1.5">
                 <span className="bg-warning/70 mt-1.5 h-1 w-1 shrink-0 rounded-full" />
@@ -295,7 +295,7 @@ export const MetricLabelWithInfo: React.FC<MetricLabelWithInfoProps> = ({
               variant="ghost"
               size="icon"
               className={cn(
-                "ml-1 h-4 w-4 rounded-full p-0",
+                "ms-1 h-4 w-4 rounded-full p-0",
                 hasWarnings && "text-warning hover:text-warning",
               )}
             />

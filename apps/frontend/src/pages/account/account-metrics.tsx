@@ -119,7 +119,7 @@ function CashCurrencyBreakdown({ cashCurrencySplit, displayCurrency }: CashCurre
   const remainingCount = rows.length - visibleRows.length;
 
   return (
-    <div className="text-muted-foreground text-2xs -mt-2 flex flex-wrap items-center justify-end gap-1 text-right">
+    <div className="text-muted-foreground text-2xs -mt-2 flex flex-wrap items-center justify-end gap-1 text-end">
       {visibleRows.map((split) => {
         const value = split.valueLocal ?? split.valueBase;
         const currency = split.valueLocal == null ? displayCurrency : split.currency;

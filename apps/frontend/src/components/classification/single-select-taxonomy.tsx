@@ -310,7 +310,7 @@ export function SingleSelectTaxonomy({
                       type="button"
                       onClick={() => handleSelectionChange(child.id)}
                       className={cn(
-                        "hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm",
+                        "hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-start text-sm",
                         selectedCategoryId === child.id && "bg-accent",
                       )}
                     >
@@ -395,7 +395,7 @@ export function SingleSelectTaxonomy({
                               hasChildren && "font-medium",
                               isSelected && "bg-accent",
                             )}
-                            style={{ paddingLeft: `${category.level * 16 + 8}px` }}
+                            style={{ paddingInlineStart: `${category.level * 16 + 8}px` }}
                           >
                             <span
                               className="h-2.5 w-2.5 shrink-0 rounded-full"

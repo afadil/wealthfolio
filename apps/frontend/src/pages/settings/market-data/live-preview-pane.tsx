@@ -266,7 +266,7 @@ function HtmlTableResponse({
     <div className="space-y-3">
       {/* Table selector — shown always when html_table, as a legend + switcher */}
       <div className="flex flex-wrap items-center gap-1">
-        <span className="text-muted-foreground text-2xs mr-1 font-medium uppercase tracking-wide">
+        <span className="text-muted-foreground text-2xs me-1 font-medium uppercase tracking-wide">
           {t("settings:market_data_page.table")}
         </span>
         {tables.map((tbl, i) => (
@@ -288,7 +288,7 @@ function HtmlTableResponse({
             {i + 1}
           </button>
         ))}
-        <span className="text-muted-foreground ml-auto text-xs">
+        <span className="text-muted-foreground ms-auto text-xs">
           {runtime.armedField
             ? t("settings:market_data_page.table_click_column_to_map_field", {
                 count: table.rowCount,
@@ -305,11 +305,11 @@ function HtmlTableResponse({
           <thead className="bg-muted/40 sticky top-0">
             <tr>
               {table.columns.map((col) => (
-                <th key={col.index} className="px-3 py-2 text-left">
+                <th key={col.index} className="px-3 py-2 text-start">
                   <button
                     type="button"
                     onClick={() => handleHeaderClick(col.index, col.role)}
-                    className="hover:text-foreground group flex flex-col items-start gap-1 text-left"
+                    className="hover:text-foreground group flex flex-col items-start gap-1 text-start"
                   >
                     <span className="text-foreground text-xs font-medium">
                       {col.header ||
@@ -378,7 +378,7 @@ function CsvResponse({ raw, runtime }: { raw: string; runtime: SourceRuntime }) 
           <thead className="bg-muted/40 sticky top-0">
             <tr>
               {headers.map((h) => (
-                <th key={h} className="px-3 py-2 text-left">
+                <th key={h} className="px-3 py-2 text-start">
                   <button
                     type="button"
                     onClick={() => handleHeaderClick(h)}
@@ -470,7 +470,7 @@ function HtmlElementsResponse({ runtime }: { runtime: SourceRuntime }) {
             key={el.selector}
             type="button"
             onClick={() => runtime.handlePathSelect(el.selector, runtime.armedField ?? "pricePath")}
-            className="bg-background hover:bg-muted/30 group flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-all"
+            className="bg-background hover:bg-muted/30 group flex w-full items-start gap-3 rounded-lg border p-3 text-start transition-all"
           >
             <div className="min-w-0 flex-1 space-y-1">
               <code className="bg-muted/60 text-2xs inline-block max-w-full truncate rounded px-1.5 py-0.5 font-mono">
@@ -531,7 +531,7 @@ function CopyButton({ text, disabled }: { text: string; disabled?: boolean }) {
       title={
         copied ? t("settings:market_data_page.copied") : t("settings:market_data_page.copy_url")
       }
-      className="text-muted-foreground hover:text-foreground hover:bg-muted/50 absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+      className="text-muted-foreground hover:text-foreground hover:bg-muted/50 absolute end-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-40"
     >
       {copied ? (
         <Icons.Check className="text-success h-3.5 w-3.5" />
@@ -613,7 +613,7 @@ function FieldMappingRow({
       type="button"
       onClick={onArm}
       className={cn(
-        "flex w-full items-center gap-3 rounded-lg border p-2.5 text-left transition-all",
+        "flex w-full items-center gap-3 rounded-lg border p-2.5 text-start transition-all",
         armed
           ? "bg-background border-foreground/30 ring-foreground/5 shadow-sm ring-1"
           : "bg-background hover:bg-muted/30",
@@ -624,7 +624,7 @@ function FieldMappingRow({
       <span className="shrink-0 text-sm font-medium">{label}</span>
       <span
         className={cn(
-          "ml-1 h-1.5 w-1.5 shrink-0 rounded-full",
+          "ms-1 h-1.5 w-1.5 shrink-0 rounded-full",
           assigned ? "bg-success" : armed ? "bg-primary" : "bg-muted-foreground/30",
         )}
       />
@@ -734,7 +734,7 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
               : t("settings:market_data_page.method_latest")}
           </span>
         </div>
-        <div className="bg-background relative min-h-10 rounded-lg border px-3 py-2 pr-10">
+        <div className="bg-background relative min-h-10 rounded-lg border px-3 py-2 pe-10">
           <PreviewUrl template={runtime.urlTemplate} values={previewValues} />
           <CopyButton text={runtime.expandedUrl} disabled={!runtime.urlTemplate} />
         </div>
@@ -746,7 +746,7 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
           <Label className="text-muted-foreground text-2xs font-medium uppercase tracking-wide">
             {t("settings:market_data_page.request_body_preview")}
           </Label>
-          <div className="bg-background relative min-h-10 rounded-lg border px-3 py-2 pr-10">
+          <div className="bg-background relative min-h-10 rounded-lg border px-3 py-2 pe-10">
             <PreviewUrl
               template={bodyTemplate}
               values={previewValues}
@@ -821,9 +821,9 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
             className="h-input-height shrink-0"
           >
             {runtime.isFetching ? (
-              <Spinner className="mr-1.5 h-3.5 w-3.5" />
+              <Spinner className="me-1.5 h-3.5 w-3.5" />
             ) : (
-              <Icons.PlayCircle className="mr-1.5 h-3.5 w-3.5" />
+              <Icons.PlayCircle className="me-1.5 h-3.5 w-3.5" />
             )}
             {t("settings:market_data_page.fetch")}
           </Button>
@@ -899,7 +899,7 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
                     <span className="tabular-nums">
                       {formatting.formatDecimal(runtime.testResult.price)}
                       {runtime.testResult.currency && (
-                        <span className="text-muted-foreground ml-1.5 text-xs font-normal">
+                        <span className="text-muted-foreground ms-1.5 text-xs font-normal">
                           {runtime.testResult.currency}
                         </span>
                       )}
@@ -1031,7 +1031,10 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
             }
           >
             <Icons.ChevronRight
-              className={cn("h-3 w-3 transition-transform", moreFieldsOpen && "rotate-90")}
+              className={cn(
+                "h-3 w-3 transition-transform",
+                moreFieldsOpen ? "rotate-90" : "rtl:rotate-180",
+              )}
             />
             {t("settings:market_data_page.more_mapping_fields")}
           </CollapsibleTrigger>

@@ -67,9 +67,9 @@ export function CurrentVsTargetCard({
             <div className="text-muted-foreground text-2xs hidden grid-cols-[minmax(7.5rem,1fr)_minmax(10rem,1.25fr)_3.5rem_3.5rem_5rem] gap-x-3 px-2 pb-2 font-medium uppercase tracking-wider md:grid">
               <span>{t("allocation:vsTarget.category")}</span>
               <span>{t("allocation:vsTarget.currentAllocation")}</span>
-              <span className="text-right">{t("allocation:vsTarget.current")}</span>
-              <span className="text-right">{t("allocation:vsTarget.target")}</span>
-              <span className="text-right">{t("allocation:vsTarget.drift")}</span>
+              <span className="text-end">{t("allocation:vsTarget.current")}</span>
+              <span className="text-end">{t("allocation:vsTarget.target")}</span>
+              <span className="text-end">{t("allocation:vsTarget.drift")}</span>
             </div>
 
             {/* Asset class rows */}
@@ -108,20 +108,20 @@ export function CurrentVsTargetCard({
                         />
                         <span
                           className="bg-foreground absolute -top-1 h-4 w-[2.5px] rounded-sm"
-                          style={{ left: `calc(${(target / maxScale) * 100}% - 1px)` }}
+                          style={{ insetInlineStart: `calc(${(target / maxScale) * 100}% - 1px)` }}
                         />
                       </div>
                     </div>
 
-                    <span className="text-foreground hidden text-right text-xs font-semibold tabular-nums md:block">
+                    <span className="text-foreground hidden text-end text-xs font-semibold tabular-nums md:block">
                       {current.toFixed(1)}%
                     </span>
-                    <span className="text-muted-foreground hidden text-right text-xs font-medium tabular-nums md:block">
+                    <span className="text-muted-foreground hidden text-end text-xs font-medium tabular-nums md:block">
                       {formatTargetBps(row.targetBps)}%
                     </span>
                     <span
                       className={cn(
-                        "col-start-2 row-start-1 text-right text-xs font-semibold tabular-nums md:col-start-auto md:row-start-auto",
+                        "col-start-2 row-start-1 text-end text-xs font-semibold tabular-nums md:col-start-auto md:row-start-auto",
                         driftColor(row),
                       )}
                     >

@@ -146,7 +146,7 @@ export function DriftDriversCard({
                       {driver.drift}
                     </span>
                   </div>
-                  <p className="text-muted-foreground mt-2 truncate pl-7 text-xs leading-relaxed">
+                  <p className="text-muted-foreground mt-2 truncate ps-7 text-xs leading-relaxed">
                     {driver.detail}
                   </p>
                 </li>

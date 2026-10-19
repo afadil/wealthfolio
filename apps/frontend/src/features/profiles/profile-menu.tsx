@@ -47,7 +47,7 @@ export function ProfileMenu({ collapsed = false }: { collapsed?: boolean }) {
         </span>
         {!collapsed && (
           <>
-            <span className="min-w-0 flex-1 truncate text-left">{profile.name}</span>
+            <span className="min-w-0 flex-1 truncate text-start">{profile.name}</span>
             <Icons.ChevronsUpDown className="text-muted-foreground size-4 shrink-0" />
           </>
         )}

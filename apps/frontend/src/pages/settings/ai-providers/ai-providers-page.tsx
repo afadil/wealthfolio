@@ -125,7 +125,7 @@ export default function AiProvidersPage() {
                 onClick={() => refetch()}
                 className="text-foreground"
               >
-                <Icons.Refresh className="mr-2 h-4 w-4" />
+                <Icons.Refresh className="me-2 h-4 w-4" />
                 {t("common:retry")}
               </Button>
             </div>

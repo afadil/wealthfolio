@@ -300,7 +300,7 @@ const CompositionTooltip = ({ active, payload, settings }: TooltipProps) => {
           {/* Market Value */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground pr-6 text-sm">
+              <span className="text-muted-foreground pe-6 text-sm">
                 {t("holdings:market_value_label")}
               </span>
               <AmountDisplay
@@ -447,7 +447,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
           />
         </div>
       </CardHeader>
-      <CardContent className="pl-2">
+      <CardContent className="ps-2">
         <RenderableChartContainer className="h-125 w-full">
           <Treemap
             width={400}

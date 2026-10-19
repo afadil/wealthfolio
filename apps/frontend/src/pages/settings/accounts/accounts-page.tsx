@@ -189,7 +189,7 @@ const SettingsAccountsPage = () => {
               className="hidden sm:inline-flex"
               onClick={() => handleAddAccount()}
             >
-              <Icons.Plus className="mr-2 h-4 w-4" />
+              <Icons.Plus className="me-2 h-4 w-4" />
               {t("settings:accounts_add_button")}
             </Button>
           </>
@@ -199,19 +199,19 @@ const SettingsAccountsPage = () => {
         {/* Search and Filter Bar */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1 sm:max-w-sm">
-            <Icons.Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+            <Icons.Search className="text-muted-foreground absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2" />
             <Input
               type="text"
               placeholder={t("settings:accounts.search_placeholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="!h-9 pl-9 pr-9 text-sm"
+              className="!h-9 pe-9 ps-9 text-sm"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="text-muted-foreground hover:text-foreground absolute right-3 top-1/2 -translate-y-1/2"
+                className="text-muted-foreground hover:text-foreground absolute end-3 top-1/2 -translate-y-1/2"
                 aria-label={t("settings:accounts.clear_search")}
               >
                 <Icons.Close className="h-4 w-4" />
@@ -264,7 +264,7 @@ const SettingsAccountsPage = () => {
               </EmptyHeader>
               <EmptyContent>
                 <Button data-testid="add-account-empty-button" onClick={() => handleAddAccount()}>
-                  <Icons.Plus className="mr-2 h-4 w-4" />
+                  <Icons.Plus className="me-2 h-4 w-4" />
                   {t("settings:accounts_add_first")}
                 </Button>
                 {showConnectLink && (

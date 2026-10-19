@@ -265,12 +265,12 @@ export default function ConnectPage() {
             >
               {isSyncRunning ? (
                 <>
-                  <Spinner className="h-4 w-4 sm:mr-2" />
+                  <Spinner className="h-4 w-4 sm:me-2" />
                   <span className="hidden sm:inline">{t("connect:sync.syncingShort")}</span>
                 </>
               ) : (
                 <>
-                  <Icons.RefreshCw className="h-4 w-4 sm:mr-2" />
+                  <Icons.RefreshCw className="h-4 w-4 sm:me-2" />
                   <span className="hidden sm:inline">{t("connect:sync.syncNow")}</span>
                 </>
               )}
@@ -380,7 +380,7 @@ export default function ConnectPage() {
                         }
                       >
                         {t("connect:upgrade.button")}
-                        <Icons.ExternalLink className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
+                        <Icons.ExternalLink className="ms-1 h-3.5 w-3.5" aria-hidden="true" />
                       </Button>
                     </div>
                   </Card>
@@ -706,7 +706,7 @@ function BrokeragesCard({
             <button
               type="button"
               onClick={() => setShowAll((value) => !value)}
-              className="text-muted-foreground hover:bg-muted/40 hover:text-foreground flex min-h-11 w-full items-center border-t px-4 text-left text-sm"
+              className="text-muted-foreground hover:bg-muted/40 hover:text-foreground flex min-h-11 w-full items-center border-t px-4 text-start text-sm"
             >
               {showAll
                 ? t("connect:page.showLess")
@@ -778,7 +778,7 @@ function BrokerageItem({
         type="button"
         aria-expanded={expanded}
         onClick={onToggle}
-        className="hover:bg-muted/40 flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left"
+        className="hover:bg-muted/40 flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-start"
       >
         <BrokerageLogo
           brokerage={row.connection.brokerage}
@@ -797,13 +797,13 @@ function BrokerageItem({
         <Icons.ChevronRight
           className={cn(
             "text-muted-foreground size-4 shrink-0 transition-transform",
-            expanded && "rotate-90",
+            expanded ? "rotate-90" : "rtl:rotate-180",
           )}
           aria-hidden="true"
         />
       </button>
       {expanded && (
-        <ul className="bg-muted/30 border-t py-1 pl-16 pr-4">
+        <ul className="bg-muted/30 border-t py-1 pe-4 ps-16">
           {row.accounts.length === 0 ? (
             <li className="text-muted-foreground py-2 text-xs">
               {t("connect:connections.noAccountsFound")}
@@ -854,7 +854,7 @@ function DevicesCard({
   const active = sorted.filter((device) => !isDeviceInactive(device));
   const inactive = sorted.filter(isDeviceInactive);
   const footerClass =
-    "text-muted-foreground hover:bg-muted/40 hover:text-foreground flex min-h-11 w-full items-center gap-2 border-t px-4 text-left text-sm";
+    "text-muted-foreground hover:bg-muted/40 hover:text-foreground flex min-h-11 w-full items-center gap-2 border-t px-4 text-start text-sm";
 
   return (
     <SectionCard

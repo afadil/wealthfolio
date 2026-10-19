@@ -32,7 +32,7 @@ function RowMarker({ detail }: { detail: StepDetail }) {
 
 export function StepDetails({ details }: { details: StepDetail[] }) {
   return (
-    <ul className="bg-muted/40 flex flex-col gap-3 rounded-xl p-4 text-left text-sm">
+    <ul className="bg-muted/40 flex flex-col gap-3 rounded-xl p-4 text-start text-sm">
       {details.map((detail) => (
         <li
           key={detail.label}

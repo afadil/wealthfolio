@@ -450,9 +450,9 @@ export const HoldingsEditMode = ({
               {/* Table Header */}
               <div className="text-muted-foreground grid grid-cols-12 gap-2 border-b pb-2 text-xs font-medium">
                 <div className="col-span-5">{t("holdings:symbol")}</div>
-                <div className="col-span-2 text-right">{t("holdings:shares")}</div>
-                <div className="col-span-2 text-right">{t("holdings:avg_cost")}</div>
-                <div className="col-span-2 text-right">{t("holdings:total")}</div>
+                <div className="col-span-2 text-end">{t("holdings:shares")}</div>
+                <div className="col-span-2 text-end">{t("holdings:avg_cost")}</div>
+                <div className="col-span-2 text-end">{t("holdings:total")}</div>
                 <div className="col-span-1"></div>
               </div>
 
@@ -516,7 +516,7 @@ export const HoldingsEditMode = ({
                         </div>
 
                         {/* Total */}
-                        <div className="col-span-2 text-right">
+                        <div className="col-span-2 text-end">
                           <span
                             className={cn(
                               "text-sm font-medium",
@@ -584,7 +584,7 @@ export const HoldingsEditMode = ({
                   onClick={openAddHolding}
                   className="border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground h-10 w-full border border-dashed"
                 >
-                  <Icons.PlusCircle className="mr-2 h-4 w-4" />
+                  <Icons.PlusCircle className="me-2 h-4 w-4" />
                   {t("holdings:add_another_holding")}
                 </Button>
               )}
@@ -607,7 +607,7 @@ export const HoldingsEditMode = ({
               {cashBalances.length > 0 && (
                 <div className="text-muted-foreground grid grid-cols-12 gap-2 border-b pb-2 text-xs font-medium">
                   <div className="col-span-6">{t("holdings:currency")}</div>
-                  <div className="col-span-5 text-right">{t("holdings:amount")}</div>
+                  <div className="col-span-5 text-end">{t("holdings:amount")}</div>
                   <div className="col-span-1"></div>
                 </div>
               )}
@@ -700,7 +700,7 @@ export const HoldingsEditMode = ({
                   onClick={openAddCurrency}
                   className="border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground h-10 w-full border border-dashed"
                 >
-                  <Icons.PlusCircle className="mr-2 h-4 w-4" />
+                  <Icons.PlusCircle className="me-2 h-4 w-4" />
                   {t("holdings:add_cash_balance")}
                 </Button>
               )}
@@ -721,7 +721,7 @@ export const HoldingsEditMode = ({
                 disabled={isSaving || isDeleting}
                 className="text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"
               >
-                <Icons.Trash className="mr-2 h-4 w-4" />
+                <Icons.Trash className="me-2 h-4 w-4" />
                 {t("holdings:delete_snapshot")}
               </Button>
             )}
@@ -733,12 +733,12 @@ export const HoldingsEditMode = ({
             <Button onClick={handleSave} disabled={isSaving || isDeleting || !hasChanges}>
               {isSaving ? (
                 <>
-                  <Spinner className="mr-2 h-4 w-4" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {t("holdings:saving")}
                 </>
               ) : (
                 <>
-                  <Icons.Check className="mr-2 h-4 w-4" />
+                  <Icons.Check className="me-2 h-4 w-4" />
                   {t("holdings:save_changes")}
                 </>
               )}
@@ -783,7 +783,7 @@ export const HoldingsEditMode = ({
             >
               {isDeleting ? (
                 <>
-                  <Spinner className="mr-2 h-4 w-4" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {t("holdings:deleting")}
                 </>
               ) : (

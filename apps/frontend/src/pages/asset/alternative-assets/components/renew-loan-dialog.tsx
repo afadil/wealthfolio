@@ -285,9 +285,9 @@ export function RenewLoanDialog({
                   value={newRate}
                   onValueChange={(value) => setNewRate(value == null ? "" : String(value))}
                   maxDecimalPlaces={3}
-                  className="pr-8"
+                  className="pe-8"
                 />
-                <span className="text-muted-foreground pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm">
+                <span className="text-muted-foreground pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-sm">
                   %
                 </span>
               </div>
@@ -386,7 +386,7 @@ export function RenewLoanDialog({
             {t("common:cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={isSubmitting || blocked}>
-            {isSubmitting && <Spinner className="mr-2 h-4 w-4" />}
+            {isSubmitting && <Spinner className="me-2 h-4 w-4" />}
             {title}
           </Button>
         </LoanSheetFooter>

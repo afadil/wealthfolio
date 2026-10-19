@@ -108,7 +108,7 @@ function StepHeader({
         {done ? <Icons.Check className="h-3.5 w-3.5" /> : number}
       </div>
       <h3 className="text-sm font-semibold">{title}</h3>
-      {badge && <div className="ml-auto">{badge}</div>}
+      {badge && <div className="ms-auto">{badge}</div>}
     </div>
   );
 }
@@ -277,7 +277,7 @@ function MappingInputRow({
           >
             <span className={cn("h-2.5 w-2.5 rounded-sm", color)} />
             <span className="text-sm font-medium">{label}</span>
-            {required && <span className="text-destructive -ml-1 text-xs">*</span>}
+            {required && <span className="text-destructive -ms-1 text-xs">*</span>}
           </button>
           <FormControl>
             <Input
@@ -424,7 +424,7 @@ export function SourceConfigPanel({ form, prefix, runtime, onUrlChange }: Source
                           runtime.resetFetchState();
                         }}
                         className={cn(
-                          "flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all",
+                          "flex flex-col items-start gap-1 rounded-lg border p-3 text-start transition-all",
                           selected
                             ? "bg-background border-foreground/30 ring-foreground/5 shadow-sm ring-1"
                             : "bg-muted/30 hover:bg-muted/50 border-transparent",
@@ -502,7 +502,7 @@ export function SourceConfigPanel({ form, prefix, runtime, onUrlChange }: Source
                   />
                 </FormControl>
                 <div className="text-muted-foreground text-2xs mt-1.5 flex flex-wrap items-center gap-1.5">
-                  <span className="mr-1">{t("settings:market_data_page.placeholders")}</span>
+                  <span className="me-1">{t("settings:market_data_page.placeholders")}</span>
                   {PLACEHOLDERS.map((p) => (
                     <PlaceholderChip key={p} token={p} onInsert={insertPlaceholder} />
                   ))}
@@ -607,7 +607,10 @@ export function SourceConfigPanel({ form, prefix, runtime, onUrlChange }: Source
               }
             >
               <Icons.ChevronRight
-                className={cn("h-3 w-3 transition-transform", headersOpen && "rotate-90")}
+                className={cn(
+                  "h-3 w-3 transition-transform",
+                  headersOpen ? "rotate-90" : "rtl:rotate-180",
+                )}
               />
               {t("settings:market_data_page.headers_auth")}
             </CollapsibleTrigger>
@@ -685,7 +688,10 @@ export function SourceConfigPanel({ form, prefix, runtime, onUrlChange }: Source
             }
           >
             <Icons.ChevronRight
-              className={cn("h-3 w-3 transition-transform", advancedOpen && "rotate-90")}
+              className={cn(
+                "h-3 w-3 transition-transform",
+                advancedOpen ? "rotate-90" : "rtl:rotate-180",
+              )}
             />
             {t("settings:market_data_page.more_mappings")}
           </CollapsibleTrigger>

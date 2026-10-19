@@ -297,10 +297,10 @@ export function MultiSelectTaxonomy({
                         }}
                         onFocus={(e) => e.target.select()}
                         autoFocus
-                        className="h-8 pr-6 text-sm"
+                        className="h-8 pe-6 text-sm"
                         placeholder="100"
                       />
-                      <span className="text-muted-foreground pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-sm">
+                      <span className="text-muted-foreground pointer-events-none absolute end-2 top-1/2 -translate-y-1/2 text-sm">
                         %
                       </span>
                     </div>
@@ -360,7 +360,7 @@ export function MultiSelectTaxonomy({
                               hasChildren && "font-medium",
                               isPendingThis && "bg-accent",
                             )}
-                            style={{ paddingLeft: `${category.level * 16 + 8}px` }}
+                            style={{ paddingInlineStart: `${category.level * 16 + 8}px` }}
                           >
                             <span
                               className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -413,7 +413,7 @@ export function MultiSelectTaxonomy({
                         setEditingValue("");
                       }
                     }}
-                    className="h-7 pr-5 text-right text-sm"
+                    className="h-7 pe-5 text-end text-sm"
                     autoFocus
                   />
                 ) : (
@@ -450,12 +450,12 @@ export function MultiSelectTaxonomy({
           {/* Total row */}
           {assignedCategories.length > 1 && (
             <div className="bg-muted/50 flex items-center gap-2 px-3 py-2">
-              <span className="text-muted-foreground flex-1 text-right text-xs font-medium">
+              <span className="text-muted-foreground flex-1 text-end text-xs font-medium">
                 {t("asset:classification.total")}
               </span>
               <div
                 className={cn(
-                  "w-20 text-right text-sm font-semibold",
+                  "w-20 text-end text-sm font-semibold",
                   totalWeight === 100
                     ? "text-success"
                     : totalWeight > 100

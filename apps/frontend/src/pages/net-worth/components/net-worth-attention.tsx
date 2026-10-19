@@ -60,7 +60,7 @@ export function NetWorthAttentionCard({
         </h3>
       </div>
       {staleAssets.length > 0 && (
-        <div className="ml-9 mt-3">
+        <div className="ms-9 mt-3">
           <p className="text-muted-foreground text-xs">
             {t("insights:networth.not_updated_over_90_days")}
           </p>
@@ -97,7 +97,7 @@ export function NetWorthAttentionCard({
         </div>
       )}
       {unlinkedLiabilities.map((liability) => (
-        <div key={liability.id} className="ml-9 mt-3 min-w-0">
+        <div key={liability.id} className="ms-9 mt-3 min-w-0">
           {properties.length > 0 ? (
             <ResponsiveSelect
               value=""
@@ -122,7 +122,7 @@ export function NetWorthAttentionCard({
             <Button
               variant="link"
               size="sm"
-              className="h-auto max-w-full p-0 text-left text-xs underline underline-offset-4"
+              className="h-auto max-w-full p-0 text-start text-xs underline underline-offset-4"
               disabled={isLinking}
               onClick={() => onAddProperty(liability.id)}
             >

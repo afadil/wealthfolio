@@ -649,7 +649,7 @@ export function CashActivityForm({
                       <button
                         type="button"
                         className={cn(
-                          "flex w-full items-start gap-3 rounded-lg border p-4 text-left transition-all",
+                          "flex w-full items-start gap-3 rounded-lg border p-4 text-start transition-all",
                           "hover:bg-muted/50 active:scale-[0.98]",
                           "disabled:cursor-not-allowed disabled:opacity-50",
                         )}
@@ -769,7 +769,7 @@ export function CashActivityForm({
                                         </span>
                                       )}
                                       <Icons.ChevronDown
-                                        className="ml-2 h-4 w-4 shrink-0 opacity-50"
+                                        className="ms-2 h-4 w-4 shrink-0 opacity-50"
                                         aria-hidden="true"
                                       />
                                     </button>
@@ -826,7 +826,7 @@ export function CashActivityForm({
                               );
                             })()}
                             <Icons.ChevronDown
-                              className="ml-2 h-4 w-4 shrink-0 opacity-50"
+                              className="ms-2 h-4 w-4 shrink-0 opacity-50"
                               aria-hidden="true"
                             />
                           </button>
@@ -883,7 +883,7 @@ export function CashActivityForm({
                       className="flex-1"
                       disabled={saveMutation.isPending}
                     >
-                      <Icons.ArrowLeft className="mr-2 h-4 w-4" />
+                      <Icons.ArrowLeft className="me-2 h-4 w-4 rtl:rotate-180" />
                       {t("common:back")}
                     </Button>
                   )}
@@ -896,7 +896,7 @@ export function CashActivityForm({
                       disabled={!watchAccountId}
                     >
                       {t("common:next")}
-                      <Icons.ArrowRight className="ml-2 h-4 w-4" />
+                      <Icons.ArrowRight className="ms-2 h-4 w-4 rtl:rotate-180" />
                     </Button>
                   ) : (
                     <Button
@@ -905,9 +905,9 @@ export function CashActivityForm({
                       disabled={saveMutation.isPending}
                     >
                       {saveMutation.isPending ? (
-                        <Spinner className="mr-2 h-4 w-4" />
+                        <Spinner className="me-2 h-4 w-4" />
                       ) : (
-                        <Icons.Check className="mr-2 h-4 w-4" />
+                        <Icons.Check className="me-2 h-4 w-4" />
                       )}
                       {isEditing
                         ? t("spending:cashForm.updateTransaction")
@@ -929,7 +929,7 @@ export function CashActivityForm({
                 <Button type="submit" disabled={saveMutation.isPending}>
                   {saveMutation.isPending ? (
                     <>
-                      <Spinner className="mr-2 h-4 w-4" />
+                      <Spinner className="me-2 h-4 w-4" />
                       {t("spending:common.saving")}
                     </>
                   ) : isEditing ? (

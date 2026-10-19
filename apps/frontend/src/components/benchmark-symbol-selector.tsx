@@ -239,7 +239,7 @@ export function BenchmarkSymbolSelector({
                       <div className="flex flex-col">
                         <div className="flex items-center">
                           <span className="font-medium">{benchmark.name}</span>
-                          <span className="text-muted-foreground ml-2 text-xs">
+                          <span className="text-muted-foreground ms-2 text-xs">
                             {benchmark.symbol}
                           </span>
                         </div>
@@ -249,7 +249,7 @@ export function BenchmarkSymbolSelector({
                       </div>
                       <Icons.Check
                         className={cn(
-                          "ml-auto h-4 w-4",
+                          "ms-auto h-4 w-4",
                           value === benchmark.name ? "opacity-100" : "opacity-0",
                         )}
                       />
@@ -302,7 +302,7 @@ export function BenchmarkSymbolSelector({
                       <div className="flex flex-col">
                         <div className="flex items-center">
                           <span className="font-medium">{ticker.longName || ticker.symbol}</span>
-                          <span className="text-muted-foreground ml-2 text-xs">
+                          <span className="text-muted-foreground ms-2 text-xs">
                             {ticker.symbol}
                           </span>
                         </div>
@@ -314,7 +314,7 @@ export function BenchmarkSymbolSelector({
                       </div>
                       <Icons.Check
                         className={cn(
-                          "ml-auto h-4 w-4",
+                          "ms-auto h-4 w-4",
                           value === (ticker.longName || ticker.symbol)
                             ? "opacity-100"
                             : "opacity-0",

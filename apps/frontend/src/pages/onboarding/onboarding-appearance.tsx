@@ -138,7 +138,7 @@ export const OnboardingAppearance = forwardRef<
                   </span>
                 </div>
                 {theme === "light" && (
-                  <div className="bg-primary absolute right-2 top-2 rounded-full p-0.5">
+                  <div className="bg-primary absolute end-2 top-2 rounded-full p-0.5">
                     <Icons.Check className="h-3 w-3 text-white" />
                   </div>
                 )}
@@ -180,7 +180,7 @@ export const OnboardingAppearance = forwardRef<
                   </span>
                 </div>
                 {theme === "dark" && (
-                  <div className="bg-primary absolute right-2 top-2 rounded-full p-0.5">
+                  <div className="bg-primary absolute end-2 top-2 rounded-full p-0.5">
                     <Icons.Check className="h-3 w-3 text-white" />
                   </div>
                 )}
@@ -222,7 +222,7 @@ export const OnboardingAppearance = forwardRef<
                   </span>
                 </div>
                 {theme === "system" && (
-                  <div className="bg-primary absolute right-2 top-2 rounded-full p-0.5">
+                  <div className="bg-primary absolute end-2 top-2 rounded-full p-0.5">
                     <Icons.Check className="h-3 w-3 text-white" />
                   </div>
                 )}
@@ -282,7 +282,7 @@ export const OnboardingAppearance = forwardRef<
                     </div>
                   </div>
                   {font === f.value && (
-                    <div className="bg-primary absolute right-2 top-2 rounded-full p-0.5">
+                    <div className="bg-primary absolute end-2 top-2 rounded-full p-0.5">
                       <Icons.Check className="h-3 w-3 text-white" />
                     </div>
                   )}

@@ -205,7 +205,7 @@ export const AccountSelectorMobile = forwardRef<HTMLButtonElement, AccountSelect
                           onPortfolioSelect?.({ id: p.id, name: p.name });
                           setOpen(false);
                         }}
-                        className="hover:bg-accent active:bg-accent/80 focus:border-primary flex w-full items-center gap-3 rounded-lg border border-transparent p-3 text-left transition-colors focus:outline-none"
+                        className="hover:bg-accent active:bg-accent/80 focus:border-primary flex w-full items-center gap-3 rounded-lg border border-transparent p-3 text-start transition-colors focus:outline-none"
                       >
                         <div className="bg-primary/10 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full">
                           <Icons.Folder className="text-primary h-5 w-5" />
@@ -213,7 +213,7 @@ export const AccountSelectorMobile = forwardRef<HTMLButtonElement, AccountSelect
                         <div className="min-w-0 flex-1">
                           <div className="text-foreground truncate font-medium">{p.name}</div>
                         </div>
-                        <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0" />
+                        <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0 rtl:rotate-180" />
                       </button>
                     ))}
                   </div>
@@ -231,7 +231,7 @@ export const AccountSelectorMobile = forwardRef<HTMLButtonElement, AccountSelect
                         <button
                           key={account.id}
                           onClick={() => handleAccountSelect(account)}
-                          className="hover:bg-accent active:bg-accent/80 focus:border-primary flex w-full items-center gap-3 rounded-lg border border-transparent p-3 text-left transition-colors focus:outline-none"
+                          className="hover:bg-accent active:bg-accent/80 focus:border-primary flex w-full items-center gap-3 rounded-lg border border-transparent p-3 text-start transition-colors focus:outline-none"
                         >
                           <div className="bg-primary/10 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full">
                             <IconComponent className="text-primary h-5 w-5" />
@@ -242,7 +242,7 @@ export const AccountSelectorMobile = forwardRef<HTMLButtonElement, AccountSelect
                             </div>
                             <div className="text-muted-foreground text-sm">{account.currency}</div>
                           </div>
-                          <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0" />
+                          <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0 rtl:rotate-180" />
                         </button>
                       );
                     })}

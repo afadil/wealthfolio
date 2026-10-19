@@ -37,14 +37,14 @@ export function CompositionBar({ data, className }: { data: ParsedNetWorth; clas
                     minWidth: "2px",
                     backgroundColor:
                       CATEGORY_CSS_COLORS[item.category] ?? "var(--muted-foreground)",
-                    marginLeft: index > 0 ? "1px" : 0,
+                    marginInlineStart: index > 0 ? "1px" : 0,
                   }}
                 />
               }
             />
             <TooltipContent side="bottom" className="text-xs">
               <span className="font-medium">{item.name}</span>
-              <span className="text-background/70 ml-2">{item.percentage.toFixed(1)}%</span>
+              <span className="text-background/70 ms-2">{item.percentage.toFixed(1)}%</span>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

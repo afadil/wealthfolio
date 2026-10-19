@@ -239,13 +239,13 @@ export function ClientSetup({ serverUrl, token }: { serverUrl: string; token?: s
         </p>
       </div>
       <div className="bg-muted relative rounded-md">
-        <pre className="text-muted-foreground max-h-56 overflow-y-auto whitespace-pre-wrap break-words py-2 pl-3 pr-10 font-mono text-xs leading-relaxed">
+        <pre className="text-muted-foreground max-h-56 overflow-y-auto whitespace-pre-wrap break-words py-2 pe-10 ps-3 font-mono text-xs leading-relaxed">
           {snippet}
         </pre>
         <CopyIconButton
           value={snippet}
           label={t("settings:agentAccess.dialog_client_config")}
-          className="absolute right-1.5 top-1.5"
+          className="absolute end-1.5 top-1.5"
         />
       </div>
       {tab.note && <p className="text-muted-foreground text-xs">{t(tab.note)}</p>}

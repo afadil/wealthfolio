@@ -112,7 +112,7 @@ function TransactionCardImpl({
       {/* Same leading marker the table row uses, so review state costs no width
           in the name and no height in the card. */}
       {row.needsReview && (
-        <span className="bg-warning absolute inset-y-0 left-0 w-[3px]" aria-hidden="true" />
+        <span className="bg-warning absolute inset-y-0 start-0 w-[3px]" aria-hidden="true" />
       )}
       {/* Centred rather than top-aligned: on a two-line card the selection
           control and the row menu read as belonging to the whole row, which is
@@ -341,7 +341,7 @@ function TransactionCardImpl({
           trigger={
             <button
               type="button"
-              className="hover:bg-muted -mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors"
+              className="hover:bg-muted -me-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors"
               aria-label={t("spending:transactions.rowActions")}
             >
               <Icons.MoreVertical className="h-4 w-4" aria-hidden="true" />

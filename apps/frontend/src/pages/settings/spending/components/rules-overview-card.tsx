@@ -78,7 +78,7 @@ export function RulesOverviewCard() {
             </p>
           </div>
           <Link to="/settings/spending/rules" className={buttonVariants({ size: "sm" })}>
-            <Icons.Plus className="mr-1.5 h-3.5 w-3.5" />
+            <Icons.Plus className="me-1.5 h-3.5 w-3.5" />
             {t("settings:spending.rules_overview.setup_cta")}
           </Link>
         </div>
@@ -120,7 +120,7 @@ export function RulesOverviewCard() {
               >
                 <span className="text-sm leading-none">{r.flag}</span>
                 <span>{r.name}</span>
-                <span className="text-muted-foreground border-border/60 ml-1 border-l pl-2 tabular-nums">
+                <span className="text-muted-foreground border-border/60 ms-1 border-s ps-2 tabular-nums">
                   {r.count}
                 </span>
               </span>
@@ -129,9 +129,9 @@ export function RulesOverviewCard() {
         )}
       </div>
 
-      <div className="bg-muted/30 group-hover:bg-foreground group-hover:text-background text-muted-foreground flex shrink-0 items-center justify-center gap-1.5 border-t px-4 py-3 text-xs font-medium uppercase tracking-widest transition-colors sm:w-24 sm:flex-col sm:gap-2 sm:border-l sm:border-t-0 sm:px-0 sm:py-0">
+      <div className="bg-muted/30 group-hover:bg-foreground group-hover:text-background text-muted-foreground flex shrink-0 items-center justify-center gap-1.5 border-t px-4 py-3 text-xs font-medium uppercase tracking-widest transition-colors sm:w-24 sm:flex-col sm:gap-2 sm:border-s sm:border-t-0 sm:px-0 sm:py-0">
         <span>{t("settings:spending.rules_overview.open")}</span>
-        <Icons.ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+        <Icons.ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
       </div>
     </Link>
   );

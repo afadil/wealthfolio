@@ -164,21 +164,21 @@ export function ContributionLimitItem({
         <div className="hidden sm:flex sm:items-center sm:justify-between">
           <div className="space-y-1">
             <div className="flex items-center">
-              {isComplete && <Icons.CheckCircle className="text-success mr-2 h-5 w-5" />}
-              {isOverLimit && <Icons.AlertTriangle className="text-destructive mr-2 h-5 w-5" />}
+              {isComplete && <Icons.CheckCircle className="text-success me-2 h-5 w-5" />}
+              {isOverLimit && <Icons.AlertTriangle className="text-destructive me-2 h-5 w-5" />}
               <CardTitle className="text-lg">{limit.groupName}</CardTitle>
             </div>
 
             {limit.startDate && limit.endDate && (
               <div className="text-muted-foreground flex items-center text-xs">
-                <Icons.Calendar className="mr-1 h-3 w-3" />
+                <Icons.Calendar className="me-1 h-3 w-3" />
                 <span>
                   {dateFormatting.formatCalendarDate(limit.startDate.slice(0, 10))} →{" "}
                   {dateFormatting.formatCalendarDate(limit.endDate.slice(0, 10))}
                 </span>
                 {daysRemaining !== null && daysRemaining > 0 && daysRemaining <= 60 && (
                   <span
-                    className={`ml-2 rounded-full px-2 py-0.5 text-xs ${
+                    className={`ms-2 rounded-full px-2 py-0.5 text-xs ${
                       daysRemaining <= 30
                         ? "bg-warning-subtle text-warning-subtle-foreground"
                         : "bg-info-subtle text-info-subtle-foreground"
@@ -210,7 +210,7 @@ export function ContributionLimitItem({
                     / {amountFormatting.formatAmount(limit.limitAmount, baseCurrency)}
                   </span>
                 </div>
-                <span className="text-muted-foreground text-right text-xs">
+                <span className="text-muted-foreground text-end text-xs">
                   {isComplete
                     ? t("settings:limits_completed")
                     : isOverLimit

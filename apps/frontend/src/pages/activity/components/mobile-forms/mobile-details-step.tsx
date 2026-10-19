@@ -718,7 +718,7 @@ export function MobileDetailsStep({
                       <span className={!field.value ? "text-muted-foreground" : ""}>
                         {displayAccountText}
                       </span>
-                      <Icons.ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      <Icons.ChevronDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </FormControl>
                   <FormMessage />
@@ -753,7 +753,7 @@ export function MobileDetailsStep({
                           <span className={!field.value ? "text-muted-foreground" : ""}>
                             {toDisplayText}
                           </span>
-                          <Icons.ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          <Icons.ChevronDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </FormControl>
                       <FormMessage />
@@ -1063,7 +1063,7 @@ export function MobileDetailsStep({
                         <FormItem>
                           <FormLabel className="text-base font-medium">
                             {t("activity:form.label_transfer_rate")}
-                            <span className="text-muted-foreground ml-2 text-xs font-normal">
+                            <span className="text-muted-foreground ms-2 text-xs font-normal">
                               1 {effectiveSourceCurrency} ={" "}
                               {Number(field.value) > 0 ? field.value : "?"}{" "}
                               {effectiveDestinationCurrency}
@@ -1236,7 +1236,7 @@ function MobileAccountSheet({ accounts, open, onOpenChange, onSelect }: MobileAc
               <button
                 key={account.value}
                 onClick={() => handleAccountSelect(account)}
-                className="card-mobile hover:bg-accent active:bg-accent/80 focus:border-primary flex w-full items-center gap-3 border border-transparent text-left transition-colors focus:outline-none"
+                className="card-mobile hover:bg-accent active:bg-accent/80 focus:border-primary flex w-full items-center gap-3 border border-transparent text-start transition-colors focus:outline-none"
               >
                 <div className="bg-primary/10 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full">
                   <Icons.Briefcase className="text-primary h-5 w-5" />
@@ -1245,7 +1245,7 @@ function MobileAccountSheet({ accounts, open, onOpenChange, onSelect }: MobileAc
                   <div className="text-foreground truncate font-medium">{account.label}</div>
                   <div className="text-muted-foreground mt-0.5 text-sm">{account.currency}</div>
                 </div>
-                <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0" />
+                <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0 rtl:rotate-180" />
               </button>
             ))}
           </div>

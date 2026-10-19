@@ -275,10 +275,8 @@ export function AccountSnapshotHistory({
               <TableRow>
                 <TableHead>{t("common:date")}</TableHead>
                 <TableHead>{t("account:snapshot.header_source")}</TableHead>
-                <TableHead className="text-right">
-                  {t("account:snapshot.header_positions")}
-                </TableHead>
-                <TableHead className="text-right">{t("account:snapshot.header_cash")}</TableHead>
+                <TableHead className="text-end">{t("account:snapshot.header_positions")}</TableHead>
+                <TableHead className="text-end">{t("account:snapshot.header_cash")}</TableHead>
                 <TableHead className="w-24" />
               </TableRow>
             </TableHeader>
@@ -301,11 +299,11 @@ export function AccountSnapshotHistory({
                       {formatSnapshotSource(snapshot.source, t)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">{snapshot.positionCount}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-end">{snapshot.positionCount}</TableCell>
+                  <TableCell className="text-end">
                     {formatting.formatAmount(snapshot.cashTotalAccountCurrency, account.currency)}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-end">
                     {(canEditSnapshot(snapshot) || canDeleteSnapshot(snapshot)) && (
                       <div className="flex items-center justify-end gap-1">
                         {canEditSnapshot(snapshot) && (

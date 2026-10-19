@@ -344,7 +344,7 @@ function CategorizationProposalsContentImpl({
               <span className="text-muted-foreground w-24 whitespace-nowrap tabular-nums">
                 {formatActivityDate(row.activityDate, dateFormatting)}
               </span>
-              <span className="w-24 text-right tabular-nums">
+              <span className="w-24 text-end tabular-nums">
                 {formatActivityAmount(
                   row.amount,
                   amountFormatter,
@@ -407,7 +407,7 @@ function CategorizationProposalsContentImpl({
                   <span className="text-muted-foreground w-24 whitespace-nowrap tabular-nums">
                     {formatActivityDate(row.activityDate, dateFormatting)}
                   </span>
-                  <span className="w-24 text-right tabular-nums">
+                  <span className="w-24 text-end tabular-nums">
                     {formatActivityAmount(
                       row.amount,
                       amountFormatter,
@@ -494,9 +494,9 @@ function CategorizationProposalsContentImpl({
           <div className="flex items-center justify-end px-6 pt-1">
             <Button onClick={handleSubmit} disabled={!canSubmit}>
               {isSubmitting ? (
-                <Spinner className="mr-2 h-4 w-4" />
+                <Spinner className="me-2 h-4 w-4" />
               ) : (
-                <Icons.Check className="mr-2 h-4 w-4" />
+                <Icons.Check className="me-2 h-4 w-4" />
               )}
               {selectedCount > 0
                 ? t("ai:categorization.applySelected", { count: selectedCount })

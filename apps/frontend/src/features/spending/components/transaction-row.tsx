@@ -125,7 +125,7 @@ function TransactionRowImpl({
     >
       <TableCell className="relative w-10 px-3 py-2" data-row-click-ignore>
         {row.needsReview && (
-          <span className="bg-warning absolute inset-y-0 left-0 w-[3px]" aria-hidden="true" />
+          <span className="bg-warning absolute inset-y-0 start-0 w-[3px]" aria-hidden="true" />
         )}
         <Checkbox
           checked={isSelected}
@@ -208,7 +208,7 @@ function TransactionRowImpl({
         ) : row.splitCount > 0 ? (
           <button
             type="button"
-            className="hover:bg-muted/60 -mx-1 inline-flex max-w-full items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left transition-colors"
+            className="hover:bg-muted/60 -mx-1 inline-flex max-w-full items-center gap-1.5 rounded-md px-1.5 py-0.5 text-start transition-colors"
             onClick={() => onEditSplits(row)}
           >
             <Icons.SplitHorizontal className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -230,7 +230,7 @@ function TransactionRowImpl({
                     ? t("spending:transactions.changeCategory", { name: row.category.name })
                     : t("spending:transactions.assignCategory")
                 }
-                className="hover:bg-muted/60 -mx-1 inline-flex max-w-full items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left transition-colors"
+                className="hover:bg-muted/60 -mx-1 inline-flex max-w-full items-center gap-1.5 rounded-md px-1.5 py-0.5 text-start transition-colors"
               >
                 {row.category ? (
                   <>
@@ -256,7 +256,7 @@ function TransactionRowImpl({
       </TableCell>
       <TableCell
         className={cn(
-          "w-28 whitespace-nowrap px-3 py-2 text-right text-sm font-medium tabular-nums",
+          "w-28 whitespace-nowrap px-3 py-2 text-end text-sm font-medium tabular-nums",
           isSaving
             ? "text-[#6B8E54]"
             : isOutflow
@@ -270,7 +270,7 @@ function TransactionRowImpl({
         <PrivacyAmount value={Math.abs(safeAmount)} currency={a.currency} />
       </TableCell>
       {showBalance && (
-        <TableCell className="text-muted-foreground hidden w-28 whitespace-nowrap px-3 py-2 text-right text-sm tabular-nums sm:table-cell">
+        <TableCell className="text-muted-foreground hidden w-28 whitespace-nowrap px-3 py-2 text-end text-sm tabular-nums sm:table-cell">
           {a.cashBalance != null && a.cashBalanceCurrency && (
             <PrivacyAmount value={Number(a.cashBalance)} currency={a.cashBalanceCurrency} />
           )}
@@ -292,48 +292,48 @@ function TransactionRowImpl({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onEdit(row)}>
-              <Icons.Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
+              <Icons.Pencil className="me-2 h-4 w-4" aria-hidden="true" />
               {t("common:edit")}
             </DropdownMenuItem>
             {canMarkReimbursement && (
               <DropdownMenuItem onClick={() => onMarkReimbursement(row)}>
-                <Icons.RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
+                <Icons.RefreshCw className="me-2 h-4 w-4" aria-hidden="true" />
                 {t("spending:transactions.markReimbursement")}
               </DropdownMenuItem>
             )}
             {!isNeutral && (
               <DropdownMenuItem onClick={() => onEditSplits(row)}>
-                <Icons.SplitHorizontal className="mr-2 h-4 w-4" aria-hidden="true" />
+                <Icons.SplitHorizontal className="me-2 h-4 w-4" aria-hidden="true" />
                 {t("spending:transactions.splitTransaction")}
               </DropdownMenuItem>
             )}
             <DropdownMenuItem onClick={() => onDuplicate(row)}>
-              <Icons.Copy className="mr-2 h-4 w-4" aria-hidden="true" />
+              <Icons.Copy className="me-2 h-4 w-4" aria-hidden="true" />
               {t("spending:transactions.duplicate")}
             </DropdownMenuItem>
             {isTransfer && (onLinkTransfer || onUnlinkTransfer) ? (
               transferLinkStatus === "linked" ? (
                 onUnlinkTransfer ? (
                   <DropdownMenuItem onClick={() => onUnlinkTransfer(row)}>
-                    <Icons.Unlink className="mr-2 h-4 w-4" aria-hidden="true" />
+                    <Icons.Unlink className="me-2 h-4 w-4" aria-hidden="true" />
                     {t("spending:transactions.unlinkTransfer")}
                   </DropdownMenuItem>
                 ) : null
               ) : onLinkTransfer ? (
                 <DropdownMenuItem onClick={() => onLinkTransfer(row)}>
-                  <Icons.Link className="mr-2 h-4 w-4" aria-hidden="true" />
+                  <Icons.Link className="me-2 h-4 w-4" aria-hidden="true" />
                   {t("spending:transactions.linkTransfer")}
                 </DropdownMenuItem>
               ) : null
             ) : null}
             {canPayLoan && (
               <DropdownMenuItem onClick={() => onLoanPayment(row)}>
-                <Icons.Link className="mr-2 h-4 w-4" aria-hidden="true" />
+                <Icons.Link className="me-2 h-4 w-4" aria-hidden="true" />
                 {t("asset:loanPayments.menu")}
               </DropdownMenuItem>
             )}
             <DropdownMenuItem className="text-destructive" onClick={() => onDelete(row)}>
-              <Icons.Trash className="mr-2 h-4 w-4" aria-hidden="true" />
+              <Icons.Trash className="me-2 h-4 w-4" aria-hidden="true" />
               {t("common:delete")}
             </DropdownMenuItem>
           </DropdownMenuContent>

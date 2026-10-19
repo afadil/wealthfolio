@@ -520,22 +520,22 @@ export const HoldingsPage = () => {
                 {canEditHoldings ? (
                   <>
                     <Button size="default" onClick={() => setIsEditMode(true)}>
-                      <Icons.Pencil className="mr-2 h-4 w-4" />
+                      <Icons.Pencil className="me-2 h-4 w-4" />
                       {t("holdings:update_holdings")}
                     </Button>
                     <Button size="default" variant="outline" onClick={() => navigate("/import")}>
-                      <Icons.Import className="mr-2 h-4 w-4" />
+                      <Icons.Import className="me-2 h-4 w-4" />
                       {t("holdings:import_from_csv")}
                     </Button>
                   </>
                 ) : (
                   <>
                     <Button size="default" onClick={() => navigate("/activities/manage")}>
-                      <Icons.Plus className="mr-2 h-4 w-4" />
+                      <Icons.Plus className="me-2 h-4 w-4" />
                       {t("holdings:add_transaction")}
                     </Button>
                     <Button size="default" variant="outline" onClick={() => navigate("/import")}>
-                      <Icons.Import className="mr-2 h-4 w-4" />
+                      <Icons.Import className="me-2 h-4 w-4" />
                       {t("holdings:import_from_csv")}
                     </Button>
                   </>
@@ -621,7 +621,7 @@ export const HoldingsPage = () => {
             </EmptyHeader>
             <EmptyContent>
               <Button size="default" onClick={() => setIsAlternativeAssetModalOpen(true)}>
-                <Icons.Plus className="mr-2 h-4 w-4" />
+                <Icons.Plus className="me-2 h-4 w-4" />
                 {t("holdings:add_asset")}
               </Button>
             </EmptyContent>
@@ -672,7 +672,7 @@ export const HoldingsPage = () => {
             </EmptyHeader>
             <EmptyContent>
               <Button size="default" onClick={() => setIsAlternativeAssetModalOpen(true)}>
-                <Icons.Plus className="mr-2 h-4 w-4" />
+                <Icons.Plus className="me-2 h-4 w-4" />
                 {t("holdings:add_liability")}
               </Button>
             </EmptyContent>
@@ -701,7 +701,7 @@ export const HoldingsPage = () => {
         {/* Show Update button for HOLDINGS-mode manual accounts (only on investments tab) */}
         {canEditHoldings && !isEditMode && currentTab === "investments" && (
           <Button size="sm" variant="outline" onClick={() => setIsEditMode(true)}>
-            <Icons.Pencil className="mr-2 h-4 w-4" />
+            <Icons.Pencil className="me-2 h-4 w-4" />
             {t("holdings:update")}
           </Button>
         )}

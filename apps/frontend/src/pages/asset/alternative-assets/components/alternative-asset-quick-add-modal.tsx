@@ -475,7 +475,7 @@ export function AlternativeAssetQuickAddModal({
       >
         {/* Header with progress indicator */}
         <DialogHeader className="shrink-0 border-b px-6 py-4">
-          <div className="flex flex-col items-center space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 sm:pr-8">
+          <div className="flex flex-col items-center space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 sm:pe-8">
             <DialogTitle className="text-foreground text-lg font-semibold">
               {step === 1
                 ? t("asset:quickAdd.add_new_asset")
@@ -533,7 +533,7 @@ export function AlternativeAssetQuickAddModal({
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         className={cn(
-                          "relative flex flex-col items-start rounded-xl border-2 p-4 text-left transition-all duration-200",
+                          "relative flex flex-col items-start rounded-xl border-2 p-4 text-start transition-all duration-200",
                           "hover:shadow-md",
                           isSelected
                             ? cn(type.borderColor, type.selectedBg)
@@ -544,7 +544,7 @@ export function AlternativeAssetQuickAddModal({
                           <motion.div
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
-                            className="absolute right-2 top-2"
+                            className="absolute end-2 top-2"
                           >
                             <div className="bg-primary flex h-5 w-5 items-center justify-center rounded-full">
                               <Icons.Check className="text-primary-foreground h-3 w-3" />
@@ -732,7 +732,7 @@ export function AlternativeAssetQuickAddModal({
                         <Label className="text-foreground text-sm font-medium">
                           {t("asset:quickAdd.interest_rate")}
                           {!automaticSchedule && (
-                            <span className="text-muted-foreground ml-1 text-xs font-normal">
+                            <span className="text-muted-foreground ms-1 text-xs font-normal">
                               {t("asset:quickAdd.optional")}
                             </span>
                           )}
@@ -744,9 +744,9 @@ export function AlternativeAssetQuickAddModal({
                             value={formData.interestRate || ""}
                             onValueChange={(v) => updateFormData("interestRate", v)}
                             placeholder="0"
-                            className="h-11 pr-8"
+                            className="h-11 pe-8"
                           />
-                          <span className="text-muted-foreground pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm">
+                          <span className="text-muted-foreground pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-sm">
                             %
                           </span>
                         </div>
@@ -833,7 +833,7 @@ export function AlternativeAssetQuickAddModal({
                           <Icons.ChevronRight
                             className={cn(
                               "size-4 transition-transform",
-                              moreOptions && "rotate-90",
+                              moreOptions ? "rotate-90" : "rtl:rotate-180",
                             )}
                           />
                           {t("common:layout.more_options")}
@@ -878,7 +878,7 @@ export function AlternativeAssetQuickAddModal({
                     <Label className="text-foreground text-sm font-medium">
                       {getValueLabel()}
                       {formData.kind === AlternativeAssetKind.LIABILITY && (
-                        <span className="text-muted-foreground ml-1 text-xs font-normal">
+                        <span className="text-muted-foreground ms-1 text-xs font-normal">
                           {t("asset:quickAdd.optional")}
                         </span>
                       )}
@@ -900,7 +900,7 @@ export function AlternativeAssetQuickAddModal({
                         ? t("asset:quickAdd.balance_date")
                         : t("asset:quickAdd.value_date")}
                       {formData.kind === AlternativeAssetKind.LIABILITY && (
-                        <span className="text-muted-foreground ml-1 text-xs font-normal">
+                        <span className="text-muted-foreground ms-1 text-xs font-normal">
                           {t("asset:quickAdd.optional")}
                         </span>
                       )}
@@ -918,7 +918,7 @@ export function AlternativeAssetQuickAddModal({
                     <div className="space-y-2">
                       <Label className="text-foreground text-sm font-medium">
                         {t("asset:quickAdd.purchase_price")}
-                        <span className="text-muted-foreground ml-1 text-xs font-normal">
+                        <span className="text-muted-foreground ms-1 text-xs font-normal">
                           {t("asset:quickAdd.optional")}
                         </span>
                       </Label>
@@ -934,7 +934,7 @@ export function AlternativeAssetQuickAddModal({
                     <div className="space-y-2">
                       <Label className="text-foreground text-sm font-medium">
                         {t("asset:quickAdd.purchase_date")}
-                        <span className="text-muted-foreground ml-1 text-xs font-normal">
+                        <span className="text-muted-foreground ms-1 text-xs font-normal">
                           {t("asset:quickAdd.optional")}
                         </span>
                       </Label>
@@ -1008,7 +1008,7 @@ export function AlternativeAssetQuickAddModal({
                 disabled={isSubmitting}
                 className="flex-1"
               >
-                <Icons.ArrowLeft className="mr-2 h-4 w-4" />
+                <Icons.ArrowLeft className="me-2 h-4 w-4 rtl:rotate-180" />
                 {t("asset:quickAdd.back")}
               </Button>
             )}
@@ -1020,13 +1020,13 @@ export function AlternativeAssetQuickAddModal({
             >
               {isSubmitting ? (
                 <>
-                  <Spinner className="mr-2 h-4 w-4" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {t("asset:quickAdd.creating")}
                 </>
               ) : step === 1 ? (
                 <>
                   {t("asset:quickAdd.continue")}
-                  <Icons.ArrowRight className="ml-2 h-4 w-4" />
+                  <Icons.ArrowRight className="ms-2 h-4 w-4 rtl:rotate-180" />
                 </>
               ) : formData.kind === AlternativeAssetKind.LIABILITY ? (
                 t("asset:quickAdd.add_liability")

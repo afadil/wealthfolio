@@ -189,7 +189,7 @@ export function EventsCard({
           className="text-muted-foreground hover:text-foreground mt-3 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
         >
           {t("spending:events.createEvent")}
-          <Icons.ChevronRight className="h-3 w-3" />
+          <Icons.ChevronRight className="h-3 w-3 rtl:rotate-180" />
         </button>
       </div>
     );
@@ -367,7 +367,7 @@ export function EventsCard({
           className="text-muted-foreground hover:text-foreground mt-3 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
         >
           {t("spending:eventsCard.planEvent")}
-          <Icons.ChevronRight className="h-3 w-3" />
+          <Icons.ChevronRight className="h-3 w-3 rtl:rotate-180" />
         </button>
       ) : (
         <Link
@@ -377,7 +377,7 @@ export function EventsCard({
           {pick.mode === "recent"
             ? t("spending:eventsCard.seeBreakdown")
             : t("spending:eventsCard.openEvent")}
-          <Icons.ChevronRight className="h-3 w-3" />
+          <Icons.ChevronRight className="h-3 w-3 rtl:rotate-180" />
         </Link>
       )}
     </div>

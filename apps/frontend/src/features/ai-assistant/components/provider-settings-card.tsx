@@ -383,7 +383,7 @@ export function ProviderSettingsCard({
               )}
               {provider.enabled && !provider.hasApiKey && provider.type === "api" && (
                 <Badge variant="warning-subtle" className="shrink-0">
-                  <Icons.AlertTriangle className="mr-1 h-3 w-3" />
+                  <Icons.AlertTriangle className="me-1 h-3 w-3" />
                   {t("ai:providerSettings.apiKeyRequired")}
                 </Badge>
               )}
@@ -451,14 +451,14 @@ export function ProviderSettingsCard({
                           placeholder={
                             provider.hasApiKey ? "" : t("ai:providerSettings.enterApiKey")
                           }
-                          className="bg-background pr-9 font-mono text-sm"
+                          className="bg-background pe-9 font-mono text-sm"
                           readOnly={!hasLoadedKey && provider.hasApiKey}
                         />
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="absolute right-0 top-0 h-full w-9 hover:bg-transparent"
+                          className="absolute end-0 top-0 h-full w-9 hover:bg-transparent"
                           onClick={handleRevealApiKey}
                           disabled={isLoadingKey}
                           aria-label={
@@ -693,7 +693,7 @@ export function ProviderSettingsCard({
                                       variant="outline"
                                       className="border-warning/50 text-warning text-2xs h-5 px-1.5"
                                     >
-                                      <Icons.AlertTriangle className="mr-1 h-3 w-3" />
+                                      <Icons.AlertTriangle className="me-1 h-3 w-3" />
                                       {t("ai:providerSettings.config")}
                                     </Badge>
                                   )}
@@ -820,7 +820,7 @@ export function ProviderSettingsCard({
                           type="button"
                           onClick={() => handleToolToggle(option.toolIds, !isEnabled)}
                           className={cn(
-                            "flex items-start gap-2.5 rounded-lg border p-3 text-left transition-all",
+                            "flex items-start gap-2.5 rounded-lg border p-3 text-start transition-all",
                             isEnabled
                               ? "border-primary/30 bg-primary/5"
                               : "bg-muted/40 hover:bg-muted/60 border-transparent",
@@ -1254,12 +1254,12 @@ function AdvancedTuningSection({
             <Icons.ChevronRight
               className={cn(
                 "text-muted-foreground h-3.5 w-3.5 transition-transform",
-                open && "rotate-90",
+                open ? "rotate-90" : "rtl:rotate-180",
               )}
             />
             {t("ai:providerSettings.advancedOptions")}
             {hasOverrides && (
-              <Badge variant="secondary" className="text-2xs ml-1 uppercase">
+              <Badge variant="secondary" className="text-2xs ms-1 uppercase">
                 {t("ai:providerSettings.customized")}
               </Badge>
             )}

@@ -412,9 +412,9 @@ function HeaderMetric({
     <div
       className={cn(
         "flex min-w-0 flex-col gap-1",
-        align === "left" && "items-start text-left",
+        align === "left" && "items-start text-start",
         align === "center" && "items-center text-center",
-        align === "right" && "items-end text-right",
+        align === "right" && "items-end text-end",
       )}
     >
       <MetricLabelWithInfo
@@ -444,7 +444,7 @@ function HeaderMetric({
 }
 
 const STRIP_SECTION_CLASS =
-  "border-border/70 flex min-h-[4.75rem] min-w-0 flex-col justify-center border-l pl-5";
+  "border-border/70 flex min-h-[4.75rem] min-w-0 flex-col justify-center border-s ps-5";
 const STRIP_TITLE_CLASS =
   "text-muted-foreground/70 mb-2.5 font-mono text-2xs font-semibold uppercase tracking-[0.28em]";
 const STRIP_LABEL_CLASS =
@@ -548,7 +548,7 @@ function StripHelpPopover({ items }: { items: StripHelpItem[] }) {
           <Button
             variant="ghost"
             size="icon"
-            className="text-muted-foreground hover:text-foreground absolute right-0 top-0 h-6 w-6 rounded-full"
+            className="text-muted-foreground hover:text-foreground absolute end-0 top-0 h-6 w-6 rounded-full"
             aria-label={t("performance:help.aria_label")}
           />
         }
@@ -790,7 +790,7 @@ function AttributionDetailMetric({
         currency={currency}
         className={cn("text-base font-semibold", sectionTitle && STRIP_VALUE_CLASS, valueClassName)}
       />
-      <Icons.ChevronRight className="text-muted-foreground/60 group-hover:text-muted-foreground h-3.5 w-3.5 shrink-0 transition-all group-hover:translate-x-0.5" />
+      <Icons.ChevronRight className="text-muted-foreground/60 group-hover:text-muted-foreground h-3.5 w-3.5 shrink-0 transition-all group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
     </div>
   );
 
@@ -803,12 +803,12 @@ function AttributionDetailMetric({
           sectionTitle
             ? cn(
                 STRIP_SECTION_CLASS,
-                "hover:bg-muted/30 group h-auto w-full items-start rounded-none px-0 pl-5 text-left",
+                "hover:bg-muted/30 group h-auto w-full items-start rounded-none px-0 ps-5 text-start",
               )
             : "hover:bg-muted/50 group h-auto w-full min-w-0 rounded-md px-2 py-1",
-          align === "left" && "text-left",
+          align === "left" && "text-start",
           align === "center" && "text-center",
-          align === "right" && "text-right",
+          align === "right" && "text-end",
           className,
         )}
         onClick={() => setIsOpen(true)}
@@ -939,12 +939,12 @@ function PerformanceContent({
       {isLoading && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <div className="animate-subtle-pulse absolute inset-0 border-2 border-transparent">
-            <div className="animate-progress-border bg-primary absolute left-0 top-0 h-[2px]"></div>
+            <div className="animate-progress-border bg-primary absolute start-0 top-0 h-[2px] rtl:-scale-x-100"></div>
           </div>
-          <div className="absolute bottom-4 right-4">
+          <div className="absolute bottom-4 end-4">
             <div className="bg-background/80 rounded-md border px-3 py-1.5 shadow-sm backdrop-blur-sm">
               <p className="text-muted-foreground flex items-center text-xs font-medium">
-                <span className="bg-primary mr-2 inline-block h-2 w-2 animate-pulse rounded-full"></span>
+                <span className="bg-primary me-2 inline-block h-2 w-2 animate-pulse rounded-full"></span>
                 {t("performance:calculating")}
               </p>
             </div>
@@ -1050,7 +1050,7 @@ const SelectedItemBadge = ({
         variant="ghost"
         size="icon-xs"
         className={cn(
-          "ml-2 size-5 transition-all duration-150",
+          "ms-2 size-5 transition-all duration-150",
           "hover:bg-destructive-subtle hover:text-destructive-subtle-foreground hover:scale-110",
           "focus-visible:ring-destructive/50 focus-visible:ring-2",
         )}
@@ -1476,7 +1476,7 @@ export default function PerformancePage() {
   return (
     <>
       {/* Account scope + date range selectors - fixed position in header area */}
-      <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden items-center gap-2 md:flex lg:right-4">
+      <div className="pointer-events-auto fixed end-2 top-4 z-20 hidden items-center gap-2 md:flex lg:end-4">
         <AccountScopeSelector value={accountScope} onChange={setAccountScope} />
         <DateRangeSelector
           asOf={today}
@@ -1509,11 +1509,11 @@ export default function PerformancePage() {
               className="flex-1 touch-pan-x overscroll-x-contain"
               data-no-swipe-drag
             >
-              <CarouselContent className="-ml-2">
+              <CarouselContent className="-ms-2">
                 {selectedItems.map((item) => {
                   const plotState = itemPlotStateById.get(item.id) ?? PLOTTED_ITEM_STATE;
                   return (
-                    <CarouselItem key={item.id} className="basis-auto pl-2">
+                    <CarouselItem key={item.id} className="basis-auto ps-2">
                       <SelectedItemBadge
                         item={item}
                         isSelected={activeChartAnchorId === item.id}
@@ -1551,14 +1551,14 @@ export default function PerformancePage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem onClick={() => setAccountSheetOpen(true)} className="py-4 md:py-2">
-                <Icons.Briefcase className="mr-2 h-4 w-4" />
+                <Icons.Briefcase className="me-2 h-4 w-4" />
                 {t("performance:add_account")}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => setBenchmarkSheetOpen(true)}
                 className="py-4 md:py-2"
               >
-                <Icons.TrendingUp className="mr-2 h-4 w-4" />
+                <Icons.TrendingUp className="me-2 h-4 w-4" />
                 {t("performance:add_benchmark")}
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -1577,11 +1577,11 @@ export default function PerformancePage() {
                 }}
                 className="w-full max-w-[calc(100vw-24rem)] md:max-w-[calc(100vw-28rem)]"
               >
-                <CarouselContent className="-ml-2">
+                <CarouselContent className="-ms-2">
                   {selectedItems.map((item) => {
                     const plotState = itemPlotStateById.get(item.id) ?? PLOTTED_ITEM_STATE;
                     return (
-                      <CarouselItem key={item.id} className="basis-auto pl-2">
+                      <CarouselItem key={item.id} className="basis-auto ps-2">
                         <SelectedItemBadge
                           item={item}
                           isSelected={activeChartAnchorId === item.id}
@@ -1664,7 +1664,7 @@ export default function PerformancePage() {
                   <CardDescription
                     className={cn(
                       "text-xs sm:text-sm",
-                      !isMobile && "whitespace-nowrap text-right 2xl:text-left",
+                      !isMobile && "whitespace-nowrap text-end 2xl:text-start",
                       isMobile && "text-2xs",
                     )}
                   >
@@ -1694,8 +1694,8 @@ export default function PerformancePage() {
                         className="w-full touch-pan-x overscroll-x-contain"
                         data-no-swipe-drag
                       >
-                        <CarouselContent className="-ml-2">
-                          <CarouselItem className="basis-[42%] pl-2">
+                        <CarouselContent className="-ms-2">
+                          <CarouselItem className="basis-[42%] ps-2">
                             <div className="bg-muted/30 rounded-lg px-3 py-2">
                               <HeaderMetric
                                 label={
@@ -1711,7 +1711,7 @@ export default function PerformancePage() {
                               />
                             </div>
                           </CarouselItem>
-                          <CarouselItem className="basis-[42%] pl-2">
+                          <CarouselItem className="basis-[42%] ps-2">
                             <div className="bg-muted/30 rounded-lg px-3 py-2">
                               <HeaderMetric
                                 label={
@@ -1728,7 +1728,7 @@ export default function PerformancePage() {
                             </div>
                           </CarouselItem>
                           {selectedItemData?.showMoneyWeightedReturn && (
-                            <CarouselItem className="basis-[42%] pl-2">
+                            <CarouselItem className="basis-[42%] ps-2">
                               <div className="bg-muted/30 rounded-lg px-3 py-2">
                                 <HeaderMetric
                                   label={selectedItemData.moneyWeightedReturnMobileLabel}
@@ -1742,7 +1742,7 @@ export default function PerformancePage() {
                               </div>
                             </CarouselItem>
                           )}
-                          <CarouselItem className="basis-[42%] pl-2">
+                          <CarouselItem className="basis-[42%] ps-2">
                             <div className="bg-muted/30 rounded-lg px-3 py-2">
                               <HeaderMetric
                                 label={t("performance:metric.volatility")}
@@ -1755,7 +1755,7 @@ export default function PerformancePage() {
                               />
                             </div>
                           </CarouselItem>
-                          <CarouselItem className="basis-[42%] pl-2">
+                          <CarouselItem className="basis-[42%] ps-2">
                             <div className="bg-muted/30 rounded-lg px-3 py-2">
                               <HeaderMetric
                                 label={t("performance:metric.max_drawdown")}
@@ -1767,7 +1767,7 @@ export default function PerformancePage() {
                             </div>
                           </CarouselItem>
                           {selectedItemData?.periodPnl != null && (
-                            <CarouselItem className="basis-[52%] pl-2">
+                            <CarouselItem className="basis-[52%] ps-2">
                               <AttributionDetailMetric
                                 result={selectedItemData.result}
                                 itemName={selectedItemData.name}
@@ -1782,7 +1782,7 @@ export default function PerformancePage() {
                         </CarouselContent>
                       </Carousel>
                     ) : (
-                      <div className="relative w-full overflow-x-auto pb-1 pr-8 2xl:w-auto 2xl:overflow-visible">
+                      <div className="relative w-full overflow-x-auto pb-1 pe-8 2xl:w-auto 2xl:overflow-visible">
                         {selectedItemData && (
                           <StripHelpPopover items={selectedItemData.helpItems} />
                         )}

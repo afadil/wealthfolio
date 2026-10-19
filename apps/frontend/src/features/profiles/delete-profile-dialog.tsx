@@ -58,7 +58,7 @@ export function DeleteProfileDialog({
         className="gap-6 rounded-3xl sm:!max-w-md"
         mobileClassName="h-[90vh] space-y-6 overflow-y-auto"
       >
-        <DialogHeader className="gap-3 text-left">
+        <DialogHeader className="gap-3 text-start">
           <span className="profile-lock-avatar mx-auto mb-1 w-fit [--avatar-rim:3px]">
             <ProfileAvatar id={profile.avatarId} className="size-14 rounded-full" />
           </span>

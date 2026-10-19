@@ -1208,7 +1208,7 @@ export default function SpendingTabContent() {
                     >
                       <div className="flex items-center justify-between">
                         <s.Icon className="h-4 w-4" style={{ color: theme.deep }} />
-                        <Icons.ArrowRight className="text-muted-foreground/40 group-hover:text-foreground h-3.5 w-3.5 transition-colors" />
+                        <Icons.ArrowRight className="text-muted-foreground/40 group-hover:text-foreground h-3.5 w-3.5 transition-colors rtl:rotate-180" />
                       </div>
                       <div>
                         <div className="text-foreground text-sm font-medium">{t(s.labelKey)}</div>
@@ -1253,7 +1253,7 @@ export default function SpendingTabContent() {
                     <h3 className="text-foreground text-sm font-semibold">
                       {t("spending:tabContent.worthALook")}
                     </h3>
-                    <span className="text-muted-foreground/70 ml-auto text-xs">
+                    <span className="text-muted-foreground/70 ms-auto text-xs">
                       {t("spending:tabContent.signalCount", { count: insights.length })}
                     </span>
                   </div>
@@ -1278,10 +1278,10 @@ export default function SpendingTabContent() {
                   </div>
                   <Link
                     to={dashboardInsightHref.changed}
-                    className="text-muted-foreground hover:text-foreground ml-6 mt-3 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
+                    className="text-muted-foreground hover:text-foreground ms-6 mt-3 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
                   >
                     {t("spending:tabContent.seeTrends")}
-                    <Icons.ChevronRight className="h-3 w-3" />
+                    <Icons.ChevronRight className="h-3 w-3 rtl:rotate-180" />
                   </Link>
                 </div>
               )}
@@ -1821,10 +1821,10 @@ function CategoryRankedBar({
               <span className="text-foreground/90 min-w-0 flex-1 truncate text-xs font-medium">
                 {r.name}
               </span>
-              <span className="text-muted-foreground/70 text-2xs w-12 text-right tabular-nums">
+              <span className="text-muted-foreground/70 text-2xs w-12 text-end tabular-nums">
                 {numberFormatting.formatPercent(share / 100, { digits: 1 })}
               </span>
-              <span className="text-foreground w-24 text-right text-xs font-semibold tabular-nums">
+              <span className="text-foreground w-24 text-end text-xs font-semibold tabular-nums">
                 <PrivacyAmount value={r.amount} currency={currency} />
               </span>
             </Link>
@@ -1839,10 +1839,10 @@ function CategoryRankedBar({
             <span className="text-foreground/80 min-w-0 flex-1 text-xs font-medium">
               {t("spending:tabContent.uncategorizedImprove")}
             </span>
-            <span className="text-muted-foreground/70 text-2xs w-12 text-right tabular-nums">
+            <span className="text-muted-foreground/70 text-2xs w-12 text-end tabular-nums">
               {numberFormatting.formatPercent(uncategorizedShare / 100, { digits: 1 })}
             </span>
-            <span className="text-foreground w-24 text-right text-xs font-semibold tabular-nums">
+            <span className="text-foreground w-24 text-end text-xs font-semibold tabular-nums">
               <PrivacyAmount value={uncategorizedAmount} currency={currency} />
             </span>
           </Link>
@@ -1904,25 +1904,25 @@ function GroupedCategoryBlock({
         <Icons.ChevronRight
           className={cn(
             "text-muted-foreground/70 h-3 w-3 shrink-0 transition-transform",
-            expanded && "rotate-90",
+            expanded ? "rotate-90" : "rtl:rotate-180",
           )}
         />
         <span
           className="block h-2.5 w-2.5 shrink-0 rounded-sm"
           style={{ backgroundColor: accent }}
         />
-        <span className="text-foreground min-w-0 flex-1 truncate text-left text-xs font-semibold uppercase tracking-wide">
+        <span className="text-foreground min-w-0 flex-1 truncate text-start text-xs font-semibold uppercase tracking-wide">
           {bucket.name}
         </span>
-        <span className="text-muted-foreground/80 text-2xs w-12 text-right font-medium tabular-nums">
+        <span className="text-muted-foreground/80 text-2xs w-12 text-end font-medium tabular-nums">
           {numberFormatting.formatPercent(share / 100, { digits: 1 })}
         </span>
-        <span className="text-foreground w-24 text-right text-xs font-semibold tabular-nums">
+        <span className="text-foreground w-24 text-end text-xs font-semibold tabular-nums">
           <PrivacyAmount value={bucket.total} currency={currency} />
         </span>
       </button>
       {expanded && (
-        <div className="mt-1 space-y-0.5 pl-6">
+        <div className="mt-1 space-y-0.5 ps-6">
           {sortedCats.map((cat) => {
             const catShare = total > 0 ? (cat.amount / total) * 100 : 0;
             const isUncategorized = cat.id === "__uncategorized__";
@@ -1946,10 +1946,10 @@ function GroupedCategoryBlock({
                 >
                   {cat.name}
                 </span>
-                <span className="text-muted-foreground/70 text-2xs w-12 text-right tabular-nums">
+                <span className="text-muted-foreground/70 text-2xs w-12 text-end tabular-nums">
                   {numberFormatting.formatPercent(catShare / 100, { digits: 1 })}
                 </span>
-                <span className="text-foreground w-24 text-right text-xs font-medium tabular-nums">
+                <span className="text-foreground w-24 text-end text-xs font-medium tabular-nums">
                   <PrivacyAmount value={cat.amount} currency={currency} />
                 </span>
               </Link>

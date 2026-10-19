@@ -168,7 +168,7 @@ export function SpendingDatePicker({
           <button
             type="button"
             onClick={() => setMode(mode === "month" ? "range" : "month")}
-            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring decoration-current/40 mr-auto whitespace-nowrap rounded-sm text-xs underline underline-offset-4 transition-colors focus-visible:outline-none focus-visible:ring-2"
+            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring decoration-current/40 me-auto whitespace-nowrap rounded-sm text-xs underline underline-offset-4 transition-colors focus-visible:outline-none focus-visible:ring-2"
           >
             {t(
               mode === "month"

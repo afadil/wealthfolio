@@ -257,12 +257,12 @@ export function NewAccountsFoundModal({
           <Button onClick={handleSaveAndSync} disabled={isSaving}>
             {isSaving ? (
               <>
-                <Spinner className="mr-2 h-4 w-4" />
+                <Spinner className="me-2 h-4 w-4" />
                 {t("connect:newAccounts.saving")}
               </>
             ) : (
               <>
-                <Icons.Check className="mr-2 h-4 w-4" />
+                <Icons.Check className="me-2 h-4 w-4" />
                 {t("connect:newAccounts.saveAndSync")}
               </>
             )}

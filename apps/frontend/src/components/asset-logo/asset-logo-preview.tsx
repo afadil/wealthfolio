@@ -78,7 +78,7 @@ export function AssetLogoPreview({
           </p>
           <div className="flex items-center gap-4">
             <div className="flex min-w-0 flex-1 items-center">
-              <TickerAvatar {...avatar} className="mr-2 h-8 w-8 shrink-0" />
+              <TickerAvatar {...avatar} className="me-2 h-8 w-8 shrink-0" />
               <div className="flex min-w-0 flex-col">
                 <span className="truncate text-sm font-medium">{symbol}</span>
                 <span className="text-muted-foreground truncate text-xs">{subtitle}</span>
@@ -98,7 +98,7 @@ export function AssetLogoPreview({
           <div className="flex items-center gap-3">
             <TickerAvatar {...avatar} className="h-8 w-8 shrink-0" />
             <span className="truncate text-sm font-medium">{symbol}</span>
-            <Bar className="ml-auto w-14" />
+            <Bar className="ms-auto w-14" />
           </div>
         </div>
       </div>

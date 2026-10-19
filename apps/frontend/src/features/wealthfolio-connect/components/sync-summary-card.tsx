@@ -79,12 +79,12 @@ export function SyncSummaryCard({
           <Button onClick={onSyncAll} disabled={isSyncing || status === "running"} size="sm">
             {isSyncing || status === "running" ? (
               <>
-                <Spinner className="mr-2 h-4 w-4" />
+                <Spinner className="me-2 h-4 w-4" />
                 {t("connect:sync.syncingShort")}
               </>
             ) : (
               <>
-                <Icons.RefreshCw className="mr-2 h-4 w-4" />
+                <Icons.RefreshCw className="me-2 h-4 w-4" />
                 {t("connect:sync.syncAll")}
               </>
             )}

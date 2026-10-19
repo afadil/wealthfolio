@@ -157,7 +157,7 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
                     ? worldCurrencies.find((currency) => currency.value === field.value)?.label ||
                       field.value
                     : t("settings:fx_select_currency")}
-                  <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  <Icons.ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                 </PopoverTrigger>
               </FormControl>
               <PopoverContent className="w-full p-0">
@@ -179,7 +179,7 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
                           >
                             <Icons.Plus
                               className={cn(
-                                "mr-2 h-4 w-4",
+                                "me-2 h-4 w-4",
                                 searchValue === field.value ? "opacity-100" : "opacity-0",
                               )}
                             />
@@ -205,7 +205,7 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
                             >
                               <Icons.Check
                                 className={cn(
-                                  "mr-2 h-4 w-4",
+                                  "me-2 h-4 w-4",
                                   currency.value === field.value ? "opacity-100" : "opacity-0",
                                 )}
                               />
@@ -308,7 +308,7 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
           </DialogTrigger>
           <Button type="submit">
             <Icons.Plus className="h-4 w-4" />
-            <span className="hidden sm:ml-2 sm:inline">{t("settings:fx_add_title")}</span>
+            <span className="hidden sm:ms-2 sm:inline">{t("settings:fx_add_title")}</span>
           </Button>
         </DialogFooter>
       </form>

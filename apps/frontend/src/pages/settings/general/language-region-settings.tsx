@@ -180,7 +180,7 @@ function CurrencyFormatSettings() {
         render={
           <Button
             variant="ghost"
-            className="h-auto w-full justify-between whitespace-normal px-0 py-1 text-left hover:bg-transparent has-[>svg]:px-0"
+            className="h-auto w-full justify-between whitespace-normal px-0 py-1 text-start hover:bg-transparent has-[>svg]:px-0"
             data-testid="currency-formats-toggle"
           />
         }

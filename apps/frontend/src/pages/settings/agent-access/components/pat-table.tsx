@@ -130,7 +130,7 @@ export function PatTable({ serverUrl }: { serverUrl?: string } = {}) {
           </CardDescription>
         </div>
         <Button size="sm" onClick={() => setCreateOpen(true)}>
-          <Icons.Plus className="mr-2 h-4 w-4" />
+          <Icons.Plus className="me-2 h-4 w-4" />
           {t("settings:agentAccess.pat_create")}
         </Button>
       </CardHeader>

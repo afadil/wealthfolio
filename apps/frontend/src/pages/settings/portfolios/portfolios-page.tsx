@@ -106,7 +106,7 @@ export default function PortfoliosPage() {
               <Icons.Plus className="h-4 w-4" />
             </Button>
             <Button size="sm" className="hidden sm:inline-flex" onClick={openCreate}>
-              <Icons.Plus className="mr-2 h-4 w-4" />
+              <Icons.Plus className="me-2 h-4 w-4" />
               {t("settings:portfolios.add_button")}
             </Button>
           </>
@@ -124,7 +124,7 @@ export default function PortfoliosPage() {
             </EmptyHeader>
             <EmptyContent>
               <Button onClick={openCreate}>
-                <Icons.Plus className="mr-2 h-4 w-4" />
+                <Icons.Plus className="me-2 h-4 w-4" />
                 {t("settings:portfolios.add_first")}
               </Button>
             </EmptyContent>
@@ -245,7 +245,7 @@ export default function PortfoliosPage() {
               disabled={deleteMutation.isPending}
               onClick={handleDelete}
             >
-              <Icons.Trash className="mr-2 h-4 w-4" />
+              <Icons.Trash className="me-2 h-4 w-4" />
               {t("common:delete")}
             </AlertDialogAction>
           </AlertDialogFooter>

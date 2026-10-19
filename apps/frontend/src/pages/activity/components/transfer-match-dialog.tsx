@@ -360,13 +360,13 @@ function CandidateButton({
     <button
       type="button"
       className={cn(
-        "hover:bg-muted/50 flex w-full items-start rounded-md border text-left transition-colors",
+        "hover:bg-muted/50 flex w-full items-start rounded-md border text-start transition-colors",
         selected && "border-primary bg-primary/5 hover:bg-primary/5",
       )}
       onClick={onSelect}
       aria-pressed={selected}
     >
-      <div className="py-3 pl-3">
+      <div className="py-3 ps-3">
         {selected ? (
           <Icons.CheckCircle className="text-primary h-4 w-4" />
         ) : (
@@ -871,19 +871,19 @@ export function TransferMatchDialog({
                 >
                   <div className="flex gap-2">
                     <div className="relative flex-1">
-                      <Icons.Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+                      <Icons.Search className="text-muted-foreground absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2" />
                       <Input
                         value={searchText}
                         onChange={(event) => setSearchText(event.target.value)}
                         placeholder={t("activity:transfer_match.search_placeholder")}
-                        className="pl-9"
+                        className="ps-9"
                       />
                     </div>
                     <Button type="submit" disabled={manualLoading}>
                       {manualLoading ? (
-                        <Spinner className="mr-2 h-4 w-4" />
+                        <Spinner className="me-2 h-4 w-4" />
                       ) : (
-                        <Icons.Search className="mr-2 h-4 w-4" />
+                        <Icons.Search className="me-2 h-4 w-4" />
                       )}
                       {t("common:search")}
                     </Button>
@@ -959,7 +959,7 @@ export function TransferMatchDialog({
                     >
                       <Icons.ChevronDown
                         className={cn(
-                          "mr-1 h-3.5 w-3.5 transition-transform",
+                          "me-1 h-3.5 w-3.5 transition-transform",
                           filtersOpen && "rotate-180",
                         )}
                       />
@@ -967,7 +967,7 @@ export function TransferMatchDialog({
                       {advancedFilterCount > 0 ? (
                         <Badge
                           variant="secondary"
-                          className="text-2xs ml-1.5 rounded-sm px-1.5 py-0"
+                          className="text-2xs ms-1.5 rounded-sm px-1.5 py-0"
                         >
                           {advancedFilterCount}
                         </Badge>
@@ -1096,7 +1096,7 @@ export function TransferMatchDialog({
                       })}
                     </div>
                     <ScrollArea className="max-h-72">
-                      <div className="space-y-2 pr-3">
+                      <div className="space-y-2 pe-3">
                         {filteredManualResults.length > 0 ? (
                           filteredManualResults.map((candidate) => (
                             <CandidateButton
@@ -1131,9 +1131,9 @@ export function TransferMatchDialog({
               disabled={!selectedCandidate || isProcessing}
             >
               {isProcessing ? (
-                <Spinner className="mr-2 h-4 w-4" />
+                <Spinner className="me-2 h-4 w-4" />
               ) : (
-                <Icons.Link className="mr-2 h-4 w-4" />
+                <Icons.Link className="me-2 h-4 w-4" />
               )}
               {t("activity:transfer_match.link_button")}
             </Button>
@@ -1145,9 +1145,9 @@ export function TransferMatchDialog({
               }
             >
               {isProcessing ? (
-                <Spinner className="mr-2 h-4 w-4" />
+                <Spinner className="me-2 h-4 w-4" />
               ) : (
-                <Icons.Unlink className="mr-2 h-4 w-4" />
+                <Icons.Unlink className="me-2 h-4 w-4" />
               )}
               {counterpart
                 ? t("activity:transfer_match.unlink_button_plural")

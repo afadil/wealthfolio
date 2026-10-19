@@ -60,7 +60,7 @@ export function AccountSelection({ limit, accounts, deposits, isLoading }: Accou
                 className="w-full justify-start space-x-2 px-3 py-8"
               >
                 <div className="flex w-full items-center">
-                  <div className="mr-2">
+                  <div className="me-2">
                     {selectedAccounts.includes(account.id) ? (
                       <Icons.CheckCircle className="text-success h-6 w-6" />
                     ) : (

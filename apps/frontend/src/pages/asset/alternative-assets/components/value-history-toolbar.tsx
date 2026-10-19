@@ -32,13 +32,13 @@ export function ValueHistoryToolbar({
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
         <Button variant="default" size="sm" onClick={onAddRow} disabled={isSaving}>
-          <Icons.Plus className="mr-2 h-4 w-4" />
+          <Icons.Plus className="me-2 h-4 w-4" />
           {isLiability ? t("asset:valueToolbar.add_balance") : t("asset:valueToolbar.add_value")}
         </Button>
 
         {selectedRowCount > 0 && (
           <Button variant="outline" size="sm" onClick={onDeleteSelected} disabled={isSaving}>
-            <Icons.Trash className="mr-2 h-4 w-4" />
+            <Icons.Trash className="me-2 h-4 w-4" />
             {t("asset:valueToolbar.delete_count", { count: selectedRowCount })}
           </Button>
         )}
@@ -56,7 +56,7 @@ export function ValueHistoryToolbar({
               {t("common:cancel")}
             </Button>
             <Button variant="default" size="sm" onClick={onSave} disabled={isSaving}>
-              <Icons.Save className="mr-2 h-4 w-4" />
+              <Icons.Save className="me-2 h-4 w-4" />
               {t("asset:valueToolbar.save_changes")}
             </Button>
           </>

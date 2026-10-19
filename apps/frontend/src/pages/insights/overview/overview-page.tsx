@@ -294,10 +294,10 @@ export function OverviewPage({
               <Button
                 variant="ghost"
                 size="sm"
-                className="-ml-2"
+                className="-ms-2"
                 onClick={() => backTo(effectiveTargetId ? "details" : "current")}
               >
-                <Icons.ArrowLeft className="mr-1.5 h-4 w-4" />
+                <Icons.ArrowLeft className="me-1.5 h-4 w-4 rtl:rotate-180" />
                 {t("insights:insights.back_to_allocation")}
               </Button>
               <span className="bg-border hidden h-5 w-px sm:block" />
@@ -350,10 +350,10 @@ export function OverviewPage({
           <Button
             variant="ghost"
             size="sm"
-            className="-ml-2 shrink-0"
+            className="-ms-2 shrink-0"
             onClick={() => backTo("details")}
           >
-            <Icons.ArrowLeft className="mr-1.5 h-4 w-4" />
+            <Icons.ArrowLeft className="me-1.5 h-4 w-4 rtl:rotate-180" />
             {t("insights:insights.back_to_overview")}
           </Button>
           <span className="bg-border hidden h-5 w-px sm:block" />

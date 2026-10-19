@@ -163,7 +163,7 @@ export function ImportQuotesSection({
                         onClick={handleStartOver}
                         disabled={!isPresent || isImporting}
                       >
-                        <Icons.ArrowLeft className="mr-2 h-4 w-4" />
+                        <Icons.ArrowLeft className="me-2 h-4 w-4 rtl:rotate-180" />
                         {t("common:back")}
                       </Button>
                       <Button
@@ -175,7 +175,7 @@ export function ImportQuotesSection({
                         }}
                         disabled={!isPresent || preview.validRows === 0 || isImporting}
                       >
-                        <Icons.Import className="mr-2 h-4 w-4" />
+                        <Icons.Import className="me-2 h-4 w-4" />
                         {t("settings:market_data_page.import_quotes_count", {
                           count: preview.validRows,
                         })}
@@ -230,7 +230,7 @@ export function ImportQuotesSection({
                 onClick={handleStartOver}
                 disabled={isValidating || isImporting}
               >
-                <Icons.Refresh className="mr-2 h-4 w-4" />
+                <Icons.Refresh className="me-2 h-4 w-4" />
                 {t("settings:market_data_page.start_over")}
               </Button>
             </div>

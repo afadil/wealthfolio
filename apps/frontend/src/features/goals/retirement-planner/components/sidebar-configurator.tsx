@@ -106,7 +106,7 @@ function ConfigRow({ label, children }: { label: React.ReactNode; children: Reac
   return (
     <div className="flex items-center justify-between gap-2 py-2.5 first:pt-1 last:pb-1">
       <span className="text-foreground/85 text-sm">{label}</span>
-      <span className="text-right text-sm font-semibold tabular-nums">{children}</span>
+      <span className="text-end text-sm font-semibold tabular-nums">{children}</span>
     </div>
   );
 }
@@ -261,7 +261,7 @@ function AgeBoundInput({
             setDraftValue(null);
           }
         }}
-        className="bg-muted/70 text-foreground h-8 w-full rounded-md border px-2.5 text-right text-sm tabular-nums outline-none placeholder:text-left placeholder:text-xs"
+        className="bg-muted/70 text-foreground h-8 w-full rounded-md border px-2.5 text-end text-sm tabular-nums outline-none placeholder:text-start placeholder:text-xs"
       />
     </label>
   );
@@ -308,7 +308,7 @@ function PercentOverrideInput({
             onChange(Math.min(max * 100, Math.max(0, parsed)) / 100);
           }
         }}
-        className="text-foreground min-w-0 flex-1 bg-transparent text-right text-sm tabular-nums outline-none placeholder:text-left placeholder:text-xs"
+        className="text-foreground min-w-0 flex-1 bg-transparent text-end text-sm tabular-nums outline-none placeholder:text-start placeholder:text-xs"
       />
       <span className="text-muted-foreground text-xs tabular-nums">%</span>
     </div>
@@ -667,7 +667,7 @@ export function SidebarConfigurator({
                     value={birthYearMonth}
                     max={maxBirthYearMonth}
                     onChange={(e) => updateBirthYearMonth(e.target.value)}
-                    className="bg-muted/70 text-foreground h-8 w-36 rounded-md border px-2.5 text-right text-sm tabular-nums outline-none"
+                    className="bg-muted/70 text-foreground h-8 w-36 rounded-md border px-2.5 text-end text-sm tabular-nums outline-none"
                   />
                   <span className="text-muted-foreground text-xs">
                     {t("goals:sidebar.plan.current_age_value", { age: draft.personal.currentAge })}
@@ -900,7 +900,7 @@ export function SidebarConfigurator({
                     <button
                       type="button"
                       onClick={() => setExpandedExpenseId(expanded ? null : item.id)}
-                      className="hover:bg-muted/30 flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5 text-left transition-colors"
+                      className="hover:bg-muted/30 flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5 text-start transition-colors"
                       aria-expanded={expanded}
                     >
                       <Icons.ChevronDown
@@ -926,7 +926,7 @@ export function SidebarConfigurator({
                     <button
                       type="button"
                       onClick={() => removeExpenseItem(item.id)}
-                      className="text-muted-foreground hover:text-foreground disabled:hover:text-muted-foreground mr-2 rounded-md p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                      className="text-muted-foreground hover:text-foreground disabled:hover:text-muted-foreground me-2 rounded-md p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                       aria-label={t("goals:sidebar.spending.remove", {
                         label: item.label || t("goals:sidebar.spending.item_fallback"),
                       })}
@@ -1168,7 +1168,7 @@ export function SidebarConfigurator({
                     <button
                       type="button"
                       onClick={() => setExpandedIncomeId(expanded ? null : s.id)}
-                      className="hover:bg-muted/30 flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5 text-left transition-colors"
+                      className="hover:bg-muted/30 flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5 text-start transition-colors"
                       aria-expanded={expanded}
                     >
                       <Icons.ChevronDown
@@ -1194,7 +1194,7 @@ export function SidebarConfigurator({
                     <button
                       type="button"
                       onClick={() => removeStream(s.id)}
-                      className="text-muted-foreground hover:text-foreground mr-2 rounded-md p-1 transition-colors"
+                      className="text-muted-foreground hover:text-foreground me-2 rounded-md p-1 transition-colors"
                       aria-label={t("goals:sidebar.income.remove", {
                         label: s.label || t("goals:sidebar.income.item_fallback"),
                       })}
@@ -1736,7 +1736,7 @@ export function SidebarConfigurator({
                     }
                   >
                     {amountFormatting.formatAmount(taxBucketBalances.taxable, currency)}{" "}
-                    <span className="text-muted-foreground ml-1 font-normal">
+                    <span className="text-muted-foreground ms-1 font-normal">
                       {pctOfTotal(taxBucketBalances.taxable, taxBucketTotal, numberFormatting)}
                     </span>
                   </ConfigRow>
@@ -1748,7 +1748,7 @@ export function SidebarConfigurator({
                     }
                   >
                     {amountFormatting.formatAmount(taxBucketBalances.taxDeferred, currency)}{" "}
-                    <span className="text-muted-foreground ml-1 font-normal">
+                    <span className="text-muted-foreground ms-1 font-normal">
                       {pctOfTotal(taxBucketBalances.taxDeferred, taxBucketTotal, numberFormatting)}
                     </span>
                   </ConfigRow>
@@ -1760,7 +1760,7 @@ export function SidebarConfigurator({
                     }
                   >
                     {amountFormatting.formatAmount(taxBucketBalances.taxFree, currency)}{" "}
-                    <span className="text-muted-foreground ml-1 font-normal">
+                    <span className="text-muted-foreground ms-1 font-normal">
                       {pctOfTotal(taxBucketBalances.taxFree, taxBucketTotal, numberFormatting)}
                     </span>
                   </ConfigRow>

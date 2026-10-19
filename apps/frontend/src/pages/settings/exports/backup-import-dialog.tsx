@@ -188,8 +188,8 @@ export function BackupImportDialog({
         mobileClassName="h-[min(42rem,85dvh)]"
         showCloseButton={pending !== "restore"}
       >
-        <DialogHeader className={restored ? "sr-only" : "shrink-0 px-6 pb-4 pt-6 text-left"}>
-          <DialogTitle ref={stepHeading} tabIndex={-1} className="pr-8 outline-none">
+        <DialogHeader className={restored ? "sr-only" : "shrink-0 px-6 pb-4 pt-6 text-start"}>
+          <DialogTitle ref={stepHeading} tabIndex={-1} className="pe-8 outline-none">
             {t(
               restored
                 ? "settings:backup_restored_title"
@@ -362,7 +362,7 @@ export function BackupImportDialog({
                         <details className="text-muted-foreground group text-xs leading-relaxed">
                           <summary className="inline-flex cursor-pointer list-none items-center gap-1 py-1 [&::-webkit-details-marker]:hidden">
                             <Icons.ChevronRight
-                              className="size-3.5 transition-transform group-open:rotate-90"
+                              className="size-3.5 transition-transform group-open:rotate-90 rtl:rotate-180"
                               aria-hidden
                             />
                             {t("settings:backup_password_help_title")}
@@ -392,7 +392,9 @@ export function BackupImportDialog({
                 disabled={pending === "restore"}
                 onClick={preview && !initialPreview ? back : close}
               >
-                {preview && !initialPreview && <Icons.ArrowLeft aria-hidden />}
+                {preview && !initialPreview && (
+                  <Icons.ArrowLeft aria-hidden className="rtl:rotate-180" />
+                )}
                 {t(preview && !initialPreview ? "common:back" : "common:cancel")}
               </Button>
               <Button
@@ -419,7 +421,9 @@ export function BackupImportDialog({
                         ? "settings:recovery_inspecting"
                         : "settings:recovery_inspect",
                 )}
-                {!pending && !preview && <Icons.ArrowRight aria-hidden />}
+                {!pending && !preview && (
+                  <Icons.ArrowRight aria-hidden className="rtl:rotate-180" />
+                )}
               </Button>
             </DialogFooter>
           </form>

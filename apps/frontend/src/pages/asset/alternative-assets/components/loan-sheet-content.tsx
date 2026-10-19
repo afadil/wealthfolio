@@ -26,7 +26,7 @@ export function LoanSheetHeader({ className, ...props }: ComponentProps<typeof S
     <SheetHeader
       data-testid="loan-sheet-header"
       {...props}
-      className={cn("shrink-0 border-b pb-4 pr-10", className)}
+      className={cn("shrink-0 border-b pb-4 pe-10", className)}
     />
   );
 }

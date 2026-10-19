@@ -166,7 +166,7 @@ function HealthIssueRow({
               <Spinner className="h-3 w-3" />
             ) : (
               <>
-                <Icons.Wand2 className="mr-1 h-3 w-3" />
+                <Icons.Wand2 className="me-1 h-3 w-3" />
                 {t("health:actions.fix")}
               </>
             )}
@@ -237,7 +237,7 @@ function StatusSummary({
         <Button
           variant="ghost"
           size="sm"
-          className="text-muted-foreground ml-1 h-7 px-2 text-xs"
+          className="text-muted-foreground ms-1 h-7 px-2 text-xs"
           onClick={() => onSeverityClick(null)}
         >
           {t("health:actions.clear")}
@@ -316,7 +316,7 @@ export default function HealthPage() {
             <h2 className="mb-1 text-base font-medium">{t("health:loadError.title")}</h2>
             <p className="text-muted-foreground mb-4 text-sm">{error.message}</p>
             <Button size="sm" variant="outline" onClick={handleRefresh}>
-              <Icons.RefreshCw className="mr-2 h-3.5 w-3.5" />
+              <Icons.RefreshCw className="me-2 h-3.5 w-3.5" />
               {t("health:loadError.retry")}
             </Button>
           </div>

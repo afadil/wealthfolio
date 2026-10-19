@@ -178,7 +178,7 @@ export const HoldingsTableMobile = ({
             >
               <Icons.ListFilter className="h-4 w-4" />
               {hasActiveFilters && (
-                <span className="bg-destructive absolute right-0 top-0.5 h-2 w-2 rounded-full" />
+                <span className="bg-destructive absolute end-0 top-0.5 h-2 w-2 rounded-full" />
               )}
             </Button>
           )}
@@ -252,7 +252,7 @@ export const HoldingsTableMobile = ({
                       )}
                     </div>
                   </div>
-                  <div className="ml-2 text-right">
+                  <div className="ms-2 text-end">
                     {isClosed ? (
                       <p className="text-muted-foreground font-medium">—</p>
                     ) : (

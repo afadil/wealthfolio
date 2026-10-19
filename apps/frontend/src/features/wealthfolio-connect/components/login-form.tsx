@@ -248,7 +248,7 @@ export function LoginForm() {
                 >
                   {loadingProvider === "email" ? (
                     <>
-                      <Spinner className="mr-2 h-4 w-4" />
+                      <Spinner className="me-2 h-4 w-4" />
                       {t("auth:connect.otp.verifying")}
                     </>
                   ) : (
@@ -263,7 +263,7 @@ export function LoginForm() {
                     onClick={handleBackToEmail}
                     className="text-muted-foreground"
                   >
-                    <Icons.ArrowLeft className="mr-2 h-4 w-4" />
+                    <Icons.ArrowLeft className="me-2 h-4 w-4 rtl:rotate-180" />
                     {t("auth:connect.otp.backToSignIn")}
                   </Button>
                   <span className="text-muted-foreground">•</span>

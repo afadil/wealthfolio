@@ -53,9 +53,9 @@ export function ActivityDeleteModal({
             className="max-sm:h-12"
           >
             {isDeleting ? (
-              <Spinner className="mr-2 h-4 w-4" />
+              <Spinner className="me-2 h-4 w-4" />
             ) : (
-              <Icons.Trash className="mr-2 h-4 w-4" />
+              <Icons.Trash className="me-2 h-4 w-4" />
             )}
             <span>{t("common:delete")}</span>
           </Button>

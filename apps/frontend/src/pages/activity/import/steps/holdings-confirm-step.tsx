@@ -495,14 +495,14 @@ export function HoldingsConfirmStep() {
         <Button onClick={handleImport} disabled={isImporting || snapshots.length === 0}>
           {isImporting ? (
             <>
-              <Spinner className="mr-2 h-4 w-4" />
+              <Spinner className="me-2 h-4 w-4" />
               {isPreparingAssets
                 ? t("activity:import.holdings.preparingAssets")
                 : t("activity:import.holdings.importing")}
             </>
           ) : (
             <>
-              <Icons.Upload className="mr-2 h-4 w-4" />
+              <Icons.Upload className="me-2 h-4 w-4" />
               {t("activity:import.holdings.importSnapshots", { count: snapshots.length })}
             </>
           )}

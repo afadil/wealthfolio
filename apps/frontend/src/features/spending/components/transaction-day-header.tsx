@@ -106,7 +106,7 @@ function TransactionDayHeaderImpl({
           )}
         </div>
       </TableCell>
-      <TableCell className="w-28 px-3 py-1.5 text-right">
+      <TableCell className="w-28 px-3 py-1.5 text-end">
         {!isPartial && <DayNet group={group} />}
       </TableCell>
       {showBalance && <TableCell className="hidden px-3 py-1.5 sm:table-cell" />}
@@ -134,7 +134,7 @@ function TransactionDayHeadingImpl({ group, appTimezone, isPartial }: Transactio
           {t("spending:txTab.dayCount", { count: group.rows.length })}
         </span>
       )}
-      <span className="ml-auto">{!isPartial && <DayNet group={group} />}</span>
+      <span className="ms-auto">{!isPartial && <DayNet group={group} />}</span>
     </div>
   );
 }

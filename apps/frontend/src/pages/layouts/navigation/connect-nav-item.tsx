@@ -66,7 +66,7 @@ export function ConnectNavItem({ collapsed }: ConnectNavItemProps) {
 
         <span
           className={cn({
-            "ml-2 flex flex-col items-start transition-opacity delay-100 duration-300 ease-in-out": true,
+            "ms-2 flex flex-col items-start transition-opacity delay-100 duration-300 ease-in-out": true,
             "sr-only opacity-0": collapsed,
             "block opacity-100": !collapsed,
           })}
@@ -74,7 +74,7 @@ export function ConnectNavItem({ collapsed }: ConnectNavItemProps) {
           {t("common:connect")}
         </span>
       </TooltipTrigger>
-      <TooltipContent side="right">{tooltipContent}</TooltipContent>
+      <TooltipContent side="inline-end">{tooltipContent}</TooltipContent>
     </Tooltip>
   );
 }

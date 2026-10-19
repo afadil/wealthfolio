@@ -219,9 +219,9 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
                 <div className="flex flex-col space-y-4">
                   <div className="space-y-2">
                     <h4 className="flex text-sm font-light">
-                      <Icons.Calendar className="mr-2 h-4 w-4" />
+                      <Icons.Calendar className="me-2 h-4 w-4" />
                       {t("asset:historyCard.as_of")}{" "}
-                      <Badge className="ml-1 font-medium" variant="secondary">
+                      <Badge className="ms-1 font-medium" variant="secondary">
                         {calculatedAt ? dateFormatting.formatDateTime(new Date(calculatedAt)) : "-"}
                       </Badge>
                     </h4>
@@ -234,9 +234,9 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
                     disabled={syncMarketDataMutation.isPending}
                   >
                     {syncMarketDataMutation.isPending ? (
-                      <Spinner className="mr-2 h-4 w-4" />
+                      <Spinner className="me-2 h-4 w-4" />
                     ) : (
-                      <Icons.Refresh className="mr-2 h-4 w-4" />
+                      <Icons.Refresh className="me-2 h-4 w-4" />
                     )}
                     {syncMarketDataMutation.isPending
                       ? t("asset:historyCard.refreshing_quotes")

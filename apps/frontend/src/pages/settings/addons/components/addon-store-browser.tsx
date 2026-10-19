@@ -218,12 +218,12 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         {/* Search */}
         <div className="relative flex-1">
-          <Icons.Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+          <Icons.Search className="text-muted-foreground absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2" />
           <Input
             placeholder={t("settings:addon_store_search")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="ps-9"
           />
         </div>
 
@@ -308,7 +308,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
               onClick={() => setSearchQuery("")}
               className="h-auto p-1 text-xs"
             >
-              <Icons.Close className="mr-1 h-3 w-3" />
+              <Icons.Close className="me-1 h-3 w-3" />
               {t("settings:addon_store_clear_search")}
             </Button>
           )}

@@ -747,7 +747,7 @@ const AccountPage = () => {
               )}
             >
               {t("account:explore")}
-              <Icons.ArrowRight className="h-3.5 w-3.5" />
+              <Icons.ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" />
             </Link>
           )}
         </div>
@@ -885,7 +885,7 @@ const AccountPage = () => {
                     render={
                       <Button
                         variant="ghost"
-                        className="-ml-2 h-auto min-w-0 justify-start rounded-md px-2 py-1 text-left"
+                        className="-ms-2 h-auto min-w-0 justify-start rounded-md px-2 py-1 text-start"
                         aria-label={t("account:switch_account")}
                       />
                     }
@@ -924,13 +924,13 @@ const AccountPage = () => {
                                   onSelect={() => handleAccountSwitch(acc)}
                                   className="flex items-center py-1.5"
                                 >
-                                  <IconComponent className="mr-2 h-4 w-4" />
+                                  <IconComponent className="me-2 h-4 w-4" />
                                   <span>
                                     {acc.name} ({acc.currency})
                                   </span>
                                   <Icons.Check
                                     className={cn(
-                                      "ml-auto h-4 w-4",
+                                      "ms-auto h-4 w-4",
                                       account?.id === acc.id ? "opacity-100" : "opacity-0",
                                     )}
                                   />
@@ -952,7 +952,7 @@ const AccountPage = () => {
                     render={
                       <Button
                         variant="ghost"
-                        className="-ml-2 h-auto min-w-0 justify-start rounded-md px-2 py-1 text-left"
+                        className="-ms-2 h-auto min-w-0 justify-start rounded-md px-2 py-1 text-start"
                         aria-label={t("account:switch_account")}
                       />
                     }
@@ -985,7 +985,7 @@ const AccountPage = () => {
                                     key={acc.id}
                                     onClick={() => handleAccountSwitch(acc)}
                                     className={cn(
-                                      "hover:bg-accent active:bg-accent/80 flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors focus:outline-none",
+                                      "hover:bg-accent active:bg-accent/80 flex w-full items-center gap-3 rounded-lg border p-3 text-start transition-colors focus:outline-none",
                                       account?.id === acc.id
                                         ? "border-primary bg-accent"
                                         : "border-transparent",
@@ -1140,7 +1140,7 @@ const AccountPage = () => {
                           }}
                         />
                         <IntervalSelector
-                          className="relative bottom-10 left-0 right-0 z-10"
+                          className="relative bottom-10 end-0 start-0 z-10"
                           onIntervalSelect={handleIntervalSelect}
                           isLoading={isValuationHistoryLoading}
                           defaultValue={INITIAL_INTERVAL_CODE}

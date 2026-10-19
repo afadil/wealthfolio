@@ -109,11 +109,11 @@ export function CSVFileViewer({ data, className, maxHeight = "400px" }: CSVFileV
                   {String(lineNumber).padStart(2, "0")}
                 </span>
               </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={10} className="max-w-xs p-3">
+              <TooltipContent side="inline-end" sideOffset={10} className="max-w-xs p-3">
                 <h4 className="mb-2 font-medium">
                   {t("activity:import.csvViewer.validationErrors")}
                 </h4>
-                <ul className="max-h-75 list-disc space-y-1 overflow-y-auto pl-5 text-sm">
+                <ul className="max-h-75 list-disc space-y-1 overflow-y-auto ps-5 text-sm">
                   {errors.map((error, index) => (
                     <li key={index}>{error}</li>
                   ))}
@@ -216,7 +216,7 @@ export function CSVFileViewer({ data, className, maxHeight = "400px" }: CSVFileV
                         className={cn(
                           "border-0 py-1.5",
                           cell.column.id === "isValid" &&
-                            "bg-background border-border group-hover:bg-muted/40 w-15 sticky left-0 border-r p-2",
+                            "bg-background border-border group-hover:bg-muted/40 w-15 sticky start-0 border-e p-2",
                         )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

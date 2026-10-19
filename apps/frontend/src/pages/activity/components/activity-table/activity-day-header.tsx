@@ -102,9 +102,9 @@ function ActivityDayHeaderRowImpl({
           <TableCell colSpan={cashStart} className="px-3 py-1.5">
             {heading}
           </TableCell>
-          {/* `pr-4` as on the row totals, so the right edges line up. */}
-          <TableCell colSpan={cashColumnIndex - cashStart + 1} className="px-3 py-1.5 text-right">
-            <div className="pr-4">
+          {/* `pe-4` as on the row totals, so the right edges line up. */}
+          <TableCell colSpan={cashColumnIndex - cashStart + 1} className="px-3 py-1.5 text-end">
+            <div className="pe-4">
               <DayCash group={group} />
             </div>
           </TableCell>
@@ -136,7 +136,7 @@ function ActivityDayHeadingImpl({ group, date, isPartial }: DayHeaderProps) {
     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-1 pt-2">
       <span className="text-muted-foreground whitespace-nowrap text-xs font-medium">{label}</span>
       <DayCount group={group} isPartial={isPartial} />
-      <span className="ml-auto">
+      <span className="ms-auto">
         <DayCash group={group} />
       </span>
     </div>

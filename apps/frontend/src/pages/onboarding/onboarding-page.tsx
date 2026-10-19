@@ -151,7 +151,7 @@ const OnboardingPage = () => {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="order-2 sm:order-1">
                 <Button variant="ghost" onClick={handleBack} size="sm">
-                  <Icons.ArrowLeft className="mr-1.5 h-4 w-4" />
+                  <Icons.ArrowLeft className="me-1.5 h-4 w-4 rtl:rotate-180" />
                   {t("common:back")}
                 </Button>
               </div>
@@ -162,7 +162,7 @@ const OnboardingPage = () => {
                     className={cn(buttonVariants({ variant: "outline" }), "order-2 sm:order-1")}
                   >
                     {t("onboarding:buttons.subscribeConnect")}
-                    <Icons.ExternalLink className="ml-1.5 h-4 w-4" />
+                    <Icons.ExternalLink className="ms-1.5 h-4 w-4" />
                   </ExternalLink>
                 )}
                 <Button
@@ -171,7 +171,7 @@ const OnboardingPage = () => {
                   onClick={() => updateSettings({ onboardingCompleted: true })}
                 >
                   {t("onboarding:buttons.getStarted")}
-                  <Icons.ArrowRight className="ml-1.5 h-4 w-4" />
+                  <Icons.ArrowRight className="ms-1.5 h-4 w-4 rtl:rotate-180" />
                 </Button>
               </div>
             </div>
@@ -180,7 +180,7 @@ const OnboardingPage = () => {
               <div>
                 {currentStep > 1 && (
                   <Button variant="ghost" onClick={handleBack} size="sm">
-                    <Icons.ArrowLeft className="mr-1.5 h-4 w-4" />
+                    <Icons.ArrowLeft className="me-1.5 h-4 w-4 rtl:rotate-180" />
                     {t("common:back")}
                   </Button>
                 )}
@@ -192,7 +192,7 @@ const OnboardingPage = () => {
                 className="from-primary to-primary/90 bg-linear-to-r"
               >
                 {t("onboarding:buttons.continue")}
-                <Icons.ArrowRight className="ml-1.5 h-4 w-4" />
+                <Icons.ArrowRight className="ms-1.5 h-4 w-4 rtl:rotate-180" />
               </Button>
             </div>
           )}

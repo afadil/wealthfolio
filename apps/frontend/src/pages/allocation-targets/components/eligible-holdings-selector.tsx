@@ -87,7 +87,7 @@ export function EligibleHoldingsSelector({
             <button
               type="button"
               aria-label={t("allocation:eligibleHoldings.triggerLabel", { label, summary })}
-              className="border-border/70 hover:border-foreground/40 mt-1.5 flex w-full items-center justify-between gap-3 rounded-xl border border-dashed px-3 py-2.5 text-left transition-colors"
+              className="border-border/70 hover:border-foreground/40 mt-1.5 flex w-full items-center justify-between gap-3 rounded-xl border border-dashed px-3 py-2.5 text-start transition-colors"
             />
           }
         >

@@ -412,7 +412,7 @@ export function RuleForm({
                             </span>
                           )}
                           <Icons.ChevronDown
-                            className="ml-2 h-4 w-4 shrink-0 opacity-50"
+                            className="ms-2 h-4 w-4 shrink-0 opacity-50"
                             aria-hidden="true"
                           />
                         </button>
@@ -578,7 +578,7 @@ export function RuleForm({
           <Button type="submit" disabled={isLoading}>
             {isLoading ? (
               <>
-                <Spinner className="mr-2 h-4 w-4" />
+                <Spinner className="me-2 h-4 w-4" />
                 {t("spending:common.saving")}
               </>
             ) : rule ? (

@@ -265,7 +265,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
               {t.name.toUpperCase()}
             </span>
           ))}
-          <div className="ml-1 inline-flex items-center gap-1">
+          <div className="ms-1 inline-flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -278,7 +278,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
                   />
                 }
               >
-                <Icons.ChevronLeft className="h-3.5 w-3.5" />
+                <Icons.ChevronLeft className="h-3.5 w-3.5 rtl:rotate-180" />
               </TooltipTrigger>
               <TooltipContent>{tr("spending:timeline.previousPeriod")}</TooltipContent>
             </Tooltip>
@@ -295,7 +295,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
                   />
                 }
               >
-                <Icons.ChevronRight className="h-3.5 w-3.5" />
+                <Icons.ChevronRight className="h-3.5 w-3.5 rtl:rotate-180" />
               </TooltipTrigger>
               <TooltipContent>
                 {windowOffset === 0
@@ -686,7 +686,7 @@ function SummaryCell({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn(divided && "md:border-border/40 md:border-l md:pl-4")}>
+    <div className={cn(divided && "md:border-border/40 md:border-s md:ps-4")}>
       <div className={LABEL_CLASS}>{label}</div>
       <div className="mt-1">{children}</div>
     </div>

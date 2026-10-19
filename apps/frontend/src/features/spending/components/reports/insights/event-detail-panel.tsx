@@ -199,7 +199,7 @@ export const EventDetailPanel: FC<EventDetailPanelProps> = ({
                   />
                 }
               >
-                <Icons.ChevronLeft className="h-4 w-4" />
+                <Icons.ChevronLeft className="h-4 w-4 rtl:rotate-180" />
               </TooltipTrigger>
               <TooltipContent>{t("spending:eventDetail.previousEvent")}</TooltipContent>
             </Tooltip>
@@ -216,7 +216,7 @@ export const EventDetailPanel: FC<EventDetailPanelProps> = ({
                   />
                 }
               >
-                <Icons.ChevronRight className="h-4 w-4" />
+                <Icons.ChevronRight className="h-4 w-4 rtl:rotate-180" />
               </TooltipTrigger>
               <TooltipContent>{t("spending:eventDetail.nextEvent")}</TooltipContent>
             </Tooltip>
@@ -267,7 +267,7 @@ export const EventDetailPanel: FC<EventDetailPanelProps> = ({
         <div className="bg-warning/10 border-warning/40 text-2xs mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-1.5">
           <span className="text-foreground/90">
             {t("spending:eventDetail.taggedOutside", { count: outOfRange.length })}
-            <span className="text-muted-foreground/80 ml-1 tabular-nums">
+            <span className="text-muted-foreground/80 ms-1 tabular-nums">
               ({formatOutOfRangeDate(outOfRange[0], dateFormatting)}
               {outOfRange.length > 1
                 ? `–${formatOutOfRangeDate(outOfRange[outOfRange.length - 1], dateFormatting)}`
@@ -350,7 +350,7 @@ export const EventDetailPanel: FC<EventDetailPanelProps> = ({
 
       {/* TAKEAWAY */}
       <p className="text-foreground/90 mt-6 text-sm leading-relaxed">
-        <span className="text-primary text-2xs mr-2 font-semibold uppercase tracking-[0.12em]">
+        <span className="text-primary text-2xs me-2 font-semibold uppercase tracking-[0.12em]">
           {t("spending:eventDetail.takeaway")}
         </span>
         {caption}
@@ -362,7 +362,7 @@ export const EventDetailPanel: FC<EventDetailPanelProps> = ({
         <div>
           <div className="flex items-center justify-between gap-3">
             <div className={LABEL_CLASS}>{t("spending:eventDetail.dayByDay")}</div>
-            <div className={cn(LABEL_CLASS, "text-right")}>
+            <div className={cn(LABEL_CLASS, "text-end")}>
               {isBalanceHidden
                 ? `${t("spending:eventDetail.baseline")} ••••${peak ? ` · ${t("spending:eventDetail.peak")} ••••` : ""}`
                 : isPhone
@@ -390,7 +390,7 @@ export const EventDetailPanel: FC<EventDetailPanelProps> = ({
         <div>
           <div className="flex items-center justify-between gap-3">
             <div className={LABEL_CLASS}>{t("spending:eventDetail.whatDroveIt")}</div>
-            <div className={cn(LABEL_CLASS, "text-right")}>
+            <div className={cn(LABEL_CLASS, "text-end")}>
               {t("spending:eventDetail.categoriesCount", { count: categories.length })}
             </div>
           </div>
@@ -427,7 +427,7 @@ export const EventDetailPanel: FC<EventDetailPanelProps> = ({
                       <span className="text-muted-foreground/80 text-2xs tabular-nums">
                         {numberFormatting.formatPercent(pct / 100, { digits: 1 })}
                       </span>
-                      <span className="text-foreground/90 text-right text-xs font-medium tabular-nums">
+                      <span className="text-foreground/90 text-end text-xs font-medium tabular-nums">
                         <PrivacyAmount value={c.amount} currency={currency} />
                       </span>
                     </div>
@@ -505,7 +505,7 @@ export const EventDetailPanel: FC<EventDetailPanelProps> = ({
                 style={{ background: c.fill, border: `1.5px solid ${c.stroke}` }}
               />
               {ev.eventName}
-              <span className="text-muted-foreground/80 ml-1">
+              <span className="text-muted-foreground/80 ms-1">
                 · {formatChipDate(parseLocalDate(ev.startDate), dateFormatting)}
               </span>
             </button>
@@ -528,7 +528,7 @@ function StatCell({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn(divided && "md:border-border/40 md:border-l md:pl-4")}>
+    <div className={cn(divided && "md:border-border/40 md:border-s md:ps-4")}>
       <div className={LABEL_CLASS}>{label}</div>
       <div className="mt-1.5">{children}</div>
     </div>
@@ -539,7 +539,7 @@ function SubLabel({ children, right }: { children: React.ReactNode; right?: stri
   return (
     <div className="mt-5 flex items-center justify-between gap-3">
       <div className={LABEL_CLASS}>{children}</div>
-      {right ? <div className={cn(LABEL_CLASS, "text-right")}>{right}</div> : null}
+      {right ? <div className={cn(LABEL_CLASS, "text-end")}>{right}</div> : null}
     </div>
   );
 }
@@ -581,7 +581,7 @@ function DailyBars({
       <div className={cn("relative flex items-end gap-[3px]", compact ? "h-20" : "h-28")}>
         {baseline > 0 && (
           <div
-            className="border-foreground/30 pointer-events-none absolute left-0 right-0 border-t border-dashed"
+            className="border-foreground/30 pointer-events-none absolute end-0 start-0 border-t border-dashed"
             style={{ bottom: `${(baseline / max) * 100}%` }}
           />
         )}

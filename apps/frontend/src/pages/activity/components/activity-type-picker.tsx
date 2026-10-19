@@ -8,6 +8,7 @@ import {
   CarouselPrevious,
   type CarouselApi,
 } from "@wealthfolio/ui/components/ui/carousel";
+import { useDirection } from "@wealthfolio/ui/components/ui/direction";
 import { Icons, type IconName } from "@wealthfolio/ui/components/ui/icons";
 import { ActivityType as CanonicalActivityType } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -193,9 +194,9 @@ function CarouselView({
           setApi={handleSetApi}
           className="w-full"
         >
-          <CarouselContent className="-ml-2">
+          <CarouselContent className="-ms-2">
             {types.map((type) => (
-              <CarouselItem key={type.value} className="basis-auto pl-2">
+              <CarouselItem key={type.value} className="basis-auto ps-2">
                 <ActivityTypeButton
                   type={type}
                   isSelected={value === type.value}
@@ -206,8 +207,8 @@ function CarouselView({
             ))}
           </CarouselContent>
 
-          {canScrollPrev && <CarouselPrevious className="left-0 h-7 w-7" />}
-          {canScrollNext && <CarouselNext className="right-0 h-7 w-7" />}
+          {canScrollPrev && <CarouselPrevious className="start-0 h-7 w-7" />}
+          {canScrollNext && <CarouselNext className="end-0 h-7 w-7" />}
         </Carousel>
       </div>
     </div>
@@ -225,19 +226,23 @@ function GridView({
 }) {
   const { t } = useTranslation();
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const direction = useDirection();
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent, index: number) => {
       const total = types.length;
       const cols = 5; // 5 columns in grid
+      // The grid mirrors in right-to-left, so "next" is the arrow pointing left.
+      const nextKey = direction === "rtl" ? "ArrowLeft" : "ArrowRight";
+      const previousKey = direction === "rtl" ? "ArrowRight" : "ArrowLeft";
       let newIndex: number | null = null;
 
       switch (e.key) {
-        case "ArrowRight":
+        case nextKey:
           e.preventDefault();
           newIndex = (index + 1) % total;
           break;
-        case "ArrowLeft":
+        case previousKey:
           e.preventDefault();
           newIndex = (index - 1 + total) % total;
           break;
@@ -263,7 +268,7 @@ function GridView({
         buttonRefs.current[newIndex]?.focus();
       }
     },
-    [types.length],
+    [direction, types.length],
   );
 
   return (

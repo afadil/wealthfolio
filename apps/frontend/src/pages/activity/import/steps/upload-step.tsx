@@ -86,13 +86,13 @@ function CsvPreviewTable({ headers, rows, maxRows = 50 }: CsvPreviewTableProps) 
       <table className="w-full">
         <thead className="bg-muted sticky top-0">
           <tr>
-            <th className="text-muted-foreground bg-muted w-12 border-r px-2 py-1.5 text-right font-mono text-xs">
+            <th className="text-muted-foreground bg-muted w-12 border-e px-2 py-1.5 text-end font-mono text-xs">
               #
             </th>
             {headers.map((header, idx) => (
               <th
                 key={idx}
-                className="border-r px-2 py-1.5 text-left font-mono text-xs font-semibold last:border-r-0"
+                className="border-e px-2 py-1.5 text-start font-mono text-xs font-semibold last:border-e-0"
               >
                 {header || (
                   <span className="text-muted-foreground italic">
@@ -113,13 +113,13 @@ function CsvPreviewTable({ headers, rows, maxRows = 50 }: CsvPreviewTableProps) 
                 "hover:bg-muted/50",
               )}
             >
-              <td className="text-muted-foreground bg-muted/20 w-12 border-r px-2 py-1 text-right">
+              <td className="text-muted-foreground bg-muted/20 w-12 border-e px-2 py-1 text-end">
                 {rowIdx + 1}
               </td>
               {row.map((cell, cellIdx) => (
                 <td
                   key={cellIdx}
-                  className="max-w-50 truncate border-r px-2 py-1 last:border-r-0"
+                  className="max-w-50 truncate border-e px-2 py-1 last:border-e-0"
                   title={cell}
                 >
                   {cell || <span className="text-muted-foreground italic">-</span>}
@@ -127,7 +127,7 @@ function CsvPreviewTable({ headers, rows, maxRows = 50 }: CsvPreviewTableProps) 
               ))}
               {row.length < headers.length &&
                 Array.from({ length: headers.length - row.length }).map((_, idx) => (
-                  <td key={`empty-${idx}`} className="border-r px-2 py-1 last:border-r-0">
+                  <td key={`empty-${idx}`} className="border-e px-2 py-1 last:border-e-0">
                     <span className="text-muted-foreground italic">-</span>
                   </td>
                 ))}

@@ -74,12 +74,12 @@ export function QuoteImportProgress({
 
         <div className="flex gap-2">
           <Badge variant="outline" className="flex-1 justify-center">
-            <Icons.CheckCircle className="mr-1 h-4 w-4" />
+            <Icons.CheckCircle className="me-1 h-4 w-4" />
             {t("settings:market_data_page.imported_count", { count: successfulRows })}
           </Badge>
           {failedRows > 0 && (
             <Badge variant="destructive" className="flex-1 justify-center">
-              <Icons.XCircle className="mr-1 h-4 w-4" />
+              <Icons.XCircle className="me-1 h-4 w-4" />
               {t("settings:market_data_page.failed_count", { count: failedRows })}
             </Badge>
           )}
@@ -87,7 +87,7 @@ export function QuoteImportProgress({
 
         {isImporting && onCancel && (
           <Button variant="outline" onClick={onCancel} className="w-full">
-            <Icons.Close className="mr-2 h-4 w-4" />
+            <Icons.Close className="me-2 h-4 w-4" />
             {t("settings:market_data_page.cancel_import")}
           </Button>
         )}

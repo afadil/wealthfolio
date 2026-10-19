@@ -69,9 +69,9 @@ export function PortfolioUpdateTrigger({
           )}
           <div className="space-y-2">
             <h4 className="flex text-sm font-light">
-              <Icons.Calendar className="mr-2 h-4 w-4" />
+              <Icons.Calendar className="me-2 h-4 w-4" />
               {t("dashboard:update.as_of")}{" "}
-              <Badge className="ml-1 font-medium" variant="secondary">
+              <Badge className="ms-1 font-medium" variant="secondary">
                 {/* Use lastCalculatedAt prop */}
                 {formattedLastCalculatedAt
                   ? `${formattedLastCalculatedAt.date} ${formattedLastCalculatedAt.time}`
@@ -87,9 +87,9 @@ export function PortfolioUpdateTrigger({
             disabled={updatePortfolioMutation.isPending} // Use internal mutation state
           >
             {updatePortfolioMutation.isPending ? (
-              <Spinner className="mr-2 h-4 w-4" />
+              <Spinner className="me-2 h-4 w-4" />
             ) : (
-              <Icons.Refresh className="mr-2 h-4 w-4" />
+              <Icons.Refresh className="me-2 h-4 w-4" />
             )}
             {updatePortfolioMutation.isPending
               ? t("dashboard:update.updating_quotes")
@@ -103,9 +103,9 @@ export function PortfolioUpdateTrigger({
             disabled={recalculatePortfolioMutation.isPending}
           >
             {recalculatePortfolioMutation.isPending ? (
-              <Spinner className="mr-2 h-4 w-4" />
+              <Spinner className="me-2 h-4 w-4" />
             ) : (
-              <Icons.Clock className="mr-2 h-4 w-4" />
+              <Icons.Clock className="me-2 h-4 w-4" />
             )}
             {recalculatePortfolioMutation.isPending
               ? t("dashboard:update.rebuilding_history")

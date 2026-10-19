@@ -116,12 +116,12 @@ export const AssetLotsTable = ({
             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={toggleAll}>
               {allExpanded ? (
                 <>
-                  <Icons.ChevronUp className="mr-1 h-3.5 w-3.5" />
+                  <Icons.ChevronUp className="me-1 h-3.5 w-3.5" />
                   {t("asset:lots.collapse_all")}
                 </>
               ) : (
                 <>
-                  <Icons.ChevronDown className="mr-1 h-3.5 w-3.5" />
+                  <Icons.ChevronDown className="me-1 h-3.5 w-3.5" />
                   {t("asset:lots.expand_all")}
                 </>
               )}
@@ -369,7 +369,7 @@ function KpiStrip({
           value={totals.gainLossAmount}
           currency={currency}
           displayCurrency={false}
-          className={cn("items-start text-left", bigAmountClass)}
+          className={cn("items-start text-start", bigAmountClass)}
         />
         <GainPercent value={totals.gainLossPercent} className="text-2xs justify-start" />
       </KpiCell>
@@ -381,7 +381,7 @@ function KpiStrip({
               value={dayChangeAmount ?? 0}
               currency={currency}
               displayCurrency={false}
-              className={cn("items-start text-left", bigAmountClass)}
+              className={cn("items-start text-start", bigAmountClass)}
             />
             {dayChangePct != null && (
               <GainPercent value={dayChangePct} className="text-2xs justify-start" />
@@ -507,7 +507,7 @@ function AccountLotGroup({
           />
           <span className="text-foreground truncate text-sm font-medium">{group.accountName}</span>
           {group.allSnapshot && (
-            <Badge variant="secondary" className="text-2xs ml-1 uppercase tracking-wider">
+            <Badge variant="secondary" className="text-2xs ms-1 uppercase tracking-wider">
               {t("asset:lots.from_snapshot")}
             </Badge>
           )}
@@ -567,19 +567,19 @@ function AccountLotGroup({
                     <TableHead className="text-2xs uppercase tracking-[0.1em]">
                       {t("asset:lots.date")}
                     </TableHead>
-                    <TableHead className="text-2xs text-right uppercase tracking-[0.1em]">
+                    <TableHead className="text-2xs text-end uppercase tracking-[0.1em]">
                       {t("asset:lots.qty")}
                     </TableHead>
-                    <TableHead className="text-2xs text-right uppercase tracking-[0.1em]">
+                    <TableHead className="text-2xs text-end uppercase tracking-[0.1em]">
                       {t("asset:lots.unit_cost")}
                     </TableHead>
-                    <TableHead className="text-2xs text-right uppercase tracking-[0.1em]">
+                    <TableHead className="text-2xs text-end uppercase tracking-[0.1em]">
                       {t("asset:lots.cost_basis_col")}
                     </TableHead>
-                    <TableHead className="text-2xs text-right uppercase tracking-[0.1em]">
+                    <TableHead className="text-2xs text-end uppercase tracking-[0.1em]">
                       {t("asset:lots.market_value_col")}
                     </TableHead>
-                    <TableHead className="text-2xs text-right uppercase tracking-[0.1em]">
+                    <TableHead className="text-2xs text-end uppercase tracking-[0.1em]">
                       {t("holdings:gain_loss")}
                     </TableHead>
                   </TableRow>
@@ -636,7 +636,7 @@ function AssetLotTableRow({ item, currency }: { item: ComputedLot; currency: str
             ` · ${t("asset:lots.closed", { date: formatDate(lot.closeDate, dateFormatting) })}`}
         </div>
       </TableCell>
-      <TableCell className="text-right tabular-nums">
+      <TableCell className="text-end tabular-nums">
         <div>{formatting.formatQuantity(item.remainingQuantity)}</div>
         {item.hasPartialSell && (
           <div className="text-muted-foreground text-2xs">
@@ -649,7 +649,7 @@ function AssetLotTableRow({ item, currency }: { item: ComputedLot; currency: str
           </div>
         )}
       </TableCell>
-      <TableCell className="text-right tabular-nums">
+      <TableCell className="text-end tabular-nums">
         {item.valuationUnitCost != null ? (
           <PrivacyAmount value={item.valuationUnitCost} currency={item.valuationCurrency} />
         ) : (
@@ -669,17 +669,17 @@ function AssetLotTableRow({ item, currency }: { item: ComputedLot; currency: str
           </div>
         )}
       </TableCell>
-      <TableCell className="text-right tabular-nums">
+      <TableCell className="text-end tabular-nums">
         {item.valuationCostBasis != null ? (
           <PrivacyAmount value={item.valuationCostBasis} currency={item.valuationCurrency} />
         ) : (
           "—"
         )}
       </TableCell>
-      <TableCell className="text-right tabular-nums">
+      <TableCell className="text-end tabular-nums">
         {item.isValuable ? <PrivacyAmount value={item.marketValue} currency={currency} /> : "—"}
       </TableCell>
-      <TableCell className="text-right">
+      <TableCell className="text-end">
         {item.gainLossAmount != null ? (
           <div className="flex flex-col items-end">
             <GainAmount
@@ -746,7 +746,7 @@ function AssetLotMobileRow({ item, currency }: { item: ComputedLot; currency: st
 
       <div className="text-muted-foreground grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
         <span>{t("asset:lots.qty")}</span>
-        <span className="text-foreground text-right tabular-nums">
+        <span className="text-foreground text-end tabular-nums">
           {formatting.formatQuantity(item.remainingQuantity)}
           {item.hasPartialSell && (
             <span className="text-muted-foreground text-2xs block">
@@ -755,7 +755,7 @@ function AssetLotMobileRow({ item, currency }: { item: ComputedLot; currency: st
           )}
         </span>
         <span>{t("asset:lots.unit_cost")}</span>
-        <span className="text-foreground text-right tabular-nums">
+        <span className="text-foreground text-end tabular-nums">
           {item.valuationUnitCost != null ? (
             <PrivacyAmount value={item.valuationUnitCost} currency={item.valuationCurrency} />
           ) : (
@@ -763,7 +763,7 @@ function AssetLotMobileRow({ item, currency }: { item: ComputedLot; currency: st
           )}
         </span>
         <span>{t("asset:lots.cost_basis_col")}</span>
-        <span className="text-foreground text-right tabular-nums">
+        <span className="text-foreground text-end tabular-nums">
           {item.valuationCostBasis != null ? (
             <PrivacyAmount value={item.valuationCostBasis} currency={item.valuationCurrency} />
           ) : (
@@ -773,7 +773,7 @@ function AssetLotMobileRow({ item, currency }: { item: ComputedLot; currency: st
         {item.isValuable && (
           <>
             <span>{t("asset:lots.market_value_col")}</span>
-            <span className="text-foreground text-right tabular-nums">
+            <span className="text-foreground text-end tabular-nums">
               <PrivacyAmount value={item.marketValue} currency={currency} />
             </span>
           </>

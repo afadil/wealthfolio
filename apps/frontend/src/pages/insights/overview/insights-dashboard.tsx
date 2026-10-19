@@ -313,7 +313,7 @@ export function InsightsDashboard({ widgets, onCustomizeActionChange }: Insights
                 </Tooltip>
                 <Button
                   size="sm"
-                  className="ml-1 h-9 shrink-0 gap-1.5 rounded-full px-4"
+                  className="ms-1 h-9 shrink-0 gap-1.5 rounded-full px-4"
                   aria-label={t(saving ? "insights:customize.saving" : "insights:customize.save")}
                   disabled={saving}
                   onClick={() => void save()}

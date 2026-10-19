@@ -117,17 +117,17 @@ function NeedsFixingRow({
             <span className="text-muted-foreground text-2xs truncate">{symbolName}</span>
           )}
         </div>
-        <Icons.ArrowRight className="text-warning ml-auto h-3.5 w-3.5 shrink-0" />
+        <Icons.ArrowRight className="text-warning ms-auto h-3.5 w-3.5 shrink-0 rtl:rotate-180" />
       </div>
 
       {/* Col 2: search input with icon */}
       <div className="relative [&_[role=combobox]]:h-9 [&_[role=combobox]]:min-h-0 [&_[role=combobox]]:py-1">
-        <Icons.Search className="text-warning pointer-events-none absolute left-2.5 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2" />
+        <Icons.Search className="text-warning pointer-events-none absolute start-2.5 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2" />
         <TickerSearchInput
           defaultValue={symbol}
           placeholder={t("activity:import.assets.searchPlaceholder")}
           onSelectResult={(_sym, result) => onSearch(item, result)}
-          className="w-full pl-8 text-xs"
+          className="w-full ps-8 text-xs"
         />
       </div>
 
@@ -728,7 +728,7 @@ export function AssetReviewStep() {
             {/* Left: icon + text — clicking collapses */}
             <button
               type="button"
-              className="flex flex-1 items-start gap-2 text-left"
+              className="flex flex-1 items-start gap-2 text-start"
               onClick={() => toggleSection("needsFixing")}
             >
               <Icons.AlertTriangle className="text-warning mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -821,7 +821,7 @@ export function AssetReviewStep() {
               {/* Section header */}
               <button
                 type="button"
-                className="border-info-subtle-border bg-info-subtle flex w-full items-start gap-2 border-b px-4 py-2.5 text-left"
+                className="border-info-subtle-border bg-info-subtle flex w-full items-start gap-2 border-b px-4 py-2.5 text-start"
                 onClick={() => toggleSection("newAssets")}
               >
                 <Icons.Sparkles className="text-info mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -909,7 +909,7 @@ export function AssetReviewStep() {
           {/* Section header */}
           <button
             type="button"
-            className="border-success/30 bg-success/[0.06] flex w-full items-start gap-2 border-b px-4 py-2.5 text-left"
+            className="border-success/30 bg-success/[0.06] flex w-full items-start gap-2 border-b px-4 py-2.5 text-start"
             onClick={() => toggleSection("existingAssets")}
           >
             <Icons.CheckCircle className="text-success mt-0.5 h-3.5 w-3.5 shrink-0" />

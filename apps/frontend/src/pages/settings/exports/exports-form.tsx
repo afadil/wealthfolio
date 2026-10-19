@@ -107,7 +107,7 @@ export const ExportForm = () => {
             <Card key={item.key} className="mb-4">
               <CardContent className="flex items-center justify-between p-4">
                 <div className="flex items-center">
-                  <item.icon className="mr-2 h-5 w-5" />
+                  <item.icon className="me-2 h-5 w-5" />
                   <div>
                     <span className="font-medium">{item.name}</span>
                     <p className="text-muted-foreground text-sm">{item.description}</p>

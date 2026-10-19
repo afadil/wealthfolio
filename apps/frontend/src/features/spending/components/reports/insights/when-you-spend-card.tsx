@@ -114,7 +114,7 @@ export const WhenYouSpendCard: FC<WhenYouSpendCardProps> = ({
         <div />
         <div className="text-muted-foreground/70 text-2xs grid grid-cols-8">
           {HOUR_LABELS.map((h, i) => (
-            <span key={i} className="text-left">
+            <span key={i} className="text-start">
               {h}
             </span>
           ))}
@@ -190,7 +190,7 @@ function Row({
   const hoursPerCell = Math.max(1, Math.round(24 / cols));
   return (
     <>
-      <div className="text-muted-foreground/80 text-2xs pr-1 text-right">{day}</div>
+      <div className="text-muted-foreground/80 text-2xs pe-1 text-end">{day}</div>
       <div
         className="grid gap-[3px]"
         style={{ gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))` }}
@@ -239,7 +239,7 @@ function Row({
       </div>
       <div
         className={cn(
-          "text-foreground/90 inline-flex items-center pl-1 text-xs tabular-nums",
+          "text-foreground/90 inline-flex items-center ps-1 text-xs tabular-nums",
           !isPhone && "gap-2",
         )}
       >

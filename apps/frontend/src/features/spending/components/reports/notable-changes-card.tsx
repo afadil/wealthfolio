@@ -144,7 +144,7 @@ function ChangeColumn({
               <span className={cn("shrink-0 text-xs font-semibold tabular-nums", toneClass)}>
                 {arrow} <PrivacyAmount value={Math.abs(r.delta)} currency={currency} />
                 {r.pct != null && (
-                  <span className="text-muted-foreground/60 text-2xs ml-1 font-normal">
+                  <span className="text-muted-foreground/60 text-2xs ms-1 font-normal">
                     ({numberFormatting.formatPercent(Math.abs(r.pct), { digits: 0 })})
                   </span>
                 )}

@@ -83,7 +83,7 @@ function Sidebar({ collapsed }: { collapsed?: boolean }) {
   return (
     <aside
       className={cn(
-        "bg-muted/30 flex h-full flex-col border-r transition-all duration-200",
+        "bg-muted/30 flex h-full flex-col border-e transition-all duration-200",
         collapsed ? "w-0 overflow-hidden opacity-0" : "w-65 opacity-100",
       )}
     >
@@ -172,7 +172,7 @@ function NoProvidersEmptyState({ className }: { className?: string }) {
         </EmptyHeader>
         <EmptyContent>
           <Link to="/settings/ai-providers" className={buttonVariants()}>
-            <Icons.Settings className="mr-2 h-4 w-4" />
+            <Icons.Settings className="me-2 h-4 w-4" />
             {t("ai:empty.configureProviders")}
           </Link>
         </EmptyContent>

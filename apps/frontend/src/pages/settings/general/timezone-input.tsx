@@ -61,7 +61,7 @@ export function TimezoneInput({ value, onChange, timezones, placeholder }: Timez
         }
       >
         <span className="truncate">{buttonLabel}</span>
-        <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        <Icons.ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
       </PopoverTrigger>
       <PopoverContent className="w-90 max-w-[calc(100vw-2rem)] p-0">
         <Command shouldFilter={false}>
@@ -84,7 +84,7 @@ export function TimezoneInput({ value, onChange, timezones, placeholder }: Timez
                     {timezone}
                     <Icons.Check
                       className={cn(
-                        "ml-auto h-4 w-4",
+                        "ms-auto h-4 w-4",
                         timezone === value ? "opacity-100" : "opacity-0",
                       )}
                     />

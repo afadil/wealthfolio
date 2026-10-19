@@ -68,7 +68,7 @@ export function MappingHeaderCell({
       <div className="flex items-center gap-2 pb-0 pt-2">
         <span className="font-bold">
           {field}
-          {isRequired && !isMapped && <span className="text-warning ml-1">*</span>}
+          {isRequired && !isMapped && <span className="text-warning ms-1">*</span>}
         </span>
       </div>
       {isEditing ? (
@@ -111,7 +111,7 @@ export function MappingHeaderCell({
         <Button
           type="button"
           variant="ghost"
-          className="text-muted-foreground h-8 rounded-md py-0 pl-0 font-normal"
+          className="text-muted-foreground h-8 rounded-md py-0 ps-0 font-normal"
           onClick={() => setEditingHeader(field)}
         >
           {displayHeader ||
@@ -156,10 +156,10 @@ function ActivityTypeDisplayCell({
         >
           {displayValue}
         </span>
-        {showSubtype && <span className="text-muted-foreground text-2xs ml-1">{subtype}</span>}
+        {showSubtype && <span className="text-muted-foreground text-2xs ms-1">{subtype}</span>}
       </div>
       <span className="text-muted-foreground shrink-0">→</span>
-      <div className="ml-auto">
+      <div className="ms-auto">
         {appType ? (
           <Badge
             variant={appType === ACTIVITY_SKIP ? "outline" : "secondary"}
@@ -244,7 +244,7 @@ function AccountIdDisplayCell({
         <span className="text-muted-foreground shrink-0">→</span>
         <Badge
           variant="secondary"
-          className="hover:bg-secondary/80 ml-auto cursor-pointer text-xs transition-colors"
+          className="hover:bg-secondary/80 ms-auto cursor-pointer text-xs transition-colors"
           onClick={() => handleAccountIdMapping(csvAccountId, "")}
         >
           {mappedAccountId}
@@ -265,7 +265,7 @@ function AccountIdDisplayCell({
         {sourceLabel}
       </span>
       <span className="text-muted-foreground shrink-0">→</span>
-      <div className="min-w-45 ml-auto">
+      <div className="min-w-45 ms-auto">
         <AccountSelector
           selectedAccount={selectedAccount}
           setSelectedAccount={(account) => {
@@ -320,7 +320,7 @@ function SymbolDisplayCell({
           {csvSymbol || "-"}
         </span>
         <span className="text-muted-foreground shrink-0">→</span>
-        <div className="min-w-45 ml-auto">
+        <div className="min-w-45 ms-auto">
           <TickerSearchInput
             defaultValue={mappedSymbol || ""}
             placeholder={t("activity:import.mapping.mapSymbol")}
@@ -345,7 +345,7 @@ function SymbolDisplayCell({
         <span className="text-muted-foreground shrink-0">→</span>
         <Badge
           variant="secondary"
-          className="hover:bg-secondary/80 ml-auto cursor-pointer text-xs transition-colors"
+          className="hover:bg-secondary/80 ms-auto cursor-pointer text-xs transition-colors"
           onClick={() => setIsEditing(true)}
         >
           {mappedSymbol}

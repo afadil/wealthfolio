@@ -79,7 +79,7 @@ export const HoldingsMobileFilterSheet = ({
         side="bottom"
         className="flex h-[85vh] flex-col rounded-t-xl pb-[max(env(safe-area-inset-bottom),0.75rem)]"
       >
-        <SheetHeader className="text-left">
+        <SheetHeader className="text-start">
           <SheetTitle>{t("holdings:display_options")}</SheetTitle>
         </SheetHeader>
         <ScrollArea className="flex-1 py-4">
@@ -137,7 +137,7 @@ export const HoldingsMobileFilterSheet = ({
                         type="button"
                         aria-pressed={isSelected}
                         className={cn(
-                          "flex w-full items-center justify-between p-3 text-left text-sm transition-colors",
+                          "flex w-full items-center justify-between p-3 text-start text-sm transition-colors",
                           index > 0 && "border-t",
                           isSelected ? "bg-accent/50 font-medium" : "hover:bg-muted/50",
                         )}

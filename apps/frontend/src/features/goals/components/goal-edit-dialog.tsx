@@ -179,7 +179,7 @@ export function GoalEditDialog({ goal, open, onClose }: Props) {
                       aria-pressed={selected}
                       onClick={() => setLifecycle(option.value)}
                       className={cn(
-                        "rounded-xl border p-4 text-left transition-colors",
+                        "rounded-xl border p-4 text-start transition-colors",
                         "focus-visible:ring-ring focus:outline-none focus-visible:ring-2",
                         selected
                           ? "border-primary bg-primary/5"

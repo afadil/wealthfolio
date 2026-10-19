@@ -52,7 +52,7 @@ export function QuoteHistoryToolbar({
         {isManualDataSource && (
           <>
             <Button variant="default" size="sm" onClick={onAddRow} disabled={isAddDisabled}>
-              <Icons.Plus className="mr-1.5 h-4 w-4" />
+              <Icons.Plus className="me-1.5 h-4 w-4" />
               {t("asset:quoteToolbar.add")}
             </Button>
 
@@ -72,7 +72,7 @@ export function QuoteHistoryToolbar({
 
         {selectedRowCount > 0 && isManualDataSource && (
           <Button variant="outline" size="sm" onClick={onDeleteSelected}>
-            <Icons.Trash className="mr-1.5 h-4 w-4" />
+            <Icons.Trash className="me-1.5 h-4 w-4" />
             {t("asset:quoteToolbar.delete_count", { count: selectedRowCount })}
           </Button>
         )}
@@ -84,9 +84,9 @@ export function QuoteHistoryToolbar({
               {t("common:cancel")}
             </Button>
             <Button variant="default" size="sm" onClick={onSave}>
-              <Icons.Save className="mr-1.5 h-4 w-4" />
+              <Icons.Save className="me-1.5 h-4 w-4" />
               {t("asset:quoteToolbar.save")}
-              <span className="text-primary-foreground/70 ml-1 text-xs">
+              <span className="text-primary-foreground/70 ms-1 text-xs">
                 ({dirtyCount + deletedCount})
               </span>
             </Button>

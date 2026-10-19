@@ -243,7 +243,7 @@ export function CategoryForm({
               >
                 {isPending ? (
                   <>
-                    <Spinner className="mr-2 h-4 w-4" />
+                    <Spinner className="me-2 h-4 w-4" />
                     {isCreateMode ? t("settings:tax_creating") : t("settings:tax_saving")}
                   </>
                 ) : isCreateMode ? (

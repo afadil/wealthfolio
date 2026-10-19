@@ -182,7 +182,7 @@ export function FloatingNavigationBar({ navigation }: FloatingNavigationBarProps
                   side="top"
                   align="end"
                   sideOffset={16}
-                  className="mb-0 mr-0 flex w-48 flex-col gap-1 border-0 bg-transparent p-0 shadow-none ring-0 ring-offset-0"
+                  className="mb-0 me-0 flex w-48 flex-col gap-1 border-0 bg-transparent p-0 shadow-none ring-0 ring-offset-0"
                 >
                   {moreItems.map((item) => {
                     const isActive = isPathActive(location.pathname, item.href);
@@ -200,7 +200,7 @@ export function FloatingNavigationBar({ navigation }: FloatingNavigationBarProps
                           <span className="flex size-6 shrink-0 items-center justify-center">
                             {renderIcon(item.icon)}
                           </span>
-                          <span className="truncate text-left">{item.title}</span>
+                          <span className="truncate text-start">{item.title}</span>
                         </Link>
                       </LiquidGlass>
                     );

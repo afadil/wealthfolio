@@ -139,7 +139,7 @@ const ThreadSuggestions: FC = () => {
             <ThreadPrimitive.Suggestion prompt={suggestion.text} asChild>
               <Button
                 variant="ghost"
-                className="text-muted-foreground hover:text-foreground dark:hover:bg-accent/60 h-auto w-full max-w-full justify-start gap-2 whitespace-normal rounded-full border px-4 py-2.5 text-left text-sm font-normal sm:w-auto sm:justify-center sm:whitespace-nowrap sm:text-center"
+                className="text-muted-foreground hover:text-foreground dark:hover:bg-accent/60 h-auto w-full max-w-full justify-start gap-2 whitespace-normal rounded-full border px-4 py-2.5 text-start text-sm font-normal sm:w-auto sm:justify-center sm:whitespace-nowrap sm:text-center"
                 aria-label={suggestion.text}
               >
                 <Icon className="size-4 shrink-0 opacity-60" />
@@ -360,7 +360,7 @@ const AssistantMessage: FC = () => {
         <MessageError />
       </div>
 
-      <div className="aui-assistant-message-footer ml-2 mt-2 flex">
+      <div className="aui-assistant-message-footer ms-2 mt-2 flex">
         <BranchPicker />
         <AssistantActionBar />
       </div>
@@ -375,7 +375,7 @@ const AssistantActionBar: FC = () => {
       hideWhenRunning
       autohide="not-last"
       autohideFloat="single-branch"
-      className="aui-assistant-action-bar-root text-muted-foreground data-floating:bg-background data-floating:absolute data-floating:rounded-md data-floating:border data-floating:p-1 data-floating:shadow-sm col-start-3 row-start-2 -ml-1 flex gap-1"
+      className="aui-assistant-action-bar-root text-muted-foreground data-floating:bg-background data-floating:absolute data-floating:rounded-md data-floating:border data-floating:p-1 data-floating:shadow-sm col-start-3 row-start-2 -ms-1 flex gap-1"
     >
       <ActionBarPrimitive.Copy asChild>
         <TooltipIconButton tooltip={t("ai:thread.copy")}>
@@ -413,12 +413,12 @@ const UserMessage: FC = () => {
             }}
           />
         </div>
-        <div className="aui-user-action-bar-wrapper absolute left-0 top-1/2 -translate-x-full -translate-y-1/2 pr-2">
+        <div className="aui-user-action-bar-wrapper absolute start-0 top-1/2 -translate-x-full -translate-y-1/2 pe-2 rtl:translate-x-full">
           <UserActionBar />
         </div>
       </div>
 
-      <BranchPicker className="aui-user-branch-picker col-span-full col-start-1 row-start-3 -mr-1 justify-end" />
+      <BranchPicker className="aui-user-branch-picker col-span-full col-start-1 row-start-3 -me-1 justify-end" />
     </MessagePrimitive.Root>
   );
 };
@@ -444,7 +444,7 @@ const EditComposer: FC = () => {
   const { t } = useTranslation();
   return (
     <MessagePrimitive.Root className="aui-edit-composer-wrapper max-w-(--thread-max-width) mx-auto flex w-full flex-col gap-4 px-2">
-      <ComposerPrimitive.Root className="aui-edit-composer-root bg-muted max-w-7/8 ml-auto flex w-full flex-col rounded-xl">
+      <ComposerPrimitive.Root className="aui-edit-composer-root bg-muted max-w-7/8 ms-auto flex w-full flex-col rounded-xl">
         <ComposerPrimitive.Input
           className="aui-edit-composer-input text-foreground min-h-15 flex w-full resize-none bg-transparent p-4 outline-none"
           autoFocus
@@ -473,14 +473,14 @@ const BranchPicker: FC<BranchPickerPrimitive.Root.Props> = ({ className, ...rest
     <BranchPickerPrimitive.Root
       hideWhenSingleBranch
       className={cn(
-        "aui-branch-picker-root text-muted-foreground -ml-2 mr-2 inline-flex items-center text-xs",
+        "aui-branch-picker-root text-muted-foreground -ms-2 me-2 inline-flex items-center text-xs",
         className,
       )}
       {...rest}
     >
       <BranchPickerPrimitive.Previous asChild>
         <TooltipIconButton tooltip={t("ai:thread.previous")}>
-          <Icons.ChevronLeft />
+          <Icons.ChevronLeft className="rtl:rotate-180" />
         </TooltipIconButton>
       </BranchPickerPrimitive.Previous>
       <span className="aui-branch-picker-state font-medium">
@@ -488,7 +488,7 @@ const BranchPicker: FC<BranchPickerPrimitive.Root.Props> = ({ className, ...rest
       </span>
       <BranchPickerPrimitive.Next asChild>
         <TooltipIconButton tooltip={t("ai:thread.next")}>
-          <Icons.ChevronRight />
+          <Icons.ChevronRight className="rtl:rotate-180" />
         </TooltipIconButton>
       </BranchPickerPrimitive.Next>
     </BranchPickerPrimitive.Root>

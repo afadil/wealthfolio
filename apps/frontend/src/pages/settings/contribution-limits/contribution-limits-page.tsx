@@ -82,7 +82,7 @@ const SettingsContributionLimitPage = () => {
               <Icons.Plus className="size-4" />
             </Button>
             <Button size="sm" className="hidden sm:inline-flex" onClick={() => handleAddLimit()}>
-              <Icons.Plus className="mr-2 size-4" />
+              <Icons.Plus className="me-2 size-4" />
               {t("settings:limits_add_button")}
             </Button>
           </>
@@ -115,7 +115,7 @@ const SettingsContributionLimitPage = () => {
               </EmptyHeader>
               <EmptyContent>
                 <Button onClick={() => handleAddLimit()}>
-                  <Icons.Plus className="mr-2 h-4 w-4" />
+                  <Icons.Plus className="me-2 h-4 w-4" />
                   {t("settings:limits_add_first")}
                 </Button>
               </EmptyContent>

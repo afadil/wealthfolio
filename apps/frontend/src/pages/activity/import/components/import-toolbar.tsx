@@ -92,7 +92,7 @@ export function ImportToolbar({
           title={t("activity:import.reviewToolbar.skipTooltip")}
           className="h-8"
         >
-          <Icons.MinusCircle className="mr-1.5 h-3.5 w-3.5" />
+          <Icons.MinusCircle className="me-1.5 h-3.5 w-3.5" />
           {t("activity:import.reviewToolbar.skip")}
         </Button>
 
@@ -104,7 +104,7 @@ export function ImportToolbar({
           title={t("activity:import.reviewToolbar.unskipTooltip")}
           className="h-8"
         >
-          <Icons.PlusCircle className="mr-1.5 h-3.5 w-3.5" />
+          <Icons.PlusCircle className="me-1.5 h-3.5 w-3.5" />
           {t("activity:import.reviewToolbar.unskip")}
         </Button>
 
@@ -117,7 +117,7 @@ export function ImportToolbar({
             title={t("activity:import.reviewToolbar.importAnywayTooltip")}
             className="border-warning/50 text-warning-subtle-foreground hover:bg-warning-subtle h-8"
           >
-            <Icons.ShieldAlert className="mr-1.5 h-3.5 w-3.5" />
+            <Icons.ShieldAlert className="me-1.5 h-3.5 w-3.5" />
             {t("activity:import.reviewToolbar.importAnyway")}
           </Button>
         )}
@@ -136,9 +136,9 @@ export function ImportToolbar({
               />
             }
           >
-            <Icons.DollarSign className="mr-1.5 h-3.5 w-3.5" />
+            <Icons.DollarSign className="me-1.5 h-3.5 w-3.5" />
             {t("activity:import.reviewToolbar.currency")}
-            <Icons.ChevronDown className="ml-1 h-3 w-3" />
+            <Icons.ChevronDown className="ms-1 h-3 w-3" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             {/* Search input */}
@@ -183,7 +183,7 @@ export function ImportToolbar({
                     }}
                   >
                     <span className="font-mono">{currency.value}</span>
-                    <span className="text-muted-foreground ml-2 truncate text-xs">
+                    <span className="text-muted-foreground ms-2 truncate text-xs">
                       {currency.label.replace(` (${currency.value})`, "")}
                     </span>
                   </DropdownMenuItem>
@@ -205,7 +205,7 @@ export function ImportToolbar({
                   }}
                 >
                   <span className="font-mono">{currency.value}</span>
-                  <span className="text-muted-foreground ml-2 truncate text-xs">
+                  <span className="text-muted-foreground ms-2 truncate text-xs">
                     {currency.label.replace(` (${currency.value})`, "")}
                   </span>
                 </DropdownMenuItem>
@@ -236,9 +236,9 @@ export function ImportToolbar({
               />
             }
           >
-            <Icons.Briefcase className="mr-1.5 h-3.5 w-3.5" />
+            <Icons.Briefcase className="me-1.5 h-3.5 w-3.5" />
             {t("activity:import.reviewToolbar.account")}
-            <Icons.ChevronDown className="ml-1 h-3 w-3" />
+            <Icons.ChevronDown className="ms-1 h-3 w-3" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             {accounts.length === 0 ? (
@@ -248,9 +248,9 @@ export function ImportToolbar({
             ) : (
               accounts.map((account) => (
                 <DropdownMenuItem key={account.id} onClick={() => onSetAccount(account.id)}>
-                  <Icons.Briefcase className="mr-2 h-3.5 w-3.5" />
+                  <Icons.Briefcase className="me-2 h-3.5 w-3.5" />
                   <span className="truncate">{account.name}</span>
-                  <span className="text-muted-foreground ml-auto text-xs">{account.currency}</span>
+                  <span className="text-muted-foreground ms-auto text-xs">{account.currency}</span>
                 </DropdownMenuItem>
               ))
             )}
@@ -331,16 +331,16 @@ export function ImportContextMenu({
 
         {/* Skip/Unskip actions */}
         <DropdownMenuItem onClick={onSkip}>
-          <Icons.MinusCircle className="mr-2 h-4 w-4" />
+          <Icons.MinusCircle className="me-2 h-4 w-4" />
           {t("activity:import.reviewToolbar.skipSelected")}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onUnskip}>
-          <Icons.PlusCircle className="mr-2 h-4 w-4" />
+          <Icons.PlusCircle className="me-2 h-4 w-4" />
           {t("activity:import.reviewToolbar.unskipSelected")}
         </DropdownMenuItem>
         {onForceImport && (
           <DropdownMenuItem onClick={onForceImport} className="text-warning-subtle-foreground">
-            <Icons.ShieldAlert className="mr-2 h-4 w-4" />
+            <Icons.ShieldAlert className="me-2 h-4 w-4" />
             {t("activity:import.reviewToolbar.importAnywayMenu")}
           </DropdownMenuItem>
         )}
@@ -350,7 +350,7 @@ export function ImportContextMenu({
         {/* Currency submenu */}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
-            <Icons.DollarSign className="mr-2 h-4 w-4" />
+            <Icons.DollarSign className="me-2 h-4 w-4" />
             {t("activity:import.reviewToolbar.setCurrency")}
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="w-40">
@@ -365,7 +365,7 @@ export function ImportContextMenu({
         {/* Account submenu */}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
-            <Icons.Briefcase className="mr-2 h-4 w-4" />
+            <Icons.Briefcase className="me-2 h-4 w-4" />
             {t("activity:import.reviewToolbar.setAccount")}
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="w-48">
@@ -377,7 +377,7 @@ export function ImportContextMenu({
               accounts.map((account) => (
                 <DropdownMenuItem key={account.id} onClick={() => onSetAccount(account.id)}>
                   <span className="truncate">{account.name}</span>
-                  <span className="text-muted-foreground ml-auto text-xs">{account.currency}</span>
+                  <span className="text-muted-foreground ms-auto text-xs">{account.currency}</span>
                 </DropdownMenuItem>
               ))
             )}

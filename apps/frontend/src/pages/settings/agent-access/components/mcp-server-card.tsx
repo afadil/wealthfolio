@@ -68,7 +68,7 @@ function ConnectHelp({ serverUrl }: { serverUrl: string }) {
       >
         <div className="space-y-1.5">
           <p className="font-medium">{t("settings:agentAccess.help_title")}</p>
-          <ol className="text-muted-foreground list-decimal space-y-1 pl-4 text-xs">
+          <ol className="text-muted-foreground list-decimal space-y-1 ps-4 text-xs">
             <li>{t("settings:agentAccess.help_step_enable")}</li>
             <li>{t("settings:agentAccess.help_step_token")}</li>
             <li>

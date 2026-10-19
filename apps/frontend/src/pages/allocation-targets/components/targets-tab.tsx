@@ -342,7 +342,7 @@ function SellProtectionSection({
           {protectedAssets.map((a) => (
             <span
               key={a.assetId}
-              className="border-border bg-background text-2xs inline-flex items-center gap-1.5 rounded-full border py-1 pl-2 pr-1 font-mono"
+              className="border-border bg-background text-2xs inline-flex items-center gap-1.5 rounded-full border py-1 pe-1 ps-2 font-mono"
             >
               <span className="bg-muted text-muted-foreground text-2xs flex h-5 w-5 items-center justify-center rounded-full font-bold uppercase">
                 {a.symbol.slice(0, 2)}
@@ -352,7 +352,7 @@ function SellProtectionSection({
               <button
                 type="button"
                 onClick={() => onToggle("asset", a.assetId)}
-                className="text-muted-foreground hover:text-foreground hover:bg-muted ml-0.5 flex h-[1.0625rem] w-[1.0625rem] items-center justify-center rounded-full"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted ms-0.5 flex h-[1.0625rem] w-[1.0625rem] items-center justify-center rounded-full"
               >
                 <Icons.X className="h-3 w-3" />
               </button>
@@ -399,7 +399,7 @@ function SellProtectionSection({
                         setAssetPopoverOpen(false);
                         setAssetSearch("");
                       }}
-                      className="hover:bg-muted flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left"
+                      className="hover:bg-muted flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-start"
                     >
                       <span className="bg-muted text-muted-foreground text-2xs h-5.5 w-5.5 flex shrink-0 items-center justify-center rounded-full font-mono font-bold uppercase">
                         {a.symbol.slice(0, 2)}
@@ -440,14 +440,14 @@ function SellProtectionSection({
           {protectedAccounts.map((a) => (
             <span
               key={a.id}
-              className="border-border bg-background text-2xs inline-flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-1"
+              className="border-border bg-background text-2xs inline-flex items-center gap-1.5 rounded-full border py-1 pe-1 ps-2.5"
             >
               <Icons.Wallet className="text-muted-foreground h-3.5 w-3.5" />
               <span className="text-foreground font-medium">{a.name}</span>
               <button
                 type="button"
                 onClick={() => onToggle("account", a.id)}
-                className="text-muted-foreground hover:text-foreground hover:bg-muted ml-0.5 flex h-[1.0625rem] w-[1.0625rem] items-center justify-center rounded-full"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted ms-0.5 flex h-[1.0625rem] w-[1.0625rem] items-center justify-center rounded-full"
               >
                 <Icons.X className="h-3 w-3" />
               </button>
@@ -480,7 +480,7 @@ function SellProtectionSection({
                       onToggle("account", a.id);
                       setAccountPopoverOpen(false);
                     }}
-                    className="hover:bg-muted flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left"
+                    className="hover:bg-muted flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-start"
                   >
                     <Icons.Wallet className="text-muted-foreground h-4 w-4 shrink-0" />
                     <span className="text-foreground text-xs font-medium">{a.name}</span>
@@ -877,7 +877,7 @@ function TargetEditor({
       >
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
           <Button variant="ghost" size="sm" onClick={handleCancel}>
-            <Icons.X className="mr-1.5 h-4 w-4" />
+            <Icons.X className="me-1.5 h-4 w-4" />
             {t("common:cancel")}
           </Button>
           {target ? (
@@ -982,7 +982,7 @@ function TargetEditor({
                     type="button"
                     onClick={() => handleTaxonomySelect(taxonomy.id)}
                     className={cn(
-                      "flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left transition-colors",
+                      "flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-start transition-colors",
                       selected ? "border-foreground bg-card" : "bg-muted/20 hover:bg-muted/40",
                     )}
                   >
@@ -1147,7 +1147,7 @@ function TargetEditor({
                     placeholder={t("allocation:editor.noLimit")}
                     className="text-foreground placeholder:text-muted-foreground/60 w-full bg-transparent text-sm outline-none"
                   />
-                  <span className="text-muted-foreground ml-1 text-sm">%</span>
+                  <span className="text-muted-foreground ms-1 text-sm">%</span>
                 </div>
                 <p className="text-muted-foreground text-2xs mt-2 leading-relaxed">
                   {t("allocation:editor.maxTurnoverNote")}

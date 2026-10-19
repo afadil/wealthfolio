@@ -291,7 +291,7 @@ export function BackupRestoreForm() {
             className="sm:max-w-md"
             mobileClassName="h-auto max-h-[85dvh] overflow-y-auto"
           >
-            <DialogHeader className="text-left">
+            <DialogHeader className="text-start">
               <DialogTitle>{t("settings:backup_original_advanced")}</DialogTitle>
               <DialogDescription>{t("settings:backup_original_warning")}</DialogDescription>
             </DialogHeader>

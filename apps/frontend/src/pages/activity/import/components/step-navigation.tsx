@@ -64,7 +64,7 @@ export function StepNavigation({
           disabled={!canGoBack}
           className="w-full sm:w-auto"
         >
-          <Icons.ArrowLeft className="mr-2 h-4 w-4" />
+          <Icons.ArrowLeft className="me-2 h-4 w-4 rtl:rotate-180" />
           {resolvedBackLabel}
         </Button>
       </motion.div>
@@ -84,13 +84,13 @@ export function StepNavigation({
           >
             {isNextLoading ? (
               <>
-                <Spinner className="mr-2 h-4 w-4" />
+                <Spinner className="me-2 h-4 w-4" />
                 {resolvedNextLoadingLabel}
               </>
             ) : (
               <>
                 {resolvedNextLabel}
-                <Icons.ArrowRight className="ml-2 h-4 w-4" />
+                <Icons.ArrowRight className="ms-2 h-4 w-4 rtl:rotate-180" />
               </>
             )}
           </Button>

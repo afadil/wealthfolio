@@ -10,7 +10,7 @@ export function QuoteImportHelpPopover() {
       <PopoverTrigger
         render={<Button type="button" variant="link" className="flex items-center gap-1 text-sm" />}
       >
-        <Icons.HelpCircle className="mr-1 h-5 w-5" />
+        <Icons.HelpCircle className="me-1 h-5 w-5" />
         {t("settings:market_data_page.how_to_import")}
       </PopoverTrigger>
       <PopoverContent className="m-3 max-h-[min(85vh,42.5rem)] w-[min(90vw,56.25rem)] overflow-y-auto p-4 text-sm sm:m-4 sm:p-6">

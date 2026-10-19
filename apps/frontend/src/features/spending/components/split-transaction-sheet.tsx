@@ -278,7 +278,7 @@ export function SplitTransactionSheet({
           isMobile ? "rounded-t-4xl mx-1 h-[90vh] gap-0 p-0" : "sm:max-w-xl",
         )}
       >
-        <SheetHeader className={cn(isMobile && "border-border border-b px-6 py-4 text-left")}>
+        <SheetHeader className={cn(isMobile && "border-border border-b px-6 py-4 text-start")}>
           <SheetTitle>{t("spending:split.title")}</SheetTitle>
           <SheetDescription>
             {activity?.notes ?? t("spending:split.transactionFallback")} ·{" "}
@@ -322,7 +322,7 @@ export function SplitTransactionSheet({
                 allocationSegments.map((segment, index) => (
                   <span
                     key={segment.id}
-                    className={cn(index > 0 && "ml-1")}
+                    className={cn(index > 0 && "ms-1")}
                     style={{
                       flexBasis: 0,
                       flexGrow: segment.amountUnits,
@@ -357,7 +357,7 @@ export function SplitTransactionSheet({
                         trigger={
                           <button
                             type="button"
-                            className="hover:text-foreground flex h-7 min-w-0 max-w-full items-center gap-2 text-left transition-colors"
+                            className="hover:text-foreground flex h-7 min-w-0 max-w-full items-center gap-2 text-start transition-colors"
                           >
                             <span
                               className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -385,12 +385,12 @@ export function SplitTransactionSheet({
                           value={line.note}
                           onChange={(event) => updateLine(line.id, { note: event.target.value })}
                           placeholder={t("spending:split.note")}
-                          className="bg-muted/40 ml-5 mt-1 !h-7 rounded-md border-0 px-2 text-xs shadow-none md:text-xs"
+                          className="bg-muted/40 ms-5 mt-1 !h-7 rounded-md border-0 px-2 text-xs shadow-none md:text-xs"
                         />
                       ) : (
                         <button
                           type="button"
-                          className="text-muted-foreground hover:text-foreground ml-5 mt-1 inline-flex h-5 items-center gap-1.5 text-xs font-medium transition-colors"
+                          className="text-muted-foreground hover:text-foreground ms-5 mt-1 inline-flex h-5 items-center gap-1.5 text-xs font-medium transition-colors"
                           onClick={() => handleShowNote(line.id)}
                         >
                           <Icons.Plus className="h-3 w-3" aria-hidden="true" />
@@ -403,7 +403,7 @@ export function SplitTransactionSheet({
                       {linePercentage(amountUnits, totalAbsUnits)}%
                     </span>
                     <div className="relative w-24">
-                      <span className="text-muted-foreground pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs">
+                      <span className="text-muted-foreground pointer-events-none absolute start-2 top-1/2 -translate-y-1/2 text-xs">
                         {currencySymbol}
                       </span>
                       <MoneyInput
@@ -412,7 +412,7 @@ export function SplitTransactionSheet({
                         onValueChange={(value: number | undefined) =>
                           updateLine(line.id, { amount: value ?? undefined })
                         }
-                        className="bg-background hover:bg-muted !h-8 rounded-md px-2 pl-5 text-right text-sm shadow-none transition-colors focus-visible:ring-2 md:text-sm"
+                        className="bg-background hover:bg-muted !h-8 rounded-md px-2 ps-5 text-end text-sm shadow-none transition-colors focus-visible:ring-2 md:text-sm"
                       />
                     </div>
                     <Button
@@ -434,7 +434,7 @@ export function SplitTransactionSheet({
 
           <div className="flex flex-wrap gap-2 py-4">
             <Button type="button" variant="outline" size="sm" onClick={handleAddLine}>
-              <Icons.Plus className="mr-2 h-4 w-4" />
+              <Icons.Plus className="me-2 h-4 w-4" />
               {t("spending:split.addLine")}
             </Button>
             <Button
@@ -444,7 +444,7 @@ export function SplitTransactionSheet({
               onClick={handleDistribute}
               disabled={!canDistribute}
             >
-              <Icons.SplitHorizontal className="mr-2 h-4 w-4" />
+              <Icons.SplitHorizontal className="me-2 h-4 w-4" />
               {t("spending:split.distributeEvenly")}
             </Button>
           </div>
@@ -461,7 +461,7 @@ export function SplitTransactionSheet({
           {isMobile ? (
             <div className="flex w-full flex-col gap-2">
               <Button type="button" onClick={handleSave} disabled={!canSave || isSaving}>
-                {isSaving && <Spinner className="mr-2 h-4 w-4" />}
+                {isSaving && <Spinner className="me-2 h-4 w-4" />}
                 {t("common:save")}
               </Button>
               <div className="flex gap-2">
@@ -495,7 +495,7 @@ export function SplitTransactionSheet({
                   variant="outline"
                   onClick={handleClear}
                   disabled={isSaving}
-                  className="mr-auto"
+                  className="me-auto"
                 >
                   {t("spending:split.clearSplit")}
                 </Button>
@@ -509,7 +509,7 @@ export function SplitTransactionSheet({
                 {t("common:cancel")}
               </Button>
               <Button type="button" onClick={handleSave} disabled={!canSave || isSaving}>
-                {isSaving && <Spinner className="mr-2 h-4 w-4" />}
+                {isSaving && <Spinner className="me-2 h-4 w-4" />}
                 {t("common:save")}
               </Button>
             </>

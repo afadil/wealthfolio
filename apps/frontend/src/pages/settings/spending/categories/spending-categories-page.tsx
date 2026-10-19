@@ -254,7 +254,7 @@ export default function SpendingCategoriesPage() {
             <Icons.Plus className="h-3.5 w-3.5" />
           </Button>
           <Button size="sm" className="hidden sm:inline-flex" onClick={handleAddCategory}>
-            <Icons.Plus className="mr-2 h-3.5 w-3.5" />
+            <Icons.Plus className="me-2 h-3.5 w-3.5" />
             {t("settings:spending.categories.add")}
           </Button>
         </SettingsHeader>
@@ -278,7 +278,7 @@ export default function SpendingCategoriesPage() {
             </EmptyHeader>
             <EmptyContent>
               <Button onClick={handleAddCategory}>
-                <Icons.Plus className="mr-2 h-4 w-4" />
+                <Icons.Plus className="me-2 h-4 w-4" />
                 {t("settings:spending.categories.add")}
               </Button>
             </EmptyContent>

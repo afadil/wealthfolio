@@ -746,17 +746,15 @@ function ComparisonTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-border/40 text-muted-foreground/70 text-2xs border-b font-semibold uppercase tracking-[0.12em]">
-            <th className="px-3 py-3 text-left md:px-4">{t("spending:filters.category")}</th>
-            <th className="px-2 py-3 text-right md:px-3">{labels.current}</th>
-            <th className="px-2 py-3 text-right md:px-3">{labels.prior}</th>
-            <th className="px-2 py-3 text-right md:px-3">
-              {t("spending:whatChanged.deltaDollar")}
-            </th>
-            <th className="hidden px-3 py-3 text-right md:table-cell">
+            <th className="px-3 py-3 text-start md:px-4">{t("spending:filters.category")}</th>
+            <th className="px-2 py-3 text-end md:px-3">{labels.current}</th>
+            <th className="px-2 py-3 text-end md:px-3">{labels.prior}</th>
+            <th className="px-2 py-3 text-end md:px-3">{t("spending:whatChanged.deltaDollar")}</th>
+            <th className="hidden px-3 py-3 text-end md:table-cell">
               {t("spending:whatChanged.impact")}
             </th>
             {!hidePct && (
-              <th className="hidden px-4 py-3 text-right md:table-cell">
+              <th className="hidden px-4 py-3 text-end md:table-cell">
                 {t("spending:whatChanged.deltaPct")}
               </th>
             )}
@@ -811,14 +809,14 @@ const ComparisonRow = memo(function ComparisonRow({
           <span className="text-foreground text-xs md:text-sm">{row.name}</span>
         </div>
       </td>
-      <td className="text-foreground/90 text-2xs px-2 py-2.5 text-right tabular-nums md:px-3 md:text-xs">
+      <td className="text-foreground/90 text-2xs px-2 py-2.5 text-end tabular-nums md:px-3 md:text-xs">
         {row.current === 0 ? (
           <span className="text-muted-foreground/60">—</span>
         ) : (
           <PrivacyAmount value={row.current} currency={currency} />
         )}
       </td>
-      <td className="text-muted-foreground/80 text-2xs px-2 py-2.5 text-right tabular-nums md:px-3 md:text-xs">
+      <td className="text-muted-foreground/80 text-2xs px-2 py-2.5 text-end tabular-nums md:px-3 md:text-xs">
         {row.prior === 0 ? (
           <span className="text-muted-foreground/60">—</span>
         ) : (
@@ -827,7 +825,7 @@ const ComparisonRow = memo(function ComparisonRow({
       </td>
       <td
         className={cn(
-          "text-2xs px-2 py-2.5 text-right font-medium tabular-nums md:px-3 md:text-xs",
+          "text-2xs px-2 py-2.5 text-end font-medium tabular-nums md:px-3 md:text-xs",
           row.delta === 0 ? "text-muted-foreground/70" : isUp ? "text-destructive" : "text-success",
         )}
       >
@@ -840,7 +838,7 @@ const ComparisonRow = memo(function ComparisonRow({
           </>
         )}
       </td>
-      <td className="text-muted-foreground/90 hidden px-3 py-2.5 text-right text-xs tabular-nums md:table-cell">
+      <td className="text-muted-foreground/90 hidden px-3 py-2.5 text-end text-xs tabular-nums md:table-cell">
         {impactPct == null || impactPct === 0
           ? "—"
           : formatPercentValue(impactPct, formatting, { digits: 0 })}
@@ -848,7 +846,7 @@ const ComparisonRow = memo(function ComparisonRow({
       {!hidePct && (
         <td
           className={cn(
-            "hidden px-4 py-2.5 text-right text-xs font-medium tabular-nums md:table-cell",
+            "hidden px-4 py-2.5 text-end text-xs font-medium tabular-nums md:table-cell",
             !row.showPct || row.pct == null
               ? "text-muted-foreground/70"
               : row.pct >= 0

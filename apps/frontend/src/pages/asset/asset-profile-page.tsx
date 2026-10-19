@@ -257,9 +257,9 @@ function AssetHealthBanner({
               onClick={onRefreshPrices}
             >
               {isRefreshingPrices ? (
-                <Spinner className="mr-2 h-4 w-4" />
+                <Spinner className="me-2 h-4 w-4" />
               ) : (
-                <Icons.Refresh className="mr-2 h-4 w-4" />
+                <Icons.Refresh className="me-2 h-4 w-4" />
               )}
               {t("asset:profile.health.refetch_prices")}
             </Button>
@@ -1149,7 +1149,7 @@ export const AssetProfilePage = () => {
                   const url = `${location.pathname}?tab=${next}`;
                   navigate(url, { replace: true });
                 }}
-                className="mr-2"
+                className="me-2"
               />
               <ActionPalette
                 open={actionPaletteOpen}
@@ -1591,9 +1591,9 @@ export const AssetProfilePage = () => {
                             variant="ghost"
                             size="icon"
                             className={cn(
-                              "ml-1 h-5 w-5 shrink-0 overflow-hidden rounded-sm p-0 transition-[width,margin,opacity]",
-                              "md:ml-0 md:w-0 md:opacity-0 md:focus-visible:ml-1 md:focus-visible:w-5 md:focus-visible:opacity-100 md:group-hover/asset-header:ml-1 md:group-hover/asset-header:w-5 md:group-hover/asset-header:opacity-100",
-                              symbolCopied && "opacity-100 md:ml-1 md:w-5 md:opacity-100",
+                              "ms-1 h-5 w-5 shrink-0 overflow-hidden rounded-sm p-0 transition-[width,margin,opacity]",
+                              "md:ms-0 md:w-0 md:opacity-0 md:focus-visible:ms-1 md:focus-visible:w-5 md:focus-visible:opacity-100 md:group-hover/asset-header:ms-1 md:group-hover/asset-header:w-5 md:group-hover/asset-header:opacity-100",
+                              symbolCopied && "opacity-100 md:ms-1 md:w-5 md:opacity-100",
                             )}
                             aria-label={`${t("ui:dataGrid.copy")} ${displayedSymbol}`}
                             onClick={() => void handleCopySymbol()}

@@ -626,7 +626,7 @@ const ActivityPage = () => {
           groups={actionPaletteGroups}
           trigger={
             <Button data-testid="add-activities-button" size="sm">
-              <Icons.Plus className="mr-2 h-4 w-4" />
+              <Icons.Plus className="me-2 h-4 w-4" />
               {t("activity:page.add_activities")}
             </Button>
           }
@@ -692,7 +692,7 @@ const ActivityPage = () => {
           groups={spendingActionPaletteGroups}
           trigger={
             <Button data-testid="add-activities-button" size="sm">
-              <Icons.Plus className="mr-2 h-4 w-4" />
+              <Icons.Plus className="me-2 h-4 w-4" />
               {t("activity:page.add_activities")}
             </Button>
           }

@@ -67,7 +67,7 @@ export function MonthSwitcher({
         disabled={!canGoPrev}
         className="h-8 w-8"
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
       </Button>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger render={<Button variant="outline" className="h-8 w-40 justify-between" />}>
@@ -93,7 +93,7 @@ export function MonthSwitcher({
         disabled={!canGoNext}
         className="h-8 w-8"
       >
-        <ChevronRight className="h-4 w-4" />
+        <ChevronRight className="h-4 w-4 rtl:rotate-180" />
       </Button>
     </div>
   );

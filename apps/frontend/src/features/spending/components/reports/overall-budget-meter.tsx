@@ -88,7 +88,7 @@ export function OverallBudgetMeter({
             {t("spending:overallBudget.perMonthTimes", { count: monthsInRange })}
           </p>
         </div>
-        <div className="text-right">
+        <div className="text-end">
           <div className="text-foreground text-xl font-semibold tabular-nums">
             {numberFormatting.formatPercent(pct, { digits: 0 })}
           </div>
@@ -118,7 +118,7 @@ export function OverallBudgetMeter({
         />
         {overflowPct > 0 && (
           <div
-            className="absolute inset-y-0 right-0 rounded-r-full"
+            className="absolute inset-y-0 end-0 rounded-e-full"
             style={{
               width: `${overflowPct}%`,
               backgroundColor: "var(--destructive)",

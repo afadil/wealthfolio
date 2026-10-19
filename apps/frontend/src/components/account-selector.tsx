@@ -377,7 +377,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                       </span>
                     )}
                   </div>
-                  <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  <Icons.ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                 </>
               )}
             </Button>
@@ -490,7 +490,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                             className="flex items-center py-1.5"
                           >
                             <div className="flex flex-1 items-center">
-                              <Icons.Folder className="mr-2 h-4 w-4" />
+                              <Icons.Folder className="me-2 h-4 w-4" />
                               <span>{p.name}</span>
                             </div>
                           </CommandItem>
@@ -518,14 +518,14 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                                     className="flex items-center py-1.5"
                                   >
                                     <div className="flex flex-1 items-center">
-                                      <IconComponent className="mr-2 h-4 w-4" />
+                                      <IconComponent className="me-2 h-4 w-4" />
                                       <span>
                                         {account.name} ({account.currency})
                                       </span>
                                     </div>
                                     <Icons.Check
                                       className={cn(
-                                        "ml-auto h-4 w-4",
+                                        "ms-auto h-4 w-4",
                                         selectedAccount?.id === account.id
                                           ? "opacity-100"
                                           : "opacity-0",

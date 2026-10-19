@@ -201,7 +201,7 @@ export const ActivityTableMobile = ({
           ) : onAdd ? (
             <div className="flex flex-col items-center gap-3 sm:flex-row">
               <Button onClick={onAdd}>
-                <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                <Icons.Plus className="me-2 h-4 w-4" aria-hidden="true" />
                 {t("activity:add_activity")}
               </Button>
               {showConnectAccountLink && (
@@ -209,7 +209,7 @@ export const ActivityTableMobile = ({
                   to={connectPagePath("activities_empty")}
                   className={buttonVariants({ variant: "outline" })}
                 >
-                  <Icons.CloudSync2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                  <Icons.CloudSync2 className="me-2 h-4 w-4" aria-hidden="true" />
                   {t("activity:page.connect_account")}
                 </Link>
               )}
@@ -314,7 +314,7 @@ export const ActivityTableMobile = ({
                           </>
                         )}
                       {cashBalance && (
-                        <span className="ml-auto flex shrink-0 items-center gap-1">
+                        <span className="ms-auto flex shrink-0 items-center gap-1">
                           {t("activity:table_balance")}
                           <AmountDisplay
                             value={cashBalance.balance}
@@ -406,9 +406,9 @@ export const ActivityTableMobile = ({
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">{t("activity:table_date")}</span>
               {headedTime ? (
-                <p className="text-right">{headedTime}</p>
+                <p className="text-end">{headedTime}</p>
               ) : (
-                <div className="text-right">
+                <div className="text-end">
                   <p>{formattedDate.date}</p>
                   <p className="text-muted-foreground text-xs">{formattedDate.time}</p>
                 </div>
@@ -534,7 +534,7 @@ export const ActivityTableMobile = ({
             {/* Account */}
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">{t("activity:table_account")}</span>
-              <div className="text-right">
+              <div className="text-end">
                 <p>{activity.accountName}</p>
                 <p className="text-muted-foreground text-xs">{activity.accountCurrency}</p>
               </div>
@@ -563,7 +563,7 @@ export const ActivityTableMobile = ({
               key={virtualItem.key}
               data-index={virtualItem.index}
               ref={virtualizer.measureElement}
-              className="absolute left-0 top-0 w-full"
+              className="absolute start-0 top-0 w-full"
               style={{ transform: `translateY(${virtualItem.start - scrollMargin}px)` }}
             >
               {listItem.kind === "header" ? (

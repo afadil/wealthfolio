@@ -122,7 +122,7 @@ export function AssetAccountHoldings({ assetId, baseCurrency }: AssetAccountHold
                   {t("asset:accountHoldings.shares_suffix")}
                 </p>
               </div>
-              <div className="shrink-0 text-right">
+              <div className="shrink-0 text-end">
                 <AmountDisplay
                   value={h.marketValue.local}
                   currency={currency}
@@ -152,10 +152,10 @@ export function AssetAccountHoldings({ assetId, baseCurrency }: AssetAccountHold
         <TableHeader className="bg-muted/50">
           <TableRow>
             <TableHead>{t("asset:accountHoldings.account")}</TableHead>
-            <TableHead className="text-right">{t("asset:accountHoldings.shares")}</TableHead>
-            <TableHead className="text-right">{t("asset:accountHoldings.market_value")}</TableHead>
-            <TableHead className="text-right">{t("asset:accountHoldings.cost_basis")}</TableHead>
-            <TableHead className="text-right">{t("asset:accountHoldings.total_pnl")}</TableHead>
+            <TableHead className="text-end">{t("asset:accountHoldings.shares")}</TableHead>
+            <TableHead className="text-end">{t("asset:accountHoldings.market_value")}</TableHead>
+            <TableHead className="text-end">{t("asset:accountHoldings.cost_basis")}</TableHead>
+            <TableHead className="text-end">{t("asset:accountHoldings.total_pnl")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -175,24 +175,24 @@ export function AssetAccountHoldings({ assetId, baseCurrency }: AssetAccountHold
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-end">
                   <QuantityDisplay value={h.quantity} isHidden={isBalanceHidden} />
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-end">
                   <AmountDisplay
                     value={h.marketValue.local}
                     currency={h.localCurrency ?? baseCurrency}
                     isHidden={isBalanceHidden}
                   />
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-end">
                   <AmountDisplay
                     value={h.costBasis?.local ?? 0}
                     currency={h.localCurrency ?? baseCurrency}
                     isHidden={isBalanceHidden}
                   />
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-end">
                   <div className="flex items-center justify-end gap-2">
                     <GainAmount
                       value={gainAmount}
@@ -418,7 +418,7 @@ export function AssetSnapshotHistory({
                   </Badge>
                 </div>
               </div>
-              <div className="shrink-0 text-right">
+              <div className="shrink-0 text-end">
                 {snap.isDetailLoading ? (
                   <div className="text-muted-foreground text-xs">...</div>
                 ) : snap.quantity > 0 ? (
@@ -474,8 +474,8 @@ export function AssetSnapshotHistory({
               <TableRow>
                 <TableHead>{t("asset:accountHoldings.date")}</TableHead>
                 <TableHead>{t("asset:accountHoldings.account")}</TableHead>
-                <TableHead className="text-right">{t("asset:accountHoldings.shares")}</TableHead>
-                <TableHead className="text-right">{t("asset:accountHoldings.avg_cost")}</TableHead>
+                <TableHead className="text-end">{t("asset:accountHoldings.shares")}</TableHead>
+                <TableHead className="text-end">{t("asset:accountHoldings.avg_cost")}</TableHead>
                 <TableHead>{t("asset:accountHoldings.source")}</TableHead>
                 <TableHead className="w-20" />
               </TableRow>
@@ -487,7 +487,7 @@ export function AssetSnapshotHistory({
                     {formatDate(snap.snapshotDate, dateFormatting)}
                   </TableCell>
                   <TableCell>{snap.accountName}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-end">
                     {snap.isDetailLoading ? (
                       <span className="text-muted-foreground">...</span>
                     ) : snap.quantity > 0 ? (
@@ -496,7 +496,7 @@ export function AssetSnapshotHistory({
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-end">
                     {snap.isDetailLoading ? (
                       <span className="text-muted-foreground">...</span>
                     ) : snap.avgCost > 0 ? (
@@ -514,7 +514,7 @@ export function AssetSnapshotHistory({
                       {formatSource(snap.source, t)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-end">
                     <div className="flex items-center justify-end gap-1">
                       <Button
                         variant="ghost"
