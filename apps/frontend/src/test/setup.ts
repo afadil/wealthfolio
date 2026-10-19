@@ -5,6 +5,8 @@ import * as matchers from "@testing-library/jest-dom/matchers";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 
+import { reactInterpolation } from "@/i18n/interpolation";
+
 import enAccount from "@/i18n/locales/en/account.json";
 import enActivity from "@/i18n/locales/en/activity.json";
 import enCommon from "@/i18n/locales/en/common.json";
@@ -80,7 +82,7 @@ if (!i18n.isInitialized) {
         connect: enConnect,
       },
     },
-    interpolation: { escapeValue: false },
+    interpolation: reactInterpolation(i18n),
     react: { useSuspense: false },
   });
 }

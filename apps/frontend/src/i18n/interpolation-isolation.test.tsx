@@ -74,6 +74,18 @@ describe("interpolated values", () => {
     );
   });
 
+  it("isolate only values with left-to-right letters in right-to-left languages", async () => {
+    await i18n.changeLanguage("ar");
+    // Already in the sentence's direction: nothing to isolate.
+    for (const name of ["صندوق الطوارئ!", "3 أشهر", "سنة واحدة"]) {
+      expect(i18n.t("common:test_goal", { name })).toBe(AR_GOAL.replace("{{name}}", name));
+    }
+    // Any left-to-right letter, even next to Arabic, is isolated.
+    expect(i18n.t("common:test_goal", { name: "AAPL سهم" })).toBe(
+      AR_GOAL.replace("{{name}}", `${FSI}AAPL سهم${PDI}`),
+    );
+  });
+
   it("keep bare numbers unisolated in right-to-left languages", async () => {
     await i18n.changeLanguage("ar");
     // Isolated, each number is its own unit and "20/50" shows as "50/20".
