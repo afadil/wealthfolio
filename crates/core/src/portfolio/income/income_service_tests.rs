@@ -241,8 +241,7 @@ fn income(
 ) -> IncomeData {
     let day = NaiveDate::parse_from_str(date, "%Y-%m-%d").expect("a YYYY-MM-DD date");
     IncomeData {
-        date: day.format("%Y-%m").to_string(),
-        activity_instant: day.and_time(NaiveTime::MIN).and_utc(),
+        activity_date: day.and_time(NaiveTime::MIN).and_utc(),
         income_type: income_type.to_string(),
         asset_id: asset_id.to_string(),
         asset_kind: "INVESTMENT".to_string(),
@@ -386,7 +385,7 @@ fn income_converts_at_the_rate_on_the_day_it_was_received() {
                 income("2025-05-02", "DIVIDEND", "SAP", "EUR", dec!(100), "acc-eur"),
                 // 20:00 UTC on 3 May is already 4 May in Tokyo.
                 IncomeData {
-                    activity_instant: Utc.with_ymd_and_hms(2025, 5, 3, 20, 0, 0).unwrap(),
+                    activity_date: Utc.with_ymd_and_hms(2025, 5, 3, 20, 0, 0).unwrap(),
                     ..income(
                         "2025-05-03",
                         "DIVIDEND",

@@ -2410,7 +2410,6 @@ impl ActivityRepositoryTrait for ActivityRepository {
         let effective_type = effective_type_sql("a");
         let query = format!(
             "SELECT a.id as activity_id,
-             strftime('%Y-%m', a.activity_date) as date,
              CAST(strftime('%s', a.activity_date) AS INTEGER) as activity_timestamp,
              {effective_type} as income_type,
              COALESCE(a.asset_id, 'CASH') as asset_id,
@@ -2442,8 +2441,6 @@ impl ActivityRepositoryTrait for ActivityRepository {
         struct RawIncomeData {
             #[diesel(sql_type = diesel::sql_types::Text)]
             pub activity_id: String,
-            #[diesel(sql_type = diesel::sql_types::Text)]
-            pub date: String,
             #[diesel(sql_type = diesel::sql_types::BigInt)]
             pub activity_timestamp: i64,
             #[diesel(sql_type = diesel::sql_types::Text)]
@@ -2502,9 +2499,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
             };
             let fee = Decimal::from_str(&raw.fee).unwrap_or_else(|_| Decimal::zero());
             let tax = Decimal::from_str(&raw.tax).unwrap_or_else(|_| Decimal::zero());
-            // SQLite reads the stored date for this column as it does for
-            // `date`, so a row that has a month has a timestamp too.
-            let Some(activity_instant) = DateTime::from_timestamp(raw.activity_timestamp, 0) else {
+            let Some(activity_date) = DateTime::from_timestamp(raw.activity_timestamp, 0) else {
                 log::warn!(
                     "Skipping {} activity {} with invalid date in income report",
                     raw.income_type,
@@ -2513,8 +2508,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 continue;
             };
             results.push(IncomeData {
-                date: raw.date,
-                activity_instant,
+                activity_date,
                 income_type: raw.income_type,
                 asset_id: raw.asset_id,
                 asset_kind: raw.asset_kind,
@@ -5156,12 +5150,10 @@ mod tests {
                 .with_timezone(&Utc)
         };
         assert_eq!(
-            rows.iter()
-                .map(|row| (row.date.as_str(), row.activity_instant))
-                .collect::<Vec<_>>(),
+            rows.iter().map(|row| row.activity_date).collect::<Vec<_>>(),
             vec![
-                ("2025-05", instant("2025-05-02T10:00:00Z")),
-                ("2025-05", instant("2025-05-03T20:15:00Z")),
+                instant("2025-05-02T10:00:00Z"),
+                instant("2025-05-03T20:15:00Z"),
             ]
         );
     }
