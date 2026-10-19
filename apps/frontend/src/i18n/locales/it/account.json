@@ -47,7 +47,17 @@
   "search_accounts": "Ricerca conti...",
   "no_accounts_found": "Nessun conto trovato.",
   "holdings": "Posizioni",
-  "click_to_update_cash_balance": "Clicca per aggiornare il saldo disponibile",
+  "balance_edit": {
+    "title": "Rettifica saldo disponibile",
+    "description": "Rettifica una valuta alla volta. La differenza viene registrata come deposito o prelievo in quella valuta.",
+    "current_balance": "Saldo attuale",
+    "new_balance": "Nuovo saldo",
+    "no_change": "Nessuna variazione del saldo",
+    "unavailable": "I saldi disponibili non sono accessibili. Attendi il caricamento o aggiorna la pagina.",
+    "invalid_amount": "Inserisci un saldo valido pari o superiore a zero.",
+    "success": "Saldo aggiornato",
+    "error": "Errore durante l’aggiornamento del saldo. Riprova."
+  },
   "investments": "Investimenti",
   "net_contribution": "Contributo netto",
   "cost_basis": "Costo di carico",

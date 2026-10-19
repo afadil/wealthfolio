@@ -47,7 +47,17 @@
   "search_accounts": "口座を検索...",
   "no_accounts_found": "口座が見つかりません。",
   "holdings": "保有銘柄",
-  "click_to_update_cash_balance": "クリックして現金残高を更新",
+  "balance_edit": {
+    "title": "現金残高を調整",
+    "description": "一度に一つの通貨の残高を調整します。差額はその通貨の入金または出金として記録されます。",
+    "current_balance": "現在の残高",
+    "new_balance": "新しい残高",
+    "no_change": "残高の変更はありません",
+    "unavailable": "現金残高を取得できません。読み込みを待つか、ページを再読み込みしてください。",
+    "invalid_amount": "0以上の有効な残高を入力してください。",
+    "success": "残高を更新しました",
+    "error": "残高の更新に失敗しました。もう一度お試しください。"
+  },
   "investments": "投資",
   "net_contribution": "純入金額",
   "cost_basis": "取得原価",

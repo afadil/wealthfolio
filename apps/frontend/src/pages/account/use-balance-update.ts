@@ -1,50 +1,62 @@
 import { useMutation } from "@tanstack/react-query";
 import { createActivity } from "@/adapters";
 import { DECIMAL_PRECISION } from "@/lib/constants";
-import { ActivityCreate, AccountValuation } from "@/lib/types";
+import { ActivityCreate } from "@/lib/types";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
+import { useTranslation } from "react-i18next";
 
-export const useBalanceUpdate = (account?: AccountValuation | null) => {
+export interface BalanceUpdateInput {
+  currency: string;
+  currentBalance: number;
+  targetBalance: number;
+}
+
+export const useBalanceUpdate = (accountId: string) => {
+  const { t } = useTranslation();
   const mutation = useMutation({
-    mutationFn: (newActivity: ActivityCreate) => createActivity(newActivity),
+    mutationFn: async ({ currency, currentBalance, targetBalance }: BalanceUpdateInput) => {
+      const difference = targetBalance - currentBalance;
+      if (
+        !accountId.trim() ||
+        !currency.trim() ||
+        !Number.isFinite(currentBalance) ||
+        !Number.isFinite(targetBalance) ||
+        !Number.isFinite(difference) ||
+        targetBalance < 0
+      ) {
+        throw new Error(t("account:balance_edit.invalid_amount"));
+      }
+
+      const amount = parseFloat(Math.abs(difference).toFixed(DECIMAL_PRECISION));
+      if (amount === 0) return;
+
+      // Don't set assetId - backend generates CASH:{currency} for cash activities.
+      const newActivity: ActivityCreate = {
+        accountId,
+        activityType: difference > 0 ? "DEPOSIT" : "WITHDRAWAL",
+        activityDate: new Date().toISOString(),
+        currency,
+        amount,
+        comment: "Balance updated manually",
+      };
+
+      return createActivity(newActivity);
+    },
+    retry: false,
     onError: () => {
       toast({
-        title: "🔴 Error updating balance",
+        title: t("account:balance_edit.error"),
         variant: "destructive",
       });
     },
-    onSuccess: () => {
+    onSuccess: (activity) => {
+      if (!activity) return;
       toast({
-        title: "✅ Balance updated",
+        title: t("account:balance_edit.success"),
         variant: "default",
       });
     },
   });
 
-  const updateBalance = (newBalance: number) => {
-    if (!account) return;
-
-    const currentBalance = account.cashBalance || 0;
-    const difference = newBalance - currentBalance;
-    const amount = parseFloat(Math.abs(difference).toFixed(DECIMAL_PRECISION));
-
-    if (amount === 0) return;
-
-    const activityType = difference > 0 ? "DEPOSIT" : "WITHDRAWAL";
-
-    // Don't set assetId - backend generates CASH:{currency} for cash activities
-    const newActivity: ActivityCreate = {
-      accountId: account.accountId,
-      activityType,
-      activityDate: new Date().toISOString(),
-      // assetId omitted - backend generates CASH:{currency}
-      currency: account.accountCurrency,
-      amount: amount,
-      comment: "Balance updated manually",
-    };
-
-    mutation.mutate(newActivity);
-  };
-
-  return { updateBalance, ...mutation };
+  return { ...mutation, updateBalance: mutation.mutateAsync };
 };

@@ -158,6 +158,7 @@ npx playwright test && npx playwright show-report
 | `30-activity-sticky-header.spec.ts`    | Activity tables pin their column header below the page header when they fit, and scroll sideways when they don't            |
 | `31-manual-liability.spec.ts`          | Manual loan origination, balance correction/deletion, principal fallback, and net-worth consistency                         |
 | `31-formatting-regions.spec.ts`        | Austria, Romania, and Bulgaria formatting selections persist after saving and reloading settings                            |
+| `33-cash-balance-edit.spec.ts`         | Desktop/mobile cash adjustments persist the selected currency's native delta without changing other currencies              |
 
 ---
 
