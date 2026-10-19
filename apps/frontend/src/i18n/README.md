@@ -93,10 +93,11 @@ different ways — only a glossary does.
 Arabic plural messages may omit `{{count}}` in `_zero`, `_one`, and `_two` forms
 when the wording already expresses the exact count. The translation checker
 permits this only for English plural families, and still requires all other
-placeholders and counts in `_few`, `_many`, and `_other`. Keep numeric
-label/value presentations where a fragment is reused in different grammatical
-contexts. `arabic.test.ts` covers rendered counts, independent interpolations,
-and financial terminology.
+placeholders and counts in `_few`, `_many`, and `_other`. Reusable fragments
+such as loan durations use the nominative CLDR forms (`سنتان`, `شهران`), so
+sentences that embed them place them as a subject or predicate, never after a
+preposition. `arabic.test.ts` covers rendered counts, independent
+interpolations, embedded durations, and financial terminology.
 
 ## Provenance of current translations
 

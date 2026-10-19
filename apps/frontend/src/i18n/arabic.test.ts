@@ -88,26 +88,32 @@ describe("Arabic plural output", () => {
   });
 
   it.each([
-    ["asset:loanActions.duration_year", "2 سنة"],
-    ["asset:loanActions.duration_month", "2 شهر"],
-  ])("keeps a numeric presentation for the reusable duration %s", (key, expected) => {
-    // These fragments are also embedded after prepositions. A compact numeric
-    // unit avoids forcing the standalone dual's grammatical case into a sentence.
-    expect(i18n.t(key, { count: 2 })).toBe(expected);
+    [1, "سنة واحدة", "شهر واحد"],
+    [2, "سنتان", "شهران"],
+    [3, "3 سنوات", "3 أشهر"],
+    [11, "11 سنةً", "11 شهرًا"],
+    [100, "100 سنة", "100 شهر"],
+    [102, "102 سنة", "102 شهر"],
+    [103, "103 سنوات", "103 أشهر"],
+    [1.5, "1.5 سنة", "1.5 شهر"],
+  ])("renders the CLDR form of a %s-unit duration", (count, year, month) => {
+    expect(i18n.t("asset:loanActions.duration_year", { count })).toBe(year);
+    expect(i18n.t("asset:loanActions.duration_month", { count })).toBe(month);
   });
 
-  it.each([
-    [1, "1 سنة"],
-    [2, "2 سنة"],
-    [3, "3 سنوات"],
-    [11, "11 سنة"],
-    [100, "100 سنة"],
-    [102, "102 سنة"],
-    [103, "103 سنوات"],
-    [1.5, "1.5 سنة"],
-    [2.5, "2.5 سنة"],
-  ])("renders numeric durations without rounding count %s", (count, expected) => {
-    expect(i18n.t("asset:loanActions.duration_year", { count })).toBe(expected);
+  it("embeds durations only where they stay in the nominative", () => {
+    // The fragments are nominative, so sentences place them as a subject or a
+    // predicate, never after a preposition.
+    expect(i18n.t("asset:loanOverview.early_by", { duration: "سنتان" })).toBe(
+      "أبكر من الموعد الأصلي، والفارق سنتان تقريبًا",
+    );
+    expect(i18n.t("asset:loanOverview.term_left", { duration: "سنتان" })).toBe("المتبقي: سنتان");
+    expect(i18n.t("asset:loanOverview.term_elapsed_years", { count: 2, elapsed: "شهران" })).toBe(
+      "انقضى شهران من مدة قدرها سنتان.",
+    );
+    expect(i18n.t("asset:loanOverview.term_elapsed_years", { count: 5, elapsed: "سنتان" })).toBe(
+      "انقضى سنتان من مدة قدرها 5 سنوات.",
+    );
   });
 });
 
