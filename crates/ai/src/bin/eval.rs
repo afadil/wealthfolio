@@ -403,7 +403,13 @@ fn compare_files(before_path: &Path, after_path: &Path) -> ExitCode {
             r.started_at
         )
     };
-    let c = compare(&before, &after);
+    let c = match compare(&before, &after) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::from(2);
+        }
+    };
     println!("==> Compare");
     println!("    before: {}", describe(&before));
     println!("    after:  {}", describe(&after));

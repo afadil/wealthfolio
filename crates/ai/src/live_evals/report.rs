@@ -272,7 +272,15 @@ pub struct Comparison {
     pub rate_diff_std_err: Option<f64>,
 }
 
-pub fn compare(before: &RunResults, after: &RunResults) -> Comparison {
+/// Runs with different trial counts are refused: pass^k gets harder as k
+/// grows, so an unchanged model would show flips.
+pub fn compare(before: &RunResults, after: &RunResults) -> Result<Comparison, String> {
+    if before.trials != after.trials {
+        return Err(format!(
+            "runs have different trial counts ({} and {}); compare runs with the same WF_EVAL_TRIALS",
+            before.trials, after.trials
+        ));
+    }
     let mut comparison = Comparison::default();
     let mut diffs = Vec::new();
     for b in &before.cases {
@@ -305,7 +313,7 @@ pub fn compare(before: &RunResults, after: &RunResults) -> Comparison {
         .map(|a| a.id.clone())
         .collect();
     (comparison.mean_rate_diff, comparison.rate_diff_std_err) = mean_and_std_err(&diffs);
-    comparison
+    Ok(comparison)
 }
 
 #[cfg(test)]
@@ -410,6 +418,21 @@ mod tests {
     }
 
     #[test]
+    fn runs_with_different_trial_counts_are_not_compared() {
+        // The same 2-in-3 model: one trial that passed, then three trials.
+        let mut before = run(vec![case("a", Severity::P0, &[true])]);
+        before.trials = 1;
+        let after = run(vec![case("a", Severity::P0, &[true, false, true])]);
+
+        let error = compare(&before, &after).unwrap_err();
+        assert!(
+            error.contains("different trial counts (1 and 3)"),
+            "{error}"
+        );
+        assert!(compare(&after, &after).is_ok());
+    }
+
+    #[test]
     fn compare_lists_flips_rate_changes_and_unpaired_cases() {
         let before = run(vec![
             case("fixed", Severity::P0, &[true, false, true]),
@@ -425,7 +448,7 @@ mod tests {
             case("moved", Severity::P1, &[true, false, false]),
             case("added", Severity::P1, &[true]),
         ]);
-        let c = compare(&before, &after);
+        let c = compare(&before, &after).unwrap();
 
         let ids = |deltas: &[CaseDelta]| deltas.iter().map(|d| d.id.clone()).collect::<Vec<_>>();
         assert_eq!(ids(&c.fixed), ["fixed"]);
