@@ -233,7 +233,12 @@ pnpm test:e2e:design-system            # compare; differences fail with a diff
 The accessibility scan records which rules fail on how many elements, because
 the primitives do not pass cleanly yet: in WebKit it counts the focus guards
 Base UI keeps around open popups, which Safari exposes as buttons without a
-name. RTL is not covered because no shipped locale is right-to-left.
+name.
+
+Right-to-left runs through the development-only `?dir=rtl` override, since no
+shipped language is right-to-left yet: `visual.spec.ts` shoots every gallery and
+overlay state again with an `-rtl` suffix, and `rtl.spec.ts` checks the mirrored
+arrows, popup and sheet sides, and a live switch between directions.
 
 `colors.spec.ts` is the colour contract: every role a theme defines, text pairs
 at 4.5:1 and the focus ring at 3:1, in light and dark. Callouts, banners and
