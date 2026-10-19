@@ -229,24 +229,26 @@ export default function AddonSettingsPage() {
               <div className="flex flex-wrap items-center gap-2">
                 {/* Check Updates */}
                 <Popover>
-                  <PopoverTrigger nativeButton={false} render={<div />}>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={handleCheckUpdates}
-                      disabled={isCheckingUpdates || installedAddons.length === 0}
-                      className="hover:bg-muted/50 relative"
-                      title={t("settings:addons_check_updates")}
-                    >
-                      {isCheckingUpdates ? (
-                        <Spinner className="h-4 w-4" />
-                      ) : (
-                        <Icons.Refresh className="h-4 w-4" />
-                      )}
-                      {hasUpdates() && (
-                        <div className="bg-destructive absolute -end-1 -top-1 h-2 w-2 rounded-full" />
-                      )}
-                    </Button>
+                  <PopoverTrigger
+                    render={
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={handleCheckUpdates}
+                        disabled={isCheckingUpdates || installedAddons.length === 0}
+                        className="hover:bg-muted/50 relative"
+                        title={t("settings:addons_check_updates")}
+                      />
+                    }
+                  >
+                    {isCheckingUpdates ? (
+                      <Spinner className="h-4 w-4" />
+                    ) : (
+                      <Icons.Refresh className="h-4 w-4" />
+                    )}
+                    {hasUpdates() && (
+                      <div className="bg-destructive absolute -end-1 -top-1 h-2 w-2 rounded-full" />
+                    )}
                   </PopoverTrigger>
                   <PopoverContent className="w-64" side="bottom" align="end">
                     <div className="space-y-2">
@@ -273,21 +275,23 @@ export default function AddonSettingsPage() {
 
                 {/* Install from File */}
                 <Popover>
-                  <PopoverTrigger nativeButton={false} render={<div />}>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={handleLoadAddon}
-                      disabled={isLoading}
-                      className="hover:bg-muted/50"
-                      title={t("settings:addons_install_from_file")}
-                    >
-                      {isLoading ? (
-                        <Spinner className="h-4 w-4" />
-                      ) : (
-                        <Icons.Plus className="h-4 w-4" />
-                      )}
-                    </Button>
+                  <PopoverTrigger
+                    render={
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={handleLoadAddon}
+                        disabled={isLoading}
+                        className="hover:bg-muted/50"
+                        title={t("settings:addons_install_from_file")}
+                      />
+                    }
+                  >
+                    {isLoading ? (
+                      <Spinner className="h-4 w-4" />
+                    ) : (
+                      <Icons.Plus className="h-4 w-4" />
+                    )}
                   </PopoverTrigger>
                   <PopoverContent className="w-64" side="bottom" align="end">
                     <div className="space-y-2">
