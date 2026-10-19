@@ -127,7 +127,7 @@
       "category": "الفئة",
       "change_over": "التغيّر خلال {{period}}",
       "delta_period": "Δ {{period}}",
-      "liabilities": "الخصوم",
+      "liabilities": "الالتزامات",
       "net_worth": "صافي الثروة",
       "new": "جديد",
       "value": "القيمة"
@@ -157,7 +157,7 @@
       "behind_prior": "أقل من الفترة السابقة بمقدار ",
       "now": "الآن",
       "title": "الزخم",
-      "vs_prior": "مقارنةً بـ {{period}} السابقة"
+      "vs_prior": "مقارنةً بالفترة السابقة ({{period}})"
     },
     "no_assets_found": "لم يتم العثور على أصول.",
     "no_history_data": "لا تتوفر بيانات سجل",

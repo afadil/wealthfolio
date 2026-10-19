@@ -65,7 +65,7 @@ describe("Arabic plural output", () => {
         taxonomy: "القطاعات",
         total: 10,
       }),
-    ).toBe("تم تحميل فئتين لـ القطاعات · الإجمالي 10");
+    ).toBe("تم تحميل فئتين · نظام التصنيف: القطاعات · الإجمالي 10");
     expect(i18n.t("common:globalEvents.positions", { count: 2, accounts: 1 })).toBe(
       "مركزان (عدد الحسابات: 1)",
     );
@@ -131,6 +131,16 @@ describe("Arabic financial terminology", () => {
     ["activity:type_dividend", "توزيعات الأرباح"],
     ["ai:income.dividends", "توزيعات الأرباح"],
     ["income:dividends", "توزيعات الأرباح"],
+    ["activity:import.page.titleHoldings", "استيراد الحيازات"],
+    ["common:nav.label_holdings", "عرض الحيازات"],
+    ["common:component.add_holding", "إضافة حيازة"],
+    ["holdings:instrument_types.FUTURE", "العقود المستقبلية"],
+    ["activity:type_credit", "إضافة رصيد"],
+    ["activity:subtype_return_of_capital", "رد رأس المال"],
+    ["activity:form.type_return_of_capital", "رد رأس المال"],
+    ["holdings:sale_proceeds", "حصيلة البيع"],
+    ["insights:networth.breakdown_table.liabilities", "الالتزامات"],
+    ["goals:risk_lab.scenarios.retire-earlier.label", "التقاعد مبكرًا بسنتين"],
   ])("uses the house term in %s", (key, expected) => {
     expect(i18n.t(key)).toBe(expected);
   });
