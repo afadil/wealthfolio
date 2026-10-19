@@ -493,10 +493,7 @@ function parsePreparedDecimalString(
 export function parseLocalizedNumber(value: string, locale: string): number | undefined {
   const resolvedLocale = locale && locale !== "system" ? locale : resolveFormattingLocale(locale);
   const input = stripFinancialAffixes(
-    value
-      .normalize("NFKC")
-      .trim()
-      .replace(/[\u061c\u200e\u200f]/gu, ""),
+    value.normalize("NFKC").trim().replace(BIDI_CONTROLS, ""),
     resolvedLocale,
   );
   if (!input) return undefined;
@@ -984,6 +981,33 @@ function currencyFormattingKey(currency: string): string {
   return getQuoteUnitCurrency(currency)?.major ?? currency?.toUpperCase?.() ?? "";
 }
 
+const FIRST_STRONG_ISOLATE = "\u2068";
+const POP_DIRECTIONAL_ISOLATE = "\u2069";
+/** Unicode bidi controls Intl or `isolateFormatting` put around formatted text. */
+const BIDI_CONTROLS = /[\u061c\u200e\u200f\u2066-\u2069]/gu;
+
+/**
+ * Wraps every `format*` result in first-strong isolates (U+2068 … U+2069), the
+ * mechanism UAX #9 gives for text inserted into a paragraph. The formatting
+ * region is independent of the UI language, so a right-to-left page shows
+ * left-to-right amounts, percentages and times; isolated, "-$1,234.56" keeps
+ * its sign in front and "9:30 AM" keeps its order instead of taking the
+ * paragraph's direction. Only for right-to-left documents: left-to-right
+ * output stays byte for byte as it was. Parsers drop the marks again.
+ */
+export function isolateFormatting<T extends object>(formatting: T): T {
+  const isolated = { ...formatting } as Record<string, unknown>;
+  for (const [key, value] of Object.entries(formatting)) {
+    if (key.startsWith("format") && typeof value === "function") {
+      isolated[key] = (...args: unknown[]) =>
+        FIRST_STRONG_ISOLATE +
+        String((value as (...a: unknown[]) => unknown)(...args)) +
+        POP_DIRECTIONAL_ISOLATE;
+    }
+  }
+  return isolated as T;
+}
+
 export function createAmountFormatting(
   locale: string,
   prepared?: PreparedAmountFormatters,
@@ -1091,10 +1115,7 @@ export function createNumberFormatting(
     },
     parseNumber(value) {
       const input = stripFinancialAffixes(
-        value
-          .normalize("NFKC")
-          .trim()
-          .replace(/[\u061c\u200e\u200f]/gu, ""),
+        value.normalize("NFKC").trim().replace(BIDI_CONTROLS, ""),
         resolvedLocale,
       );
       if (!input) return undefined;

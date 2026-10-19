@@ -83,6 +83,13 @@ Styles use logical classes (`ms-*`, `pe-*`, `start-*`, `text-end`, `border-s`,
 physical class only where the side is meant literally: safe-area insets, chart
 plot coordinates, centring with `left-1/2 -translate-x-1/2`.
 
+Values and names keep their own direction inside right-to-left text. The
+formatters wrap their output in Unicode isolates in a right-to-left document, so
+`-$1,234.56` and `9:30 AM` stay intact; parsers drop the marks. Provider and
+user text that can be clipped (asset names, symbols, notes) gets `dir="auto"` on
+the clipping element with `rtl:text-right`; unclipped names are wrapped in
+`<bdi>`. Chart plots stay left-to-right (`.recharts-surface` in `globals.css`).
+
 To try right-to-left without shipping a language, development builds read
 `?dir=rtl` on load and expose `__wealthfolioSetDirection("rtl" | "ltr" | null)`
 in the console; neither exists in production builds and nothing is stored.

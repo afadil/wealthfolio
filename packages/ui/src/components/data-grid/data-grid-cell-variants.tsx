@@ -2714,7 +2714,15 @@ export function SymbolCell<TData>({
       onKeyDown={onWrapperKeyDown}
     >
       <Popover open={isEditing && !disabled} onOpenChange={onOpenChange}>
-        <span ref={anchorRef} data-slot="grid-cell-content" className={cn(!value && "text-muted-foreground")}>
+        {/* A symbol reads in its own direction, so a long one keeps its start visible when
+            clipped. In a right-to-left grid it still sits on the column's (right) side;
+            Chrome has no text-align: match-parent. */}
+        <span
+          ref={anchorRef}
+          data-slot="grid-cell-content"
+          dir="auto"
+          className={cn("rtl:text-right", !value && "text-muted-foreground")}
+        >
           {disabled ? value || "—" : value}
           {value && displayContext ? (
             <span className="text-muted-foreground ms-1 text-xs">({displayContext})</span>

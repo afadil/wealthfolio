@@ -250,14 +250,17 @@ export const ActivityTable = ({
               />
               <div className="flex min-w-0 flex-col">
                 <span className="flex items-center gap-1 truncate font-medium">
-                  <span className="truncate">{displaySymbol}</span>
+                  <bdi className="truncate">{displaySymbol}</bdi>
                   {exchangeDisplay ? (
                     <span className="text-muted-foreground shrink-0 text-xs font-normal">
                       · {exchangeDisplay}
                     </span>
                   ) : null}
                 </span>
-                <span className="text-muted-foreground truncate text-xs font-light">
+                <span
+                  dir="auto"
+                  className="text-muted-foreground truncate text-xs font-light rtl:text-right"
+                >
                   {isCash
                     ? cashPayee
                       ? `${t("activity:table.cash")} · ${String(currency)}`
@@ -626,7 +629,9 @@ export const ActivityTable = ({
           const accountCurrency = row.getValue("accountCurrency");
           return (
             <div className="min-w-37.5 ms-2 flex flex-col">
-              <span>{String(accountName)}</span>
+              <span>
+                <bdi>{String(accountName)}</bdi>
+              </span>
               <span className="text-muted-foreground text-xs font-light">
                 {String(accountCurrency)}
               </span>
