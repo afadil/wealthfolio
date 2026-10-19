@@ -15,7 +15,13 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@wealthfolio/ui/components/ui/chart";
-import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@wealthfolio/ui/components/ui/empty";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -244,16 +250,19 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
       </CardHeader>
       <CardContent className="flex flex-1 flex-col px-4 pt-0 md:px-6">
         {chartData.length === 0 ? (
-          <EmptyPlaceholder
-            className="mx-auto flex h-[250px] max-w-[420px] items-center justify-center md:h-[300px]"
-            icon={<Icons.Activity className="h-8 w-8 md:h-10 md:w-10" />}
-            title={t("income:no_income_history")}
-            description={t("income:no_income_history_desc")}
-          />
+          <Empty className="h-62.5 max-w-105 md:h-75 mx-auto flex items-center justify-center">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                {<Icons.Activity className="size-8 md:size-10" />}
+              </EmptyMedia>
+              <EmptyTitle>{t("income:no_income_history")}</EmptyTitle>
+              <EmptyDescription>{t("income:no_income_history_desc")}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : effectiveViewMode === "byAccount" ? (
           <ChartContainer
             config={accountChartConfig}
-            className={cn("h-full min-h-[280px] w-full flex-1 md:min-h-[380px]")}
+            className={cn("min-h-70 md:min-h-95 h-full w-full flex-1")}
             data-no-swipe-drag
           >
             <BarChart
@@ -272,7 +281,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
               <ChartTooltip
                 content={
                   <ChartTooltipContent
-                    className="min-w-[150px] md:min-w-[180px]"
+                    className="min-w-37.5 md:min-w-45"
                     formatter={(value, name, entry) => {
                       const formattedValue = isBalanceHidden
                         ? "••••"
@@ -334,7 +343,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                 color: "var(--chart-stone)",
               },
             }}
-            className={cn("h-full min-h-[280px] w-full flex-1 md:min-h-[380px]")}
+            className={cn("min-h-70 md:min-h-95 h-full w-full flex-1")}
             data-no-swipe-drag
           >
             <ComposedChart
@@ -358,13 +367,13 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                 width={isMobile ? 0 : 48}
                 ticks={rightTicks}
                 domain={[0, rightTicks[rightTicks.length - 1] || 0]}
-                tick={{ fontSize: 12, fill: "var(--chart-2)" }}
+                tick={{ fontSize: "0.75rem", fill: "var(--chart-2)" }}
                 tickFormatter={(value: number) => formatCompactAmount(value, currency, false)}
               />
               <ChartTooltip
                 content={
                   <ChartTooltipContent
-                    className="min-w-[150px] md:min-w-[180px]"
+                    className="min-w-37.5 md:min-w-45"
                     formatter={(value, name, entry) => {
                       const formattedValue = isBalanceHidden
                         ? "••••"

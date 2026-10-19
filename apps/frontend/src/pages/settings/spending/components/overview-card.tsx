@@ -2,13 +2,13 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import {
-  Button,
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
   Icons,
+  buttonVariants,
 } from "@wealthfolio/ui";
 
 export interface OverviewChip {
@@ -101,12 +101,10 @@ export function OverviewCard({
               <div className="text-foreground text-sm font-medium">{emptyTitle}</div>
               <p className="text-muted-foreground text-xs">{emptyDescription}</p>
             </div>
-            <Button asChild size="sm">
-              <Link to={manageHref}>
-                <Icons.Plus className="mr-1.5 h-3.5 w-3.5" />
-                {emptyCtaLabel}
-              </Link>
-            </Button>
+            <Link to={manageHref} className={buttonVariants({ size: "sm" })}>
+              <Icons.Plus className="mr-1.5 h-3.5 w-3.5" />
+              {emptyCtaLabel}
+            </Link>
           </div>
         ) : (
           <div className="space-y-3">
@@ -146,7 +144,7 @@ export function OverviewCard({
                 ) : (
                   <span
                     key={chip.id}
-                    className="bg-muted/60 text-foreground inline-flex max-w-[200px] items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs"
+                    className="bg-muted/60 text-foreground max-w-50 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs"
                   >
                     <span
                       className="h-2 w-2 shrink-0 rounded-full"

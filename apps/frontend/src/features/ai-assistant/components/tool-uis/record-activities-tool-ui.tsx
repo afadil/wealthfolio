@@ -1,4 +1,5 @@
 import { saveActivities, updateToolResult } from "@/adapters";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,7 @@ import {
   useAmountFormatting,
   useDateFormatting,
   useNumberFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import type { TFunction } from "i18next";
@@ -195,25 +197,19 @@ function RecordActivitiesToolUIContentImpl({
 
   if (isIncomplete) {
     return (
-      <Card className="border-destructive/30 bg-destructive/5">
-        <CardContent className="py-4">
-          <p className="text-destructive text-sm font-medium">
-            {t("ai:recordActivities.failedPrepare")}
-          </p>
-        </CardContent>
-      </Card>
+      <Alert variant="destructive">
+        <Icons.AlertCircle />
+        <AlertTitle>{t("ai:recordActivities.failedPrepare")}</AlertTitle>
+      </Alert>
     );
   }
 
   if (!parsed) {
     return (
-      <Card className="border-destructive/30 bg-destructive/5">
-        <CardContent className="py-4">
-          <p className="text-destructive text-sm font-medium">
-            {t("ai:recordActivities.noBatchDraft")}
-          </p>
-        </CardContent>
-      </Card>
+      <Alert variant="destructive">
+        <Icons.AlertCircle />
+        <AlertTitle>{t("ai:recordActivities.noBatchDraft")}</AlertTitle>
+      </Alert>
     );
   }
 
@@ -315,7 +311,7 @@ function RecordActivitiesToolUIContentImpl({
           </div>
         </div>
 
-        <div className="max-h-[360px] overflow-y-auto">
+        <div className="max-h-90 overflow-y-auto">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -348,7 +344,7 @@ function RecordActivitiesToolUIContentImpl({
                     <TableCell className="py-2">
                       <Badge
                         variant={activityBadge.variant}
-                        className={cn("text-[10px] uppercase", activityBadge.className)}
+                        className={cn("text-2xs uppercase", activityBadge.className)}
                       >
                         {formatActivityType(row.draft.activityType)}
                       </Badge>
@@ -402,19 +398,19 @@ function RecordActivitiesToolUIContentImpl({
                       <div className="space-y-1">
                         <Badge
                           variant={rowStatusBadge.variant}
-                          className={cn("text-[10px] uppercase", rowStatusBadge.className)}
+                          className={cn("text-2xs uppercase", rowStatusBadge.className)}
                         >
                           {rowStatusBadge.label}
                         </Badge>
                         {statusEntry?.error && (
-                          <p className="text-destructive max-w-[180px] truncate text-[10px]">
+                          <p className="text-destructive text-2xs max-w-45 truncate">
                             {statusEntry.error}
                           </p>
                         )}
                         {!statusEntry?.error &&
                           row.errors[0] &&
                           statusEntry?.status !== "submitted" && (
-                            <p className="text-muted-foreground max-w-[180px] truncate text-[10px]">
+                            <p className="text-muted-foreground text-2xs max-w-45 truncate">
                               {row.errors[0]}
                             </p>
                           )}
@@ -428,10 +424,10 @@ function RecordActivitiesToolUIContentImpl({
         </div>
 
         {submitError && (
-          <div className="border-destructive/50 bg-destructive/10 text-destructive mx-6 flex items-center gap-2 rounded-md border px-3 py-2 text-xs">
-            <Icons.AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{submitError}</span>
-          </div>
+          <Alert variant="destructive" className="mx-6 w-auto px-3 py-2 text-xs">
+            <Icons.AlertCircle />
+            <AlertDescription>{submitError}</AlertDescription>
+          </Alert>
         )}
 
         {(submitSummary || parsed.submittedAt) && (
@@ -446,7 +442,7 @@ function RecordActivitiesToolUIContentImpl({
         <div className="flex items-center justify-end px-6 pt-1">
           <Button onClick={handleSubmit} disabled={!canSubmit}>
             {isSubmitting ? (
-              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+              <Spinner className="mr-2 h-4 w-4" />
             ) : (
               <Icons.Check className="mr-2 h-4 w-4" />
             )}

@@ -65,7 +65,13 @@ import {
   useNumberFormatting,
   type FormattingApi,
 } from "@wealthfolio/ui";
-import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@wealthfolio/ui/components/ui/empty";
 import { isSameDay, subDays, subMonths } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -440,9 +446,9 @@ function HeaderMetric({
 const STRIP_SECTION_CLASS =
   "border-border/70 flex min-h-[4.75rem] min-w-0 flex-col justify-center border-l pl-5";
 const STRIP_TITLE_CLASS =
-  "text-muted-foreground/70 mb-2.5 font-mono text-[9px] font-semibold uppercase tracking-[0.28em]";
+  "text-muted-foreground/70 mb-2.5 font-mono text-2xs font-semibold uppercase tracking-[0.28em]";
 const STRIP_LABEL_CLASS =
-  "text-muted-foreground truncate font-mono text-[11px] font-medium tracking-[0.02em]";
+  "text-muted-foreground truncate font-mono text-2xs font-medium tracking-[0.02em]";
 const STRIP_VALUE_CLASS = "font-mono text-lg font-semibold leading-none";
 
 function StripSection({
@@ -488,17 +494,19 @@ function StripMetric({
         <span className={STRIP_LABEL_CLASS}>{label}</span>
         {warningItems.length > 0 && (
           <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-warning hover:text-warning h-4 w-4 shrink-0 rounded-full p-0"
-              >
-                <Icons.AlertTriangle className="h-3 w-3" />
-                <span className="sr-only">
-                  {t("common:component.calculation_note_for", { label })}
-                </span>
-              </Button>
+            <PopoverTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-warning hover:text-warning h-4 w-4 shrink-0 rounded-full p-0"
+                />
+              }
+            >
+              <Icons.AlertTriangle className="h-3 w-3" />
+              <span className="sr-only">
+                {t("common:component.calculation_note_for", { label })}
+              </span>
             </PopoverTrigger>
             <PopoverContent
               className="w-[34rem] max-w-[calc(100vw-2rem)] p-0 text-sm"
@@ -535,15 +543,17 @@ function StripHelpPopover({ items }: { items: StripHelpItem[] }) {
   const { t } = useTranslation();
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-muted-foreground hover:text-foreground absolute right-0 top-0 h-6 w-6 rounded-full"
-          aria-label={t("performance:help.aria_label")}
-        >
-          <Icons.Info className="h-3.5 w-3.5" />
-        </Button>
+      <PopoverTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-foreground absolute right-0 top-0 h-6 w-6 rounded-full"
+            aria-label={t("performance:help.aria_label")}
+          />
+        }
+      >
+        <Icons.Info className="h-3.5 w-3.5" />
       </PopoverTrigger>
       <PopoverContent className="w-[34rem] max-w-[calc(100vw-2rem)] p-0" side="bottom" align="end">
         <div className="space-y-4 p-5">
@@ -835,15 +845,17 @@ function AttributionDetailMetric({
                 {[itemName, dateRangeLabel].filter(Boolean).join(" · ")}
               </SheetDescription>
             </div>
-            <SheetClose asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground h-8 w-8 shrink-0"
-              >
-                <Icons.X className="h-4 w-4" />
-                <span className="sr-only">{t("performance:attribution.close")}</span>
-              </Button>
+            <SheetClose
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground h-8 w-8 shrink-0"
+                />
+              }
+            >
+              <Icons.X className="h-4 w-4" />
+              <span className="sr-only">{t("performance:attribution.close")}</span>
             </SheetClose>
           </div>
           <div className="pt-3">
@@ -914,12 +926,13 @@ function PerformanceContent({
       )}
 
       {!chartData?.length && !isLoading && !hasErrors && (
-        <EmptyPlaceholder
-          className="mx-auto flex max-w-[420px] items-center justify-center"
-          icon={<Icons.BarChart className="h-10 w-10" />}
-          title={t("performance:empty.title")}
-          description={t("performance:empty.description")}
-        />
+        <Empty className="max-w-105 mx-auto flex items-center justify-center">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">{<Icons.BarChart className="size-10" />}</EmptyMedia>
+            <EmptyTitle>{t("performance:empty.title")}</EmptyTitle>
+            <EmptyDescription>{t("performance:empty.description")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       )}
 
       {/* Modern horizontal loader with improved UX */}
@@ -990,7 +1003,7 @@ const SelectedItemBadge = ({
         "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
         !isPlotted &&
           "text-muted-foreground bg-muted/30 hover:bg-muted/50 border-dashed shadow-none hover:shadow-sm",
-        isSelected && "bg-warning/20 hover:bg-warning/30",
+        isSelected && "bg-warning-subtle hover:bg-warning-subtle/70",
       )}
       onClick={onSelect}
       role="button"
@@ -1015,7 +1028,7 @@ const SelectedItemBadge = ({
                 ? "transition-opacity group-hover:opacity-80"
                 : item.type === "account"
                   ? "bg-muted-foreground group-hover:bg-foreground transition-colors"
-                  : "bg-orange-500 transition-colors group-hover:bg-orange-600 dark:bg-orange-400",
+                  : "bg-warning group-hover:bg-warning transition-colors",
           )}
           style={isPlotted && color ? { backgroundColor: color } : undefined}
         />
@@ -1023,12 +1036,12 @@ const SelectedItemBadge = ({
           {item.name}
         </span>
         {!isPlotted && (
-          <span className="bg-background/70 text-muted-foreground rounded px-1.5 py-0.5 text-[10px] font-medium">
+          <span className="bg-background/70 text-muted-foreground text-2xs rounded px-1.5 py-0.5 font-medium">
             {t("performance:not_plotted")}
           </span>
         )}
         {isPlotted && contextLabel && (
-          <span className="bg-background/70 text-muted-foreground rounded px-1.5 py-0.5 text-[10px] font-medium">
+          <span className="bg-background/70 text-muted-foreground text-2xs rounded px-1.5 py-0.5 font-medium">
             {contextLabel}
           </span>
         )}
@@ -1038,7 +1051,7 @@ const SelectedItemBadge = ({
         size="icon-xs"
         className={cn(
           "ml-2 size-5 transition-all duration-150",
-          "hover:bg-destructive/10 hover:text-destructive hover:scale-110",
+          "hover:bg-destructive-subtle hover:text-destructive-subtle-foreground hover:scale-110",
           "focus-visible:ring-destructive/50 focus-visible:ring-2",
         )}
         onClick={onDelete}
@@ -1524,23 +1537,25 @@ export default function PerformancePage() {
 
           {/* Mobile: Plus button with dropdown */}
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="bg-secondary/30 hover:bg-muted/80 size-9 flex-shrink-0 rounded-md border-[1.5px] border-none"
-                aria-label={t("performance:add_item")}
-              >
-                <Icons.Plus className="h-4 w-4" />
-              </Button>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="bg-secondary/30 hover:bg-muted/80 size-9 flex-shrink-0 rounded-md border-[1.5px] border-none"
+                  aria-label={t("performance:add_item")}
+                />
+              }
+            >
+              <Icons.Plus className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onSelect={() => setAccountSheetOpen(true)} className="py-4 md:py-2">
+              <DropdownMenuItem onClick={() => setAccountSheetOpen(true)} className="py-4 md:py-2">
                 <Icons.Briefcase className="mr-2 h-4 w-4" />
                 {t("performance:add_account")}
               </DropdownMenuItem>
               <DropdownMenuItem
-                onSelect={() => setBenchmarkSheetOpen(true)}
+                onClick={() => setBenchmarkSheetOpen(true)}
                 className="py-4 md:py-2"
               >
                 <Icons.TrendingUp className="mr-2 h-4 w-4" />
@@ -1650,7 +1665,7 @@ export default function PerformancePage() {
                     className={cn(
                       "text-xs sm:text-sm",
                       !isMobile && "whitespace-nowrap text-right 2xl:text-left",
-                      isMobile && "text-[10px]",
+                      isMobile && "text-2xs",
                     )}
                   >
                     {displayDateRange}
@@ -1659,7 +1674,7 @@ export default function PerformancePage() {
                     <Badge
                       variant={selectedItemData.trackingModeBadge.variant}
                       className={cn(
-                        "mt-2 h-5 rounded-md px-1.5 text-[10px] font-medium",
+                        "text-2xs mt-2 h-5 rounded-md px-1.5 font-medium",
                         !isMobile && "col-start-1 mt-1 w-fit 2xl:mt-2",
                       )}
                     >

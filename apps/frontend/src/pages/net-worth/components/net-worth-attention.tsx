@@ -11,6 +11,8 @@ import {
   type StaleAssetInfo,
 } from "@/lib/types";
 import { AlternativeAssetQuickAddModal } from "@/pages/asset/alternative-assets/components/alternative-asset-quick-add-modal";
+import { statusSurfaceVariants } from "@wealthfolio/ui/components/ui/status-surface";
+import { cn } from "@/lib/utils";
 
 const ADD_PROPERTY_OPTION = "__add_property__";
 
@@ -43,17 +45,22 @@ export function NetWorthAttentionCard({
 
   return (
     <section
-      className="border-warning/10 bg-warning/10 rounded-xl border p-4 backdrop-blur-xl md:p-5"
+      className={cn(
+        statusSurfaceVariants({ status: "warning" }),
+        "rounded-xl p-4 backdrop-blur-xl md:p-5",
+      )}
       aria-label={t("insights:networth.attention.title")}
     >
       <div className="flex items-center gap-2">
-        <Icons.AlertCircle className="text-warning h-4 w-4 shrink-0" />
+        <span className="text-warning-subtle-foreground bg-current/15 flex shrink-0 rounded-full p-1.5">
+          <Icons.AlertCircle className="size-4" />
+        </span>
         <h3 className="text-foreground text-sm font-semibold">
           {t("insights:networth.attention.title")}
         </h3>
       </div>
       {staleAssets.length > 0 && (
-        <div className="ml-6 mt-3">
+        <div className="ml-9 mt-3">
           <p className="text-muted-foreground text-xs">
             {t("insights:networth.not_updated_over_90_days")}
           </p>
@@ -66,7 +73,7 @@ export function NetWorthAttentionCard({
                 <Link
                   key={asset.assetId}
                   to={`/holdings/${encodeURIComponent(asset.assetId)}?tab=history`}
-                  className="hover:bg-warning/10 -mx-2 block rounded-md px-2 py-1.5 transition-colors"
+                  className="hover:bg-warning-subtle -mx-2 block rounded-md px-2 py-1.5 transition-colors"
                 >
                   <span className="flex items-baseline justify-between gap-2">
                     <span className="min-w-0 break-words text-xs font-medium">
@@ -90,7 +97,7 @@ export function NetWorthAttentionCard({
         </div>
       )}
       {unlinkedLiabilities.map((liability) => (
-        <div key={liability.id} className="ml-6 mt-3 min-w-0">
+        <div key={liability.id} className="ml-9 mt-3 min-w-0">
           {properties.length > 0 ? (
             <ResponsiveSelect
               value=""

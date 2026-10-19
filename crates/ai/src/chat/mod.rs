@@ -546,23 +546,6 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
         Ok(owned_event_stream(rx, producer))
     }
 
-    /// List available tool names.
-    pub fn list_tools(&self) -> Vec<String> {
-        vec![
-            "get_holdings".to_string(),
-            "get_accounts".to_string(),
-            "search_activities".to_string(),
-            "get_goals".to_string(),
-            "get_valuation_history".to_string(),
-            "get_income".to_string(),
-            "get_asset_allocation".to_string(),
-            "get_performance".to_string(),
-            "record_activity".to_string(),
-            "record_activities".to_string(),
-            "import_csv".to_string(),
-        ]
-    }
-
     /// Get environment reference.
     pub fn env(&self) -> &Arc<E> {
         &self.env
@@ -701,16 +684,6 @@ mod tests {
         let retrieved = service.get_thread(&thread_id).unwrap();
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().id, thread_id);
-    }
-
-    #[test]
-    fn test_chat_service_list_tools() {
-        let env = Arc::new(MockEnvironment::new());
-        let service = ChatService::new(env, ChatConfig::default());
-
-        let tools = service.list_tools();
-        assert!(tools.contains(&"get_accounts".to_string()));
-        assert!(tools.contains(&"get_holdings".to_string()));
     }
 
     #[test]

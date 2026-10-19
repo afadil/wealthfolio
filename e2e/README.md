@@ -85,10 +85,12 @@ WEALTHFOLIO_E2E=1 WEALTHFOLIO_FIXTURE_DIR="$PWD/e2e/fixtures/quotes" pnpm run de
 ./scripts/wait-for-both-servers-to-be-ready.sh
 ```
 
-`wait-for-both-servers-to-be-ready.sh` polls the log file until it detects both
-"ready in" (Vite) and the Axum server binding on port 8088, then prints the last
-few lines and exits. The output redirect is required — the script reads from a
-file, not from a live terminal.
+`wait-for-both-servers-to-be-ready.sh` polls Vite and the Axum server's
+`/api/v1/healthz` on port 8088 until both answer, then prints the last few lines
+of the log file. It exits with status 1 if they still don't answer after 60
+attempts with a 2-second pause after each (`-m` and `-i` change these), for
+example while `cargo` is still compiling the server; run it again to keep
+waiting.
 
 > **If the web app is already running:** Stop it first (Ctrl+C), then re-run
 > `prep-e2e.mjs` and restart. The running instance is using a stale database —
@@ -208,3 +210,48 @@ covers, OS lifecycle events, and native OAuth require device testing.
 See the
 [profile architecture](../docs/architecture/multi-profile-and-app-lock.md) for
 access boundaries and additional release verification requirements.
+
+## UI primitive guardrails (on demand)
+
+`e2e/design-system/` checks the `@wealthfolio/ui` primitives on a synthetic
+gallery (`apps/frontend/e2e/design-system/`): screenshots of every component and
+open overlay (light and dark, 390 and 1440 px), overlay and keyboard behaviour,
+and an axe WCAG 2.1 A/AA scan. It runs in Chromium and WebKit, only when asked;
+it is not part of CI.
+
+Screenshots and accessibility results compare against a baseline recorded on the
+same machine from the code before a change, kept in `.local/design-system/`
+(never committed, so baselines never cross platforms):
+
+```bash
+git switch main
+pnpm test:e2e:design-system:baseline   # record the "before" state
+git switch <your-branch>
+pnpm test:e2e:design-system            # compare; differences fail with a diff
+```
+
+The accessibility scan records which rules fail on how many elements, because
+the primitives do not pass cleanly yet: in WebKit it counts the focus guards
+Base UI keeps around open popups, which Safari exposes as buttons without a
+name. RTL is not covered because no shipped locale is right-to-left.
+
+`colors.spec.ts` is the colour contract: every role a theme defines, text pairs
+at 4.5:1 and the focus ring at 3:1, in light and dark. Callouts, banners and
+pills on a status use its subtle surface (`bg-warning-subtle`,
+`text-warning-subtle-foreground`, `border-warning-subtle-border`): status text
+on a tint of its own colour (`text-warning` on `bg-warning/10`) can't reach
+4.5:1. `Alert`'s status variants show that surface as glass (60% fill, a
+hairline and `--surface-highlight` along the top), also checked at 4.5:1.
+
+Each test is retried once in a fresh browser: late in a long run WebKit
+sometimes stalls a page load without sending a request. Playwright reports a
+test that only passes on retry as flaky; a real difference fails both attempts.
+
+`pnpm ui:design-ratchet` counts, per file, font sizes off the type scale
+(`text-[11px]`; the scale is `text-2xs` to `text-3xl` in `globals.css`), other
+hard-coded px sizes in class names (`w-[300px]`; borders, rings, shadows and
+offsets up to 4 px stay in px), and raw colours that bypass the theme's roles
+(`text-amber-600`, hex literals, `rgb()`/`hsl()` values) or tint a status colour
+(`bg-warning/10`), and fails when a file gains one. Sizes in rem follow the root
+font size, which the Text size setting will change. Run it with `--update` after
+removing some.

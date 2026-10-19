@@ -33,10 +33,16 @@ import { observeElementOffset, useVirtualizer } from "@tanstack/react-virtual";
 import {
   AmountDisplay,
   Button,
-  EmptyPlaceholder,
   PriceDisplay,
   useAmountFormatting,
   useDateFormatting,
+  buttonVariants,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
 } from "@wealthfolio/ui";
 import { DataTableColumnHeader } from "@wealthfolio/ui/components/ui/data-table/data-table-column-header";
 import {
@@ -234,7 +240,7 @@ export const ActivityTable = ({
             : null;
 
           const content = (
-            <div className="flex max-w-[220px] items-center gap-2">
+            <div className="max-w-55 flex items-center gap-2">
               <TickerAvatar
                 symbol={avatarSymbol}
                 exchangeMic={row.original.exchangeMic}
@@ -321,7 +327,7 @@ export const ActivityTable = ({
               : undefined;
 
           return (
-            <div className="flex min-w-0 max-w-[160px] flex-col items-start gap-1 text-sm">
+            <div className="flex min-w-0 max-w-40 flex-col items-start gap-1 text-sm">
               <ActivityTypeBadge
                 type={activityType as ActivityType}
                 className="whitespace-nowrap text-xs font-normal"
@@ -619,7 +625,7 @@ export const ActivityTable = ({
           const accountName = row.getValue("account");
           const accountCurrency = row.getValue("accountCurrency");
           return (
-            <div className="ml-2 flex min-w-[150px] flex-col">
+            <div className="min-w-37.5 ml-2 flex flex-col">
               <span>{String(accountName)}</span>
               <span className="text-muted-foreground text-xs font-light">
                 {String(accountCurrency)}
@@ -671,15 +677,17 @@ export const ActivityTable = ({
           return (
             <div className="flex justify-end">
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 rounded-lg"
-                    title={t("activity:table_toggle_columns")}
-                  >
-                    <Icons.ChevronDown className="h-4 w-4" />
-                  </Button>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg"
+                      title={t("activity:table_toggle_columns")}
+                    />
+                  }
+                >
+                  <Icons.ChevronDown className="h-4 w-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {hideableColumns.map((column) => {
@@ -839,37 +847,44 @@ export const ActivityTable = ({
   if (!hasRows) {
     return (
       <div className="flex h-full flex-col">
-        <EmptyPlaceholder>
-          <EmptyPlaceholder.Icon name="Activity" />
-          <EmptyPlaceholder.Title>{t("activity:table.no_activities")}</EmptyPlaceholder.Title>
-          <EmptyPlaceholder.Description>
-            {filtersActive
-              ? t("activity:table.no_activities_filtered")
-              : t("activity:table.no_activities_desc")}
-          </EmptyPlaceholder.Description>
-          {filtersActive ? (
-            onClearFilters ? (
-              <Button variant="outline" onClick={onClearFilters}>
-                {t("activity:table.clear_filters")}
-              </Button>
-            ) : null
-          ) : onAdd ? (
-            <div className="flex flex-col items-center gap-3 sm:flex-row">
-              <Button onClick={onAdd}>
-                <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-                {t("activity:add_activity")}
-              </Button>
-              {showConnectAccountLink && (
-                <Button variant="outline" asChild>
-                  <Link to={connectPagePath("activities_empty")}>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Icons.Activity />
+            </EmptyMedia>
+            <EmptyTitle>{t("activity:table.no_activities")}</EmptyTitle>
+            <EmptyDescription>
+              {filtersActive
+                ? t("activity:table.no_activities_filtered")
+                : t("activity:table.no_activities_desc")}
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            {filtersActive ? (
+              onClearFilters ? (
+                <Button variant="outline" onClick={onClearFilters}>
+                  {t("activity:table.clear_filters")}
+                </Button>
+              ) : null
+            ) : onAdd ? (
+              <div className="flex flex-col items-center gap-3 sm:flex-row">
+                <Button onClick={onAdd}>
+                  <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                  {t("activity:add_activity")}
+                </Button>
+                {showConnectAccountLink && (
+                  <Link
+                    to={connectPagePath("activities_empty")}
+                    className={buttonVariants({ variant: "outline" })}
+                  >
                     <Icons.CloudSync2 className="mr-2 h-4 w-4" aria-hidden="true" />
                     {t("activity:page.connect_account")}
                   </Link>
-                </Button>
-              )}
-            </div>
-          ) : null}
-        </EmptyPlaceholder>
+                )}
+              </div>
+            ) : null}
+          </EmptyContent>
+        </Empty>
       </div>
     );
   }

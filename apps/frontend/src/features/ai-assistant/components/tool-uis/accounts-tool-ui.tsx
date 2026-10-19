@@ -1,4 +1,6 @@
 import type { ToolCallMessagePartProps } from "@assistant-ui/react";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { makeAssistantToolUI } from "@assistant-ui/react";
 import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from "@wealthfolio/ui";
 import { memo, useMemo } from "react";
@@ -136,7 +138,7 @@ function AccountsLoadingSkeleton() {
           <Skeleton className="h-5 w-16" />
         </div>
       </CardHeader>
-      <CardContent className="max-h-[320px] space-y-2 overflow-y-auto">
+      <CardContent className="max-h-80 space-y-2 overflow-y-auto">
         {Array.from({ length: 3 }).map((_, index) => (
           <div
             key={index}
@@ -185,12 +187,11 @@ function EmptyState() {
 function ErrorState({ message }: { message?: string }) {
   const { t } = useTranslation();
   return (
-    <Card className="border-destructive/30 bg-destructive/5">
-      <CardContent className="py-4">
-        <p className="text-destructive text-sm font-medium">{t("ai:accounts.error")}</p>
-        {message && <p className="text-muted-foreground mt-1 text-xs">{message}</p>}
-      </CardContent>
-    </Card>
+    <Alert variant="destructive">
+      <Icons.AlertCircle />
+      <AlertTitle>{t("ai:accounts.error")}</AlertTitle>
+      {message && <AlertDescription className="text-xs">{message}</AlertDescription>}
+    </Alert>
   );
 }
 
@@ -264,7 +265,7 @@ function AccountsToolUIContentImpl({ args, result, status }: AccountsToolUIConte
           )}
         </div>
       </CardHeader>
-      <CardContent className="max-h-[320px] space-y-2 overflow-y-auto">
+      <CardContent className="max-h-80 space-y-2 overflow-y-auto">
         {accounts.map((account) => (
           <AccountCard key={account.id} account={account} />
         ))}

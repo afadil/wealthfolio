@@ -219,7 +219,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
 
         case "dropdown":
           return (
-            <Button variant="outline" className="w-[240px] justify-between" disabled>
+            <Button variant="outline" className="w-60 justify-between" disabled>
               <div className="flex w-full items-center gap-2">
                 <Skeleton className="h-4 w-4 rounded-full" />
                 <Skeleton className="h-4 w-36" />
@@ -272,15 +272,13 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                       initial="initial"
                       animate="animate"
                       exit="exit"
-                      className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 shadow-sm dark:bg-green-900/20"
+                      className="bg-success-subtle flex h-8 w-8 items-center justify-center rounded-full shadow-sm"
                     >
                       <motion.div variants={iconVariants} initial="initial" animate="animate">
                         {(() => {
                           const IconComponent =
                             accountTypeIcons[selectedAccount.accountType] ?? Icons.CreditCard;
-                          return (
-                            <IconComponent className="h-4 w-4 text-green-600 dark:text-green-400" />
-                          );
+                          return <IconComponent className="text-success h-4 w-4" />;
                         })()}
                       </motion.div>
                     </motion.div>
@@ -441,15 +439,18 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
       }
     };
 
+    // A loading selector shows its skeleton (none for the form variant) instead of a trigger.
+    const trigger = renderTrigger();
+
     return (
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>{renderTrigger()}</PopoverTrigger>
+        {isLoading ? trigger : trigger && <PopoverTrigger render={trigger} />}
         <PopoverContent
           className="p-0"
           align="start"
           sideOffset={8}
           style={{
-            minWidth: variant === "card" ? "var(--radix-popover-trigger-width)" : "240px",
+            minWidth: variant === "card" ? "var(--anchor-width)" : "240px",
           }}
         >
           <Command className="w-full">

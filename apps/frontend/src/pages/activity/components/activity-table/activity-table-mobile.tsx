@@ -21,12 +21,18 @@ import { formatDateTime } from "@/lib/utils";
 import {
   AmountDisplay,
   Button,
-  EmptyPlaceholder,
   Icons,
   PriceDisplay,
   Separator,
   useAmountFormatting,
   useDateFormatting,
+  buttonVariants,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
 } from "@wealthfolio/ui";
 import { Card } from "@wealthfolio/ui/components/ui/card";
 import { Link } from "react-router-dom";
@@ -173,37 +179,44 @@ export const ActivityTableMobile = ({
 
   if (activities.length === 0) {
     return (
-      <EmptyPlaceholder>
-        <EmptyPlaceholder.Icon name="Activity" />
-        <EmptyPlaceholder.Title>{t("activity:table.no_activities")}</EmptyPlaceholder.Title>
-        <EmptyPlaceholder.Description>
-          {filtersActive
-            ? t("activity:table.no_activities_filtered")
-            : t("activity:table.no_activities_desc")}
-        </EmptyPlaceholder.Description>
-        {filtersActive ? (
-          onClearFilters ? (
-            <Button variant="outline" onClick={onClearFilters}>
-              {t("activity:table.clear_filters")}
-            </Button>
-          ) : null
-        ) : onAdd ? (
-          <div className="flex flex-col items-center gap-3 sm:flex-row">
-            <Button onClick={onAdd}>
-              <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-              {t("activity:add_activity")}
-            </Button>
-            {showConnectAccountLink && (
-              <Button variant="outline" asChild>
-                <Link to={connectPagePath("activities_empty")}>
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Icons.Activity />
+          </EmptyMedia>
+          <EmptyTitle>{t("activity:table.no_activities")}</EmptyTitle>
+          <EmptyDescription>
+            {filtersActive
+              ? t("activity:table.no_activities_filtered")
+              : t("activity:table.no_activities_desc")}
+          </EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          {filtersActive ? (
+            onClearFilters ? (
+              <Button variant="outline" onClick={onClearFilters}>
+                {t("activity:table.clear_filters")}
+              </Button>
+            ) : null
+          ) : onAdd ? (
+            <div className="flex flex-col items-center gap-3 sm:flex-row">
+              <Button onClick={onAdd}>
+                <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                {t("activity:add_activity")}
+              </Button>
+              {showConnectAccountLink && (
+                <Link
+                  to={connectPagePath("activities_empty")}
+                  className={buttonVariants({ variant: "outline" })}
+                >
                   <Icons.CloudSync2 className="mr-2 h-4 w-4" aria-hidden="true" />
                   {t("activity:page.connect_account")}
                 </Link>
-              </Button>
-            )}
-          </div>
-        ) : null}
-      </EmptyPlaceholder>
+              )}
+            </div>
+          ) : null}
+        </EmptyContent>
+      </Empty>
     );
   }
 

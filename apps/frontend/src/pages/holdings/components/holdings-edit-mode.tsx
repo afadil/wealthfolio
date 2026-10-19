@@ -4,6 +4,7 @@ import {
   MoneyInput,
   QuantityInput,
   useAmountFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import {
   AlertDialog,
@@ -536,7 +537,7 @@ export const HoldingsEditMode = ({
                             variant="ghost"
                             size="sm"
                             onClick={() => handleRemoveHolding(holding.assetId)}
-                            className="hover:bg-destructive/20 hover:text-destructive h-7 w-7 p-0"
+                            className="hover:bg-destructive-subtle hover:text-destructive-subtle-foreground h-7 w-7 p-0"
                           >
                             <Icons.Trash className="h-3.5 w-3.5" />
                           </Button>
@@ -650,7 +651,7 @@ export const HoldingsEditMode = ({
                           variant="ghost"
                           size="sm"
                           onClick={() => handleRemoveCashBalance(cash.currency)}
-                          className="hover:bg-destructive/20 hover:text-destructive h-7 w-7 p-0"
+                          className="hover:bg-destructive-subtle hover:text-destructive-subtle-foreground h-7 w-7 p-0"
                         >
                           <Icons.Trash className="h-3.5 w-3.5" />
                         </Button>
@@ -662,7 +663,7 @@ export const HoldingsEditMode = ({
                 {/* Add Currency Input */}
                 {showAddCurrency && (
                   <div className="flex items-center gap-2 py-2">
-                    <div className="w-[160px]">
+                    <div className="w-40">
                       <CurrencyInput
                         placeholder={t("holdings:select_currency")}
                         valueDisplay="code"
@@ -718,7 +719,7 @@ export const HoldingsEditMode = ({
                 variant="outline"
                 onClick={() => setShowDeleteDialog(true)}
                 disabled={isSaving || isDeleting}
-                className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                className="text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"
               >
                 <Icons.Trash className="mr-2 h-4 w-4" />
                 {t("holdings:delete_snapshot")}
@@ -732,7 +733,7 @@ export const HoldingsEditMode = ({
             <Button onClick={handleSave} disabled={isSaving || isDeleting || !hasChanges}>
               {isSaving ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                   {t("holdings:saving")}
                 </>
               ) : (
@@ -778,11 +779,11 @@ export const HoldingsEditMode = ({
             <AlertDialogAction
               onClick={handleDeleteSnapshot}
               disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
             >
               {isDeleting ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                   {t("holdings:deleting")}
                 </>
               ) : (

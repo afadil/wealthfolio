@@ -388,6 +388,7 @@ export interface ActivityBulkMutationResult {
 }
 
 export interface InternalTransferPairRequest {
+  editedActivityId?: string;
   transferOutId?: string;
   transferInId?: string;
   sourceGroupId?: string;

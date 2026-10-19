@@ -32,6 +32,7 @@ import {
   TooltipTrigger,
   useDateFormatting,
   useNumberFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { format, subMonths } from "date-fns";
 import React, { useCallback, useMemo, useState } from "react";
@@ -197,28 +198,22 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-md">
             <HoverCard>
-              <HoverCardTrigger asChild className="cursor-pointer">
-                <div>
-                  <p className="pt-3 text-xl font-bold">
-                    <PriceDisplay
-                      value={marketPrice}
-                      currency={currency}
-                      isHidden={isBalanceHidden}
-                    />
-                  </p>
-                  <p className={`text-sm ${ganAmount > 0 ? "text-success" : "text-destructive"}`}>
-                    <AmountDisplay
-                      value={ganAmount}
-                      currency={currency}
-                      isHidden={isBalanceHidden}
-                    />{" "}
-                    (
-                    {percentage == null
-                      ? t("asset:historyCard.na")
-                      : numberFormatting.formatPercent(percentage)}
-                    ) {selectedIntervalDesc}
-                  </p>
-                </div>
+              <HoverCardTrigger className="cursor-pointer" render={<div />}>
+                <p className="pt-3 text-xl font-bold">
+                  <PriceDisplay
+                    value={marketPrice}
+                    currency={currency}
+                    isHidden={isBalanceHidden}
+                  />
+                </p>
+                <p className={`text-sm ${ganAmount > 0 ? "text-success" : "text-destructive"}`}>
+                  <AmountDisplay value={ganAmount} currency={currency} isHidden={isBalanceHidden} />{" "}
+                  (
+                  {percentage == null
+                    ? t("asset:historyCard.na")
+                    : numberFormatting.formatPercent(percentage)}
+                  ) {selectedIntervalDesc}
+                </p>
               </HoverCardTrigger>
               <HoverCardContent align="start" className="w-80 shadow-none">
                 <div className="flex flex-col space-y-4">
@@ -239,7 +234,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
                     disabled={syncMarketDataMutation.isPending}
                   >
                     {syncMarketDataMutation.isPending ? (
-                      <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                      <Spinner className="mr-2 h-4 w-4" />
                     ) : (
                       <Icons.Refresh className="mr-2 h-4 w-4" />
                     )}
@@ -254,20 +249,22 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
           <div className="mt-2 flex items-center gap-1 self-start">
             <TooltipProvider>
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={showActivityMarkers ? "default" : "secondary"}
-                    size="icon-xs"
-                    className={cn("rounded-full", !showActivityMarkers && "bg-secondary/50")}
-                    onClick={() => setShowActivityMarkers((current) => !current)}
-                    aria-label={
-                      showActivityMarkers
-                        ? t("asset:historyCard.hide_activity_markers")
-                        : t("asset:historyCard.show_activity_markers")
-                    }
-                  >
-                    <Icons.History className="size-5" />
-                  </Button>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant={showActivityMarkers ? "default" : "secondary"}
+                      size="icon-xs"
+                      className={cn("rounded-full", !showActivityMarkers && "bg-secondary/50")}
+                      onClick={() => setShowActivityMarkers((current) => !current)}
+                      aria-label={
+                        showActivityMarkers
+                          ? t("asset:historyCard.hide_activity_markers")
+                          : t("asset:historyCard.show_activity_markers")
+                      }
+                    />
+                  }
+                >
+                  <Icons.History className="size-5" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>

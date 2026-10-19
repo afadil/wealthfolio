@@ -21,6 +21,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { useWealthfolioConnect } from "../providers/wealthfolio-connect-provider";
 import { ProviderButton } from "./provider-button";
 import { ConnectFeatures } from "./connect-features";
+import { Spinner } from "@wealthfolio/ui";
 
 // OAuth is only available on desktop/mobile (Tauri) where we can handle deep links
 // Web (self-hosted) uses email OTP only since we can't register all possible redirect URLs
@@ -247,7 +248,7 @@ export function LoginForm() {
                 >
                   {loadingProvider === "email" ? (
                     <>
-                      <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                      <Spinner className="mr-2 h-4 w-4" />
                       {t("auth:connect.otp.verifying")}
                     </>
                   ) : (

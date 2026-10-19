@@ -323,21 +323,19 @@ function LoanLedger({ holding, calculation, quotes, actions, onEditDetails }: Lo
             </label>
           </div>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline">
-                {t("asset:loanEvents.add_event")}
-                <Icons.ChevronDown className="ml-2 size-3.5" />
-              </Button>
+            <DropdownMenuTrigger render={<Button size="sm" variant="outline" />}>
+              {t("asset:loanEvents.add_event")}
+              <Icons.ChevronDown className="ml-2 size-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={actions.confirmBalance}>
+              <DropdownMenuItem onClick={actions.confirmBalance}>
                 {t("asset:loanActions.confirm_balance")}
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={actions.extraPayment}>
+              <DropdownMenuItem onClick={actions.extraPayment}>
                 {t("asset:loanActions.extra_repayment")}
               </DropdownMenuItem>
               {canRenewLoan(metadata) && (
-                <DropdownMenuItem onSelect={actions.renew}>
+                <DropdownMenuItem onClick={actions.renew}>
                   {t(
                     (metadata.sub_type ?? metadata.liability_type) === "mortgage"
                       ? "asset:loanOverview.renew_mortgage"
@@ -526,22 +524,22 @@ function LoanLedger({ holding, calculation, quotes, actions, onEditDetails }: Lo
   );
 }
 
-const INSTALMENT_TONES: Record<InstalmentStatus, string> = {
-  paid: "bg-success/10 text-success",
-  due: "bg-muted text-muted-foreground",
-  short: "bg-warning/10 text-warning",
-  missing: "bg-warning/10 text-warning",
-};
+const INSTALMENT_VARIANTS = {
+  paid: "success-subtle",
+  due: "secondary",
+  short: "warning-subtle",
+  missing: "warning-subtle",
+} as const satisfies Record<InstalmentStatus, string>;
 
 /** An instalment's status once the loan is paid from an account. */
 function InstalmentBadge({ status, label }: { status: InstalmentStatus; label: string }) {
   return (
     <Badge
-      variant="secondary"
+      variant={INSTALMENT_VARIANTS[status]}
       data-status={status}
       className={cn(
         "shrink-0 rounded-md px-1.5 py-0 text-xs font-medium",
-        INSTALMENT_TONES[status],
+        status === "due" && "bg-muted text-muted-foreground",
       )}
     >
       {label}

@@ -121,6 +121,7 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
           onKeyDownCapture={handleKeyDown}
           className={cn("relative", className)}
           role="region"
+          data-slot="carousel"
           aria-roledescription="carousel"
           {...props}
         >
@@ -137,7 +138,7 @@ const CarouselContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
     const { carouselRef, orientation } = useCarousel();
 
     return (
-      <div ref={carouselRef} className="overflow-hidden">
+      <div ref={carouselRef} className="overflow-hidden" data-slot="carousel-content">
         <div
           ref={ref}
           className={cn("flex", orientation === "horizontal" ? "-ml-4" : "-mt-4 flex-col", className)}
@@ -160,6 +161,7 @@ const CarouselItem = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLD
       <div
         ref={ref}
         role="group"
+        data-slot="carousel-item"
         aria-roledescription="slide"
         className={cn("min-w-0 shrink-0 grow-0 basis-full", orientation === "horizontal" ? "pl-4" : "pt-4", className)}
         {...props}
@@ -177,6 +179,7 @@ const CarouselPrevious = React.forwardRef<HTMLButtonElement, React.ComponentProp
     return (
       <Button
         ref={ref}
+        data-slot="carousel-previous"
         variant={variant}
         size={size}
         className={cn(
@@ -206,6 +209,7 @@ const CarouselNext = React.forwardRef<HTMLButtonElement, React.ComponentProps<ty
     return (
       <Button
         ref={ref}
+        data-slot="carousel-next"
         variant={variant}
         size={size}
         className={cn(

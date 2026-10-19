@@ -144,7 +144,7 @@ const formSectionLabelClassName =
 const trackingOptionClassName =
   "hover:bg-accent/50 relative flex cursor-pointer gap-3 rounded-xl border bg-card p-4 transition-colors dark:bg-muted/20 dark:hover:bg-muted/30";
 const cashClassificationItemClassName =
-  "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground h-9 rounded-md text-sm data-[state=on]:shadow-sm dark:data-[state=on]:bg-secondary dark:data-[state=on]:text-foreground";
+  "aria-pressed:bg-primary aria-pressed:text-primary-foreground h-9 rounded-md text-sm aria-pressed:shadow-sm dark:aria-pressed:bg-secondary dark:aria-pressed:text-foreground";
 
 // Input type (what the form receives)
 type AccountFormInput = z.input<typeof newAccountSchema>;
@@ -351,7 +351,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
           </div>
         </DialogHeader>
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.9fr)]">
           <input type="hidden" name="id" />
           <div className="contents lg:grid lg:content-start lg:gap-4">
             <section className={formCardClassName}>
@@ -443,10 +443,9 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                       </p>
                     </div>
                     <ToggleGroup
-                      type="single"
                       aria-label={t("settings:accounts.form_cash_classification_aria")}
-                      value={getSelectableCashCategoryFromMeta(form.watch("meta"))}
-                      onValueChange={(v) => {
+                      value={[getSelectableCashCategoryFromMeta(form.watch("meta"))]}
+                      onValueChange={([v]) => {
                         if (!v) return;
                         const categoryId = v === CASH_ALLOCATION_DEFAULT_VALUE ? null : v;
                         const updatedMeta = setCashCategoryInMeta(
@@ -539,10 +538,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                     {t("settings:accounts.form_tracking_mode_label")}
                   </FormLabel>
                   {needsSetup && !currentTrackingMode && (
-                    <Alert
-                      variant="warning"
-                      className="px-3 py-2.5 [&>svg]:left-3 [&>svg]:top-2.5 [&>svg~*]:pl-6"
-                    >
+                    <Alert variant="warning" className="px-3 py-2.5">
                       <Icons.AlertTriangle className="h-4 w-4" />
                       <AlertDescription className="text-xs">
                         {t("settings:accounts.form_tracking_setup_hint")}{" "}
@@ -606,10 +602,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                     </RadioGroup>
                   </FormControl>
                   {field.value === "HOLDINGS" && (
-                    <Alert
-                      variant="warning"
-                      className="px-3 py-2.5 [&>svg]:left-3 [&>svg]:top-2.5 [&>svg~*]:pl-6"
-                    >
+                    <Alert variant="warning" className="px-3 py-2.5">
                       <Icons.AlertTriangle className="h-4 w-4" />
                       <AlertDescription className="text-xs">
                         {t("settings:accounts.form_tracking_holdings_warning")}{" "}
@@ -689,10 +682,10 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
           </div>
         </div>
         <DialogFooter className="gap-2">
-          <DialogClose asChild>
-            <Button data-testid="account-cancel-button" type="button" variant="outline">
-              {t("settings:accounts_cancel_button")}
-            </Button>
+          <DialogClose
+            render={<Button data-testid="account-cancel-button" type="button" variant="outline" />}
+          >
+            {t("settings:accounts_cancel_button")}
           </DialogClose>
           <Button
             data-testid="account-submit-button"
@@ -719,8 +712,8 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
           <div className="px-5 pb-4 pt-5">
             <AlertDialogHeader className="space-y-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-100/30 dark:bg-orange-100/20">
-                  <Icons.ArrowRightLeft className="h-4 w-4 text-orange-500 dark:text-orange-300" />
+                <div className="bg-warning-subtle flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
+                  <Icons.ArrowRightLeft className="text-warning h-4 w-4" />
                 </div>
                 <AlertDialogTitle className="text-base font-semibold">
                   {t("settings:accounts.mode_switch_title")}
@@ -732,26 +725,26 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
             </AlertDialogHeader>
 
             {/* Checklist */}
-            <div className="mt-4 rounded-lg border border-orange-100/40 bg-orange-100/30 p-3 dark:border-orange-100/20 dark:bg-orange-100/20">
-              <p className="mb-2 text-xs font-medium text-orange-600 dark:text-orange-200">
+            <div className="border-warning-subtle-border bg-warning-subtle mt-4 rounded-lg border p-3">
+              <p className="text-warning mb-2 text-xs font-medium">
                 {t("settings:accounts.mode_switch_checklist_title")}
               </p>
-              <ul className="space-y-2 text-[13px]">
+              <ul className="space-y-2 text-sm">
                 <li className="flex items-start gap-2">
-                  <Icons.Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-500 dark:text-orange-300" />
-                  <span className="text-orange-500 dark:text-orange-200">
+                  <Icons.Check className="text-warning mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span className="text-warning">
                     {t("settings:accounts.mode_switch_checklist_recorded")}
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <Icons.Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-500 dark:text-orange-300" />
-                  <span className="text-orange-500 dark:text-orange-200">
+                  <Icons.Check className="text-warning mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span className="text-warning">
                     {t("settings:accounts.mode_switch_checklist_accurate")}
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <Icons.AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-600 dark:text-orange-300" />
-                  <span className="text-orange-500 dark:text-orange-200">
+                  <Icons.AlertTriangle className="text-warning mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span className="text-warning">
                     {t("settings:accounts.mode_switch_checklist_gaps")}
                   </span>
                 </li>
@@ -780,7 +773,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <Icons.AlertTriangle className="h-5 w-5 text-amber-500" />
+              <Icons.AlertTriangle className="text-warning h-5 w-5" />
               {t("settings:accounts.archive_title")}
             </AlertDialogTitle>
             <AlertDialogDescription>

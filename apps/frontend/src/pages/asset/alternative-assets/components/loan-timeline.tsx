@@ -218,7 +218,7 @@ export function LoanTimeline({
   const referenceLabel = (value: string, position: "insideTopLeft" | "insideTopRight") => ({
     value,
     position,
-    fontSize: 11,
+    fontSize: "0.6875rem",
     fill: "var(--muted-foreground)",
   });
   const title = t(
@@ -230,58 +230,56 @@ export function LoanTimeline({
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-md">
           <HoverCard>
-            <HoverCardTrigger asChild className="cursor-pointer">
-              <div>
-                <p className="flex items-center gap-2 pt-3 text-xl font-bold">
-                  {balanceAvailable ? (
-                    <AmountDisplay value={balance} currency={currency} isHidden={isBalanceHidden} />
-                  ) : (
-                    t("asset:loanOverview.unavailable")
-                  )}
-                  {originalBalance && (
-                    <Badge variant="secondary" className="text-xs font-normal">
-                      {t("asset:quickAdd.original_amount")}
-                    </Badge>
-                  )}
-                  {estimated && (
-                    <Badge variant="secondary" className="text-xs font-normal">
-                      {t("asset:loanOverview.projected")}
-                    </Badge>
-                  )}
-                </p>
-                <p
-                  className={cn(
-                    "text-sm font-light",
-                    paidDown.amount == null
-                      ? "text-muted-foreground"
-                      : paidDown.amount >= 0
-                        ? "text-success"
-                        : "text-destructive",
-                  )}
-                  data-testid="loan-period-change"
-                >
-                  {paidDown.amount == null ? (
-                    `${t("asset:loanOverview.period_change")} ${t("asset:loanOverview.unavailable")}`
-                  ) : (
-                    <>
-                      {t(
-                        paidDown.amount >= 0
-                          ? "asset:altContent.paid_down"
-                          : "asset:altContent.increased",
-                      )}
-                      <AmountDisplay
-                        value={Math.abs(paidDown.amount)}
-                        currency={currency}
-                        isHidden={isBalanceHidden}
-                      />
-                      {paidDown.percent != null &&
-                        !isBalanceHidden &&
-                        ` (${formatting.formatPercent(Math.abs(paidDown.percent), { digits: 1 })})`}{" "}
-                      {t(`ui:interval.${range}`)}
-                    </>
-                  )}
-                </p>
-              </div>
+            <HoverCardTrigger className="cursor-pointer" render={<div />}>
+              <p className="flex items-center gap-2 pt-3 text-xl font-bold">
+                {balanceAvailable ? (
+                  <AmountDisplay value={balance} currency={currency} isHidden={isBalanceHidden} />
+                ) : (
+                  t("asset:loanOverview.unavailable")
+                )}
+                {originalBalance && (
+                  <Badge variant="secondary" className="text-xs font-normal">
+                    {t("asset:quickAdd.original_amount")}
+                  </Badge>
+                )}
+                {estimated && (
+                  <Badge variant="secondary" className="text-xs font-normal">
+                    {t("asset:loanOverview.projected")}
+                  </Badge>
+                )}
+              </p>
+              <p
+                className={cn(
+                  "text-sm font-light",
+                  paidDown.amount == null
+                    ? "text-muted-foreground"
+                    : paidDown.amount >= 0
+                      ? "text-success"
+                      : "text-destructive",
+                )}
+                data-testid="loan-period-change"
+              >
+                {paidDown.amount == null ? (
+                  `${t("asset:loanOverview.period_change")} ${t("asset:loanOverview.unavailable")}`
+                ) : (
+                  <>
+                    {t(
+                      paidDown.amount >= 0
+                        ? "asset:altContent.paid_down"
+                        : "asset:altContent.increased",
+                    )}
+                    <AmountDisplay
+                      value={Math.abs(paidDown.amount)}
+                      currency={currency}
+                      isHidden={isBalanceHidden}
+                    />
+                    {paidDown.percent != null &&
+                      !isBalanceHidden &&
+                      ` (${formatting.formatPercent(Math.abs(paidDown.percent), { digits: 1 })})`}{" "}
+                    {t(`ui:interval.${range}`)}
+                  </>
+                )}
+              </p>
             </HoverCardTrigger>
             <HoverCardContent align="start" className="w-80 shadow-none">
               <div className="flex flex-col space-y-4">
@@ -319,9 +317,9 @@ export function LoanTimeline({
             {renderTooltip(focusedEvent)}
           </div>
         )}
-        <div className="h-full min-h-[320px]" data-testid="loan-timeline-chart">
+        <div className="h-full min-h-80" data-testid="loan-timeline-chart">
           {isBalanceHidden ? (
-            <div className="text-muted-foreground flex h-full min-h-[320px] items-center justify-center">
+            <div className="text-muted-foreground flex h-full min-h-80 items-center justify-center">
               ••••
             </div>
           ) : chart.length ? (
@@ -433,7 +431,7 @@ export function LoanTimeline({
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="text-muted-foreground flex h-full min-h-[320px] items-center justify-center text-sm">
+            <div className="text-muted-foreground flex h-full min-h-80 items-center justify-center text-sm">
               {t("asset:altContent.no_valuation_data")}
             </div>
           )}

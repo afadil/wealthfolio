@@ -942,7 +942,7 @@ export default function SpendingTabContent() {
   return (
     <div className="flex min-h-screen flex-col">
       {dataErrored && (
-        <div className="mx-4 mt-2 flex items-center justify-between gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-700 md:mx-6 lg:mx-8 dark:text-amber-300">
+        <div className="border-warning-subtle-border bg-warning-subtle text-warning-subtle-foreground mx-4 mt-2 flex items-center justify-between gap-2 rounded-md border px-3 py-1.5 text-xs md:mx-6 lg:mx-8">
           <span>
             <span className="font-semibold">{t("spending:tabContent.loadError")}</span>{" "}
             {t("spending:insightsPage.showingZeros")}
@@ -959,7 +959,7 @@ export default function SpendingTabContent() {
       <div className="px-4 pb-6 pt-2 md:px-6 md:pb-2 lg:px-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-8">
           <div>
-            <div className="text-muted-foreground/80 text-[11px] font-semibold uppercase tracking-[0.12em]">
+            <div className="text-muted-foreground/80 text-2xs font-semibold uppercase tracking-[0.12em]">
               {t("spending:tabContent.spentLabel")}
               {selectedIntervalDescription
                 ? ` · ${selectedIntervalDescription.startsWith("spending:") ? t(selectedIntervalDescription) : selectedIntervalDescription}`
@@ -1019,7 +1019,7 @@ export default function SpendingTabContent() {
           backgroundImage: `linear-gradient(to top, ${themeBg(theme, 0.3)}, ${themeBg(theme, 0.15)} 50%, transparent 100%)`,
         }}
       >
-        <div className="h-[280px] [&_.recharts-layer]:outline-none [&_.recharts-rectangle]:outline-none [&_.recharts-surface]:outline-none">
+        <div className="h-70 [&_.recharts-layer]:outline-none [&_.recharts-rectangle]:outline-none [&_.recharts-surface]:outline-none">
           {isLoading ? (
             <div className="flex h-full items-center justify-center">
               <Skeleton className="h-full w-full" />
@@ -1044,7 +1044,7 @@ export default function SpendingTabContent() {
                   dataKey="label"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                  tick={{ fontSize: "0.6875rem", fill: "var(--muted-foreground)" }}
                   interval="preserveStartEnd"
                   minTickGap={granularity === "day" ? 8 : 16}
                 />
@@ -1163,7 +1163,7 @@ export default function SpendingTabContent() {
                 }
               >
                 {isLoading ? (
-                  <Skeleton className="h-[260px] w-full rounded-lg" />
+                  <Skeleton className="h-65 w-full rounded-lg" />
                 ) : whereItWentView === "map" ? (
                   <CategoryTreemapMono
                     rows={categoryRows}
@@ -1338,7 +1338,7 @@ function SegmentedToggle({
             onClick={() => onChange(it.value)}
             aria-pressed={active}
             className={cn(
-              "rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+              "text-2xs rounded-full px-2.5 py-0.5 font-medium transition-colors",
               active
                 ? "bg-background text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground",
@@ -1459,7 +1459,7 @@ function CategoryTreemapMono({
 
   return (
     <div className="border-border/60 bg-card/40 overflow-hidden rounded-xl border p-4 backdrop-blur-xl md:p-5">
-      <div className="h-[220px] w-full">
+      <div className="h-55 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <Treemap
             data={data}
@@ -1821,7 +1821,7 @@ function CategoryRankedBar({
               <span className="text-foreground/90 min-w-0 flex-1 truncate text-xs font-medium">
                 {r.name}
               </span>
-              <span className="text-muted-foreground/70 w-12 text-right text-[11px] tabular-nums">
+              <span className="text-muted-foreground/70 text-2xs w-12 text-right tabular-nums">
                 {numberFormatting.formatPercent(share / 100, { digits: 1 })}
               </span>
               <span className="text-foreground w-24 text-right text-xs font-semibold tabular-nums">
@@ -1839,7 +1839,7 @@ function CategoryRankedBar({
             <span className="text-foreground/80 min-w-0 flex-1 text-xs font-medium">
               {t("spending:tabContent.uncategorizedImprove")}
             </span>
-            <span className="text-muted-foreground/70 w-12 text-right text-[11px] tabular-nums">
+            <span className="text-muted-foreground/70 text-2xs w-12 text-right tabular-nums">
               {numberFormatting.formatPercent(uncategorizedShare / 100, { digits: 1 })}
             </span>
             <span className="text-foreground w-24 text-right text-xs font-semibold tabular-nums">
@@ -1848,7 +1848,7 @@ function CategoryRankedBar({
           </Link>
         )}
         {restAmount > 0 && (
-          <div className="text-muted-foreground/60 px-1 pt-1 text-[10px]">
+          <div className="text-muted-foreground/60 text-2xs px-1 pt-1">
             {t("spending:tabContent.plusMore", { count: rows.length - 7 })} ·{" "}
             <PrivacyAmount value={restAmount} currency={currency} />
           </div>
@@ -1914,7 +1914,7 @@ function GroupedCategoryBlock({
         <span className="text-foreground min-w-0 flex-1 truncate text-left text-xs font-semibold uppercase tracking-wide">
           {bucket.name}
         </span>
-        <span className="text-muted-foreground/80 w-12 text-right text-[11px] font-medium tabular-nums">
+        <span className="text-muted-foreground/80 text-2xs w-12 text-right font-medium tabular-nums">
           {numberFormatting.formatPercent(share / 100, { digits: 1 })}
         </span>
         <span className="text-foreground w-24 text-right text-xs font-semibold tabular-nums">
@@ -1946,7 +1946,7 @@ function GroupedCategoryBlock({
                 >
                   {cat.name}
                 </span>
-                <span className="text-muted-foreground/70 w-12 text-right text-[11px] tabular-nums">
+                <span className="text-muted-foreground/70 text-2xs w-12 text-right tabular-nums">
                   {numberFormatting.formatPercent(catShare / 100, { digits: 1 })}
                 </span>
                 <span className="text-foreground w-24 text-right text-xs font-medium tabular-nums">

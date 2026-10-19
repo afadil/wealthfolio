@@ -24,6 +24,8 @@ import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { ActionPalette } from "@/components/action-palette";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { BackupError, type BackupFailure } from "./backup-error";
+import { AlertDescription } from "@wealthfolio/ui/components/ui/alert";
+import { Spinner } from "@wealthfolio/ui";
 
 /** Rows shown before "Show older". Connect returns at most 30 restore points. */
 const BACKUP_LIST_LIMIT = 5;
@@ -32,15 +34,17 @@ const BACKUP_LIST_LIMIT = 5;
 export function InfoPopover({ label, children }: { label: string; children: ReactNode }) {
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          className="text-muted-foreground pointer-coarse:size-11"
-          aria-label={label}
-        >
-          <Icons.Info className="size-4" aria-hidden />
-        </Button>
+      <PopoverTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className="text-muted-foreground pointer-coarse:size-11"
+            aria-label={label}
+          />
+        }
+      >
+        <Icons.Info className="size-4" aria-hidden />
       </PopoverTrigger>
       <PopoverContent
         align="start"
@@ -123,14 +127,22 @@ export function InlineFacts({ items }: { items: { label: string; value: ReactNod
   );
 }
 
-export function BackupAlert({ error, action }: { error: BackupFailure; action?: ReactNode }) {
+export function BackupAlert({
+  error,
+  action,
+  className,
+}: {
+  error: BackupFailure;
+  action?: ReactNode;
+  className?: string;
+}) {
   return (
-    <Alert className="border-destructive/20 bg-destructive/5 text-destructive [&>svg]:text-destructive">
-      <Icons.AlertCircle className="size-4" aria-hidden />
-      <div className="space-y-2 break-words text-sm">
+    <Alert variant="destructive" className={className}>
+      <Icons.AlertCircle aria-hidden />
+      <AlertDescription className="space-y-2 break-words">
         <BackupError error={error} />
         {action}
-      </div>
+      </AlertDescription>
     </Alert>
   );
 }
@@ -266,7 +278,7 @@ export function BackupActions({
       disabled={disabled}
     >
       {busy ? (
-        <Icons.Spinner className="size-4 animate-spin" aria-hidden />
+        <Spinner className="size-4" aria-hidden />
       ) : (
         <Icons.MoreHorizontal className="size-4" aria-hidden />
       )}
@@ -314,7 +326,7 @@ export function BackupActions({
       )}
       {menu.length > 0 && (
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+          <DropdownMenuTrigger render={trigger} />
           <DropdownMenuContent align="end" className="min-w-48">
             {menu.map((group, index) => (
               <Fragment key={index}>
@@ -324,7 +336,7 @@ export function BackupActions({
                     key={action.label}
                     variant={action.destructive ? "destructive" : "default"}
                     disabled={action.disabled}
-                    onSelect={action.onSelect}
+                    onClick={action.onSelect}
                   >
                     <action.icon />
                     {action.label}
@@ -373,7 +385,7 @@ export function BackupRowsSkeleton() {
 }
 
 export function PendingIcon({ pending, icon }: { pending: boolean; icon?: ReactNode }) {
-  return pending ? <Icons.Spinner className="size-4 animate-spin" aria-hidden /> : (icon ?? null);
+  return pending ? <Spinner className="size-4" aria-hidden /> : (icon ?? null);
 }
 
 /** Destructive confirmation shared by local and cloud backups. */

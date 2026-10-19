@@ -18,6 +18,21 @@
 /* Enable class-based dark mode across the subtree (Tailwind v4 pattern) */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Orientation variants from shadcn/tailwind.css, which shadcn's Base UI sources use.
+   :where() keeps them at a plain utility's specificity, so a call site's h-4 still
+   wins over data-vertical:h-full. */
+@custom-variant data-horizontal {
+  &:where([data-orientation="horizontal"]) {
+    @slot;
+  }
+}
+
+@custom-variant data-vertical {
+  &:where([data-orientation="vertical"]) {
+    @slot;
+  }
+}
+
 /* Tailwind v4 custom utilities for 3D rotation used in the sidebar logo */
 @utility transform-3d {
   transform-style: preserve-3d;
@@ -57,10 +72,33 @@
 }
 
 @theme {
+  /* Extra-small breakpoint (430 px), below sm, for phone headers */
+  --breakpoint-xs: 26.875rem;
+
   /* Font families */
   --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Merriweather", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Type scale. 11px is the floor, and every step is rem so text follows the
+     root font size. Steps outside the scale (text-4xl and up) don't exist. */
+  --text-*: initial;
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: calc(1 / 0.6875);
+  --text-xs: 0.75rem;
+  --text-xs--line-height: calc(1 / 0.75);
+  --text-sm: 0.875rem;
+  --text-sm--line-height: calc(1.25 / 0.875);
+  --text-base: 1rem;
+  --text-base--line-height: calc(1.5 / 1);
+  --text-lg: 1.125rem;
+  --text-lg--line-height: calc(1.75 / 1.125);
+  --text-xl: 1.25rem;
+  --text-xl--line-height: calc(1.75 / 1.25);
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: calc(2 / 1.5);
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: calc(2.25 / 1.875);
 
   /* Disable default colors to prevent their use; feel free to re-enable as needed. */
   --color-amber-50: #fef3c7;
@@ -211,17 +249,13 @@
 }
 
 @theme inline {
-  /* Spacing/Sizing theme tokens - inherit from CSS variables */
+  /* Field height (h-input-height), from --input-height */
   --spacing-input-height: var(--input-height);
-  --spacing-button-height: var(--button-height);
-  --spacing-sheet-padding: var(--sheet-padding);
-  --font-size-sheet-title: var(--sheet-title-size);
-  --font-size-input: var(--font-size-base);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 0.25rem);
+  --radius-md: calc(var(--radius) - 0.125rem);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 0.25rem);
 
   /* Semantic colors */
   --color-background: var(--background);
@@ -247,6 +281,18 @@
   --color-connect-brand: var(--connect-brand);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
+  --color-success-subtle: var(--success-subtle);
+  --color-success-subtle-foreground: var(--success-subtle-foreground);
+  --color-success-subtle-border: var(--success-subtle-border);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-subtle-foreground: var(--warning-subtle-foreground);
+  --color-warning-subtle-border: var(--warning-subtle-border);
+  --color-destructive-subtle: var(--destructive-subtle);
+  --color-destructive-subtle-foreground: var(--destructive-subtle-foreground);
+  --color-destructive-subtle-border: var(--destructive-subtle-border);
+  --color-info-subtle: var(--info-subtle);
+  --color-info-subtle-foreground: var(--info-subtle-foreground);
+  --color-info-subtle-border: var(--info-subtle-border);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-input-bg: var(--input-bg);
@@ -359,10 +405,10 @@
   --color-purple-950: #1a1623;
 
   /* Custom sizes */
-  --spacing-sidebar: 220px;
-  --spacing-sidebar-collapsed: 70px;
-  --grid-template-columns-sidebar: 200px auto;
-  --grid-template-columns-sidebar-collapsed: 70px auto;
+  --spacing-sidebar: 13.75rem;
+  --spacing-sidebar-collapsed: 4.375rem;
+  --grid-template-columns-sidebar: 12.5rem auto;
+  --grid-template-columns-sidebar-collapsed: 4.375rem auto;
 }
 
 :root {
@@ -371,37 +417,23 @@
   /* Base radius - desktop default */
   --radius: 0.625rem;
 
-  /* Input heights - desktop default */
+  /* Field height; a container can set it for compact fields */
   --input-height: 2.75rem; /* h-11 */
-  --input-height-lg: 2.75rem; /* h-11 */
 
-  /* Button heights - desktop default */
-  --button-height: 2.5rem; /* h-10 */
-  --button-height-sm: 2.25rem; /* h-9 */
-  --button-height-lg: 2.75rem; /* h-11 */
-
-  /* Card padding - desktop default */
-  --card-padding: 1rem; /* p-4 */
-
-  /* Sheet spacing - desktop default */
-  --sheet-padding: 1rem; /* p-4 */
-  --sheet-title-size: 1.125rem; /* text-lg */
-
-  /* Font size - desktop default */
-  --font-size-base: 0.875rem; /* text-sm */
-
-  /* Flexoki Light Theme (HSL numeric components) */
+  /* Flexoki Light Theme (HSL numeric components). Classic darkens tx-2, gr
+     and ye from Flexoki so text in them reaches 4.5:1 on every surface
+     (e2e/design-system/colors.spec.ts). */
   --flexoki-bg: 48 100% 97%;
   --flexoki-bg-2: 51 59% 95%;
   --flexoki-ui: 51 21% 88%;
   --flexoki-ui-2: 50 14% 83%;
   --flexoki-ui-3: 55 10% 79%;
   --flexoki-tx: 0 3% 6%;
-  --flexoki-tx-2: 50 3% 42%;
+  --flexoki-tx-2: 50 3% 36%;
   --flexoki-tx-3: 49 7% 70%;
   --flexoki-re: 3 62% 42%;
-  --flexoki-gr: 73 84% 27%;
-  --flexoki-ye: 45 99% 34%;
+  --flexoki-gr: 73 84% 26%;
+  --flexoki-ye: 45 99% 28%;
   --flexoki-bl: 214 67% 39%;
 
   /* Shadcn tokens as full HSL colors */
@@ -430,7 +462,10 @@
   --border: hsl(var(--flexoki-ui));
   --input: hsl(var(--flexoki-ui));
   --input-bg: hsl(var(--flexoki-bg));
-  --ring: hsl(var(--flexoki-ui-3));
+  /* Focus indicator colour. Controls draw it as a 2px outline 2px out
+     (focus-visible:outline-solid outline-2 outline-offset-2 outline-ring),
+     which forced-colors mode keeps; it needs 3:1 against the page and cards. */
+  --ring: hsl(var(--flexoki-tx-2));
 
   /* Charts (allocation palette: forest / sage / sand / clay / plum + stone) */
   --chart-1: #355c4c;
@@ -452,7 +487,7 @@
   --sidebar-accent: hsl(var(--flexoki-ui));
   --sidebar-accent-foreground: hsl(var(--flexoki-tx-2));
   --sidebar-border: hsl(var(--flexoki-ui));
-  --sidebar-ring: hsl(var(--flexoki-ui-3));
+  --sidebar-ring: hsl(var(--flexoki-tx-2));
 
   --liquid-glass-bg: rgba(255, 255, 255, 0.05);
   --liquid-glass-border: rgba(255, 255, 255, 0.1);
@@ -462,43 +497,64 @@
   --inset-bottom: env(safe-area-inset-bottom, 0px);
   --inset-left: env(safe-area-inset-left, 0px);
 
-  --mobile-nav-ui-height: 64px; /* nav bar height */
-  --mobile-nav-gap: 12px; /* space between nav and bottom */
+  --mobile-nav-ui-height: 4rem; /* nav bar height */
+  --mobile-nav-gap: 0.75rem; /* space between nav and bottom */
   /* iOS WKWebView can report an oversized bottom inset after relaunch. */
   --mobile-safe-area-bottom: min(env(safe-area-inset-bottom, 0px), 44px);
   --mobile-nav-bottom-offset: max(var(--mobile-nav-gap), var(--mobile-safe-area-bottom));
   --mobile-nav-total-offset: calc(var(--mobile-nav-ui-height) + var(--mobile-nav-bottom-offset));
 
+  /* Status surfaces: a pale background with text and border of the same hue,
+     for callouts, banners and pills (bg-warning-subtle
+     text-warning-subtle-foreground border-warning-subtle-border). Status text
+     on a tint of itself (text-warning on bg-warning/10) can't reach 4.5:1. */
+  --success-subtle: var(--color-green-50);
+  --success-subtle-foreground: var(--color-green-700);
+  --success-subtle-border: var(--color-green-200);
+  --warning-subtle: var(--color-yellow-50);
+  --warning-subtle-foreground: var(--color-yellow-800);
+  --warning-subtle-border: var(--color-yellow-200);
+  --destructive-subtle: var(--color-red-50);
+  --destructive-subtle-foreground: var(--color-red-700);
+  --destructive-subtle-border: var(--color-red-200);
+  --info-subtle: var(--color-blue-50);
+  --info-subtle-foreground: var(--color-blue-700);
+  --info-subtle-border: var(--color-blue-200);
+  /* Light caught by the top edge of glass surfaces (status alerts); a theme
+     can set it to transparent. */
+  --surface-highlight: rgb(255 255 255 / 0.35);
+
   /* Sonner toast overrides - solid backgrounds for better readability */
   --toast-bg: hsl(var(--flexoki-bg-2));
   --toast-fg: hsl(var(--flexoki-tx));
   --toast-border: hsl(var(--flexoki-ui-2));
-  --toast-success-bg: var(--color-green-50);
-  --toast-success-fg: var(--color-green-700);
-  --toast-success-border: var(--color-green-200);
-  --toast-error-bg: var(--color-red-50);
-  --toast-error-fg: var(--color-red-700);
-  --toast-error-border: var(--color-red-200);
+  --toast-success-bg: var(--success-subtle);
+  --toast-success-fg: var(--success-subtle-foreground);
+  --toast-success-border: var(--success-subtle-border);
+  --toast-error-bg: var(--destructive-subtle);
+  --toast-error-fg: var(--destructive-subtle-foreground);
+  --toast-error-border: var(--destructive-subtle-border);
   --toast-warning-bg: var(--color-orange-50);
   --toast-warning-fg: var(--color-orange-700);
   --toast-warning-border: var(--color-orange-200);
-  --toast-info-bg: var(--color-blue-50);
-  --toast-info-fg: var(--color-blue-700);
-  --toast-info-border: var(--color-blue-200);
+  --toast-info-bg: var(--info-subtle);
+  --toast-info-fg: var(--info-subtle-foreground);
+  --toast-info-border: var(--info-subtle-border);
 }
 
 .dark {
   --connect-brand: #9ca88a;
-  /* Flexoki Dark Theme (HSL numeric components) */
+  /* Flexoki Dark Theme (HSL numeric components). Classic lightens tx-2 and
+     re from Flexoki so text in them reaches 4.5:1 on every surface. */
   --flexoki-bg: 0 3% 6%;
   --flexoki-bg-2: 30 4% 11%;
   --flexoki-ui: 30 3% 15%;
   --flexoki-ui-2: 40 3% 20%;
   --flexoki-ui-3: 30 3% 24%;
   --flexoki-tx: 55 10% 79%;
-  --flexoki-tx-2: 43 3% 52%;
+  --flexoki-tx-2: 43 3% 60.5%;
   --flexoki-tx-3: 45 2% 33%;
-  --flexoki-re: 5 61% 54%;
+  --flexoki-re: 5 61% 58.5%;
   --flexoki-gr: 72 46% 41%;
   --flexoki-ye: 45 82% 45%;
   --flexoki-bl: 210 47% 50%;
@@ -517,22 +573,27 @@
   --chart-9: hsl(51 18% 77%);
   --chart-stone: hsl(49 8% 60%);
 
+  --success-subtle: var(--color-green-950);
+  --success-subtle-foreground: var(--color-green-200);
+  --success-subtle-border: var(--color-green-800);
+  --warning-subtle: var(--color-yellow-950);
+  --warning-subtle-foreground: var(--color-yellow-200);
+  --warning-subtle-border: var(--color-yellow-800);
+  --destructive-subtle: var(--color-red-950);
+  --destructive-subtle-foreground: var(--color-red-200);
+  --destructive-subtle-border: var(--color-red-800);
+  --info-subtle: var(--color-blue-950);
+  --info-subtle-foreground: var(--color-blue-200);
+  --info-subtle-border: var(--color-blue-800);
+  --surface-highlight: rgb(255 255 255 / 0.03);
+
   /* Sonner toast overrides for dark mode - solid backgrounds for better readability */
   --toast-bg: hsl(var(--flexoki-bg-2));
   --toast-fg: hsl(var(--flexoki-tx));
   --toast-border: hsl(var(--flexoki-ui-2));
-  --toast-success-bg: var(--color-green-950);
-  --toast-success-fg: var(--color-green-100);
-  --toast-success-border: var(--color-green-800);
-  --toast-error-bg: var(--color-red-950);
-  --toast-error-fg: var(--color-red-200);
-  --toast-error-border: var(--color-red-800);
   --toast-warning-bg: var(--color-orange-950);
   --toast-warning-fg: var(--color-orange-200);
   --toast-warning-border: var(--color-orange-800);
-  --toast-info-bg: var(--color-blue-950);
-  --toast-info-fg: var(--color-blue-200);
-  --toast-info-border: var(--color-blue-800);
 
   --input: hsl(var(--flexoki-ui-2));
 }
@@ -671,7 +732,7 @@ body.qr-scan-active > .qr-overlay {
    Recompute clearance here so page content inherits the reduced height too. */
 @media (orientation: landscape) {
   .app-shell[data-mobile-navigation="true"] {
-    --mobile-nav-ui-height: 56px;
+    --mobile-nav-ui-height: 3.5rem;
     --mobile-nav-total-offset: calc(var(--mobile-nav-ui-height) + var(--mobile-nav-bottom-offset));
   }
 }
@@ -774,19 +835,6 @@ body.qr-scan-active > .qr-overlay {
     padding: 1rem; /* p-4 */
   }
 
-  /* JSON preview clickable numbers */
-  .json-preview .json-number {
-    cursor: pointer;
-    border-radius: 2px;
-    padding: 0 2px;
-    transition: background-color 150ms;
-  }
-
-  .json-preview .json-number:hover {
-    background-color: hsl(var(--primary) / 0.15);
-    color: hsl(var(--primary));
-  }
-
   /* Desktop responsive adjustments */
   @media (width >= 640px) {
     .form-mobile-spacing > * + * {
@@ -849,6 +897,13 @@ body.qr-scan-active > .qr-overlay {
     }
   }
 
+  /* A titled Alert draws its icon's tinted circle with padding around a
+     content-box icon; border-box from the rule above would shrink the icon to a
+     dot. revert-layer restores the utility value. */
+  [data-slot="alert"] > svg {
+    box-sizing: revert-layer;
+  }
+
   /* assistant-ui thread needs native overflow behavior for sticky footer + viewport */
   .aui-root,
   .aui-root .flex,
@@ -885,24 +940,6 @@ number-flow-react.muted-fraction::part(fraction) {
 }
 
 /* v3 -> v4: ported custom animations (keyframes + utilities) */
-@keyframes accordion-down {
-  from {
-    height: 0;
-  }
-  to {
-    height: var(--radix-accordion-content-height);
-  }
-}
-
-@keyframes accordion-up {
-  from {
-    height: var(--radix-accordion-content-height);
-  }
-  to {
-    height: 0;
-  }
-}
-
 @keyframes progress-bar {
   0% {
     transform: translateX(-100%);
@@ -925,20 +962,27 @@ number-flow-react.muted-fraction::part(fraction) {
   }
 }
 
-@utility animate-accordion-down {
-  animation: accordion-down 0.2s ease-out;
-}
-
-@utility animate-accordion-up {
-  animation: accordion-up 0.2s ease-out;
-}
-
 @utility animate-progress-border {
   animation: progress-bar 1.5s ease-in-out infinite;
 }
 
 @utility animate-subtle-pulse {
   animation: subtle-pulse 1.2s ease-in-out infinite;
+}
+
+/* Reduced motion: animations and transitions still run, so code waiting for
+   them (Base UI's exit animations) completes, but they take no time and
+   repeat once. Motion components follow the same setting through
+   MotionConfig in App.tsx. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* app.css - lockdown styles only apply when .app-lockdown class is present */
@@ -1054,8 +1098,8 @@ summary {
 .lever-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 1rem;
+  height: 1rem;
   border-radius: 50%;
   background: hsl(var(--flexoki-tx-2));
   border: 2px solid var(--color-card);
@@ -1066,8 +1110,8 @@ summary {
   cursor: grabbing;
 }
 .lever-slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+  width: 1rem;
+  height: 1rem;
   border-radius: 50%;
   background: hsl(var(--flexoki-tx-2));
   border: 2px solid var(--color-card);

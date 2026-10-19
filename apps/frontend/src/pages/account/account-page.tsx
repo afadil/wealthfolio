@@ -22,6 +22,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  buttonVariants,
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -737,12 +738,17 @@ const AccountPage = () => {
           )}
 
           {activeAccountDetailTab === "activities" && (
-            <Button variant="ghost" size="sm" className="shrink-0" asChild>
-              <Link to={`/activities?account=${id}`} className="inline-flex items-center gap-1.5">
-                {t("account:explore")}
-                <Icons.ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </Button>
+            <Link
+              to={`/activities?account=${id}`}
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "sm" }),
+                "inline-flex items-center gap-1.5",
+                "shrink-0",
+              )}
+            >
+              {t("account:explore")}
+              <Icons.ArrowRight className="h-3.5 w-3.5" />
+            </Link>
           )}
         </div>
       )}
@@ -875,29 +881,31 @@ const AccountPage = () => {
               {/* Desktop account selector */}
               <div className="hidden min-w-0 sm:block">
                 <Popover open={desktopSelectorOpen} onOpenChange={setDesktopSelectorOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className="-ml-2 h-auto min-w-0 justify-start rounded-md px-2 py-1 text-left"
-                      aria-label={t("account:switch_account")}
-                    >
-                      <span className="flex min-w-0 items-center gap-1.5">
-                        {account?.group ? (
-                          <>
-                            <span className="text-muted-foreground truncate text-base font-semibold leading-tight md:text-lg">
-                              {account.group}
-                            </span>
-                            <span className="text-muted-foreground text-sm" aria-hidden="true">
-                              &gt;
-                            </span>
-                          </>
-                        ) : null}
-                        <span className="truncate text-base font-semibold leading-tight md:text-lg">
-                          {account?.name ?? t("account:account")}
-                        </span>
-                        <Icons.ChevronDown className="text-muted-foreground size-5 shrink-0" />
+                  <PopoverTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        className="-ml-2 h-auto min-w-0 justify-start rounded-md px-2 py-1 text-left"
+                        aria-label={t("account:switch_account")}
+                      />
+                    }
+                  >
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      {account?.group ? (
+                        <>
+                          <span className="text-muted-foreground truncate text-base font-semibold leading-tight md:text-lg">
+                            {account.group}
+                          </span>
+                          <span className="text-muted-foreground text-sm" aria-hidden="true">
+                            &gt;
+                          </span>
+                        </>
+                      ) : null}
+                      <span className="truncate text-base font-semibold leading-tight md:text-lg">
+                        {account?.name ?? t("account:account")}
                       </span>
-                    </Button>
+                      <Icons.ChevronDown className="text-muted-foreground size-5 shrink-0" />
+                    </span>
                   </PopoverTrigger>
                   <PopoverContent className="w-60 p-0" align="start">
                     <Command>
@@ -940,19 +948,21 @@ const AccountPage = () => {
               {/* Mobile account selector */}
               <div className="block min-w-0 sm:hidden">
                 <Sheet open={mobileSelectorOpen} onOpenChange={setMobileSelectorOpen}>
-                  <SheetTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className="-ml-2 h-auto min-w-0 justify-start rounded-md px-2 py-1 text-left"
-                      aria-label={t("account:switch_account")}
-                    >
-                      <span className="flex min-w-0 items-center gap-1.5">
-                        <span className="truncate text-base font-semibold leading-tight">
-                          {account?.name ?? t("account:account")}
-                        </span>
-                        <Icons.ChevronDown className="text-muted-foreground h-5 w-5 shrink-0" />
+                  <SheetTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        className="-ml-2 h-auto min-w-0 justify-start rounded-md px-2 py-1 text-left"
+                        aria-label={t("account:switch_account")}
+                      />
+                    }
+                  >
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate text-base font-semibold leading-tight">
+                        {account?.name ?? t("account:account")}
                       </span>
-                    </Button>
+                      <Icons.ChevronDown className="text-muted-foreground h-5 w-5 shrink-0" />
+                    </span>
                   </SheetTrigger>
                   <SheetContent side="bottom" className="rounded-t-4xl mx-1 h-[80vh] p-0">
                     <SheetHeader className="border-border border-b px-6 py-4">
@@ -1077,18 +1087,25 @@ const AccountPage = () => {
                     <PrivacyToggle />
                     <TooltipProvider>
                       <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant={showSnapshotMarkers ? "default" : "secondary"}
-                            size="icon-xs"
-                            className={cn(
-                              "rounded-full",
-                              !showSnapshotMarkers && "bg-secondary/50",
-                            )}
-                            onClick={() => setShowSnapshotMarkers(!showSnapshotMarkers)}
-                          >
-                            <Icons.History className="size-5" />
-                          </Button>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              variant={showSnapshotMarkers ? "default" : "secondary"}
+                              size="icon-xs"
+                              className={cn(
+                                "rounded-full",
+                                !showSnapshotMarkers && "bg-secondary/50",
+                              )}
+                              onClick={() => setShowSnapshotMarkers(!showSnapshotMarkers)}
+                              aria-label={
+                                showSnapshotMarkers
+                                  ? t("account:hide_snapshot_markers")
+                                  : t("account:show_snapshot_markers")
+                              }
+                            />
+                          }
+                        >
+                          <Icons.History className="size-5" />
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>

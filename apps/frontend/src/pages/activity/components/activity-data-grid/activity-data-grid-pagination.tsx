@@ -7,6 +7,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Spinner,
 } from "@wealthfolio/ui";
 import { KeyboardEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -76,7 +77,7 @@ export function ActivityDataGridPagination({
     >
       {/* Results count */}
       <div className="text-muted-foreground flex items-center gap-2 text-center text-xs sm:text-left">
-        {isFetching && <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />}
+        {isFetching && <Spinner className="h-3.5 w-3.5" />}
         {totalRowCount === 0 ? (
           <span>{t("activity:datagrid.pagination.no_activities")}</span>
         ) : (
@@ -113,7 +114,7 @@ export function ActivityDataGridPagination({
               onPageSizeChange(Number(value));
             }}
           >
-            <SelectTrigger className="h-7 w-[65px] text-xs">
+            <SelectTrigger className="h-7 w-[4.0625rem] text-xs">
               <SelectValue placeholder={pageSize} />
             </SelectTrigger>
             <SelectContent side="top">
@@ -137,7 +138,7 @@ export function ActivityDataGridPagination({
             onKeyDown={handleKeyDown}
             onBlur={handleBlur}
             placeholder={`${currentPage}`}
-            className="h-7 w-[50px] text-center text-xs"
+            className="w-12.5 h-7 text-center text-xs"
             title={t("activity:datagrid.pagination.jump_hint", { count: pageCount })}
           />
           <span className="text-muted-foreground whitespace-nowrap text-xs">

@@ -1,4 +1,4 @@
-import { useDateFormatting, type FormattingApi } from "@wealthfolio/ui";
+import { useDateFormatting, type FormattingApi, Spinner } from "@wealthfolio/ui";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -239,15 +239,13 @@ export function UpdateDialog() {
                     </span>
                   </div>
                   <Progress
-                    value={
-                      progress.total ? (progress.downloaded / progress.total) * 100 : undefined
-                    }
+                    value={progress.total ? (progress.downloaded / progress.total) * 100 : null}
                     className="h-2"
                   />
                 </>
               ) : (
                 <div className="flex items-center gap-2 text-sm">
-                  <Icons.Spinner className="h-4 w-4 animate-spin" />
+                  <Spinner className="h-4 w-4" />
                   <span className="text-muted-foreground">
                     {t("common:component.installing_update")}
                   </span>

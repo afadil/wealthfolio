@@ -94,14 +94,12 @@ function ScopeBadge({ scopes }: { scopes: string[] }) {
     : t("settings:agentAccess.pat_scope_custom", { count: scopes.length });
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <Badge variant="secondary" className="cursor-default font-normal">
-          {label}
-        </Badge>
+      <TooltipTrigger render={<Badge variant="secondary" className="cursor-default font-normal" />}>
+        {label}
       </TooltipTrigger>
       <TooltipContent className="max-w-xs">
         <p className="mb-1 font-medium">{t("settings:agentAccess.pat_scopes_tooltip")}</p>
-        <ul className="text-muted-foreground space-y-0.5">
+        <ul className="text-background/70 space-y-0.5">
           {scopes.map((scope) => (
             <li key={scope}>{scopeLabel(t, scope)}</li>
           ))}
@@ -231,7 +229,7 @@ export function PatTable({ serverUrl }: { serverUrl?: string } = {}) {
               {t("common:cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
               disabled={deleteMutation.isPending}
               onClick={() => {
                 if (!removing) return;

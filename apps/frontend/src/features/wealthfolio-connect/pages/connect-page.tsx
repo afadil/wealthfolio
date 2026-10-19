@@ -31,7 +31,7 @@ import { InfoIcon } from "@phosphor-icons/react/dist/csr/Info";
 import { WarningIcon } from "@phosphor-icons/react/dist/csr/Warning";
 import { XCircleIcon } from "@phosphor-icons/react/dist/csr/XCircle";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocalizationSettings } from "@wealthfolio/ui";
+import { useLocalizationSettings, buttonVariants, Spinner } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -265,7 +265,7 @@ export default function ConnectPage() {
             >
               {isSyncRunning ? (
                 <>
-                  <Icons.Spinner className="h-4 w-4 animate-spin sm:mr-2" />
+                  <Spinner className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">{t("connect:sync.syncingShort")}</span>
                 </>
               ) : (
@@ -275,14 +275,21 @@ export default function ConnectPage() {
                 </>
               )}
             </Button>
-            <TooltipProvider delayDuration={300}>
+            <TooltipProvider delay={300}>
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" className="size-11 sm:size-9" asChild>
-                    <Link to="/settings/connect" aria-label={t("common:settings")}>
-                      <Icons.Settings className="size-4" />
-                    </Link>
-                  </Button>
+                <TooltipTrigger
+                  render={
+                    <Link
+                      to="/settings/connect"
+                      aria-label={t("common:settings")}
+                      className={cn(
+                        buttonVariants({ variant: "outline", size: "icon" }),
+                        "size-11 sm:size-9",
+                      )}
+                    />
+                  }
+                >
+                  <Icons.Settings className="size-4" />
                 </TooltipTrigger>
                 <TooltipContent>{t("common:settings")}</TooltipContent>
               </Tooltip>
@@ -578,11 +585,12 @@ function AttentionRow({
       ];
       action =
         item.reviewCount > 0 ? (
-          <Button size="sm" variant="outline" className={buttonClass} asChild>
-            <Link to={`/activities?account=${item.accountId}&needsReview=true`}>
-              {t("connect:syncHistory.review")}
-            </Link>
-          </Button>
+          <Link
+            to={`/activities?account=${item.accountId}&needsReview=true`}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), buttonClass)}
+          >
+            {t("connect:syncHistory.review")}
+          </Link>
         ) : (
           retry
         );
@@ -1054,24 +1062,20 @@ function SyncHistoryItem({
     <div
       className={cn(
         "flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 sm:flex-nowrap sm:gap-4",
-        isFailed
-          ? "bg-destructive/5"
-          : needsAttention
-            ? "bg-yellow-500/10 dark:bg-yellow-500/5"
-            : "hover:bg-muted/30",
+        isFailed ? "bg-destructive/5" : needsAttention ? "bg-warning/10" : "hover:bg-muted/30",
       )}
     >
       <span
         className={cn(
           "inline-block h-2 w-2 shrink-0 rounded-full",
-          isFailed ? "bg-destructive" : needsAttention ? "bg-yellow-500" : "bg-green-500",
+          isFailed ? "bg-destructive" : needsAttention ? "bg-warning" : "bg-success",
         )}
       />
-      <span className="text-muted-foreground shrink-0 whitespace-nowrap text-xs sm:min-w-[80px] sm:text-sm">
+      <span className="text-muted-foreground shrink-0 whitespace-nowrap text-xs sm:min-w-20 sm:text-sm">
         {t("connect:page.timeAgo", { time: timeAgo })}
       </span>
       {accountName && (
-        <span className="hidden shrink-0 truncate text-sm font-medium sm:inline sm:min-w-[100px]">
+        <span className="sm:min-w-25 hidden shrink-0 truncate text-sm font-medium sm:inline">
           {accountName}
         </span>
       )}
@@ -1080,12 +1084,12 @@ function SyncHistoryItem({
         <span
           className={cn(
             isFailed && "text-destructive font-medium",
-            needsAttention && !isFailed && "font-medium text-amber-600 dark:text-amber-400",
+            needsAttention && !isFailed && "text-warning font-medium",
           )}
         >
           {description}
         </span>
-        {isRunning && <Icons.Spinner className="h-3 w-3 animate-spin" />}
+        {isRunning && <Spinner className="h-3 w-3" />}
       </div>
       {canReviewActivities && (
         <Link

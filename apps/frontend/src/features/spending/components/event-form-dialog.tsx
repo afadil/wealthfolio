@@ -313,7 +313,7 @@ export function EventFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-125">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? t("spending:eventForm.editTitle") : t("spending:eventForm.createTitle")}
@@ -365,46 +365,45 @@ export function EventFormDialog({
                   {!showCreateType ? (
                     <>
                       <Popover open={typePopoverOpen} onOpenChange={setTypePopoverOpen}>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <button
-                              type="button"
-                              aria-label={
-                                selectedType
-                                  ? t("spending:eventForm.changeEventType", {
-                                      name: selectedType.name,
-                                    })
-                                  : t("spending:eventForm.selectEventType")
-                              }
-                              className="border-input bg-input-bg dark:bg-input/30 hover:bg-accent/30 ring-offset-background focus:ring-ring h-input-height flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
-                            >
-                              {selectedType ? (
-                                <span className="flex min-w-0 items-center gap-2">
-                                  {selectedType.color && (
-                                    <span
-                                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                                      style={{ backgroundColor: selectedType.color }}
-                                      aria-hidden="true"
-                                    />
-                                  )}
-                                  <span className="truncate">{selectedType.name}</span>
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground">
-                                  {t("spending:eventForm.selectEventType")}
-                                </span>
-                              )}
-                              <Icons.ChevronDown
-                                className="ml-2 h-4 w-4 shrink-0 opacity-50"
-                                aria-hidden="true"
+                        <FormControl>
+                          <PopoverTrigger
+                            render={
+                              <button
+                                type="button"
+                                aria-label={
+                                  selectedType
+                                    ? t("spending:eventForm.changeEventType", {
+                                        name: selectedType.name,
+                                      })
+                                    : t("spending:eventForm.selectEventType")
+                                }
+                                className="border-input bg-input-bg dark:bg-input/30 hover:bg-accent/30 ring-offset-background focus:ring-ring h-input-height flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
                               />
-                            </button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent
-                          className="w-[--radix-popover-trigger-width] p-0"
-                          align="start"
-                        >
+                            }
+                          >
+                            {selectedType ? (
+                              <span className="flex min-w-0 items-center gap-2">
+                                {selectedType.color && (
+                                  <span
+                                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                    style={{ backgroundColor: selectedType.color }}
+                                    aria-hidden="true"
+                                  />
+                                )}
+                                <span className="truncate">{selectedType.name}</span>
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">
+                                {t("spending:eventForm.selectEventType")}
+                              </span>
+                            )}
+                            <Icons.ChevronDown
+                              className="ml-2 h-4 w-4 shrink-0 opacity-50"
+                              aria-hidden="true"
+                            />
+                          </PopoverTrigger>
+                        </FormControl>
+                        <PopoverContent className="w-(--anchor-width) p-0" align="start">
                           <Command>
                             <CommandInput placeholder={t("spending:eventForm.searchTypes")} />
                             <CommandList>
@@ -579,7 +578,7 @@ export function EventFormDialog({
             )}
 
             {replacedTagCount > 0 && (
-              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+              <div className="border-warning-subtle-border bg-warning-subtle text-warning-subtle-foreground rounded-md border px-3 py-2 text-xs">
                 {t("spending:eventForm.replaceTagsWarning", { count: replacedTagCount })}
               </div>
             )}
@@ -655,7 +654,7 @@ function SuggestedTransactions({
           <p className="text-foreground text-xs font-semibold">
             {t("spending:eventForm.tagTxInRange")}
           </p>
-          <p className="text-muted-foreground text-[11px]">
+          <p className="text-muted-foreground text-2xs">
             {t("spending:eventForm.selectedOfTotal", {
               selected: selectedCount,
               total: candidates.length,
@@ -666,14 +665,14 @@ function SuggestedTransactions({
           <button
             type="button"
             onClick={onSelectAll}
-            className="text-muted-foreground hover:text-foreground text-[11px] underline-offset-2 hover:underline"
+            className="text-muted-foreground hover:text-foreground text-2xs underline-offset-2 hover:underline"
           >
             {t("common:select_all")}
           </button>
           <button
             type="button"
             onClick={onClearAll}
-            className="text-muted-foreground hover:text-foreground text-[11px] underline-offset-2 hover:underline"
+            className="text-muted-foreground hover:text-foreground text-2xs underline-offset-2 hover:underline"
           >
             {t("common:clear")}
           </button>
@@ -705,17 +704,17 @@ function SuggestedTransactions({
                       {c.notes || c.activityType}
                     </span>
                     {c.eventId && checked && (
-                      <span className="shrink-0 rounded border border-amber-500/30 bg-amber-500/15 px-1 py-px text-[9px] uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                      <span className="text-2xs border-warning-subtle-border bg-warning-subtle text-warning-subtle-foreground shrink-0 rounded border px-1 py-px uppercase tracking-wide">
                         {t("spending:eventForm.willReplaceTag")}
                       </span>
                     )}
                     {c.eventId && !checked && (
-                      <span className="text-muted-foreground/80 border-muted-foreground/30 shrink-0 rounded border px-1 py-px text-[9px] uppercase tracking-wide">
+                      <span className="text-muted-foreground/80 border-muted-foreground/30 text-2xs shrink-0 rounded border px-1 py-px uppercase tracking-wide">
                         {t("spending:eventForm.alreadyTagged")}
                       </span>
                     )}
                   </div>
-                  <p className="text-muted-foreground text-[10px]">{dateLabel}</p>
+                  <p className="text-muted-foreground text-2xs">{dateLabel}</p>
                 </div>
                 <span className="text-foreground shrink-0 text-xs font-medium tabular-nums">
                   <PrivacyAmount value={Math.abs(amt)} currency={c.currency || "USD"} />

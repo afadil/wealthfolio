@@ -190,13 +190,13 @@ export function GoalEditDialog({ goal, open, onClose }: Props) {
                         <span
                           className={cn(
                             "bg-muted inline-flex h-8 w-8 items-center justify-center rounded-full",
-                            option.value === "achieved" && "text-green-600",
+                            option.value === "achieved" && "text-success",
                             option.value === "active" && "text-primary",
                           )}
                         >
                           <Icon className="h-4 w-4" />
                         </span>
-                        <span className="text-muted-foreground text-[11px] font-medium uppercase tracking-wider">
+                        <span className="text-muted-foreground text-2xs font-medium uppercase tracking-wider">
                           {option.hint}
                         </span>
                       </span>

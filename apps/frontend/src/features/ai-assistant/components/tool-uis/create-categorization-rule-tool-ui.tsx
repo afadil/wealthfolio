@@ -2,7 +2,7 @@ import { updateToolResult } from "@/adapters";
 import { useCategorizationRuleMutations } from "@/features/spending/hooks/use-categorization-rules";
 import type { ToolCallMessagePartProps } from "@assistant-ui/react";
 import { makeAssistantToolUI } from "@assistant-ui/react";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui";
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Spinner } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { memo, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -33,7 +33,7 @@ function CreateCategorizationRuleLoadingState() {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">{t("ai:createRule.drafting")}</p>
         </div>
-        <Icons.Spinner className="text-muted-foreground h-4 w-4 shrink-0 animate-spin" />
+        <Spinner className="text-muted-foreground h-4 w-4 shrink-0" />
       </CardContent>
     </Card>
   );
@@ -195,7 +195,7 @@ function CreateCategorizationRuleToolUIContentImpl({
         <div className="flex items-center justify-end">
           <Button size="sm" onClick={handleCreate} disabled={isSubmitted || create.isPending}>
             {create.isPending ? (
-              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+              <Spinner className="mr-2 h-4 w-4" />
             ) : isSubmitted ? (
               <Icons.Check className="mr-2 h-4 w-4" />
             ) : null}

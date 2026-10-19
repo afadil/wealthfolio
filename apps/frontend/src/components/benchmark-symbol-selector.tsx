@@ -182,31 +182,33 @@ export function BenchmarkSymbolSelector({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          aria-label={iconOnly ? t("common:component.add_benchmark") : undefined}
-          className={cn(
-            "bg-secondary/30 hover:bg-muted/80 flex items-center gap-1.5 rounded-md border-dashed text-sm font-medium",
-            iconOnly ? "h-9 w-9 p-0" : "h-8 px-3 py-1",
-            className,
-          )}
-          size={iconOnly ? "icon" : "sm"}
-        >
-          <Icons.TrendingUp className="h-4 w-4" />
-          {!iconOnly && t("common:component.add_benchmark")}
-        </Button>
+      <PopoverTrigger
+        render={
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            aria-label={iconOnly ? t("common:component.add_benchmark") : undefined}
+            className={cn(
+              "bg-secondary/30 hover:bg-muted/80 flex items-center gap-1.5 rounded-md border-dashed text-sm font-medium",
+              iconOnly ? "h-9 w-9 p-0" : "h-8 px-3 py-1",
+              className,
+            )}
+            size={iconOnly ? "icon" : "sm"}
+          />
+        }
+      >
+        <Icons.TrendingUp className="h-4 w-4" />
+        {!iconOnly && t("common:component.add_benchmark")}
       </PopoverTrigger>
-      <PopoverContent className="w-[350px] p-0">
+      <PopoverContent className="w-87.5 p-0">
         <Command shouldFilter={false}>
           <CommandInput
             placeholder={t("common:search_benchmarks")}
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
-          <CommandList className="max-h-[300px] overflow-y-auto">
+          <CommandList className="max-h-75 overflow-y-auto">
             <CommandEmpty>
               {isLoading ? t("common:searching") : t("common:no_benchmarks_found")}
             </CommandEmpty>

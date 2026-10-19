@@ -1,4 +1,5 @@
 import { updateToolResult } from "@/adapters";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { localizeActivitySubtypeName, localizeActivityTypeName } from "@/lib/activity-utils";
 import { ActivityType, QuoteMode } from "@/lib/constants";
@@ -26,6 +27,8 @@ import {
   useAmountFormatting,
   useDateFormatting,
   type FormattingApi,
+  buttonVariants,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { parse as dateFnsParse } from "date-fns";
@@ -488,12 +491,13 @@ function SuccessState({ draft, createdActivityId, currency }: SuccessStateProps)
           )}
         </div>
         <div className="pt-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link to={createdActivityId ? `/activities?id=${createdActivityId}` : "/activities"}>
-              <Icons.ArrowRight className="mr-2 h-4 w-4" />
-              {t("ai:recordActivity.viewInActivities")}
-            </Link>
-          </Button>
+          <Link
+            to={createdActivityId ? `/activities?id=${createdActivityId}` : "/activities"}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            <Icons.ArrowRight className="mr-2 h-4 w-4" />
+            {t("ai:recordActivity.viewInActivities")}
+          </Link>
         </div>
       </CardContent>
     </Card>
@@ -625,19 +629,22 @@ function ValidationHints({ validation }: ValidationHintsProps) {
   }
 
   return (
-    <div className="bg-warning/10 border-warning/30 rounded-md border p-2 text-xs">
-      <p className="font-medium">{t("ai:recordActivity.flaggedIssues")}</p>
-      <ul className="mt-1 list-disc pl-4">
-        {validation.errors.map((e, i) => (
-          <li key={`err-${i}`}>
-            <span className="font-medium">{e.field}:</span> {e.message}
-          </li>
-        ))}
-        {validation.missingFields.map((f) => (
-          <li key={`missing-${f}`}>{t("ai:recordActivity.missing", { field: f })}</li>
-        ))}
-      </ul>
-    </div>
+    <Alert variant="warning" className="p-2 text-xs">
+      <Icons.AlertTriangle />
+      <AlertTitle>{t("ai:recordActivity.flaggedIssues")}</AlertTitle>
+      <AlertDescription>
+        <ul className="list-disc pl-4">
+          {validation.errors.map((e, i) => (
+            <li key={`err-${i}`}>
+              <span className="font-medium">{e.field}:</span> {e.message}
+            </li>
+          ))}
+          {validation.missingFields.map((f) => (
+            <li key={`missing-${f}`}>{t("ai:recordActivity.missing", { field: f })}</li>
+          ))}
+        </ul>
+      </AlertDescription>
+    </Alert>
   );
 }
 
@@ -775,7 +782,7 @@ function DraftReview({
           {t("ai:recordActivity.edit")}
         </Button>
         <Button type="button" size="sm" onClick={onConfirm} disabled={isLoading || !canConfirm}>
-          {isLoading && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+          {isLoading && <Spinner className="mr-2 h-4 w-4" />}
           {t("ai:recordActivity.confirm")}
         </Button>
       </div>
@@ -908,13 +915,12 @@ function DraftForm({
 
   if (!config) {
     return (
-      <Card className="border-destructive/30 bg-destructive/5">
-        <CardContent className="py-4">
-          <p className="text-destructive text-sm font-medium">
-            {t("ai:recordActivity.unsupportedType", { type: draft.activityType })}
-          </p>
-        </CardContent>
-      </Card>
+      <Alert variant="destructive">
+        <Icons.AlertCircle />
+        <AlertTitle>
+          {t("ai:recordActivity.unsupportedType", { type: draft.activityType })}
+        </AlertTitle>
+      </Alert>
     );
   }
 
@@ -1022,24 +1028,22 @@ function RecordActivityToolUIContentImpl({
 
   if (isIncomplete) {
     return (
-      <Card className="border-destructive/30 bg-destructive/5">
-        <CardContent className="py-4">
-          <p className="text-destructive text-sm font-medium">
-            {t("ai:recordActivity.failedPrepare")}
-          </p>
-          <p className="text-muted-foreground mt-1 text-xs">{t("ai:recordActivity.interrupted")}</p>
-        </CardContent>
-      </Card>
+      <Alert variant="destructive">
+        <Icons.AlertCircle />
+        <AlertTitle>{t("ai:recordActivity.failedPrepare")}</AlertTitle>
+        <AlertDescription className="text-xs">
+          {t("ai:recordActivity.interrupted")}
+        </AlertDescription>
+      </Alert>
     );
   }
 
   if (!parsed) {
     return (
-      <Card className="border-destructive/30 bg-destructive/5">
-        <CardContent className="py-4">
-          <p className="text-destructive text-sm font-medium">{t("ai:recordActivity.noData")}</p>
-        </CardContent>
-      </Card>
+      <Alert variant="destructive">
+        <Icons.AlertCircle />
+        <AlertTitle>{t("ai:recordActivity.noData")}</AlertTitle>
+      </Alert>
     );
   }
 

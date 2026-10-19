@@ -18,6 +18,8 @@ import {
   SheetTitle,
   useDateFormatting,
   type FormattingApi,
+  buttonVariants,
+  Spinner,
 } from "@wealthfolio/ui";
 import { cn } from "@wealthfolio/ui/lib/utils";
 import type { TFunction } from "i18next";
@@ -47,7 +49,7 @@ function buildDiagnosticRoute(action: Extract<DiagnosticAction, { kind: "navigat
 
 const SEVERITY_CONFIG: Record<HealthSeverity, { labelKey: string; color: string }> = {
   INFO: { labelKey: "severity.info", color: "text-muted-foreground" },
-  WARNING: { labelKey: "severity.warning", color: "text-yellow-600 dark:text-yellow-400" },
+  WARNING: { labelKey: "severity.warning", color: "text-warning" },
   ERROR: { labelKey: "severity.error", color: "text-destructive" },
   CRITICAL: { labelKey: "severity.critical", color: "text-destructive" },
 };
@@ -645,12 +647,14 @@ export function IssueDetailSheet({
                         <div className="flex flex-wrap gap-2">
                           {actionEntries.map(({ key, action }) =>
                             action.kind === "navigate" ? (
-                              <Button key={key} variant="outline" size="sm" asChild>
-                                <Link to={buildDiagnosticRoute(action)}>
-                                  <Icons.ArrowRight className="mr-2 h-4 w-4" />
-                                  {action.label}
-                                </Link>
-                              </Button>
+                              <Link
+                                to={buildDiagnosticRoute(action)}
+                                key={key}
+                                className={buttonVariants({ variant: "outline", size: "sm" })}
+                              >
+                                <Icons.ArrowRight className="mr-2 h-4 w-4" />
+                                {action.label}
+                              </Link>
                             ) : (
                               <Button
                                 key={key}
@@ -667,7 +671,7 @@ export function IssueDetailSheet({
                                 }
                               >
                                 {isFixing ? (
-                                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                                  <Spinner className="mr-2 h-4 w-4" />
                                 ) : (
                                   <Icons.Wand2 className="mr-2 h-4 w-4" />
                                 )}
@@ -762,7 +766,7 @@ export function IssueDetailSheet({
           {issue.fixAction && !hasDiagnosticActions && (
             <Button onClick={onFix} disabled={isFixing} className="w-full">
               {isFixing ? (
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
               ) : (
                 <Icons.Wand2 className="mr-2 h-4 w-4" />
               )}
@@ -771,12 +775,13 @@ export function IssueDetailSheet({
           )}
 
           {issue.navigateAction && !hasDiagnosticActions && (
-            <Button variant="outline" className="w-full" asChild>
-              <Link to={navigateActionRoute ?? issue.navigateAction.route}>
-                <Icons.ArrowRight className="mr-2 h-4 w-4" />
-                {issue.navigateAction.label}
-              </Link>
-            </Button>
+            <Link
+              to={navigateActionRoute ?? issue.navigateAction.route}
+              className={cn(buttonVariants({ variant: "outline" }), "w-full")}
+            >
+              <Icons.ArrowRight className="mr-2 h-4 w-4" />
+              {issue.navigateAction.label}
+            </Link>
           )}
 
           <ActionConfirm

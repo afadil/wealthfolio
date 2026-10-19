@@ -85,14 +85,16 @@ function InfoLabel({ label, children }: { label: string; children: React.ReactNo
     <span className="inline-flex items-center gap-1">
       <span>{label}</span>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            className="text-muted-foreground/70 hover:text-foreground inline-flex rounded-full transition-colors"
-            aria-label={t("goals:sidebar.more_info_about", { label })}
-          >
-            <Icons.Info className="h-3 w-3" />
-          </button>
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              className="text-muted-foreground/70 hover:text-foreground inline-flex rounded-full transition-colors"
+              aria-label={t("goals:sidebar.more_info_about", { label })}
+            />
+          }
+        >
+          <Icons.Info className="h-3 w-3" />
         </TooltipTrigger>
         <TooltipContent className="max-w-xs text-xs">{children}</TooltipContent>
       </Tooltip>
@@ -624,7 +626,7 @@ export function SidebarConfigurator({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold">{t("goals:sidebar.plan.plan_type")}</p>
-                  <p className="text-muted-foreground mt-1 max-w-[260px] text-xs leading-snug">
+                  <p className="text-muted-foreground max-w-65 mt-1 text-xs leading-snug">
                     {t("goals:sidebar.plan.plan_type_help")}
                   </p>
                 </div>
@@ -641,7 +643,7 @@ export function SidebarConfigurator({
                 />
               </div>
               {draftMode !== plannerMode && (
-                <p className="rounded-md bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-800 dark:text-amber-300">
+                <p className="bg-warning-subtle text-warning-subtle-foreground rounded-md px-3 py-2 text-xs leading-relaxed">
                   {t("goals:sidebar.plan.mode_change_prefix")}{" "}
                   {draftMode === "traditional"
                     ? t("goals:sidebar.plan.mode_change_traditional")
@@ -655,7 +657,7 @@ export function SidebarConfigurator({
                   <div className="text-foreground text-sm font-semibold leading-tight">
                     {t("goals:sidebar.plan.birth_month")}
                   </div>
-                  <div className="text-muted-foreground mt-1 max-w-[240px] text-xs leading-tight">
+                  <div className="text-muted-foreground mt-1 max-w-60 text-xs leading-tight">
                     {t("goals:sidebar.plan.birth_month_help")}
                   </div>
                 </div>
@@ -910,7 +912,7 @@ export function SidebarConfigurator({
                         <span className="text-foreground block truncate text-sm font-semibold">
                           {item.label || t("goals:sidebar.spending.default_label")}
                         </span>
-                        <span className="text-muted-foreground mt-0.5 block truncate text-[11px]">
+                        <span className="text-muted-foreground text-2xs mt-0.5 block truncate">
                           {meta}
                         </span>
                       </span>
@@ -977,7 +979,7 @@ export function SidebarConfigurator({
                             <div className="text-foreground text-xs font-semibold">
                               {t("goals:sidebar.spending.spending_type")}
                             </div>
-                            <div className="text-muted-foreground mt-0.5 text-[11px] leading-tight">
+                            <div className="text-muted-foreground text-2xs mt-0.5 leading-tight">
                               {t("goals:sidebar.spending.spending_type_help")}
                             </div>
                           </div>
@@ -999,7 +1001,7 @@ export function SidebarConfigurator({
                             <div className="text-foreground text-xs font-semibold">
                               {t("goals:sidebar.spending.inflation_override")}
                             </div>
-                            <div className="text-muted-foreground mt-0.5 text-[11px] leading-tight">
+                            <div className="text-muted-foreground text-2xs mt-0.5 leading-tight">
                               {t("goals:sidebar.spending.inflation_override_help")}
                             </div>
                           </div>
@@ -1178,7 +1180,7 @@ export function SidebarConfigurator({
                         <span className="text-foreground block truncate text-sm font-semibold">
                           {s.label || t("goals:sidebar.income.income")}
                         </span>
-                        <span className="text-muted-foreground mt-0.5 block truncate text-[11px]">
+                        <span className="text-muted-foreground text-2xs mt-0.5 block truncate">
                           {meta}
                         </span>
                       </span>
@@ -1214,7 +1216,7 @@ export function SidebarConfigurator({
                           <div className="text-foreground text-xs font-semibold">
                             {t("goals:sidebar.income.income_type")}
                           </div>
-                          <div className="text-muted-foreground mt-0.5 text-[11px] leading-tight">
+                          <div className="text-muted-foreground text-2xs mt-0.5 leading-tight">
                             {t("goals:sidebar.income.income_type_help")}
                           </div>
                         </div>
@@ -1319,7 +1321,7 @@ export function SidebarConfigurator({
                                 <div className="text-foreground text-xs font-semibold">
                                   {t("goals:sidebar.income.fund_payout_mode")}
                                 </div>
-                                <div className="text-muted-foreground mt-0.5 text-[11px] leading-tight">
+                                <div className="text-muted-foreground text-2xs mt-0.5 leading-tight">
                                   {t("goals:sidebar.income.fund_payout_mode_help")}
                                 </div>
                               </div>
@@ -1367,7 +1369,7 @@ export function SidebarConfigurator({
                                 format={(v) => String(Math.round(v))}
                               />
                             )}
-                            <p className="text-muted-foreground px-1 text-[11px] leading-relaxed">
+                            <p className="text-muted-foreground text-2xs px-1 leading-relaxed">
                               {t(
                                 s.payoutMode === "drawdown"
                                   ? "goals:sidebar.income.drawdown_note"
@@ -1398,7 +1400,7 @@ export function SidebarConfigurator({
                             <div className="text-foreground text-xs font-semibold">
                               {t("goals:sidebar.income.income_growth")}
                             </div>
-                            <div className="text-muted-foreground mt-0.5 text-[11px] leading-tight">
+                            <div className="text-muted-foreground text-2xs mt-0.5 leading-tight">
                               {t("goals:sidebar.income.income_growth_help")}
                             </div>
                           </div>
@@ -1423,7 +1425,7 @@ export function SidebarConfigurator({
                             <div className="text-foreground text-xs font-semibold">
                               {t("goals:sidebar.income.custom_annual_growth")}
                             </div>
-                            <div className="text-muted-foreground mt-0.5 text-[11px] leading-tight">
+                            <div className="text-muted-foreground text-2xs mt-0.5 leading-tight">
                               {t("goals:sidebar.income.custom_annual_growth_help")}
                             </div>
                           </div>
@@ -1706,17 +1708,19 @@ export function SidebarConfigurator({
 
             {taxBucketBalances && taxBucketTotal > 0 && (
               <div className="border-t pt-3">
-                <p className="text-muted-foreground mb-1.5 flex items-center gap-1 text-[10px] uppercase tracking-wider">
+                <p className="text-muted-foreground text-2xs mb-1.5 flex items-center gap-1 uppercase tracking-wider">
                   {t("goals:sidebar.taxes.account_buckets")}
                   <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        className="text-muted-foreground/70 hover:text-foreground rounded-full transition-colors"
-                        aria-label={t("goals:sidebar.taxes.account_buckets_aria")}
-                      >
-                        <Icons.Info className="h-3 w-3" />
-                      </button>
+                    <TooltipTrigger
+                      render={
+                        <button
+                          type="button"
+                          className="text-muted-foreground/70 hover:text-foreground rounded-full transition-colors"
+                          aria-label={t("goals:sidebar.taxes.account_buckets_aria")}
+                        />
+                      }
+                    >
+                      <Icons.Info className="h-3 w-3" />
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs text-xs">
                       {t("goals:sidebar.taxes.account_buckets_tip")}
@@ -1765,7 +1769,7 @@ export function SidebarConfigurator({
             )}
 
             {allTaxRatesZero && taxBucketTotal > 0 && (
-              <p className="text-muted-foreground text-[10px]">
+              <p className="text-muted-foreground text-2xs">
                 {t("goals:sidebar.taxes.zero_rates_note")}
               </p>
             )}

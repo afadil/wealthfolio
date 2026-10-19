@@ -245,7 +245,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
           <div className="text-foreground text-base font-semibold tracking-tight">
             {tr("spending:eventsCard.title")}
           </div>
-          <div className="text-muted-foreground/80 mt-0.5 text-[11px]">
+          <div className="text-muted-foreground/80 text-2xs mt-0.5">
             {tr("spending:timeline.headerSummary", {
               events: tr("spending:timeline.taggedEvents", { count: events.length }),
               days: computed.totalEventDays,
@@ -256,7 +256,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
           {usedTypes.map((t) => (
             <span
               key={t.id}
-              className="text-muted-foreground/80 inline-flex items-center gap-1.5 text-[10px] tracking-wider"
+              className="text-muted-foreground/80 text-2xs inline-flex items-center gap-1.5 tracking-wider"
             >
               <span
                 className="inline-block h-2.5 w-2.5 rounded-[2px]"
@@ -267,31 +267,35 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
           ))}
           <div className="ml-1 inline-flex items-center gap-1">
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label={tr("spending:timeline.previousPeriod")}
-                  className="h-7 w-7 rounded-full"
-                  onClick={onPrevWindow}
-                >
-                  <Icons.ChevronLeft className="h-3.5 w-3.5" />
-                </Button>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label={tr("spending:timeline.previousPeriod")}
+                    className="h-7 w-7 rounded-full"
+                    onClick={onPrevWindow}
+                  />
+                }
+              >
+                <Icons.ChevronLeft className="h-3.5 w-3.5" />
               </TooltipTrigger>
               <TooltipContent>{tr("spending:timeline.previousPeriod")}</TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label={tr("spending:timeline.nextPeriod")}
-                  className="h-7 w-7 rounded-full"
-                  onClick={onNextWindow}
-                  disabled={windowOffset === 0}
-                >
-                  <Icons.ChevronRight className="h-3.5 w-3.5" />
-                </Button>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label={tr("spending:timeline.nextPeriod")}
+                    className="h-7 w-7 rounded-full"
+                    onClick={onNextWindow}
+                    disabled={windowOffset === 0}
+                  />
+                }
+              >
+                <Icons.ChevronRight className="h-3.5 w-3.5" />
               </TooltipTrigger>
               <TooltipContent>
                 {windowOffset === 0
@@ -301,21 +305,23 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
             </Tooltip>
           </div>
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label={tr("spending:events.createEvent")}
-                className="h-7 w-7 rounded-full"
-                onClick={() =>
-                  openEventDialog({
-                    prefill: { startDate: rangeStart, endDate: rangeEnd },
-                    onCreated: (ev) => onSelect(ev.id),
-                  })
-                }
-              >
-                <Icons.Plus className="h-3.5 w-3.5" />
-              </Button>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label={tr("spending:events.createEvent")}
+                  className="h-7 w-7 rounded-full"
+                  onClick={() =>
+                    openEventDialog({
+                      prefill: { startDate: rangeStart, endDate: rangeEnd },
+                      onCreated: (ev) => onSelect(ev.id),
+                    })
+                  }
+                />
+              }
+            >
+              <Icons.Plus className="h-3.5 w-3.5" />
             </TooltipTrigger>
             <TooltipContent>{tr("spending:events.createEvent")}</TooltipContent>
           </Tooltip>
@@ -348,7 +354,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
                   x={x + 6}
                   y={14}
                   className="fill-muted-foreground/80"
-                  fontSize={10}
+                  fontSize="0.6875rem"
                   letterSpacing={0.5}
                 >
                   {label}
@@ -372,7 +378,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
               <text
                 x={padL + innerW + 4}
                 y={yNormal + 3}
-                fontSize={9}
+                fontSize="0.6875rem"
                 className="fill-muted-foreground"
               >
                 {isBalanceHidden
@@ -492,7 +498,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
                     <text
                       x={x1 + 8}
                       y={bandY + 16}
-                      fontSize={11}
+                      fontSize="0.6875rem"
                       className="fill-foreground"
                       fontWeight={isSel ? 700 : 600}
                     >
@@ -501,7 +507,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
                     <text
                       x={x1 + 8}
                       y={bandY + 32}
-                      fontSize={9.5}
+                      fontSize="0.6875rem"
                       fontWeight={600}
                       className={lift >= 0 ? "fill-destructive" : "fill-success"}
                     >
@@ -510,7 +516,12 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
                         ? "••••"
                         : amountFormatting.formatCompactAmount(Math.abs(lift), currency)}
                     </text>
-                    <text x={x1 + 8} y={bandY + 46} fontSize={9} className="fill-muted-foreground">
+                    <text
+                      x={x1 + 8}
+                      y={bandY + 46}
+                      fontSize="0.6875rem"
+                      className="fill-muted-foreground"
+                    >
                       {tr("spending:timeline.daysUpper", { count: days })} · {kindLabel}
                     </text>
                   </>
@@ -530,7 +541,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
                     <text
                       x={x1 + w / 2}
                       y={bandY + labelYOffset}
-                      fontSize={10}
+                      fontSize="0.6875rem"
                       fontWeight={isSel ? 700 : 500}
                       textAnchor="middle"
                       className={isSel ? "fill-foreground" : "fill-foreground/80"}
@@ -555,20 +566,26 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
                 strokeWidth={1.5}
               />
               <circle cx={todayX} cy={4} r={3} fill="var(--event-today)" />
-              <text x={todayX + 6} y={14} fontSize={9.5} fontWeight={600} fill="var(--event-today)">
+              <text
+                x={todayX + 6}
+                y={14}
+                fontSize="0.6875rem"
+                fontWeight={600}
+                fill="var(--event-today)"
+              >
                 {tr("spending:timeline.today")}
               </text>
             </>
           )}
 
           {/* Bookend dates */}
-          <text x={padL} y={axisTop + 14} fontSize={9.5} className="fill-muted-foreground">
+          <text x={padL} y={axisTop + 14} fontSize="0.6875rem" className="fill-muted-foreground">
             {formatBookendDate(rangeStart, dateFormatting)}
           </text>
           <text
             x={padL + innerW}
             y={axisTop + 14}
-            fontSize={9.5}
+            fontSize="0.6875rem"
             textAnchor="end"
             className="fill-muted-foreground"
           >
@@ -578,7 +595,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
           <text
             x={padL + innerW / 2}
             y={axisTop + 14}
-            fontSize={9.5}
+            fontSize="0.6875rem"
             textAnchor="middle"
             className="fill-muted-foreground/70"
           >
@@ -593,7 +610,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
           <div className="text-foreground text-sm font-semibold tabular-nums tracking-tight">
             <PrivacyAmount value={computed.totalSpent} currency={currency} />
           </div>
-          <div className="text-muted-foreground/80 mt-0.5 text-[10px]">
+          <div className="text-muted-foreground/80 text-2xs mt-0.5">
             {tr("spending:timeline.eventDaysOfPeriod", {
               days: computed.totalEventDays,
               pct: Math.round((computed.totalEventDays / periodDays) * 100),
@@ -610,7 +627,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
             {computed.lift >= 0 ? "+" : "−"}
             <PrivacyAmount value={Math.abs(computed.lift)} currency={currency} />
           </div>
-          <div className="text-muted-foreground/80 mt-0.5 text-[10px]">
+          <div className="text-muted-foreground/80 text-2xs mt-0.5">
             {tr("spending:timeline.onEventDays")}
           </div>
         </SummaryCell>
@@ -619,7 +636,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
             <div className="text-foreground truncate text-sm font-semibold tracking-tight">
               {biggest.eventName}
             </div>
-            <div className="text-muted-foreground/80 mt-0.5 text-[10px] tabular-nums">
+            <div className="text-muted-foreground/80 text-2xs mt-0.5 tabular-nums">
               <PrivacyAmount value={biggest.totalSpending} currency={currency} />
             </div>
           </SummaryCell>
@@ -638,7 +655,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
                 {selected.eventName}
               </span>
             </div>
-            <div className="text-muted-foreground/80 mt-0.5 text-[10px] tabular-nums">
+            <div className="text-muted-foreground/80 text-2xs mt-0.5 tabular-nums">
               {formatSelectedRange(
                 parseLocalDate(selected.startDate),
                 parseLocalDate(selected.endDate),

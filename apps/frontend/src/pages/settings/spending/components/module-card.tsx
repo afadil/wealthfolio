@@ -112,13 +112,13 @@ export function ModuleCard() {
               <span
                 className={cn(
                   "absolute inline-flex h-full w-full rounded-full opacity-60",
-                  enabled ? "animate-ping bg-green-300" : "bg-background/40",
+                  enabled ? "bg-success animate-ping" : "bg-background/40",
                 )}
               />
               <span
                 className={cn(
                   "relative inline-flex h-2 w-2 rounded-full",
-                  enabled ? "bg-green-300" : "bg-background/40",
+                  enabled ? "bg-success" : "bg-background/40",
                 )}
               />
             </span>
@@ -145,9 +145,9 @@ export function ModuleCard() {
               onCheckedChange={handleToggle}
               disabled={isLoading || mutation.isPending}
               className={cn(
-                "data-[state=checked]:bg-warning data-[state=unchecked]:bg-background/15",
-                "[&_[data-slot=switch-thumb]]:data-[state=checked]:bg-foreground",
-                "[&_[data-slot=switch-thumb]]:data-[state=unchecked]:bg-background/40",
+                "data-checked:bg-warning data-unchecked:bg-background/15",
+                "[&_[data-slot=switch-thumb]]:data-checked:bg-foreground",
+                "[&_[data-slot=switch-thumb]]:data-unchecked:bg-background/40",
               )}
             />
           </label>
@@ -253,7 +253,7 @@ interface HeroStatProps {
 function HeroStat({ label, value, unit, sub, valueClassName, sublineClassName }: HeroStatProps) {
   return (
     <div className="pr-4">
-      <div className="text-background/55 text-[10px] font-medium uppercase tracking-widest">
+      <div className="text-background/55 text-2xs font-medium uppercase tracking-widest">
         {label}
       </div>
       <div className="mt-2 flex items-baseline gap-1 tabular-nums">

@@ -28,14 +28,13 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  DialogDescription,
-  DialogTitle,
   Icons,
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   type Icon,
+  Spinner,
 } from "@wealthfolio/ui";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -274,7 +273,7 @@ export function AppLauncher() {
         title: t("common:component.update_quotes"),
         href: "#update-portfolio",
         icon: isUpdatingPortfolio ? (
-          <Icons.Spinner className="size-6 animate-spin" />
+          <Spinner className="size-6" />
         ) : (
           <Icons.Refresh className="size-6" />
         ),
@@ -288,7 +287,7 @@ export function AppLauncher() {
         title: t("common:component.rebuild_full_history"),
         href: "#recalculate-portfolio",
         icon: isRecalculatingPortfolio ? (
-          <Icons.Spinner className="size-6 animate-spin" />
+          <Spinner className="size-6" />
         ) : (
           <Icons.Clock className="size-6" />
         ),
@@ -633,8 +632,8 @@ export function AppLauncher() {
         className={cn(
           "flex-1",
           isMobileViewport
-            ? "max-h-[calc(80vh-160px)] px-2 pb-8"
-            : "h-[min(420px,calc(100dvh_-_6rem))] max-h-none flex-none",
+            ? "max-h-[calc(80vh-10rem)] px-2 pb-8"
+            : "h-[min(26.25rem,calc(100dvh_-_6rem))] max-h-none flex-none",
         )}
       >
         {!hasResults && <CommandEmpty>{t("common:component.no_matches_found")}</CommandEmpty>}
@@ -786,12 +785,10 @@ export function AppLauncher() {
     <CommandDialog
       open={open}
       onOpenChange={setOpen}
-      contentClassName="w-[calc(100%_-_2rem)] max-w-[720px] rounded-[28px] [&>button]:top-6 [&_[cmdk-item]]:rounded-xl [&_[data-cmdk-input-wrapper]]:h-16 [&_[data-cmdk-input-wrapper]]:px-5"
+      title={t("common:component.command_palette")}
+      description={t("common:component.command_palette_description")}
+      contentClassName="w-[calc(100%_-_2rem)] max-w-180 rounded-[1.75rem] [&>button]:top-6 [&_[cmdk-item]]:rounded-xl [&_[data-cmdk-input-wrapper]]:h-16 [&_[data-cmdk-input-wrapper]]:px-5"
     >
-      <DialogTitle className="sr-only">{t("common:component.command_palette")}</DialogTitle>
-      <DialogDescription className="sr-only">
-        {t("common:component.command_palette_description")}
-      </DialogDescription>
       {commandContent}
     </CommandDialog>
   );

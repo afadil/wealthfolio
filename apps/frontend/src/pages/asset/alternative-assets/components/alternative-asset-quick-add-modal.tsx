@@ -30,6 +30,7 @@ import {
   QuantityInput,
   useAmountFormatting,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { cn } from "@/lib/utils";
 import { useSettingsContext } from "@/lib/settings-provider";
@@ -469,7 +470,7 @@ export function AlternativeAssetQuickAddModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[560px]"
+        className="sm:max-w-140 flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0"
         mobileClassName="flex h-[90vh] flex-col"
       >
         {/* Header with progress indicator */}
@@ -1019,7 +1020,7 @@ export function AlternativeAssetQuickAddModal({
             >
               {isSubmitting ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                   {t("asset:quickAdd.creating")}
                 </>
               ) : step === 1 ? (

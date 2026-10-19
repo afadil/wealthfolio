@@ -23,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
+  Spinner,
 } from "@wealthfolio/ui";
 import type { TaxonomyCategory } from "@/lib/types";
 import { useCreateCategory, useUpdateCategory, useDeleteCategory } from "@/hooks/use-taxonomies";
@@ -242,7 +243,7 @@ export function CategoryForm({
               >
                 {isPending ? (
                   <>
-                    <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
+                    <Spinner className="mr-2 h-4 w-4" />
                     {isCreateMode ? t("settings:tax_creating") : t("settings:tax_saving")}
                   </>
                 ) : isCreateMode ? (
@@ -266,20 +267,22 @@ export function CategoryForm({
             {/* Delete button for non-system taxonomies */}
             {!isCreateMode && !isSystem && (
               <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    disabled={deleteMutation.isPending}
-                  >
-                    {deleteMutation.isPending ? (
-                      <Icons.Loader className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Icons.Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
+                <AlertDialogTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      disabled={deleteMutation.isPending}
+                    />
+                  }
+                >
+                  {deleteMutation.isPending ? (
+                    <Spinner className="h-4 w-4" />
+                  ) : (
+                    <Icons.Trash2 className="h-4 w-4" />
+                  )}
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
@@ -290,10 +293,7 @@ export function CategoryForm({
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>{t("common:cancel")}</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDelete}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
+                    <AlertDialogAction onClick={handleDelete} variant="destructive">
                       {t("common:delete")}
                     </AlertDialogAction>
                   </AlertDialogFooter>

@@ -1,10 +1,10 @@
 import type { ActivityDetails } from "@/lib/types";
 import type { CashAuditReviewTarget } from "@/pages/account/cash-audit";
 import {
-  Icons,
   calendarDateFromLocalDate,
   useDateFormatting,
   type FormattingApi,
+  Spinner,
 } from "@wealthfolio/ui";
 import {
   Sheet,
@@ -58,7 +58,7 @@ export function ActivityDateSheet({
         <div className="flex-1 overflow-auto px-4 py-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Icons.Spinner className="size-6 animate-spin" />
+              <Spinner className="size-6" />
             </div>
           ) : (
             <ActivityDateList

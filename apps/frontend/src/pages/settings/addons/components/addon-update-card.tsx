@@ -3,7 +3,7 @@ import { clearAddonStaging, downloadAddonForReview, installFromStaging } from "@
 import { reloadAllAddons } from "@/addons/addons-core";
 import { ExternalLink } from "@/components/external-link";
 import type { AddonUpdateInfo, Permission, RiskLevel } from "@wealthfolio/addon-sdk";
-import { useDateFormatting } from "@wealthfolio/ui";
+import { useDateFormatting, buttonVariants, Spinner } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -179,12 +179,12 @@ export function AddonUpdateCard({
 
   return (
     <>
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/20">
+      <div className="border-warning-subtle-border bg-warning-subtle rounded-lg border p-4">
         <div className="flex items-start justify-between">
           <div className="flex-1 space-y-2">
             <div className="flex items-center gap-2">
-              <Icons.ArrowUp className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              <h4 className="font-medium text-amber-900 dark:text-amber-100">
+              <Icons.ArrowUp className="text-warning h-4 w-4" />
+              <h4 className="text-warning-subtle-foreground font-medium">
                 {t("settings:addon_update_available")}
               </h4>
               {getUpdateBadgeText() && (
@@ -194,7 +194,7 @@ export function AddonUpdateCard({
               )}
             </div>
 
-            <div className="text-sm text-amber-800 dark:text-amber-200">
+            <div className="text-warning-subtle-foreground text-sm">
               <p>
                 {updateInfo.currentVersion} →{" "}
                 <span className="font-medium">{updateInfo.latestVersion}</span>
@@ -209,7 +209,7 @@ export function AddonUpdateCard({
             </div>
 
             {updateInfo.releaseNotes && (
-              <p className="line-clamp-2 text-sm text-amber-700 dark:text-amber-300">
+              <p className="text-warning-subtle-foreground line-clamp-2 text-sm">
                 {updateInfo.releaseNotes}
               </p>
             )}
@@ -217,20 +217,21 @@ export function AddonUpdateCard({
 
           <div className="ml-4 flex items-center gap-2">
             {(updateInfo.releaseNotes || updateInfo.changelogUrl) && (
-              <Button variant="ghost" size="sm" asChild>
-                <ExternalLink href={addonDetailUrl}>
-                  <span className="inline-flex items-center">
-                    <Icons.FileText className="mr-1 h-3 w-3" />
-                    {t("settings:addon_update_release_notes")}
-                  </span>
-                </ExternalLink>
-              </Button>
+              <ExternalLink
+                href={addonDetailUrl}
+                className={buttonVariants({ variant: "ghost", size: "sm" })}
+              >
+                <span className="inline-flex items-center">
+                  <Icons.FileText className="mr-1 h-3 w-3" />
+                  {t("settings:addon_update_release_notes")}
+                </span>
+              </ExternalLink>
             )}
 
             <Button onClick={handleUpdate} disabled={isUpdating || disabled} size="sm">
               {isUpdating ? (
                 <>
-                  <Icons.Loader className="mr-1 h-3 w-3 animate-spin" />
+                  <Spinner className="mr-1 h-3 w-3" />
                   {t("settings:addon_update_updating")}
                 </>
               ) : (
@@ -244,8 +245,8 @@ export function AddonUpdateCard({
         </div>
 
         {updateInfo.minWealthfolioVersion && (
-          <div className="mt-3 rounded-md bg-amber-100 p-2 dark:bg-amber-900/20">
-            <p className="text-xs text-amber-800 dark:text-amber-200">
+          <div className="bg-warning-subtle mt-3 rounded-md p-2">
+            <p className="text-warning-subtle-foreground text-xs">
               <Icons.Info className="mr-1 inline h-3 w-3" />
               {t("settings:addon_update_requires", {
                 version: updateInfo.minWealthfolioVersion,

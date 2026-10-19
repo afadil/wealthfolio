@@ -2,6 +2,7 @@ import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
+import { Spinner } from "@wealthfolio/ui";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -83,7 +84,7 @@ export function StepNavigation({
           >
             {isNextLoading ? (
               <>
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
                 {resolvedNextLoadingLabel}
               </>
             ) : (

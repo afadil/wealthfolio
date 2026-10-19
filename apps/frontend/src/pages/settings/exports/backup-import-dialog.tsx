@@ -28,6 +28,7 @@ import { PasswordInput } from "@wealthfolio/ui/components/ui/password-input";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { BackupAlert, PendingIcon } from "./backup-ui";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 
 export function BackupImportDialog({
   filename,
@@ -172,20 +173,20 @@ export function BackupImportDialog({
   return (
     <Dialog
       open
-      onOpenChange={(open) => {
-        if (!open) close();
+      onOpenChange={(open, details) => {
+        if (open) return;
+        // A running restore can't be dismissed.
+        if (pending === "restore") {
+          details.cancel();
+          return;
+        }
+        close();
       }}
     >
       <DialogContent
         className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
         mobileClassName="h-[min(42rem,85dvh)]"
         showCloseButton={pending !== "restore"}
-        onEscapeKeyDown={(event) => {
-          if (pending === "restore") event.preventDefault();
-        }}
-        onPointerDownOutside={(event) => {
-          if (pending === "restore") event.preventDefault();
-        }}
       >
         <DialogHeader className={restored ? "sr-only" : "shrink-0 px-6 pb-4 pt-6 text-left"}>
           <DialogTitle ref={stepHeading} tabIndex={-1} className="pr-8 outline-none">
@@ -211,7 +212,7 @@ export function BackupImportDialog({
               initial={reduceMotion ? false : { scale: 0.6, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: "spring", stiffness: 200, damping: 15 }}
-              className="bg-success/10 text-success flex size-20 items-center justify-center rounded-full"
+              className="text-success-subtle-foreground bg-current/15 flex size-20 items-center justify-center rounded-full"
             >
               <Icons.CheckCircle className="size-10" aria-hidden />
             </motion.div>
@@ -270,20 +271,13 @@ export function BackupImportDialog({
                         </p>
                       )}
                     </section>
-                    <div className="border-warning/30 bg-warning/10 flex gap-3 rounded-lg border p-3">
-                      <Icons.AlertTriangle
-                        className="text-warning mt-0.5 size-4 shrink-0"
-                        aria-hidden
-                      />
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">
-                          {t("settings:backup_replace_warning")}
-                        </p>
-                        <p className="text-muted-foreground text-xs leading-relaxed">
-                          {t("settings:backup_restore_safeguard")}
-                        </p>
-                      </div>
-                    </div>
+                    <Alert variant="warning" className="p-3">
+                      <Icons.AlertTriangle aria-hidden />
+                      <AlertTitle>{t("settings:backup_replace_warning")}</AlertTitle>
+                      <AlertDescription className="text-xs leading-relaxed">
+                        {t("settings:backup_restore_safeguard")}
+                      </AlertDescription>
+                    </Alert>
                     <ul className="text-muted-foreground space-y-2 text-xs leading-relaxed">
                       {encryption.data && (
                         <li className="flex gap-2.5">

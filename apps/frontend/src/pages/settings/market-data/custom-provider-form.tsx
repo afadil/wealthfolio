@@ -19,7 +19,7 @@ import { Input } from "@wealthfolio/ui/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@wealthfolio/ui/components/ui/radio-group";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@wealthfolio/ui";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, Spinner } from "@wealthfolio/ui";
 
 import { ExternalLink } from "@/components/external-link";
 import { useCreateCustomProvider, useUpdateCustomProvider } from "@/hooks/use-custom-providers";
@@ -264,7 +264,7 @@ export function CustomProviderForm({
       }}
     >
       <DialogContent
-        className="flex h-[92vh] w-[98vw] max-w-[1400px] flex-col overflow-hidden p-0 [--input-height:2.25rem]"
+        className="max-w-350 flex h-[92vh] w-[98vw] flex-col overflow-hidden p-0 [--input-height:2.25rem]"
         showCloseButton={false}
       >
         {open && (
@@ -581,12 +581,12 @@ function CustomProviderFormContent({
         </div>
 
         {/* ── Body: two-pane ── */}
-        <div className="bg-muted/40 grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_560px]">
+        <div className="bg-muted/40 grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_35rem]">
           {/* LEFT pane */}
           <div className="min-h-0 space-y-3 overflow-y-auto border-r p-4">
             {/* Provider Mode */}
             <div>
-              <div className="text-muted-foreground mb-2 text-[11px] font-medium uppercase tracking-wide">
+              <div className="text-muted-foreground text-2xs mb-2 font-medium uppercase tracking-wide">
                 {t("settings:market_data_page.provider_mode")}
               </div>
               <div className="grid gap-2 sm:grid-cols-3">
@@ -657,13 +657,13 @@ function CustomProviderFormContent({
                 </h3>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_140px]">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_8.75rem]">
                 <FormField
                   control={form.control}
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                      <FormLabel className="text-muted-foreground text-2xs font-medium uppercase tracking-wide">
                         {t("settings:market_data_page.provider_name")}
                         {!nameManuallyEdited && !isEditing && form.getValues("name") && (
                           <span className="text-muted-foreground ml-1 font-normal normal-case tracking-normal">
@@ -687,7 +687,7 @@ function CustomProviderFormContent({
                   name="code"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                      <FormLabel className="text-muted-foreground text-2xs font-medium uppercase tracking-wide">
                         {t("settings:market_data_page.code")}{" "}
                         <span className="font-normal normal-case tracking-normal">
                           {t("settings:market_data_page.code_auto")}
@@ -715,7 +715,7 @@ function CustomProviderFormContent({
                 name="description"
                 render={({ field }) => (
                   <FormItem className="mt-3">
-                    <FormLabel className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                    <FormLabel className="text-muted-foreground text-2xs font-medium uppercase tracking-wide">
                       {t("common:description")}{" "}
                       <span className="font-normal normal-case tracking-normal">
                         {t("settings:market_data_page.description_optional")}
@@ -799,7 +799,7 @@ function CustomProviderFormContent({
 
               {isEditing && (
                 <div className="mt-3 space-y-2 border-t pt-3">
-                  <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                  <div className="text-muted-foreground text-2xs font-medium uppercase tracking-wide">
                     {t("settings:market_data_page.usage_used_by")}
                   </div>
                   {usageCount(usage) === 0 ? (
@@ -872,7 +872,7 @@ function CustomProviderFormContent({
             <Button type="submit" disabled={isSaving}>
               {isSaving ? (
                 <>
-                  <Icons.Spinner className="mr-1.5 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-1.5 h-4 w-4" />
                   {t("settings:market_data_page.saving")}
                 </>
               ) : (

@@ -17,6 +17,7 @@ import {
   useDateFormatting,
   useNumberFormatting,
   type FormattingApi,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import type { TFunction } from "i18next";
@@ -190,7 +191,7 @@ function AssetClassificationLoadingState() {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">{t("ai:assetClassification.preparing")}</p>
         </div>
-        <Icons.Spinner className="text-muted-foreground h-4 w-4 shrink-0 animate-spin" />
+        <Spinner className="text-muted-foreground h-4 w-4 shrink-0" />
       </CardContent>
     </Card>
   );
@@ -298,7 +299,7 @@ function DiffStat({
   return (
     <div className="bg-background/70 min-w-[5rem] rounded-md border px-2 py-1.5">
       <div className={cn("text-sm font-semibold", className)}>{value}</div>
-      <div className="text-muted-foreground text-[11px] leading-4">{label}</div>
+      <div className="text-muted-foreground text-2xs leading-4">{label}</div>
     </div>
   );
 }
@@ -385,7 +386,7 @@ function ClassificationComparisonTable({
         {t("ai:assetClassification.allocation")}
       </div>
       <div className="bg-background/70 overflow-hidden rounded-md border">
-        <div className="text-muted-foreground grid grid-cols-[minmax(0,1fr)_4.25rem_4.25rem] gap-2 border-b px-2.5 py-1.5 text-[11px] font-medium sm:grid-cols-[minmax(0,1fr)_5.25rem_5.25rem]">
+        <div className="text-muted-foreground text-2xs grid grid-cols-[minmax(0,1fr)_4.25rem_4.25rem] gap-2 border-b px-2.5 py-1.5 font-medium sm:grid-cols-[minmax(0,1fr)_5.25rem_5.25rem]">
           <div>{t("ai:assetClassification.section")}</div>
           <div className="text-right">{t("ai:assetClassification.current")}</div>
           <div className="text-right">{t("ai:assetClassification.new")}</div>
@@ -461,7 +462,7 @@ function ClassificationComparisonTable({
                       onNewWeightChange(row, basisPoints);
                     }}
                   />
-                  <span className="pointer-events-none absolute right-1.5 text-[10px]">%</span>
+                  <span className="text-2xs pointer-events-none absolute right-1.5">%</span>
                 </div>
               </div>
             </div>
@@ -845,21 +846,17 @@ export function AssetClassificationToolUIContentImpl({
         ) : null}
 
         {isApplied ? (
-          <div className="border-success/30 bg-success/10 flex items-center gap-3 rounded-md border px-3 py-2">
-            <div className="bg-success/20 text-success flex h-7 w-7 shrink-0 items-center justify-center rounded-full">
-              <Icons.Check className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-success text-sm font-medium">
-                {t("ai:assetClassification.categoriesClassified", { count: appliedCategoryCount })}
-              </p>
-              <p className="text-muted-foreground text-xs">
-                {t("ai:assetClassification.allocationsSaved", {
-                  asset: selectedAsset?.label ?? t("ai:assetClassification.yourAsset"),
-                })}
-              </p>
-            </div>
-          </div>
+          <Alert variant="success" className="px-3 py-2">
+            <Icons.Check />
+            <AlertTitle>
+              {t("ai:assetClassification.categoriesClassified", { count: appliedCategoryCount })}
+            </AlertTitle>
+            <AlertDescription className="text-xs">
+              {t("ai:assetClassification.allocationsSaved", {
+                asset: selectedAsset?.label ?? t("ai:assetClassification.yourAsset"),
+              })}
+            </AlertDescription>
+          </Alert>
         ) : null}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -875,7 +872,7 @@ export function AssetClassificationToolUIContentImpl({
           </div>
           <Button size="sm" onClick={handleConfirm} disabled={!canConfirm}>
             {isSubmitting ? (
-              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+              <Spinner className="mr-2 h-4 w-4" />
             ) : isApplied ? (
               <Icons.Check className="mr-2 h-4 w-4" />
             ) : null}

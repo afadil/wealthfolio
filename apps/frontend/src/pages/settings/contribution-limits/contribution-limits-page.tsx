@@ -3,7 +3,18 @@ import { useAccounts } from "@/hooks/use-accounts";
 import { QueryKeys } from "@/lib/query-keys";
 import type { ContributionLimit } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import { Button, EmptyPlaceholder, Icons, Separator, Skeleton } from "@wealthfolio/ui";
+import {
+  Button,
+  Icons,
+  Separator,
+  Skeleton,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "@wealthfolio/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsHeader } from "../settings-header";
@@ -94,19 +105,21 @@ const SettingsContributionLimitPage = () => {
               ))}
             </div>
           ) : (
-            <EmptyPlaceholder>
-              <EmptyPlaceholder.Icon name="CircleGauge" />
-              <EmptyPlaceholder.Title>
-                {t("settings:limits_empty_title", { year: currentYear })}
-              </EmptyPlaceholder.Title>
-              <EmptyPlaceholder.Description>
-                {t("settings:limits_empty_description")}
-              </EmptyPlaceholder.Description>
-              <Button onClick={() => handleAddLimit()}>
-                <Icons.Plus className="mr-2 h-4 w-4" />
-                {t("settings:limits_add_first")}
-              </Button>
-            </EmptyPlaceholder>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Icons.CircleGauge />
+                </EmptyMedia>
+                <EmptyTitle>{t("settings:limits_empty_title", { year: currentYear })}</EmptyTitle>
+                <EmptyDescription>{t("settings:limits_empty_description")}</EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button onClick={() => handleAddLimit()}>
+                  <Icons.Plus className="mr-2 h-4 w-4" />
+                  {t("settings:limits_add_first")}
+                </Button>
+              </EmptyContent>
+            </Empty>
           )}
 
           {previousYearsLimits.length > 0 && (

@@ -395,7 +395,7 @@ export function BudgetLineChartCard({
         <svg
           viewBox={`0 0 ${chartW} ${chartH}`}
           preserveAspectRatio="none"
-          className="block h-[110px] w-full"
+          className="h-27.5 block w-full"
         >
           {targetPacePath ? (
             <path
@@ -439,7 +439,7 @@ export function BudgetLineChartCard({
           // SVG uses preserveAspectRatio="none", which would stretch a circle
           // into an ellipse.
           <div
-            className="absolute h-[9px] w-[9px] rounded-full bg-white"
+            className="absolute h-[0.5625rem] w-[0.5625rem] rounded-full bg-white"
             style={{
               left: `${pillLeftPctRaw}%`,
               top: `${endY}px`,
@@ -450,7 +450,7 @@ export function BudgetLineChartCard({
         )}
         {cumulative.length > 0 && (
           <div
-            className="absolute whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums shadow-sm"
+            className="text-2xs absolute whitespace-nowrap rounded-full px-2 py-0.5 font-semibold tabular-nums shadow-sm"
             style={{
               left: `${pillFlip ? pillLeftPctRaw : pillLeftPct}%`,
               top: `${pillTopPx}px`,
@@ -463,14 +463,14 @@ export function BudgetLineChartCard({
           </div>
         )}
       </div>
-      <div className="text-muted-foreground/70 mt-1 flex justify-between text-[10px] tabular-nums">
+      <div className="text-muted-foreground/70 text-2xs mt-1 flex justify-between tabular-nums">
         <span>{t("spending:budgetChart.dayN", { day: 1 })}</span>
         <span>{t("spending:budgetChart.dayN", { day: daysInMonth })}</span>
       </div>
 
       <div className="border-border mt-4 grid grid-cols-2 gap-3 border-t pt-3 text-xs">
         <div>
-          <div className="text-muted-foreground/70 text-[11px] uppercase tracking-wide">
+          <div className="text-muted-foreground/70 text-2xs uppercase tracking-wide">
             {isCurrentMonth
               ? t("spending:budgetChart.spentSoFar")
               : t("spending:budgetChart.spentUpper")}
@@ -480,7 +480,7 @@ export function BudgetLineChartCard({
           </div>
         </div>
         <div className="text-right">
-          <div className="text-muted-foreground/70 text-[11px] uppercase tracking-wide">
+          <div className="text-muted-foreground/70 text-2xs uppercase tracking-wide">
             {isCurrentMonth
               ? t("spending:budgetChart.forecastUpper")
               : t("spending:budgetChart.result")}
@@ -508,7 +508,7 @@ export function BudgetLineChartCard({
               <PrivacyAmount value={isOver ? overBy : remaining} currency={currency} />
             </div>
           )}
-          <div className="text-muted-foreground/60 text-[10px]">
+          <div className="text-muted-foreground/60 text-2xs">
             {isCurrentMonth
               ? forecastReliable
                 ? haveHistory
@@ -524,7 +524,7 @@ export function BudgetLineChartCard({
 
       <div className="border-border mt-5 border-t pt-4">
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-muted-foreground/80 text-[11px] font-semibold uppercase tracking-wide">
+          <span className="text-muted-foreground/80 text-2xs font-semibold uppercase tracking-wide">
             {t("spending:budgetChart.byCategory")}
           </span>
           <BudgetManageLink monthKey={monthKey} />
@@ -674,7 +674,7 @@ function BudgetCardHeaderActions({
         >
           <Icons.ChevronLeft className="h-3.5 w-3.5" />
         </button>
-        <span className="text-foreground min-w-[74px] px-1 text-center text-[11px] font-medium tabular-nums">
+        <span className="text-foreground text-2xs min-w-18.5 px-1 text-center font-medium tabular-nums">
           {monthLabel}
         </span>
         <button
@@ -780,7 +780,7 @@ function BudgetRing({
       </div>
       <div
         className={cn(
-          "text-[10px] uppercase tracking-wide",
+          "text-2xs uppercase tracking-wide",
           isOver ? "text-destructive" : "text-muted-foreground/70",
         )}
       >

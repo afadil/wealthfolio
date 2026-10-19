@@ -5,7 +5,15 @@ import { AssistantRuntimeProvider, useThreadRuntime } from "@assistant-ui/react"
 import { cn } from "@/lib/utils";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { EmptyPlaceholder } from "@wealthfolio/ui";
+import {
+  buttonVariants,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "@wealthfolio/ui";
 import {
   Sheet,
   SheetContent,
@@ -59,11 +67,9 @@ function ButtonWithTooltip({
 }) {
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <Button {...props}>
-          {children}
-          <span className="sr-only">{tooltip}</span>
-        </Button>
+      <TooltipTrigger render={<Button {...props} />}>
+        {children}
+        <span className="sr-only">{tooltip}</span>
       </TooltipTrigger>
       <TooltipContent side={side}>{tooltip}</TooltipContent>
     </Tooltip>
@@ -78,7 +84,7 @@ function Sidebar({ collapsed }: { collapsed?: boolean }) {
     <aside
       className={cn(
         "bg-muted/30 flex h-full flex-col border-r transition-all duration-200",
-        collapsed ? "w-0 overflow-hidden opacity-0" : "w-[260px] opacity-100",
+        collapsed ? "w-0 overflow-hidden opacity-0" : "w-65 opacity-100",
       )}
     >
       <div className="flex-1 overflow-y-auto p-3">
@@ -95,15 +101,15 @@ function MobileSidebar() {
   const { t } = useTranslation();
   return (
     <Sheet>
-      <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="size-9 shrink-0 md:hidden">
-          <Icons.PanelLeft className="size-4" />
-          <span className="sr-only">{t("ai:shell.toggleMenu")}</span>
-        </Button>
+      <SheetTrigger
+        render={<Button variant="ghost" size="icon" className="size-9 shrink-0 md:hidden" />}
+      >
+        <Icons.PanelLeft className="size-4" />
+        <span className="sr-only">{t("ai:shell.toggleMenu")}</span>
       </SheetTrigger>
       <SheetContent
         side="left"
-        className="flex w-[280px] flex-col gap-0 px-0 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-[max(env(safe-area-inset-top),0.75rem)]"
+        className="w-70 flex flex-col gap-0 px-0 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-[max(env(safe-area-inset-top),0.75rem)]"
       >
         <SheetHeader className="sr-only">
           <SheetTitle>{t("ai:shell.conversations")}</SheetTitle>
@@ -156,18 +162,21 @@ function NoProvidersEmptyState({ className }: { className?: string }) {
   const { t } = useTranslation();
   return (
     <div className={cn("flex h-full w-full items-center justify-center", className)}>
-      <EmptyPlaceholder
-        icon={<Icons.Sparkles className="text-muted-foreground h-10 w-10" />}
-        title={t("ai:empty.noProviderTitle")}
-        description={t("ai:empty.noProviderDescription")}
-      >
-        <Button asChild>
-          <Link to="/settings/ai-providers">
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            {<Icons.Sparkles className="text-muted-foreground size-10" />}
+          </EmptyMedia>
+          <EmptyTitle>{t("ai:empty.noProviderTitle")}</EmptyTitle>
+          <EmptyDescription>{t("ai:empty.noProviderDescription")}</EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          <Link to="/settings/ai-providers" className={buttonVariants()}>
             <Icons.Settings className="mr-2 h-4 w-4" />
             {t("ai:empty.configureProviders")}
           </Link>
-        </Button>
-      </EmptyPlaceholder>
+        </EmptyContent>
+      </Empty>
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { UnconvertedCurrenciesNotice } from "@/pages/income/unconverted-currencies-notice";
+import { Alert, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import type { ToolCallMessagePartProps } from "@assistant-ui/react";
 import { makeAssistantToolUI } from "@assistant-ui/react";
 import {
@@ -314,11 +316,10 @@ export function IncomeContentImpl({ args, result, status }: IncomeContentProps) 
   // Error state
   if (hasError) {
     return (
-      <Card className="border-destructive/30 bg-destructive/5 w-full">
-        <CardContent className="py-4">
-          <p className="text-destructive text-sm font-medium">{t("ai:income.error")}</p>
-        </CardContent>
-      </Card>
+      <Alert variant="destructive">
+        <Icons.AlertCircle />
+        <AlertTitle>{t("ai:income.error")}</AlertTitle>
+      </Alert>
     );
   }
 
@@ -356,7 +357,7 @@ export function IncomeContentImpl({ args, result, status }: IncomeContentProps) 
             <div className="text-muted-foreground mt-1 flex items-center gap-2 text-xs">
               <span>{getPeriodLabel(parsed.period, t)}</span>
               {parsed.yoyGrowth !== undefined && parsed.yoyGrowth !== null && (
-                <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                <Badge variant="outline" className="text-2xs px-1.5 py-0">
                   <span className="mr-0.5">YoY</span>
                   <GainPercent value={parsed.yoyGrowth} />
                 </Badge>
@@ -416,7 +417,7 @@ export function IncomeContentImpl({ args, result, status }: IncomeContentProps) 
                     dataKey="label"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    tick={{ fontSize: "0.6875rem", fill: "var(--muted-foreground)" }}
                     interval={monthlyData.length > 12 ? Math.floor(monthlyData.length / 12) : 0}
                   />
                   <ChartTooltip
@@ -454,27 +455,30 @@ export function IncomeContentImpl({ args, result, status }: IncomeContentProps) 
                     topAssetsTotal > 0 ? (asset.income / topAssetsTotal) * 100 : 0;
                   if (widthPercent < 0.5) return null;
                   return (
-                    <Tooltip key={asset.symbol} delayDuration={100}>
-                      <TooltipTrigger asChild>
-                        <div
-                          className="flex h-full cursor-default items-center justify-center transition-opacity hover:opacity-80"
-                          style={{
-                            width: `${widthPercent}%`,
-                            backgroundColor: `var(--chart-${(index % 9) + 1})`,
-                            minWidth: widthPercent >= 1 ? "4px" : undefined,
-                          }}
-                        >
-                          {widthPercent > 14 && (
-                            <span className="text-background truncate px-1 text-[10px] font-medium">
-                              {asset.symbol}
-                            </span>
-                          )}
-                        </div>
+                    <Tooltip key={asset.symbol}>
+                      <TooltipTrigger
+                        delay={100}
+                        render={
+                          <div
+                            className="flex h-full cursor-default items-center justify-center transition-opacity hover:opacity-80"
+                            style={{
+                              width: `${widthPercent}%`,
+                              backgroundColor: `var(--chart-${(index % 9) + 1})`,
+                              minWidth: widthPercent >= 1 ? "4px" : undefined,
+                            }}
+                          />
+                        }
+                      >
+                        {widthPercent > 14 && (
+                          <span className="text-background text-2xs truncate px-1 font-medium">
+                            {asset.symbol}
+                          </span>
+                        )}
                       </TooltipTrigger>
                       <TooltipContent side="top" align="center">
                         <div className="text-center">
                           <div className="font-medium">{asset.symbol}</div>
-                          <div className="text-muted-foreground text-xs">
+                          <div className="text-background/70 text-xs">
                             {formatValue(asset.income)} (
                             {formatting.formatPercent(asset.percentage / 100)})
                           </div>

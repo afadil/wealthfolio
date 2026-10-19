@@ -125,7 +125,7 @@ export function AssetsTable({
                 <div className="group-hover:text-primary flex items-center gap-1.5 font-semibold leading-tight transition-colors">
                   {displaySymbol}
                   {parsedOption ? (
-                    <Badge variant="secondary" className="text-[10px]">
+                    <Badge variant="secondary" className="text-2xs">
                       {t("asset:table.option")}
                     </Badge>
                   ) : null}
@@ -160,7 +160,7 @@ export function AssetsTable({
               </div>
               {isManual ? (
                 <div>
-                  <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                  <Badge variant="outline" className="text-2xs px-1.5 py-0">
                     {t("asset:table.manual")}
                   </Badge>
                 </div>
@@ -242,12 +242,14 @@ export function AssetsTable({
               <div className="text-right">
                 <div className="flex items-center justify-end gap-1.5">
                   <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Icons.AlertTriangle
-                        className="h-3.5 w-3.5 text-amber-500"
-                        aria-label={noQuoteReason}
-                      />
-                    </TooltipTrigger>
+                    <TooltipTrigger
+                      render={
+                        <Icons.AlertTriangle
+                          className="text-warning h-3.5 w-3.5"
+                          aria-label={noQuoteReason}
+                        />
+                      }
+                    />
                     <TooltipContent>{noQuoteReason}</TooltipContent>
                   </Tooltip>
                   <span className="text-muted-foreground text-sm">
@@ -263,12 +265,14 @@ export function AssetsTable({
               <div className="flex items-center justify-end gap-1.5">
                 {stale ? (
                   <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Icons.AlertTriangle
-                        className="h-3.5 w-3.5 text-amber-500"
-                        aria-label={t("asset:table.quote_behind_aria")}
-                      />
-                    </TooltipTrigger>
+                    <TooltipTrigger
+                      render={
+                        <Icons.AlertTriangle
+                          className="text-warning h-3.5 w-3.5"
+                          aria-label={t("asset:table.quote_behind_aria")}
+                        />
+                      }
+                    />
                     <TooltipContent>{t("asset:table.quote_behind_tooltip")}</TooltipContent>
                   </Tooltip>
                 ) : null}
@@ -279,7 +283,7 @@ export function AssetsTable({
                   )}
                 </span>
               </div>
-              <div className="text-muted-foreground text-[11px]">
+              <div className="text-muted-foreground text-2xs">
                 {formatDate(quote.timestamp, dateFormatting)}
               </div>
             </div>
@@ -296,14 +300,16 @@ export function AssetsTable({
           return (
             <div className="flex justify-end">
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="hover:bg-muted text-muted-foreground inline-flex h-9 w-9 items-center justify-center rounded-md border transition"
-                    aria-label={t("asset:table.open_actions")}
-                  >
-                    <Icons.MoreVertical className="h-4 w-4" />
-                  </button>
+                <DropdownMenuTrigger
+                  render={
+                    <button
+                      type="button"
+                      className="hover:bg-muted text-muted-foreground inline-flex h-9 w-9 items-center justify-center rounded-md border transition"
+                      aria-label={t("asset:table.open_actions")}
+                    />
+                  }
+                >
+                  <Icons.MoreVertical className="h-4 w-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => onEdit(asset)}>
@@ -325,7 +331,7 @@ export function AssetsTable({
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
-                    onSelect={() => onDelete(asset)}
+                    onClick={() => onDelete(asset)}
                   >
                     {t("asset:table.delete")}
                   </DropdownMenuItem>

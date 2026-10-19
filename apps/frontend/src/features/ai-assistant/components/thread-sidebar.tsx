@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { isKeyboardEventComposing, useDateFormatting } from "@wealthfolio/ui";
+import { isKeyboardEventComposing, useDateFormatting, Spinner } from "@wealthfolio/ui";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -197,16 +197,12 @@ export function ThreadSidebar({
           {thread.tags && thread.tags.length > 0 && (
             <div className="flex flex-wrap gap-0.5">
               {thread.tags.slice(0, 2).map((tag) => (
-                <Badge
-                  key={tag}
-                  variant="outline"
-                  className="h-4 px-1 py-0 text-[10px] leading-none"
-                >
+                <Badge key={tag} variant="outline" className="text-2xs h-4 px-1 py-0 leading-none">
                   {tag}
                 </Badge>
               ))}
               {thread.tags.length > 2 && (
-                <span className="text-muted-foreground text-[10px]">+{thread.tags.length - 2}</span>
+                <span className="text-muted-foreground text-2xs">+{thread.tags.length - 2}</span>
               )}
             </div>
           )}
@@ -214,15 +210,17 @@ export function ThreadSidebar({
       </button>
 
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-          >
-            <Icons.MoreVertical className="h-4 w-4" />
-            <span className="sr-only">{t("ai:threadSidebar.threadOptions")}</span>
-          </Button>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+            />
+          }
+        >
+          <Icons.MoreVertical className="h-4 w-4" />
+          <span className="sr-only">{t("ai:threadSidebar.threadOptions")}</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => handleOpenRenameDialog(thread)}>
@@ -305,7 +303,7 @@ export function ThreadSidebar({
       <div className="flex-1 overflow-y-auto p-2">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Icons.Spinner className="text-muted-foreground h-6 w-6 animate-spin" />
+            <Spinner className="text-muted-foreground h-6 w-6" />
           </div>
         ) : threads.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">

@@ -210,7 +210,11 @@ export function ClientSetup({ serverUrl, token }: { serverUrl: string; token?: s
       />
       <div className="flex min-h-7 items-center gap-2">
         {tab.options.length > 1 && (
-          <Select value={option.id} onValueChange={setOptionId}>
+          <Select
+            value={option.id}
+            items={tab.options.map((entry) => ({ value: entry.id, label: labelOf(entry) }))}
+            onValueChange={(value) => setOptionId(value ?? undefined)}
+          >
             <SelectTrigger
               aria-label={t("settings:agentAccess.client_option_aria")}
               className="bg-muted/60 !h-7 w-auto shrink-0 gap-1 border-0 px-2 py-0 text-xs font-medium shadow-none"

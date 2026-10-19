@@ -177,7 +177,7 @@ export function PatCreateDialog({
           className={cn(
             "grid h-4 w-4 shrink-0 place-items-center transition-colors",
             checked
-              ? "bg-success rounded-[5px] text-white"
+              ? "bg-success rounded-[0.3125rem] text-white"
               : "border-muted-foreground/30 rounded-full border-2",
           )}
           aria-hidden
@@ -261,7 +261,7 @@ export function PatCreateDialog({
             {/* Right: live capability summary + action */}
             <aside className="bg-muted/30 flex flex-col border-t md:max-h-[85vh] md:border-l md:border-t-0">
               <div className="flex-1 space-y-3 overflow-y-auto px-5 py-6">
-                <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wider">
+                <p className="text-muted-foreground text-2xs font-medium uppercase tracking-wider">
                   {t("settings:agentAccess.dialog_capabilities_title")}
                 </p>
                 {selectedScopes.length === 0 ? (

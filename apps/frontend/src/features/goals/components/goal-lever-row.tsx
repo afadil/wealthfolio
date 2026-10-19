@@ -149,7 +149,7 @@ export function GoalLeverRow({
                   event.currentTarget.blur();
                 }
               }}
-              className="text-foreground dark:bg-input/0 h-auto min-w-0 flex-1 rounded-none border-0 bg-transparent p-0 text-right text-sm tabular-nums shadow-none outline-none ring-0 focus-visible:ring-0"
+              className="text-foreground dark:bg-input/0 h-auto min-w-0 flex-1 rounded-none border-0 bg-transparent p-0 text-right text-sm tabular-nums shadow-none outline-none ring-0 focus-visible:outline-none"
             />
           ) : (
             <input
@@ -196,7 +196,7 @@ export function GoalLeverRow({
         style={{ ["--lever-pct" as string]: `${pct}%` }}
       />
       {warning && (
-        <p className="mt-2 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-xs leading-snug text-amber-800 dark:text-amber-300">
+        <p className="bg-warning-subtle text-warning-subtle-foreground mt-2 rounded-md px-2.5 py-1.5 text-xs leading-snug">
           {warning}
         </p>
       )}

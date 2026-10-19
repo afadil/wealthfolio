@@ -12,9 +12,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
-  EmptyPlaceholder,
   Icons,
   Skeleton,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
 } from "@wealthfolio/ui";
 
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
@@ -118,15 +123,15 @@ export default function SpendingEventsPage() {
           <Skeleton className="h-12" />
         </div>
       ) : eventsErrored || typesErrored ? (
-        <EmptyPlaceholder>
-          <EmptyPlaceholder.Icon name="AlertTriangle" />
-          <EmptyPlaceholder.Title>
-            {t("settings:spending.events.error_title")}
-          </EmptyPlaceholder.Title>
-          <EmptyPlaceholder.Description>
-            {t("settings:spending.events.error_description")}
-          </EmptyPlaceholder.Description>
-        </EmptyPlaceholder>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Icons.AlertTriangle />
+            </EmptyMedia>
+            <EmptyTitle>{t("settings:spending.events.error_title")}</EmptyTitle>
+            <EmptyDescription>{t("settings:spending.events.error_description")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : eventTypes.length > 0 ? (
         <div className="divide-border divide-y rounded-md border">
           {eventTypes.map((type) => {
@@ -163,19 +168,21 @@ export default function SpendingEventsPage() {
           })}
         </div>
       ) : (
-        <EmptyPlaceholder>
-          <EmptyPlaceholder.Icon name="Calendar" />
-          <EmptyPlaceholder.Title>
-            {t("settings:spending.events.empty_title")}
-          </EmptyPlaceholder.Title>
-          <EmptyPlaceholder.Description>
-            {t("settings:spending.events.empty_description")}
-          </EmptyPlaceholder.Description>
-          <Button onClick={handleAddEventType}>
-            <Icons.Plus className="mr-2 h-4 w-4" />
-            {t("settings:spending.events.add_type")}
-          </Button>
-        </EmptyPlaceholder>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Icons.Calendar />
+            </EmptyMedia>
+            <EmptyTitle>{t("settings:spending.events.empty_title")}</EmptyTitle>
+            <EmptyDescription>{t("settings:spending.events.empty_description")}</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button onClick={handleAddEventType}>
+              <Icons.Plus className="mr-2 h-4 w-4" />
+              {t("settings:spending.events.add_type")}
+            </Button>
+          </EmptyContent>
+        </Empty>
       )}
     </div>
   );
@@ -316,10 +323,7 @@ function EventTypeRow({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common:cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={onDeleteEventType}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
+            <AlertDialogAction onClick={onDeleteEventType} variant="destructive">
               {t("common:delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -433,10 +437,7 @@ function EventRow({
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>{t("common:cancel")}</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={onDelete}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
+              <AlertDialogAction onClick={onDelete} variant="destructive">
                 {t("common:delete")}
               </AlertDialogAction>
             </AlertDialogFooter>

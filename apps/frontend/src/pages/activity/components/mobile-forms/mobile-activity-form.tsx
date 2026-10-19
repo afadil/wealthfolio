@@ -39,6 +39,7 @@ import { showValidationToast, type AccountSelectOption } from "../forms/fields";
 import { newActivitySchema, type NewActivityFormValues } from "../forms/schemas";
 import { MobileActivitySteps } from "./mobile-activity-steps";
 import { getMobileActivityAssetId, hasStoredCustomTradeAmount } from "./mobile-activity-utils";
+import { Spinner } from "@wealthfolio/ui";
 
 interface MobileActivityFormProps {
   accounts: AccountSelectOption[];
@@ -650,6 +651,7 @@ export function MobileActivityForm({
           }
 
           await saveInternalTransferPairMutation.mutateAsync({
+            editedActivityId: id,
             transferOutId: id ? transferOutId : undefined,
             transferInId: id ? transferInId : undefined,
             fromAccountId: submitData.accountId,
@@ -1044,7 +1046,7 @@ export function MobileActivityForm({
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                 ) : (
                   <Icons.Check className="mr-2 h-4 w-4" />
                 )}

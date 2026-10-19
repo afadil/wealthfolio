@@ -6,12 +6,12 @@ import type { LoanInterestMethod, LoanPaymentFrequency } from "../lib/loan-event
 import {
   Button,
   DatePickerInput,
-  Icons,
   MoneyInput,
   QuantityInput,
   ResponsiveSelect,
   useAmountFormatting,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { buttonVariants } from "@wealthfolio/ui/components/ui/button-variants";
@@ -386,7 +386,7 @@ export function RenewLoanDialog({
             {t("common:cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={isSubmitting || blocked}>
-            {isSubmitting && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+            {isSubmitting && <Spinner className="mr-2 h-4 w-4" />}
             {title}
           </Button>
         </LoanSheetFooter>

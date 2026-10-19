@@ -493,7 +493,7 @@ function HoldingsContentImpl({ args, result, status }: HoldingsContentProps) {
           </div>
         </CardHeader>
         <CardContent className="px-0 pb-0">
-          <div className="max-h-[320px] overflow-y-auto">
+          <div className="max-h-80 overflow-y-auto">
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
@@ -611,7 +611,7 @@ function HoldingsContentImpl({ args, result, status }: HoldingsContentProps) {
           )}
         </div>
       </div>
-      <div className="h-[240px] px-2">
+      <div className="h-60 px-2">
         <ResponsiveContainer width="100%" height="100%">
           <Treemap
             data={treemapData}
@@ -679,7 +679,7 @@ function HoldingsContentImpl({ args, result, status }: HoldingsContentProps) {
             </div>
           </div>
         )}
-        <div className="max-h-[320px] overflow-y-auto">
+        <div className="max-h-80 overflow-y-auto">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -711,7 +711,7 @@ function HoldingsContentImpl({ args, result, status }: HoldingsContentProps) {
                       <div>
                         <div className="font-medium">{holding.symbol}</div>
                         {holding.name && (
-                          <div className="text-muted-foreground max-w-[120px] truncate text-[10px] sm:max-w-[200px]">
+                          <div className="text-muted-foreground text-2xs max-w-30 sm:max-w-50 truncate">
                             {holding.name}
                           </div>
                         )}
@@ -719,7 +719,7 @@ function HoldingsContentImpl({ args, result, status }: HoldingsContentProps) {
                     </TableCell>
                     <TableCell className="py-2 text-right font-medium tabular-nums">
                       <div>{formatValue(holding.marketValueBase)}</div>
-                      <div className="text-muted-foreground text-[10px]">{holding.currency}</div>
+                      <div className="text-muted-foreground text-2xs">{holding.currency}</div>
                     </TableCell>
                     <TableCell className="hidden py-2 text-right tabular-nums sm:table-cell">
                       {(holding.weight * 100).toFixed(1)}%

@@ -1,4 +1,5 @@
 import type { BaselinePeriod } from "../../../hooks/use-baseline-pace";
+import { badgeVariants } from "@wealthfolio/ui";
 /**
  * Rich, focused panel that renders the currently-selected event:
  *   header  → stat block → takeaway → DAY BY DAY + WHAT DROVE IT →
@@ -186,67 +187,75 @@ export const EventDetailPanel: FC<EventDetailPanelProps> = ({
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label={t("spending:eventDetail.previousEvent")}
-                  className="h-7 w-7"
-                  onClick={() => prevEvent && onSelect(prevEvent.eventId)}
-                  disabled={!canNav}
-                >
-                  <Icons.ChevronLeft className="h-4 w-4" />
-                </Button>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label={t("spending:eventDetail.previousEvent")}
+                    className="h-7 w-7"
+                    onClick={() => prevEvent && onSelect(prevEvent.eventId)}
+                    disabled={!canNav}
+                  />
+                }
+              >
+                <Icons.ChevronLeft className="h-4 w-4" />
               </TooltipTrigger>
               <TooltipContent>{t("spending:eventDetail.previousEvent")}</TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label={t("spending:eventDetail.nextEvent")}
-                  className="h-7 w-7"
-                  onClick={() => nextEvent && onSelect(nextEvent.eventId)}
-                  disabled={!canNav}
-                >
-                  <Icons.ChevronRight className="h-4 w-4" />
-                </Button>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label={t("spending:eventDetail.nextEvent")}
+                    className="h-7 w-7"
+                    onClick={() => nextEvent && onSelect(nextEvent.eventId)}
+                    disabled={!canNav}
+                  />
+                }
+              >
+                <Icons.ChevronRight className="h-4 w-4" />
               </TooltipTrigger>
               <TooltipContent>{t("spending:eventDetail.nextEvent")}</TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label={t("spending:eventDetail.editEvent")}
-                  className="h-7 w-7"
-                  onClick={handleEdit}
-                  disabled={!fullEvent}
-                >
-                  <Icons.Pencil className="h-3.5 w-3.5" />
-                </Button>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label={t("spending:eventDetail.editEvent")}
+                    className="h-7 w-7"
+                    onClick={handleEdit}
+                    disabled={!fullEvent}
+                  />
+                }
+              >
+                <Icons.Pencil className="h-3.5 w-3.5" />
               </TooltipTrigger>
               <TooltipContent>{t("spending:eventDetail.editEvent")}</TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label={t("spending:eventDetail.tagTransactionsInPeriod")}
-                  className="h-7 w-7"
-                  onClick={handleViewTransactions}
-                >
-                  <Icons.Activity className="h-3.5 w-3.5" />
-                </Button>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label={t("spending:eventDetail.tagTransactionsInPeriod")}
+                    className="h-7 w-7"
+                    onClick={handleViewTransactions}
+                  />
+                }
+              >
+                <Icons.Activity className="h-3.5 w-3.5" />
               </TooltipTrigger>
               <TooltipContent>{t("spending:eventDetail.tagTransactions")}</TooltipContent>
             </Tooltip>
           </div>
         </div>
-        <div className="text-muted-foreground/80 mt-1 text-[11px]">
+        <div className="text-muted-foreground/80 text-2xs mt-1">
           {formatRange(startDate, endDate, dateFormatting)} ·{" "}
           {t("spending:eventDetail.daysCount", { count: days })} ·{" "}
           {t("spending:eventDetail.transactionCount", { count: event.transactionCount })}
@@ -255,7 +264,7 @@ export const EventDetailPanel: FC<EventDetailPanelProps> = ({
       </div>
 
       {outOfRange.length > 0 && (
-        <div className="bg-warning/10 border-warning/40 mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-[11px]">
+        <div className="bg-warning/10 border-warning/40 text-2xs mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border px-2.5 py-1.5">
           <span className="text-foreground/90">
             {t("spending:eventDetail.taggedOutside", { count: outOfRange.length })}
             <span className="text-muted-foreground/80 ml-1 tabular-nums">
@@ -270,7 +279,7 @@ export const EventDetailPanel: FC<EventDetailPanelProps> = ({
             type="button"
             onClick={expandWindow}
             disabled={update.isPending}
-            className="text-foreground hover:bg-warning/15 rounded px-2 py-0.5 text-[11px] font-medium underline-offset-2 hover:underline disabled:opacity-50"
+            className="text-foreground hover:bg-warning-subtle text-2xs rounded px-2 py-0.5 font-medium underline-offset-2 hover:underline disabled:opacity-50"
           >
             {update.isPending
               ? t("spending:eventDetail.expanding")
@@ -285,7 +294,7 @@ export const EventDetailPanel: FC<EventDetailPanelProps> = ({
           <div className="text-foreground text-sm font-semibold tabular-nums tracking-tight md:text-base">
             <PrivacyAmount value={event.totalSpending} currency={currency} />
           </div>
-          <div className="text-muted-foreground/80 mt-1 text-[10px]">
+          <div className="text-muted-foreground/80 text-2xs mt-1">
             {t("spending:eventDetail.acrossTransactions", { count: event.transactionCount })}
           </div>
         </StatCell>
@@ -304,7 +313,7 @@ export const EventDetailPanel: FC<EventDetailPanelProps> = ({
             {lift >= 0 ? "+" : "−"}
             <PrivacyAmount value={Math.abs(lift)} currency={currency} />
           </div>
-          <div className="text-muted-foreground/80 mt-1 text-[10px]">
+          <div className="text-muted-foreground/80 text-2xs mt-1">
             {t("spending:eventDetail.vsLabel")}{" "}
             <PrivacyAmount value={Math.max(0, expected)} currency={currency} />{" "}
             {t("spending:eventDetail.expected")}
@@ -319,7 +328,7 @@ export const EventDetailPanel: FC<EventDetailPanelProps> = ({
           <div className="text-foreground text-sm font-semibold tabular-nums tracking-tight md:text-base">
             <PrivacyAmount value={dailyDuring} currency={currency} />
           </div>
-          <div className="text-muted-foreground/80 mt-1 text-[10px]">
+          <div className="text-muted-foreground/80 text-2xs mt-1">
             {baseline > 0
               ? t("spending:eventDetail.dailyDeltaVs", {
                   sign: dailyDeltaPct >= 0 ? "+" : "−",
@@ -333,15 +342,15 @@ export const EventDetailPanel: FC<EventDetailPanelProps> = ({
           <div className="text-foreground text-sm font-semibold tabular-nums tracking-tight md:text-base">
             {peak ? <PrivacyAmount value={peak.amount} currency={currency} /> : "—"}
           </div>
-          <div className="text-muted-foreground/80 mt-1 text-[10px]">
+          <div className="text-muted-foreground/80 text-2xs mt-1">
             {peak ? formatPeakDay(peak.date, dateFormatting) : ""}
           </div>
         </StatCell>
       </div>
 
       {/* TAKEAWAY */}
-      <p className="text-foreground/90 mt-6 text-[13px] leading-relaxed">
-        <span className="text-primary mr-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
+      <p className="text-foreground/90 mt-6 text-sm leading-relaxed">
+        <span className="text-primary text-2xs mr-2 font-semibold uppercase tracking-[0.12em]">
           {t("spending:eventDetail.takeaway")}
         </span>
         {caption}
@@ -412,13 +421,13 @@ export const EventDetailPanel: FC<EventDetailPanelProps> = ({
                         className="inline-block h-2 w-2 shrink-0 rounded-full"
                         style={{ background: c.color }}
                       />
-                      <span className="text-foreground/90 min-w-0 flex-1 truncate text-[12px]">
+                      <span className="text-foreground/90 min-w-0 flex-1 truncate text-xs">
                         {c.name}
                       </span>
-                      <span className="text-muted-foreground/80 text-[11px] tabular-nums">
+                      <span className="text-muted-foreground/80 text-2xs tabular-nums">
                         {numberFormatting.formatPercent(pct / 100, { digits: 1 })}
                       </span>
-                      <span className="text-foreground/90 text-right text-[12px] font-medium tabular-nums">
+                      <span className="text-foreground/90 text-right text-xs font-medium tabular-nums">
                         <PrivacyAmount value={c.amount} currency={currency} />
                       </span>
                     </div>
@@ -481,7 +490,7 @@ export const EventDetailPanel: FC<EventDetailPanelProps> = ({
               type="button"
               onClick={() => onSelect(ev.eventId)}
               className={cn(
-                "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] transition-colors",
+                "text-2xs inline-flex items-center gap-2 rounded-full border px-3 py-1 transition-colors",
                 isSel
                   ? "text-foreground"
                   : "text-muted-foreground hover:bg-muted/30 hover:text-foreground",
@@ -604,7 +613,7 @@ function DailyBars({
           ];
         })}
       </div>
-      <div className="text-muted-foreground/80 mt-2 flex items-center justify-between text-[10px] tracking-wide">
+      <div className="text-muted-foreground/80 text-2xs mt-2 flex items-center justify-between tracking-wide">
         <span className="tabular-nums">{formatPeakDay(chartStartDate, dateFormatting)}</span>
         <span className="text-muted-foreground/60">
           {t("spending:eventDetail.daysCount", { count: eventDays })}
@@ -668,8 +677,8 @@ function RhythmCard({
         {typeof hangoverPct === "number" && Math.abs(hangoverPct) > 5 && (
           <span
             className={cn(
-              "rounded-sm px-1 py-0.5 text-[9px] tracking-wider",
-              hangoverPct > 0 ? "bg-destructive/15 text-destructive" : "bg-success/15 text-success",
+              badgeVariants({ variant: hangoverPct > 0 ? "destructive-subtle" : "success-subtle" }),
+              "text-2xs rounded-sm px-1 font-normal tracking-wider",
             )}
           >
             {hangoverPct > 0
@@ -679,7 +688,7 @@ function RhythmCard({
         )}
       </div>
       <div className="mt-1 flex items-center justify-between gap-2">
-        <span className="text-foreground text-[13px] font-medium tabular-nums">
+        <span className="text-foreground text-sm font-medium tabular-nums">
           {series.length === 0 ? (
             "—"
           ) : (

@@ -32,6 +32,7 @@ import {
   SwipableView,
   useDateFormatting,
   type FormattingApi,
+  Spinner,
 } from "@wealthfolio/ui";
 import {
   AlertDialog,
@@ -68,6 +69,7 @@ import { useQuoteMutations } from "./hooks/use-quote-mutations";
 import { QuoteHistoryDataGrid } from "./quote-history-data-grid";
 import { ResetProviderHistoryDialog } from "./reset-provider-history-dialog";
 import { RefreshQuotesConfirmDialog } from "./refresh-quotes-confirm-dialog";
+import { statusSurfaceVariants } from "@wealthfolio/ui/components/ui/status-surface";
 
 // Alternative asset kinds that should use ValueHistoryDataGrid
 const ALTERNATIVE_ASSET_KINDS: AssetKind[] = [
@@ -236,10 +238,10 @@ function AssetHealthBanner({
           };
 
   return (
-    <div className="border-warning/30 bg-warning/10 mb-4 rounded-md border px-3 py-3">
+    <div className={cn(statusSurfaceVariants({ status: "warning" }), "mb-4 rounded-md px-3 py-3")}>
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex min-w-0 items-start gap-2">
-          <Icons.AlertTriangle className="text-warning mt-0.5 h-4 w-4 shrink-0" />
+          <Icons.AlertTriangle className="text-warning-subtle-foreground mt-0.5 h-4 w-4 shrink-0" />
           <div className="min-w-0 space-y-1">
             <p className="text-sm font-medium">{copy.title}</p>
             <p className="text-muted-foreground text-sm leading-relaxed">{copy.description}</p>
@@ -255,7 +257,7 @@ function AssetHealthBanner({
               onClick={onRefreshPrices}
             >
               {isRefreshingPrices ? (
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
               ) : (
                 <Icons.Refresh className="mr-2 h-4 w-4" />
               )}
@@ -1120,7 +1122,7 @@ export const AssetProfilePage = () => {
     return (
       <Page>
         <PageContent>
-          <Icons.Spinner className="h-6 w-6 animate-spin" />
+          <Spinner className="h-6 w-6" />
         </PageContent>
       </Page>
     ); // Show loading spinner
@@ -1227,7 +1229,7 @@ export const AssetProfilePage = () => {
               {/* Type badge */}
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="secondary" className="gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-blue-500" />
+                  <span className="bg-info h-2 w-2 rounded-full" />
                   {t("asset:profile.fx_rate")}
                 </Badge>
               </div>
@@ -1290,13 +1292,15 @@ export const AssetProfilePage = () => {
         <PageContent>
           <p>{t("asset:profile.could_not_load")}</p>
           {isHoldingError && (
-            <p className="text-sm text-red-500">{t("asset:profile.holding_fetch_error")}</p>
+            <p className="text-destructive text-sm">{t("asset:profile.holding_fetch_error")}</p>
           )}
           {isQuotesError && (
-            <p className="text-sm text-red-500">{t("asset:profile.quote_fetch_error")}</p>
+            <p className="text-destructive text-sm">{t("asset:profile.quote_fetch_error")}</p>
           )}
           {isAssetProfileError && (
-            <p className="text-sm text-red-500">{t("asset:profile.asset_profile_fetch_error")}</p>
+            <p className="text-destructive text-sm">
+              {t("asset:profile.asset_profile_fetch_error")}
+            </p>
           )}
         </PageContent>
       </Page>
@@ -1580,25 +1584,27 @@ export const AssetProfilePage = () => {
                   <span className="flex items-center">
                     <span>{displayedSymbol}</span>
                     <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className={cn(
-                            "ml-1 h-5 w-5 shrink-0 overflow-hidden rounded-sm p-0 transition-[width,margin,opacity]",
-                            "md:ml-0 md:w-0 md:opacity-0 md:focus-visible:ml-1 md:focus-visible:w-5 md:focus-visible:opacity-100 md:group-hover/asset-header:ml-1 md:group-hover/asset-header:w-5 md:group-hover/asset-header:opacity-100",
-                            symbolCopied && "opacity-100 md:ml-1 md:w-5 md:opacity-100",
-                          )}
-                          aria-label={`${t("ui:dataGrid.copy")} ${displayedSymbol}`}
-                          onClick={() => void handleCopySymbol()}
-                        >
-                          {symbolCopied ? (
-                            <Icons.Check className="text-success size-3.5" />
-                          ) : (
-                            <Icons.Copy className="size-3.5" />
-                          )}
-                        </Button>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className={cn(
+                              "ml-1 h-5 w-5 shrink-0 overflow-hidden rounded-sm p-0 transition-[width,margin,opacity]",
+                              "md:ml-0 md:w-0 md:opacity-0 md:focus-visible:ml-1 md:focus-visible:w-5 md:focus-visible:opacity-100 md:group-hover/asset-header:ml-1 md:group-hover/asset-header:w-5 md:group-hover/asset-header:opacity-100",
+                              symbolCopied && "opacity-100 md:ml-1 md:w-5 md:opacity-100",
+                            )}
+                            aria-label={`${t("ui:dataGrid.copy")} ${displayedSymbol}`}
+                            onClick={() => void handleCopySymbol()}
+                          />
+                        }
+                      >
+                        {symbolCopied ? (
+                          <Icons.Check className="text-success size-3.5" />
+                        ) : (
+                          <Icons.Copy className="size-3.5" />
+                        )}
                       </TooltipTrigger>
                       <TooltipContent side="bottom">{t("ui:dataGrid.copy")}</TooltipContent>
                     </Tooltip>

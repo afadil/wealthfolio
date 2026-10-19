@@ -242,11 +242,11 @@ export function AssetsTableMobile({
                         <div className="flex items-center gap-2">
                           <p className="truncate font-semibold">{displaySymbol}</p>
                           {parsedOption ? (
-                            <Badge variant="secondary" className="text-[10px]">
+                            <Badge variant="secondary" className="text-2xs">
                               {t("asset:mobileTable.option")}
                             </Badge>
                           ) : null}
-                          <Badge variant="secondary" className="text-[10px] uppercase">
+                          <Badge variant="secondary" className="text-2xs uppercase">
                             {asset.quoteCcy}
                           </Badge>
                         </div>
@@ -273,12 +273,14 @@ export function AssetsTableMobile({
                             )}
                             {isStaleQuote(snapshot, asset) ? (
                               <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Icons.AlertTriangle
-                                    className="text-destructive h-3.5 w-3.5"
-                                    aria-label={t("asset:mobileTable.quote_behind_aria")}
-                                  />
-                                </TooltipTrigger>
+                                <TooltipTrigger
+                                  render={
+                                    <Icons.AlertTriangle
+                                      className="text-destructive h-3.5 w-3.5"
+                                      aria-label={t("asset:mobileTable.quote_behind_aria")}
+                                    />
+                                  }
+                                />
                                 <TooltipContent>
                                   {t("asset:mobileTable.quote_behind_tooltip")}
                                 </TooltipContent>
@@ -297,12 +299,14 @@ export function AssetsTableMobile({
                     return (
                       <div className="flex items-center justify-end gap-1">
                         <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Icons.AlertTriangle
-                              className="h-3.5 w-3.5 text-amber-500"
-                              aria-label={noQuoteReason}
-                            />
-                          </TooltipTrigger>
+                          <TooltipTrigger
+                            render={
+                              <Icons.AlertTriangle
+                                className="text-warning h-3.5 w-3.5"
+                                aria-label={noQuoteReason}
+                              />
+                            }
+                          />
                           <TooltipContent>{noQuoteReason}</TooltipContent>
                         </Tooltip>
                         <span className="text-muted-foreground text-xs">
@@ -314,14 +318,16 @@ export function AssetsTableMobile({
                 </div>
 
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="hover:bg-muted text-muted-foreground inline-flex h-9 w-9 items-center justify-center rounded-md border transition"
-                      aria-label={t("asset:mobileTable.open_actions")}
-                    >
-                      <Icons.MoreVertical className="h-4 w-4" />
-                    </button>
+                  <DropdownMenuTrigger
+                    render={
+                      <button
+                        type="button"
+                        className="hover:bg-muted text-muted-foreground inline-flex h-9 w-9 items-center justify-center rounded-md border transition"
+                        aria-label={t("asset:mobileTable.open_actions")}
+                      />
+                    }
+                  >
+                    <Icons.MoreVertical className="h-4 w-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
@@ -345,7 +351,7 @@ export function AssetsTableMobile({
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-destructive focus:text-destructive"
-                      onSelect={() => onDelete(asset)}
+                      onClick={() => onDelete(asset)}
                     >
                       {t("asset:mobileTable.delete")}
                     </DropdownMenuItem>
@@ -633,10 +639,8 @@ export function AssetsTableMobile({
                 {t("asset:mobileTable.reset_all")}
               </Button>
             )}
-            <SheetClose asChild>
-              <Button variant="default" className="flex-1">
-                {t("asset:mobileTable.apply")}
-              </Button>
+            <SheetClose render={<Button variant="default" className="flex-1" />}>
+              {t("asset:mobileTable.apply")}
             </SheetClose>
           </SheetFooter>
         </SheetContent>

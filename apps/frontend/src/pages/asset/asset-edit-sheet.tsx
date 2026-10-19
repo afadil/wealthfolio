@@ -10,8 +10,6 @@ import type { Asset, Quote } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Alert,
-  AlertDescription,
   CurrencyInput,
   DatePickerInput,
   Label,
@@ -30,6 +28,7 @@ import {
   Switch,
   useAmountFormatting,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -211,12 +210,10 @@ function PricingModeToggle({
           </p>
         </div>
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <button type="button" className="shrink-0">
-              <Switch checked={isAutomatic} />
-            </button>
+          <PopoverTrigger render={<button type="button" className="shrink-0" />}>
+            <Switch checked={isAutomatic} />
           </PopoverTrigger>
-          <PopoverContent className="w-[360px] p-4" align="end">
+          <PopoverContent className="w-90 p-4" align="end">
             <div className="space-y-4">
               <h4 className="font-medium">
                 {isAutomatic
@@ -228,7 +225,7 @@ function PricingModeToggle({
                   <p className="text-muted-foreground text-sm">
                     {t("asset:editSheet.disable_automatic_description")}
                   </p>
-                  <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                  <p className="text-warning text-sm font-medium">
                     {t("asset:editSheet.disable_automatic_warning")}
                   </p>
                 </>
@@ -237,7 +234,7 @@ function PricingModeToggle({
                   <p className="text-muted-foreground text-sm">
                     {t("asset:editSheet.enable_automatic_description")}
                   </p>
-                  <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                  <p className="text-warning text-sm font-medium">
                     {t("asset:editSheet.enable_automatic_warning")}
                   </p>
                 </>
@@ -422,17 +419,17 @@ function SymbolMappingRow({
                   <span className="absolute right-2 flex items-center">
                     {validationStatus === "loading" && (
                       <span data-testid="symbol-validation-loading">
-                        <Icons.Spinner className="text-muted-foreground h-3.5 w-3.5 animate-spin" />
+                        <Spinner className="text-muted-foreground h-3.5 w-3.5" />
                       </span>
                     )}
                     {validationStatus === "valid" && (
                       <span data-testid="symbol-validation-valid">
-                        <Icons.Check className="h-3.5 w-3.5 text-green-500" />
+                        <Icons.Check className="text-success h-3.5 w-3.5" />
                       </span>
                     )}
                     {validationStatus === "invalid" && (
                       <span data-testid="symbol-validation-invalid">
-                        <Icons.AlertCircle className="h-3.5 w-3.5 text-red-500" />
+                        <Icons.AlertCircle className="text-destructive h-3.5 w-3.5" />
                       </span>
                     )}
                   </span>
@@ -951,6 +948,7 @@ export function AssetEditSheet({
                             <FormItem>
                               <FormLabel>{t("asset:editSheet.instrument_type")}</FormLabel>
                               <Select
+                                items={EDIT_INSTRUMENT_TYPE_OPTIONS}
                                 onValueChange={field.onChange}
                                 value={field.value ?? ""}
                                 disabled={isSystemManagedKind}
@@ -1050,7 +1048,14 @@ export function AssetEditSheet({
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>{t("asset:editSheet.coupon_frequency")}</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                                <Select
+                                  items={COUPON_FREQUENCIES.map((frequency) => ({
+                                    value: frequency,
+                                    label: t(`asset:editSheet.couponFrequency.${frequency}`),
+                                  }))}
+                                  onValueChange={field.onChange}
+                                  value={field.value ?? ""}
+                                >
                                   <FormControl>
                                     <SelectTrigger className="h-11">
                                       <SelectValue
@@ -1108,8 +1113,7 @@ export function AssetEditSheet({
                         <Button type="submit" disabled={isSaving}>
                           {isSaving ? (
                             <span className="flex items-center gap-2">
-                              <Icons.Spinner className="h-4 w-4 animate-spin" />{" "}
-                              {t("asset:editSheet.saving_short")}
+                              <Spinner className="h-4 w-4" /> {t("asset:editSheet.saving_short")}
                             </span>
                           ) : (
                             t("asset:editSheet.save_changes_lower")
@@ -1200,12 +1204,13 @@ export function AssetEditSheet({
                           </div>
                         </div>
                       ) : (
-                        <Alert variant="destructive" className="border-0 bg-transparent p-0">
-                          <Icons.AlertCircle className="h-4 w-4" />
-                          <AlertDescription>
-                            {t("asset:editSheet.price_fetch_error")}
-                          </AlertDescription>
-                        </Alert>
+                        <p
+                          role="alert"
+                          className="text-destructive flex items-center gap-2 text-sm"
+                        >
+                          <Icons.AlertCircle className="h-4 w-4 shrink-0" />
+                          {t("asset:editSheet.price_fetch_error")}
+                        </p>
                       )}
                     </div>
 
@@ -1231,6 +1236,14 @@ export function AssetEditSheet({
                             {customProviders.length > 0 ? (
                               <Select
                                 value={field.value ?? "__auto__"}
+                                items={[
+                                  { value: "__auto__", label: t("asset:editSheet.auto_default") },
+                                  ...builtinProviders.map((p) => ({ value: p.id, label: p.name })),
+                                  ...customProviders.map((cp) => ({
+                                    value: `CUSTOM:${cp.id}`,
+                                    label: cp.name,
+                                  })),
+                                ]}
                                 onValueChange={(v) =>
                                   field.onChange(v === "__auto__" ? undefined : v)
                                 }
@@ -1382,8 +1395,7 @@ export function AssetEditSheet({
                       >
                         {isSaving ? (
                           <span className="flex items-center gap-2">
-                            <Icons.Spinner className="h-4 w-4 animate-spin" />{" "}
-                            {t("asset:editSheet.saving_short")}
+                            <Spinner className="h-4 w-4" /> {t("asset:editSheet.saving_short")}
                           </span>
                         ) : (
                           t("asset:editSheet.save_changes_lower")

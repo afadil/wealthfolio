@@ -20,6 +20,7 @@ import { createAsset } from "@/adapters";
 import { draftToActivityImport } from "../utils/draft-utils";
 import { buildNewAssetFromDraft } from "../utils/asset-review-utils";
 import type { ActivityType } from "@/lib/constants";
+import { Spinner } from "@wealthfolio/ui";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -568,7 +569,7 @@ export function ConfirmStep() {
           >
             {isProcessing ? (
               <>
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
                 {isPreparingAssets
                   ? t("activity:import.confirm.preparingAssets")
                   : t("activity:import.confirm.importing")}

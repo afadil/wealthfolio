@@ -206,7 +206,7 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
         <SheetContent
           side="bottom"
           showCloseButton={false}
-          className="bg-background inset-x-4 bottom-4 flex max-h-[min(82dvh,720px)] flex-col gap-0 overflow-hidden rounded-[2rem] border-0 px-0 pb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] pt-0 shadow-2xl"
+          className="bg-background inset-x-4 bottom-4 flex max-h-[min(82dvh,45rem)] flex-col gap-0 overflow-hidden rounded-[2rem] border-0 px-0 pb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] pt-0 shadow-2xl"
         >
           <div className="bg-muted mx-auto mt-4 h-1.5 w-14 shrink-0 rounded-full" />
           <div className="flex shrink-0 items-center justify-between px-8 pb-4 pt-7">

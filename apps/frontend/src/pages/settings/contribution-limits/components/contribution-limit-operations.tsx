@@ -21,6 +21,7 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 
 import type { ContributionLimit } from "@/lib/types";
+import { Spinner } from "@wealthfolio/ui";
 
 export interface ContributionLimitOperationsProps {
   limit: ContributionLimit;
@@ -56,7 +57,7 @@ export function ContributionLimitOperations({
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:text-destructive flex cursor-pointer items-center"
-            onSelect={() => setShowDeleteAlert(true)}
+            onClick={() => setShowDeleteAlert(true)}
           >
             {t("settings:limits_operations_delete")}
           </DropdownMenuItem>
@@ -77,10 +78,10 @@ export function ContributionLimitOperations({
             <Button
               disabled={isDeleting}
               onClick={() => handleDelete()}
-              className="bg-red-600 focus:ring-red-600"
+              className="bg-destructive focus:ring-destructive"
             >
               {isDeleting ? (
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
               ) : (
                 <Icons.Trash className="mr-2 h-4 w-4" />
               )}

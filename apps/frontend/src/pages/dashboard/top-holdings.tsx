@@ -124,7 +124,7 @@ function HoldingRow({
           <HoldingPerformancePercent
             value={gainPercent}
             variant="badge"
-            className="min-w-[60px] justify-center text-center text-xs"
+            className="min-w-15 justify-center text-center text-xs"
           />
         </div>
       </div>
@@ -201,7 +201,7 @@ function TopHoldingsSkeleton() {
               <Skeleton className="h-3.5 w-24" />
               <div className="flex items-center gap-2">
                 <Skeleton className="h-3 w-16" />
-                <Skeleton className="h-5 w-[60px] rounded-md" />
+                <Skeleton className="w-15 h-5 rounded-md" />
               </div>
             </div>
           </div>
@@ -305,18 +305,20 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
       action={
         <div className="flex items-center gap-1">
           <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:bg-success/10 h-8 w-8 p-0"
-              >
-                <Icons.ListFilter className="h-4 w-4" />
-              </Button>
+            <PopoverTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:bg-success-subtle h-8 w-8 p-0"
+                />
+              }
+            >
+              <Icons.ListFilter className="h-4 w-4" />
             </PopoverTrigger>
             <PopoverContent
               align="end"
-              className="border-border/50 bg-card min-w-[200px] rounded-2xl border p-2 shadow-lg backdrop-blur-xl"
+              className="border-border/50 bg-card min-w-50 rounded-2xl border p-2 shadow-lg backdrop-blur-xl"
             >
               <p className="text-muted-foreground px-2 py-1.5 text-xs font-medium uppercase tracking-wider">
                 {t("dashboard:holdings.filter_show")}
@@ -403,7 +405,7 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
           <Button
             variant="ghost"
             size="sm"
-            className="text-muted-foreground hover:bg-success/10 text-xs"
+            className="text-muted-foreground hover:bg-success-subtle text-xs"
             onClick={() => navigate("/holdings")}
           >
             {t("dashboard:view_all")}

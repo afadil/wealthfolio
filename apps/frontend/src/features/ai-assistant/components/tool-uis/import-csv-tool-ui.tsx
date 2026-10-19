@@ -1,4 +1,5 @@
 import { memo, useMemo } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 import { useTranslation } from "react-i18next";
 
 import type { ToolCallMessagePartProps } from "@assistant-ui/react";
@@ -15,6 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
+  buttonVariants,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 
@@ -157,12 +160,10 @@ function SuccessCard({ count }: { count: number }) {
         <p className="text-muted-foreground text-sm">
           {t("ai:importCsv.importedActivities", { count })}
         </p>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/activities">
-            <Icons.ExternalLink className="mr-2 h-4 w-4" />
-            {t("ai:importCsv.viewActivities")}
-          </Link>
-        </Button>
+        <Link to="/activities" className={buttonVariants({ variant: "outline", size: "sm" })}>
+          <Icons.ExternalLink className="mr-2 h-4 w-4" />
+          {t("ai:importCsv.viewActivities")}
+        </Link>
       </CardContent>
     </Card>
   );
@@ -171,12 +172,11 @@ function SuccessCard({ count }: { count: number }) {
 function ErrorCard({ message }: { message: string }) {
   const { t } = useTranslation();
   return (
-    <Card className="border-destructive/30 bg-destructive/5">
-      <CardContent className="py-4">
-        <p className="text-destructive text-sm font-medium">{t("ai:importCsv.importFailed")}</p>
-        <p className="text-muted-foreground mt-1 text-xs">{message}</p>
-      </CardContent>
-    </Card>
+    <Alert variant="destructive">
+      <Icons.AlertCircle />
+      <AlertTitle>{t("ai:importCsv.importFailed")}</AlertTitle>
+      <AlertDescription className="text-xs">{message}</AlertDescription>
+    </Alert>
   );
 }
 
@@ -362,8 +362,17 @@ function ImportCsvToolUIContentImpl({
               {t("ai:importCsv.importTitle", { count: mapping.totalRows })}
             </CardTitle>
           </div>
-          <Select value={session.accountId || ""} onValueChange={session.setAccountId}>
-            <SelectTrigger className="w-[220px]">
+          <Select
+            value={session.accountId || ""}
+            items={mapping.availableAccounts.map((account) => ({
+              value: account.id,
+              label: `${account.name} (${account.currency})`,
+            }))}
+            onValueChange={(accountId) => {
+              if (accountId !== null) session.setAccountId(accountId);
+            }}
+          >
+            <SelectTrigger className="w-55">
               <SelectValue placeholder={t("ai:importCsv.selectTargetAccount")} />
             </SelectTrigger>
             <SelectContent>
@@ -380,10 +389,10 @@ function ImportCsvToolUIContentImpl({
         <MappingBadgeStrip mapping={mapping} baseCurrency={baseCurrency} />
 
         {session.error && session.drafts.length > 0 && (
-          <div className="border-destructive/50 bg-destructive/10 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
-            <Icons.AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{session.error}</span>
-          </div>
+          <Alert variant="destructive" className="px-3 py-2">
+            <Icons.AlertCircle />
+            <AlertDescription>{session.error}</AlertDescription>
+          </Alert>
         )}
 
         <ChatReviewGrid
@@ -418,7 +427,7 @@ function ImportCsvToolUIContentImpl({
               disabled={!session.canConfirm || session.isSubmitting}
             >
               {session.isSubmitting ? (
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
               ) : (
                 <Icons.Download className="mr-2 h-4 w-4" />
               )}

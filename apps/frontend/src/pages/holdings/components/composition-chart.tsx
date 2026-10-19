@@ -13,7 +13,13 @@ import {
 } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
-import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@wealthfolio/ui/components/ui/empty";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
@@ -54,14 +60,24 @@ const DisplayModeToggle: React.FC<{
   const { t } = useTranslation();
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <Button variant="secondary" size="icon-sm" className="rounded-full" onClick={onToggle}>
-          {displayMode === "symbol" ? (
-            <Icons.Hash className="h-4 w-4" />
-          ) : (
-            <Icons.Type className="h-4 w-4" />
-          )}
-        </Button>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="secondary"
+            size="icon-sm"
+            className="rounded-full"
+            onClick={onToggle}
+            aria-label={
+              displayMode === "symbol" ? t("holdings:show_full_names") : t("holdings:show_symbols")
+            }
+          />
+        }
+      >
+        {displayMode === "symbol" ? (
+          <Icons.Hash className="h-4 w-4" />
+        ) : (
+          <Icons.Type className="h-4 w-4" />
+        )}
       </TooltipTrigger>
       <TooltipContent>
         <p>
@@ -381,7 +397,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
           </div>
         </CardHeader>
         <CardContent>
-          <Skeleton className="h-[500px] w-full" />
+          <Skeleton className="h-125 w-full" />
         </CardContent>
       </Card>
     );
@@ -396,12 +412,14 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
             <CardTitle className="text-md font-medium">{t("holdings:composition")}</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="flex h-[500px] items-center justify-center">
-          <EmptyPlaceholder
-            icon={<Icons.BarChart className="h-10 w-10" />}
-            title={t("holdings:no_holdings_data")}
-            description={t("holdings:no_holdings_data_desc")}
-          />
+        <CardContent className="h-125 flex items-center justify-center">
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">{<Icons.BarChart className="size-10" />}</EmptyMedia>
+              <EmptyTitle>{t("holdings:no_holdings_data")}</EmptyTitle>
+              <EmptyDescription>{t("holdings:no_holdings_data_desc")}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         </CardContent>
       </Card>
     );
@@ -430,7 +448,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
         </div>
       </CardHeader>
       <CardContent className="pl-2">
-        <RenderableChartContainer className="h-[500px] w-full">
+        <RenderableChartContainer className="h-125 w-full">
           <Treemap
             width={400}
             height={200}

@@ -87,8 +87,8 @@ export function CSVFileViewer({ data, className, maxHeight = "400px" }: CSVFileV
         const lineNumber = row.original.id + 1;
 
         return isValid ? (
-          <div className="flex w-[60px] items-center gap-1 text-xs">
-            <div className="bg-success/20 text-success flex h-5 w-5 items-center justify-center rounded-full">
+          <div className="w-15 flex items-center gap-1 text-xs">
+            <div className="text-success-subtle-foreground bg-current/15 flex h-5 w-5 items-center justify-center rounded-full">
               <Icons.CheckCircle className="h-3.5 w-3.5" />
             </div>
             <span className="text-muted-foreground text-xs">
@@ -97,26 +97,23 @@ export function CSVFileViewer({ data, className, maxHeight = "400px" }: CSVFileV
           </div>
         ) : (
           <TooltipProvider>
-            <Tooltip delayDuration={30}>
-              <TooltipTrigger asChild>
-                <div className="flex w-[60px] cursor-help items-center gap-1 text-xs">
-                  <div className="bg-destructive/20 text-destructive flex h-5 w-5 items-center justify-center rounded-full">
-                    <Icons.XCircle className="h-3.5 w-3.5" />
-                  </div>
-                  <span className="text-muted-foreground text-xs">
-                    {String(lineNumber).padStart(2, "0")}
-                  </span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent
-                side="right"
-                sideOffset={10}
-                className="bg-destructive text-destructive-foreground max-w-xs border-none p-3"
+            <Tooltip>
+              <TooltipTrigger
+                delay={30}
+                render={<div className="w-15 flex cursor-help items-center gap-1 text-xs" />}
               >
+                <div className="text-destructive-subtle-foreground bg-current/15 flex h-5 w-5 items-center justify-center rounded-full">
+                  <Icons.XCircle className="h-3.5 w-3.5" />
+                </div>
+                <span className="text-muted-foreground text-xs">
+                  {String(lineNumber).padStart(2, "0")}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={10} className="max-w-xs p-3">
                 <h4 className="mb-2 font-medium">
                   {t("activity:import.csvViewer.validationErrors")}
                 </h4>
-                <ul className="max-h-[300px] list-disc space-y-1 overflow-y-auto pl-5 text-sm">
+                <ul className="max-h-75 list-disc space-y-1 overflow-y-auto pl-5 text-sm">
                   {errors.map((error, index) => (
                     <li key={index}>{error}</li>
                   ))}
@@ -219,7 +216,7 @@ export function CSVFileViewer({ data, className, maxHeight = "400px" }: CSVFileV
                         className={cn(
                           "border-0 py-1.5",
                           cell.column.id === "isValid" &&
-                            "bg-background border-border group-hover:bg-muted/40 sticky left-0 w-[60px] border-r p-2",
+                            "bg-background border-border group-hover:bg-muted/40 w-15 sticky left-0 border-r p-2",
                         )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

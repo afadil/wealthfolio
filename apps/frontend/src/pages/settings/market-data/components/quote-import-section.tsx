@@ -135,20 +135,22 @@ export function ImportQuotesSection({
                         <span className="text-muted-foreground">
                           {t("settings:market_data_page.field_valid")}:
                         </span>
-                        <span className="font-semibold text-green-600">{preview.validRows}</span>
+                        <span className="text-success font-semibold">{preview.validRows}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className="text-muted-foreground">
                           {t("settings:market_data_page.field_invalid")}:
                         </span>
-                        <span className="font-semibold text-red-600">{preview.invalidRows}</span>
+                        <span className="text-destructive font-semibold">
+                          {preview.invalidRows}
+                        </span>
                       </div>
                       {preview.duplicateCount > 0 && (
                         <div className="flex items-center gap-1.5">
                           <span className="text-muted-foreground">
                             {t("settings:market_data_page.field_duplicates")}:
                           </span>
-                          <span className="font-semibold text-yellow-600">
+                          <span className="text-warning font-semibold">
                             {preview.duplicateCount}
                           </span>
                         </div>

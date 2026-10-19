@@ -16,6 +16,8 @@ import {
   DialogTrigger,
   Icons,
   StarRatingDisplay,
+  buttonVariants,
+  Spinner,
 } from "@wealthfolio/ui";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -89,11 +91,9 @@ export function AddonStoreCard({
         {/* Mobile Action Buttons - Always visible on mobile, hidden on desktop */}
         <div className="flex gap-2 pt-2 sm:hidden">
           <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="flex-1">
-                <Icons.Eye className="mr-2 h-4 w-4" />
-                {t("settings:addon_card_details")}
-              </Button>
+            <DialogTrigger render={<Button variant="outline" size="sm" className="flex-1" />}>
+              <Icons.Eye className="mr-2 h-4 w-4" />
+              {t("settings:addon_card_details")}
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
@@ -208,7 +208,7 @@ export function AddonStoreCard({
                   >
                     {isInstalling ? (
                       <>
-                        <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
+                        <Spinner className="mr-2 h-4 w-4" />
                         {t("settings:addon_card_installing")}
                       </>
                     ) : isInstalled ? (
@@ -225,12 +225,13 @@ export function AddonStoreCard({
                   </Button>
 
                   {listing.changelogUrl && (
-                    <Button variant="outline" asChild>
-                      <ExternalLink href={addonDetailUrl}>
-                        <Icons.ExternalLink className="mr-2 h-4 w-4" />
-                        {t("settings:addon_card_addon_page")}
-                      </ExternalLink>
-                    </Button>
+                    <ExternalLink
+                      href={addonDetailUrl}
+                      className={buttonVariants({ variant: "outline" })}
+                    >
+                      <Icons.ExternalLink className="mr-2 h-4 w-4" />
+                      {t("settings:addon_card_addon_page")}
+                    </ExternalLink>
                   )}
                 </div>
               </div>
@@ -246,7 +247,7 @@ export function AddonStoreCard({
             >
               {isInstalling ? (
                 <>
-                  <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                   {t("settings:addon_card_installing")}
                 </>
               ) : listing.status !== "active" ? (
@@ -288,11 +289,17 @@ export function AddonStoreCard({
       <div className="absolute inset-0 hidden items-center justify-center gap-2 bg-black/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100 sm:flex">
         {/* View Details Button */}
         <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="secondary" size="sm" className="bg-white/90 text-black hover:bg-white">
-              <Icons.Eye className="mr-2 h-4 w-4" />
-              {t("settings:addon_card_details")}
-            </Button>
+          <DialogTrigger
+            render={
+              <Button
+                variant="secondary"
+                size="sm"
+                className="bg-white/90 text-black hover:bg-white"
+              />
+            }
+          >
+            <Icons.Eye className="mr-2 h-4 w-4" />
+            {t("settings:addon_card_details")}
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
@@ -407,7 +414,7 @@ export function AddonStoreCard({
                 >
                   {isInstalling ? (
                     <>
-                      <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
+                      <Spinner className="mr-2 h-4 w-4" />
                       {t("settings:addon_card_installing")}
                     </>
                   ) : isInstalled ? (
@@ -424,12 +431,13 @@ export function AddonStoreCard({
                 </Button>
 
                 {listing.changelogUrl && (
-                  <Button variant="outline" asChild>
-                    <ExternalLink href={addonDetailUrl}>
-                      <Icons.ExternalLink className="mr-2 h-4 w-4" />
-                      {t("settings:addon_card_addon_page")}
-                    </ExternalLink>
-                  </Button>
+                  <ExternalLink
+                    href={addonDetailUrl}
+                    className={buttonVariants({ variant: "outline" })}
+                  >
+                    <Icons.ExternalLink className="mr-2 h-4 w-4" />
+                    {t("settings:addon_card_addon_page")}
+                  </ExternalLink>
                 )}
               </div>
             </div>
@@ -459,7 +467,7 @@ export function AddonStoreCard({
           >
             {isInstalling ? (
               <>
-                <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
                 {t("settings:addon_card_installing")}
               </>
             ) : listing.status !== "active" ? (
@@ -489,10 +497,7 @@ export function AddonStoreCard({
       {/* Status Indicators */}
       <div className="absolute right-2 top-2 flex flex-col gap-1 opacity-90">
         {isInstalled && (
-          <Badge
-            variant="secondary"
-            className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-          >
+          <Badge variant="secondary" className="bg-success-subtle text-success-subtle-foreground">
             <Icons.Check className="mr-1 h-3 w-3" />
             {t("settings:addon_card_installed")}
           </Badge>

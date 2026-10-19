@@ -9,6 +9,7 @@ import {
   Skeleton,
   useAmountFormatting,
   useNumberFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
@@ -49,6 +50,7 @@ import {
 } from "../lib/dashboard-math";
 import { expenseAgeRangeLabel, expenseItems, isExpenseActiveAtAge } from "../lib/expense-items";
 import type { RetirementPlan } from "../types";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 
 interface Props {
   plan: RetirementPlan;
@@ -88,15 +90,11 @@ function RetirementAnalysisPendingColumn({ error }: { error: Error | null }) {
   if (error) {
     return (
       <div className="space-y-6 lg:col-span-2">
-        <Card className="border-destructive/30 bg-destructive/5">
-          <CardContent className="text-destructive flex gap-3 py-5 text-sm">
-            <Icons.AlertTriangle className="mt-0.5 size-4 shrink-0" />
-            <div>
-              <p className="font-medium">{t("goals:dashboard.pending.failed_to_load")}</p>
-              <p className="mt-1 text-xs">{error.message}</p>
-            </div>
-          </CardContent>
-        </Card>
+        <Alert variant="destructive">
+          <Icons.AlertTriangle />
+          <AlertTitle>{t("goals:dashboard.pending.failed_to_load")}</AlertTitle>
+          <AlertDescription className="text-xs">{error.message}</AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -107,7 +105,7 @@ function RetirementAnalysisPendingColumn({ error }: { error: Error | null }) {
         <CardContent className="px-7 py-6">
           <div className="mb-5 flex items-start gap-3">
             <span className="bg-muted/60 flex size-8 shrink-0 items-center justify-center rounded-full">
-              <Icons.Spinner className="text-muted-foreground size-4 animate-spin" />
+              <Spinner className="text-muted-foreground size-4" />
             </span>
             <div className="min-w-0">
               <p className="text-sm font-semibold">{t("goals:dashboard.pending.calculating")}</p>
@@ -506,7 +504,7 @@ export default function DashboardPage({
     <div className="space-y-6">
       {retirementOverviewIsFetching && (
         <div className="bg-muted/20 text-muted-foreground flex items-center gap-2 rounded-lg border px-3 py-2 text-xs">
-          <Icons.Spinner className="size-3.5 animate-spin" />
+          <Spinner className="size-3.5" />
           {t("goals:dashboard.recalculating")}
         </div>
       )}
@@ -519,10 +517,10 @@ export default function DashboardPage({
           {(() => {
             const statusAccent =
               heroHealth === "on_track"
-                ? "text-green-600"
+                ? "text-success"
                 : heroHealth === "at_risk"
-                  ? "text-amber-600"
-                  : "text-red-500";
+                  ? "text-warning"
+                  : "text-destructive";
             const goalShortfallNominal =
               targetReconciliation?.shortfallNominal ?? retirementOverview.shortfallAtGoalAge;
             const goalShortfallToday =
@@ -574,7 +572,7 @@ export default function DashboardPage({
                       {heroHealth === "on_track" ? (
                         <Badge
                           variant="default"
-                          className="gap-1.5 bg-green-600 text-[10px] hover:bg-green-600"
+                          className="text-2xs bg-success hover:bg-success gap-1.5"
                         >
                           <span className="h-1.5 w-1.5 rounded-full bg-white/90" />
                           {isTraditionalMode
@@ -586,9 +584,9 @@ export default function DashboardPage({
                       ) : heroHealth === "at_risk" ? (
                         <Badge
                           variant="secondary"
-                          className="gap-1.5 text-[10px] text-amber-700 dark:text-amber-400"
+                          className="text-2xs text-warning-subtle-foreground gap-1.5"
                         >
-                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                          <span className="bg-warning h-1.5 w-1.5 rounded-full" />
                           {isTraditionalMode
                             ? traditionalBadge
                             : yearsFromDesired != null
@@ -596,7 +594,7 @@ export default function DashboardPage({
                               : t("goals:dashboard.badge.at_risk")}
                         </Badge>
                       ) : (
-                        <Badge variant="destructive" className="gap-1.5 text-[10px]">
+                        <Badge variant="destructive" className="text-2xs gap-1.5">
                           <span className="h-1.5 w-1.5 rounded-full bg-white/90" />
                           {isTraditionalMode
                             ? traditionalBadge
@@ -611,26 +609,28 @@ export default function DashboardPage({
                     <div className="ml-auto flex items-center gap-2">
                       <ValueModeToggle value={chartValueMode} onChange={setChartValueMode} />
                       <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            className="text-muted-foreground/70 hover:text-foreground inline-flex rounded-full transition-colors"
-                            aria-label={t("goals:dashboard.value_mode.explained_aria")}
-                          >
-                            <Icons.Info className="h-3.5 w-3.5" />
-                          </button>
+                        <TooltipTrigger
+                          render={
+                            <button
+                              type="button"
+                              className="text-muted-foreground/70 hover:text-foreground inline-flex rounded-full transition-colors"
+                              aria-label={t("goals:dashboard.value_mode.explained_aria")}
+                            />
+                          }
+                        >
+                          <Icons.Info className="h-3.5 w-3.5" />
                         </TooltipTrigger>
                         <TooltipContent className="max-w-xs text-xs">
                           <div className="font-semibold">
                             {t("goals:dashboard.value_mode.todays_value")}
                           </div>
-                          <p className="text-muted-foreground mt-1">
+                          <p className="text-background/70 mt-1">
                             {t("goals:dashboard.value_mode.todays_value_tip")}
                           </p>
                           <div className="mt-3 font-semibold">
                             {t("goals:dashboard.value_mode.nominal")}
                           </div>
-                          <p className="text-muted-foreground mt-1">
+                          <p className="text-background/70 mt-1">
                             {t("goals:dashboard.value_mode.nominal_tip")}
                           </p>
                         </TooltipContent>
@@ -749,7 +749,7 @@ export default function DashboardPage({
                     )}
                   </h1>
 
-                  <p className="text-muted-foreground mt-4 max-w-[620px] text-sm leading-relaxed xl:max-w-4xl">
+                  <p className="text-muted-foreground max-w-155 mt-4 text-sm leading-relaxed xl:max-w-4xl">
                     <Trans
                       t={t}
                       i18nKey={
@@ -816,7 +816,7 @@ export default function DashboardPage({
                             todayValue={goalShortfallToday}
                             nominalValue={goalShortfallNominal}
                           >
-                            <span className="font-medium tabular-nums text-amber-600">
+                            <span className="text-warning font-medium tabular-nums">
                               {formatting.formatCompactAmount(goalShortfall, currency)}
                             </span>
                           </ValueModeTooltip>{" "}
@@ -831,7 +831,7 @@ export default function DashboardPage({
                   <div className="mt-6">
                     <div className="mb-2 flex items-end justify-between gap-3">
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-muted-foreground text-[10px] uppercase tracking-wider">
+                        <span className="text-muted-foreground text-2xs uppercase tracking-wider">
                           {t("goals:dashboard.progress.portfolio_today")}
                         </span>
                         <span className="text-sm font-semibold tabular-nums">
@@ -840,16 +840,18 @@ export default function DashboardPage({
                       </div>
                       <div className="flex flex-col items-end gap-0.5">
                         <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="text-muted-foreground cursor-help text-[10px] uppercase tracking-wider underline decoration-dotted underline-offset-2">
-                              {isTraditionalMode
-                                ? t("goals:dashboard.progress.required_at_age", {
-                                    age: plan.personal.targetRetirementAge,
-                                  })
-                                : t("goals:dashboard.progress.target_at_age", {
-                                    age: plan.personal.targetRetirementAge,
-                                  })}
-                            </span>
+                          <TooltipTrigger
+                            render={
+                              <span className="text-muted-foreground text-2xs cursor-help uppercase tracking-wider underline decoration-dotted underline-offset-2" />
+                            }
+                          >
+                            {isTraditionalMode
+                              ? t("goals:dashboard.progress.required_at_age", {
+                                  age: plan.personal.targetRetirementAge,
+                                })
+                              : t("goals:dashboard.progress.target_at_age", {
+                                  age: plan.personal.targetRetirementAge,
+                                })}
                           </TooltipTrigger>
                           <TooltipContent className="max-w-xs text-xs">
                             {isTraditionalMode
@@ -895,7 +897,7 @@ export default function DashboardPage({
                           />
                         )}
                     </div>
-                    <div className="text-muted-foreground mt-1 flex justify-between text-[10px]">
+                    <div className="text-muted-foreground text-2xs mt-1 flex justify-between">
                       <span className="tabular-nums">
                         {t("goals:dashboard.progress.funded_pct", {
                           pct: numberFormatting.formatDecimal(progress * 100, {
@@ -919,10 +921,10 @@ export default function DashboardPage({
                       <p
                         className={`mt-4 border-t pt-4 text-xs ${
                           heroHealth === "on_track"
-                            ? "text-green-700 dark:text-green-300"
+                            ? "text-success-subtle-foreground"
                             : heroHealth === "at_risk"
-                              ? "text-amber-700 dark:text-amber-300"
-                              : "text-red-600 dark:text-red-300"
+                              ? "text-warning-subtle-foreground"
+                              : "text-destructive"
                         }`}
                       >
                         {heroGuidance}
@@ -939,7 +941,7 @@ export default function DashboardPage({
               <CardHeader className="pb-2">
                 <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                   <div>
-                    <div className="text-muted-foreground mb-0.5 text-[10px] font-semibold uppercase tracking-wider">
+                    <div className="text-muted-foreground text-2xs mb-0.5 font-semibold uppercase tracking-wider">
                       {t("goals:dashboard.chart.projection_age_range", {
                         start: plan.personal.currentAge,
                         end: plan.personal.planningHorizonAge,
@@ -950,14 +952,16 @@ export default function DashboardPage({
                         {t("goals:dashboard.chart.portfolio_trajectory")}
                       </CardTitle>
                       <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            className="text-muted-foreground/70 hover:text-foreground inline-flex rounded-full transition-colors"
-                            aria-label={t("goals:dashboard.chart.portfolio_trajectory_aria")}
-                          >
-                            <Icons.Info className="h-3.5 w-3.5" />
-                          </button>
+                        <TooltipTrigger
+                          render={
+                            <button
+                              type="button"
+                              className="text-muted-foreground/70 hover:text-foreground inline-flex rounded-full transition-colors"
+                              aria-label={t("goals:dashboard.chart.portfolio_trajectory_aria")}
+                            />
+                          }
+                        >
+                          <Icons.Info className="h-3.5 w-3.5" />
                         </TooltipTrigger>
                         <TooltipContent className="max-w-sm text-xs">
                           {isTraditionalMode
@@ -981,22 +985,24 @@ export default function DashboardPage({
                       {t("goals:dashboard.chart.projected")}
                     </span>
                     <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="flex cursor-help items-center gap-1.5 underline decoration-dotted underline-offset-2">
-                          <svg viewBox="0 0 24 4" aria-hidden="true" className="h-1 w-6 shrink-0">
-                            <line
-                              x1="1"
-                              y1="2"
-                              x2="23"
-                              y2="2"
-                              stroke={CHART_COLORS.reference}
-                              strokeWidth="1.5"
-                              strokeDasharray="6 4"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                          {t("goals:dashboard.chart.required")}
-                        </span>
+                      <TooltipTrigger
+                        render={
+                          <span className="flex cursor-help items-center gap-1.5 underline decoration-dotted underline-offset-2" />
+                        }
+                      >
+                        <svg viewBox="0 0 24 4" aria-hidden="true" className="h-1 w-6 shrink-0">
+                          <line
+                            x1="1"
+                            y1="2"
+                            x2="23"
+                            y2="2"
+                            stroke={CHART_COLORS.reference}
+                            strokeWidth="1.5"
+                            strokeDasharray="6 4"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                        {t("goals:dashboard.chart.required")}
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs text-xs">
                         {isTraditionalMode
@@ -1078,42 +1084,44 @@ export default function DashboardPage({
                   return (
                     <div key={m.key} className="p-4">
                       <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                        <span className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">
+                        <span className="text-muted-foreground text-2xs font-semibold uppercase tracking-wider">
                           {m.label}
                         </span>
                         <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              className="text-muted-foreground/70 hover:text-foreground inline-flex rounded-full transition-colors"
-                              aria-label={t("goals:dashboard.milestone.more_info_about", {
-                                label: m.label,
-                              })}
-                            >
-                              <Icons.Info className="h-3 w-3" />
-                            </button>
+                          <TooltipTrigger
+                            render={
+                              <button
+                                type="button"
+                                className="text-muted-foreground/70 hover:text-foreground inline-flex rounded-full transition-colors"
+                                aria-label={t("goals:dashboard.milestone.more_info_about", {
+                                  label: m.label,
+                                })}
+                              />
+                            }
+                          >
+                            <Icons.Info className="h-3 w-3" />
                           </TooltipTrigger>
                           <TooltipContent className="max-w-xs text-xs">{m.tip}</TooltipContent>
                         </Tooltip>
                         {reached && (
                           <Badge
                             variant="default"
-                            className="h-[14px] bg-green-600 px-1.5 text-[9px] font-semibold tracking-wider hover:bg-green-600"
+                            className="text-2xs bg-success hover:bg-success h-3.5 px-1.5 font-semibold tracking-wider"
                           >
                             {t("goals:dashboard.milestone.done")}
                           </Badge>
                         )}
                       </div>
-                      <div className="text-[17px] font-semibold tabular-nums tracking-tight">
+                      <div className="text-lg font-semibold tabular-nums tracking-tight">
                         {m.value == null ? "—" : formatting.formatCompactAmount(m.value, currency)}
                       </div>
                       <div className="bg-muted/60 mt-2 h-[3px] overflow-hidden rounded-sm">
                         <div
-                          className={`h-full transition-[width] duration-500 ${reached ? "bg-green-600" : "bg-success"}`}
+                          className={`h-full transition-[width] duration-500 ${reached ? "bg-success" : "bg-success"}`}
                           style={{ width: `${pct * 100}%`, opacity: 0.85 }}
                         />
                       </div>
-                      <div className="text-muted-foreground mt-1.5 text-[10.5px]">{m.hint}</div>
+                      <div className="text-muted-foreground text-2xs mt-1.5">{m.hint}</div>
                     </div>
                   );
                 })}
@@ -1127,11 +1135,11 @@ export default function DashboardPage({
               <div className="min-w-0">
                 <div className="mb-1 flex items-center gap-2">
                   <Icons.CreditCard className="text-muted-foreground h-3.5 w-3.5" />
-                  <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-[0.15em]">
+                  <div className="text-muted-foreground text-2xs font-medium uppercase tracking-[0.15em]">
                     {t("goals:dashboard.coverage.kicker")}
                   </div>
                 </div>
-                <CardTitle className="text-[17px] font-semibold leading-none tracking-tight">
+                <CardTitle className="text-lg font-semibold leading-none tracking-tight">
                   {L.budgetAt}
                 </CardTitle>
                 <div className="mt-2 flex items-start gap-1.5">
@@ -1155,14 +1163,16 @@ export default function DashboardPage({
                   </p>
                   {coverageView === "over-time" && (
                     <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          className="text-muted-foreground hover:text-foreground mt-0.5 rounded-full transition-colors"
-                          aria-label={t("goals:dashboard.coverage.chart_details_aria")}
-                        >
-                          <Icons.Info className="h-3.5 w-3.5" />
-                        </button>
+                      <TooltipTrigger
+                        render={
+                          <button
+                            type="button"
+                            className="text-muted-foreground hover:text-foreground mt-0.5 rounded-full transition-colors"
+                            aria-label={t("goals:dashboard.coverage.chart_details_aria")}
+                          />
+                        }
+                      >
+                        <Icons.Info className="h-3.5 w-3.5" />
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs text-xs">
                         {t("goals:dashboard.coverage.over_time_tip", {
@@ -1188,7 +1198,7 @@ export default function DashboardPage({
             <CardContent className="space-y-3.5">
               {coverageView === "at-retirement" ? (
                 <>
-                  <div className="text-foreground/90 text-[13px]">
+                  <div className="text-foreground/90 text-sm">
                     {t("goals:dashboard.coverage.at_age_dash", { age: fireAgeForBudget })}{" "}
                     <span className="text-foreground font-semibold tabular-nums">
                       {t("goals:dashboard.coverage.amount_per_mo", {
@@ -1233,7 +1243,7 @@ export default function DashboardPage({
                     )}
                     {coverageShortfallPct > 0 && (
                       <div
-                        className="h-full bg-red-500/75 transition-[width] duration-500"
+                        className="bg-destructive/75 h-full transition-[width] duration-500"
                         style={{ width: `${coverageShortfallPct}%` }}
                         title={t("goals:dashboard.coverage.unfunded_title", {
                           pct: numberFormatting.formatDecimal(coverageShortfallPct, {
@@ -1243,7 +1253,7 @@ export default function DashboardPage({
                       />
                     )}
                   </div>
-                  <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                  <div className="text-muted-foreground text-2xs flex flex-wrap items-center gap-x-3 gap-y-1">
                     {budgetStreams.length > 0 && (
                       <span className="flex items-center gap-1.5">
                         <span
@@ -1269,7 +1279,7 @@ export default function DashboardPage({
                     )}
                     {coverageShortfallPct > 0 && (
                       <span className="flex items-center gap-1.5">
-                        <span className="inline-block h-2 w-2 rounded-sm bg-red-500/75" />
+                        <span className="bg-destructive/75 inline-block h-2 w-2 rounded-sm" />
                         {t("goals:dashboard.coverage.unfunded_pct", {
                           pct: numberFormatting.formatDecimal(coverageShortfallPct, {
                             maximumFractionDigits: 0,
@@ -1290,7 +1300,7 @@ export default function DashboardPage({
                   <div className="grid gap-4 lg:grid-cols-2">
                     {/* Expense breakdown — no color dots */}
                     <div className="min-w-0">
-                      <div className="text-muted-foreground mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em]">
+                      <div className="text-muted-foreground text-2xs mb-1.5 font-semibold uppercase tracking-[0.14em]">
                         {t("goals:dashboard.coverage.spending_schedule")}
                       </div>
                       <div className="divide-border divide-y">
@@ -1305,13 +1315,13 @@ export default function DashboardPage({
                           return (
                             <div
                               key={r.id}
-                              className="flex items-center justify-between gap-3 py-1.5 text-[13px]"
+                              className="flex items-center justify-between gap-3 py-1.5 text-sm"
                             >
                               <span className="min-w-0">
                                 <span className="text-foreground block truncate font-medium">
                                   {r.label}
                                 </span>
-                                <span className="text-muted-foreground block truncate text-[11px]">
+                                <span className="text-muted-foreground text-2xs block truncate">
                                   {expenseAgeRangeLabel(r, plan.personal.planningHorizonAge)}
                                   {status ? ` · ${status}` : ""}
                                 </span>
@@ -1329,12 +1339,12 @@ export default function DashboardPage({
 
                     {/* Income schedule + current-age funding sources */}
                     <div className="min-w-0 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
-                      <div className="text-muted-foreground mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em]">
+                      <div className="text-muted-foreground text-2xs mb-1.5 font-semibold uppercase tracking-[0.14em]">
                         {t("goals:dashboard.coverage.income_schedule")}
                       </div>
                       <div className="space-y-1.5">
                         {coverageIncomeStreams.length === 0 && (
-                          <div className="text-muted-foreground py-1 text-[12px]">
+                          <div className="text-muted-foreground py-1 text-xs">
                             {t("goals:dashboard.coverage.no_income_configured")}
                           </div>
                         )}
@@ -1357,7 +1367,7 @@ export default function DashboardPage({
                           return (
                             <div
                               key={s.id}
-                              className="flex items-center justify-between gap-3 text-[13px]"
+                              className="flex items-center justify-between gap-3 text-sm"
                             >
                               <span className="flex min-w-0 items-center gap-2">
                                 <span
@@ -1371,7 +1381,7 @@ export default function DashboardPage({
                                   <span className="text-foreground block truncate font-medium">
                                     {s.label}
                                   </span>
-                                  <span className="text-muted-foreground block truncate text-[11px]">
+                                  <span className="text-muted-foreground text-2xs block truncate">
                                     {incomeAgeRangeLabel(s, plan.personal.planningHorizonAge, t)}
                                     {status ? ` · ${status}` : ""}
                                   </span>
@@ -1382,7 +1392,7 @@ export default function DashboardPage({
                                   amount: formatting.formatCompactAmount(monthlyAmount, currency),
                                 })}{" "}
                                 {isActive && matchedBudgetStream ? (
-                                  <span className="text-muted-foreground ml-1 text-[11px]">
+                                  <span className="text-muted-foreground text-2xs ml-1">
                                     {numberFormatting.formatPercent(
                                       matchedBudgetStream.percentageOfBudget,
                                       { digits: 0 },
@@ -1397,32 +1407,34 @@ export default function DashboardPage({
                           coverageShortfallMonthly > 0 ||
                           coverageEstimatedTaxesMonthly > 0) && (
                           <div className="border-border mt-2 flex items-center justify-between gap-3 border-t pt-2">
-                            <div className="text-muted-foreground text-[10px] font-semibold uppercase tracking-[0.14em]">
+                            <div className="text-muted-foreground text-2xs font-semibold uppercase tracking-[0.14em]">
                               {t("goals:dashboard.coverage.funding_at_age", {
                                 age: fireAgeForBudget,
                               })}
                             </div>
                             {coveragePortfolioDrawRate != null && (
                               <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    type="button"
-                                    className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors"
-                                  >
-                                    {t("goals:dashboard.coverage.draw_on_portfolio")}{" "}
-                                    <span className="text-foreground tabular-nums">
-                                      {t("goals:dashboard.coverage.draw_rate_per_yr", {
-                                        pct: numberFormatting.formatDecimal(
-                                          coveragePortfolioDrawRate * 100,
-                                          {
-                                            minimumFractionDigits: 1,
-                                            maximumFractionDigits: 1,
-                                          },
-                                        ),
-                                      })}
-                                    </span>
-                                    <Icons.Info className="size-3" />
-                                  </button>
+                                <TooltipTrigger
+                                  render={
+                                    <button
+                                      type="button"
+                                      className="text-muted-foreground hover:text-foreground text-2xs inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium transition-colors"
+                                    />
+                                  }
+                                >
+                                  {t("goals:dashboard.coverage.draw_on_portfolio")}{" "}
+                                  <span className="text-foreground tabular-nums">
+                                    {t("goals:dashboard.coverage.draw_rate_per_yr", {
+                                      pct: numberFormatting.formatDecimal(
+                                        coveragePortfolioDrawRate * 100,
+                                        {
+                                          minimumFractionDigits: 1,
+                                          maximumFractionDigits: 1,
+                                        },
+                                      ),
+                                    })}
+                                  </span>
+                                  <Icons.Info className="size-3" />
                                 </TooltipTrigger>
                                 <TooltipContent className="max-w-xs text-xs">
                                   {t("goals:dashboard.coverage.draw_rate_tip")}
@@ -1432,7 +1444,7 @@ export default function DashboardPage({
                           </div>
                         )}
                         {coveragePortfolioAppliedMonthly > 0 && (
-                          <div className="flex items-center justify-between gap-3 text-[13px]">
+                          <div className="flex items-center justify-between gap-3 text-sm">
                             <span className="flex min-w-0 items-center gap-2">
                               <span className="bg-success inline-block h-2 w-2 shrink-0 rounded-sm" />
                               <span className="text-foreground truncate font-medium">
@@ -1446,7 +1458,7 @@ export default function DashboardPage({
                                   currency,
                                 ),
                               })}{" "}
-                              <span className="text-muted-foreground ml-1 text-[11px]">
+                              <span className="text-muted-foreground text-2xs ml-1">
                                 {numberFormatting.formatPercent(coveragePortfolioPct / 100, {
                                   digits: 0,
                                 })}
@@ -1455,9 +1467,9 @@ export default function DashboardPage({
                           </div>
                         )}
                         {coverageShortfallMonthly > 0 && (
-                          <div className="flex items-center justify-between gap-3 text-[13px]">
+                          <div className="flex items-center justify-between gap-3 text-sm">
                             <span className="flex min-w-0 items-center gap-2">
-                              <span className="inline-block h-2 w-2 shrink-0 rounded-sm bg-red-500/75" />
+                              <span className="bg-destructive/75 inline-block h-2 w-2 shrink-0 rounded-sm" />
                               <span className="text-foreground truncate font-medium">
                                 {t("goals:dashboard.coverage.unfunded_spending")}
                               </span>
@@ -1469,7 +1481,7 @@ export default function DashboardPage({
                                   currency,
                                 ),
                               })}{" "}
-                              <span className="text-muted-foreground ml-1 text-[11px]">
+                              <span className="text-muted-foreground text-2xs ml-1">
                                 {numberFormatting.formatPercent(coverageShortfallPct / 100, {
                                   digits: 0,
                                 })}
@@ -1478,7 +1490,7 @@ export default function DashboardPage({
                           </div>
                         )}
                         {coverageEstimatedTaxesMonthly > 0 && (
-                          <div className="text-muted-foreground flex items-center justify-between gap-3 pt-1 text-[11px] italic">
+                          <div className="text-muted-foreground text-2xs flex items-center justify-between gap-3 pt-1 italic">
                             <span>{t("goals:dashboard.coverage.withdrawal_taxes")}</span>
                             <span className="tabular-nums">
                               +
@@ -1530,7 +1542,7 @@ export default function DashboardPage({
                         {t("goals:dashboard.coverage.planned_spending_legend")}
                       </span>
                     </div>
-                    <span className="bg-muted/60 text-muted-foreground rounded-full px-2.5 py-1 text-[11px] font-medium">
+                    <span className="bg-muted/60 text-muted-foreground text-2xs rounded-full px-2.5 py-1 font-medium">
                       {t("goals:dashboard.coverage.showing", { valueLabel: valueModeLabel })}
                     </span>
                   </div>

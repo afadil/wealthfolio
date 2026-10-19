@@ -228,7 +228,7 @@ function ActivitiesContentImpl({ args, result, status }: ActivitiesContentProps)
           </div>
         </CardHeader>
         <CardContent className="px-0 pb-0">
-          <div className="max-h-[320px] overflow-y-auto">
+          <div className="max-h-80 overflow-y-auto">
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
@@ -321,7 +321,7 @@ function ActivitiesContentImpl({ args, result, status }: ActivitiesContentProps)
         </div>
       </CardHeader>
       <CardContent className="px-0 pb-0">
-        <div className="max-h-[320px] overflow-y-auto">
+        <div className="max-h-80 overflow-y-auto">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -346,7 +346,7 @@ function ActivitiesContentImpl({ args, result, status }: ActivitiesContentProps)
                     <TableCell className="py-2">
                       <Badge
                         variant={badgeProps.variant}
-                        className={cn("text-[10px] uppercase", badgeProps.className)}
+                        className={cn("text-2xs uppercase", badgeProps.className)}
                       >
                         {formatActivityType(activity.activityType)}
                       </Badge>

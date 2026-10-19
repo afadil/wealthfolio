@@ -32,13 +32,13 @@ import type { CategoryBreakdownRow, MonthBucket, MonthlyReport } from "../../../
 import { CategoryHierarchyTable, type CategorySort } from "../category-hierarchy-table";
 import { formatMonthDay, formatMonthName, formatPercentValue } from "./format";
 import { MoneyFlowSection } from "./money-flow-section";
+import { badgeVariants } from "@wealthfolio/ui";
 
 // ─── shared chrome ────────────────────────────────────────────────────────
 
 const CARD_CLASS =
   "border-border/60 bg-card/40 bg-gradient-to-br from-white/[0.07] via-transparent to-black/[0.04] dark:from-white/[0.025] dark:to-black/[0.06] rounded-2xl border p-5 backdrop-blur-xl";
-const LABEL_CLASS =
-  "text-muted-foreground/70 text-[10px] font-semibold uppercase tracking-[0.12em]";
+const LABEL_CLASS = "text-muted-foreground/70 text-2xs font-semibold uppercase tracking-[0.12em]";
 const SAVINGS_GROUP_KEY = "savings";
 const SPENDING_TAXONOMY = "spending_categories";
 
@@ -254,7 +254,7 @@ const PaceCard: FC<PaceCardProps> = ({
             {statusLabel}
           </span>
         </div>
-        <span className="text-muted-foreground/70 text-[11px]">{pace.contextRight}</span>
+        <span className="text-muted-foreground/70 text-2xs">{pace.contextRight}</span>
       </div>
 
       {/* Row 2 — text insight (replaces the redundant "big number" — that fact
@@ -595,12 +595,16 @@ const SpentThisPeriodCard: FC<SpentThisPeriodCardProps> = ({
         {deltaPct != null && (
           <span
             className={cn(
-              "rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums",
-              Math.abs(deltaPct) < 1
-                ? "bg-muted/50 text-muted-foreground"
-                : deltaPct > 0
-                  ? "bg-amber-100/60 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300"
-                  : "bg-success/15 text-success",
+              badgeVariants({
+                variant:
+                  Math.abs(deltaPct) < 1
+                    ? "secondary"
+                    : deltaPct > 0
+                      ? "warning-subtle"
+                      : "success-subtle",
+              }),
+              "text-2xs tabular-nums",
+              Math.abs(deltaPct) < 1 && "bg-muted/50 text-muted-foreground",
             )}
           >
             {formatPercentValue(deltaPct, numberFormatting, { digits: 0, signDisplay: "always" })}{" "}
@@ -628,7 +632,7 @@ const SpentThisPeriodCard: FC<SpentThisPeriodCardProps> = ({
               />
             ))}
           </div>
-          <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+          <div className="text-2xs mt-3 flex flex-wrap gap-x-3 gap-y-1">
             {segments.slice(0, 4).map((s) => (
               <span key={s.id} className="inline-flex items-center gap-1.5">
                 <span
@@ -642,7 +646,7 @@ const SpentThisPeriodCard: FC<SpentThisPeriodCardProps> = ({
               </span>
             ))}
             {segments.length > 4 && (
-              <span className="text-muted-foreground/70 inline-flex items-center text-[11px]">
+              <span className="text-muted-foreground/70 text-2xs inline-flex items-center">
                 {t("spending:whereIAm.moreCount", { count: segments.length - 4 })}
               </span>
             )}
@@ -771,8 +775,8 @@ const NetCashflowCard: FC<NetCashflowCardProps> = ({ months, currency, isLoading
         {totals.income > 0 && (
           <span
             className={cn(
-              "rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums",
-              totals.net >= 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive",
+              badgeVariants({ variant: totals.net >= 0 ? "success-subtle" : "destructive-subtle" }),
+              "text-2xs tabular-nums",
             )}
           >
             {(() => {
@@ -798,7 +802,7 @@ const NetCashflowCard: FC<NetCashflowCardProps> = ({ months, currency, isLoading
       </div>
 
       <div className="mt-4 space-y-2">
-        <div className="flex items-center gap-2 text-[11px]">
+        <div className="text-2xs flex items-center gap-2">
           <span className="text-muted-foreground w-12 shrink-0">
             {t("spending:cashFlow.income")}
           </span>
@@ -813,11 +817,11 @@ const NetCashflowCard: FC<NetCashflowCardProps> = ({ months, currency, isLoading
           </span>
         </div>
         {totals.income === 0 && (
-          <p className="text-muted-foreground/70 pl-14 text-[10px] leading-snug">
+          <p className="text-muted-foreground/70 text-2xs pl-14 leading-snug">
             {t("spending:whereIAm.noIncome")}
           </p>
         )}
-        <div className="flex items-center gap-2 text-[11px]">
+        <div className="text-2xs flex items-center gap-2">
           <span className="text-muted-foreground w-12 shrink-0">
             {t("spending:whereIAm.spent")}
           </span>
@@ -832,7 +836,7 @@ const NetCashflowCard: FC<NetCashflowCardProps> = ({ months, currency, isLoading
           </span>
         </div>
         {totals.saved > 0 && (
-          <div className="flex items-center gap-2 text-[11px]">
+          <div className="text-2xs flex items-center gap-2">
             <span className="text-muted-foreground w-12 shrink-0">
               {t("spending:whereIAm.saved")}
             </span>
@@ -986,11 +990,11 @@ function BreakdownCanvas({
               {t(SORT_LABEL_KEYS[sort])}
               <Icons.ChevronDown className="size-3 opacity-60" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[140px]">
+            <DropdownMenuContent align="end" className="min-w-35">
               {SORT_OPTIONS.map((opt) => (
                 <DropdownMenuItem
                   key={opt}
-                  onSelect={() => setSort(opt)}
+                  onClick={() => setSort(opt)}
                   className={cn("text-xs", sort === opt && "font-semibold")}
                 >
                   {t(SORT_LABEL_KEYS[opt])}
@@ -1023,7 +1027,7 @@ function BreakdownCanvas({
               <span>{chip.label}</span>
               <span
                 className={cn(
-                  "rounded-full px-1.5 text-[10px] font-medium tabular-nums",
+                  "text-2xs rounded-full px-1.5 font-medium tabular-nums",
                   active ? "bg-background/20" : "bg-muted/60",
                 )}
               >

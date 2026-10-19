@@ -20,6 +20,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -62,6 +63,7 @@ import { AmountInput } from "./amount-input";
 import { CategoryIcon } from "./category-chips";
 import { EXTENDED_PALETTE } from "./color-picker";
 import { IconPicker } from "./icon-picker";
+import { badgeVariants } from "@wealthfolio/ui";
 
 const SPENDING_TAXONOMY = "spending_categories";
 const CARD_CLASS = "border-border/60 bg-card/40 shadow-xs rounded-xl border backdrop-blur-xl";
@@ -246,7 +248,7 @@ export function BudgetEditor({ mode, periodKey }: BudgetEditorProps) {
 
   if (mode === "monthly") {
     return (
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-4">
           <BudgetSummary budget={budget} currency={currency} mode={mode} />
           <BudgetFxNote budget={budget} currency={currency} />
@@ -311,7 +313,7 @@ function BudgetSummary({
     <section className={cn(CARD_CLASS, "overflow-hidden p-3 sm:p-4")}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-muted-foreground text-[10px] font-semibold uppercase tracking-[0.08em]">
+          <div className="text-muted-foreground text-2xs font-semibold uppercase tracking-[0.08em]">
             {headingLabel}
           </div>
           <div className="mt-0.5 flex items-baseline gap-1.5">
@@ -319,7 +321,7 @@ function BudgetSummary({
               <PrivacyAmount value={planned} currency={currency} />
             </span>
             {income > 0 && (
-              <span className="text-muted-foreground truncate text-[11px]">
+              <span className="text-muted-foreground text-2xs truncate">
                 / <PrivacyAmount value={income} currency={currency} />
               </span>
             )}
@@ -327,12 +329,15 @@ function BudgetSummary({
         </div>
         <div
           className={cn(
-            "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
-            fullyAllocated
-              ? "bg-success/10 text-success"
-              : overAllocated
-                ? "bg-destructive/10 text-destructive"
-                : "bg-muted/60 text-muted-foreground",
+            badgeVariants({
+              variant: fullyAllocated
+                ? "success-subtle"
+                : overAllocated
+                  ? "destructive-subtle"
+                  : "secondary",
+            }),
+            "text-2xs",
+            !fullyAllocated && !overAllocated && "bg-muted/60 text-muted-foreground",
           )}
         >
           {fullyAllocated ? (
@@ -429,7 +434,7 @@ function GroupSummaryCell({
         aria-hidden
       />
       <span className="text-foreground min-w-0 flex-1 truncate text-xs">{row.group.name}</span>
-      <span className="text-muted-foreground w-8 shrink-0 text-right text-[10px] tabular-nums">
+      <span className="text-muted-foreground text-2xs w-8 shrink-0 text-right tabular-nums">
         {numberFormatting.formatPercent(pct, { digits: 0 })}
       </span>
       <span className="text-foreground shrink-0 text-xs font-medium tabular-nums">
@@ -560,7 +565,7 @@ function GroupBudgetSection({
                 }}
               />
             </div>
-            <span className="text-muted-foreground truncate text-[10px] tabular-nums">
+            <span className="text-muted-foreground text-2xs truncate tabular-nums">
               <PrivacyAmount value={row.actual} currency={currency} /> /{" "}
               <PrivacyAmount value={row.plannedTotal} currency={currency} />
             </span>
@@ -571,65 +576,69 @@ function GroupBudgetSection({
           <div className="text-sm font-semibold tabular-nums">
             <PrivacyAmount value={row.plannedTotal} currency={currency} />
           </div>
-          <div className="text-muted-foreground text-[9px] uppercase tracking-wide">
+          <div className="text-muted-foreground text-2xs uppercase tracking-wide">
             {totalSuffix}
           </div>
         </div>
 
         {mode === "setup" && (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:text-foreground h-7 w-7 shrink-0 p-0"
-                aria-label={t("spending:budgetEditor.groupActions")}
-              >
-                <Icons.MoreVertical className="h-4 w-4" />
-              </Button>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground h-7 w-7 shrink-0 p-0"
+                  aria-label={t("spending:budgetEditor.groupActions")}
+                />
+              }
+            >
+              <Icons.MoreVertical className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel className="text-muted-foreground/70 text-[10px] font-normal uppercase tracking-wide">
-                {t("spending:budgetEditor.categoryCount", { count: row.categories.length })}
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={(event) => {
-                  event.preventDefault();
-                  setEditOpen(true);
-                }}
-                className="text-xs"
-              >
-                <Icons.Pencil className="mr-2 h-3.5 w-3.5" />
-                {t("common:edit")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={(event) => {
-                  event.preventDefault();
-                  onSaveGroupRollover(!groupRollover?.enabled);
-                }}
-                className="text-xs"
-              >
-                <Icons.Refresh className="mr-2 h-3.5 w-3.5" />
-                <span className="flex-1">{t("spending:budgetEditor.groupRollover")}</span>
-                <span className="text-muted-foreground text-[10px]">
-                  {groupRollover?.enabled
-                    ? t("spending:budgetEditor.on")
-                    : t("spending:budgetEditor.off")}
-                </span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                disabled={!canDelete}
-                onSelect={(event) => {
-                  event.preventDefault();
-                  if (canDelete) setConfirmDeleteOpen(true);
-                }}
-                className="text-destructive focus:text-destructive text-xs"
-              >
-                <Icons.Trash className="mr-2 h-3.5 w-3.5" />
-                {t("spending:budgetEditor.deleteGroup")}
-              </DropdownMenuItem>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="text-muted-foreground/70 text-2xs font-normal uppercase tracking-wide">
+                  {t("spending:budgetEditor.categoryCount", { count: row.categories.length })}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  closeOnClick={false}
+                  onClick={() => {
+                    setEditOpen(true);
+                  }}
+                  className="text-xs"
+                >
+                  <Icons.Pencil className="mr-2 h-3.5 w-3.5" />
+                  {t("common:edit")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  closeOnClick={false}
+                  onClick={() => {
+                    onSaveGroupRollover(!groupRollover?.enabled);
+                  }}
+                  className="text-xs"
+                >
+                  <Icons.Refresh className="mr-2 h-3.5 w-3.5" />
+                  <span className="flex-1">{t("spending:budgetEditor.groupRollover")}</span>
+                  <span className="text-muted-foreground text-2xs">
+                    {groupRollover?.enabled
+                      ? t("spending:budgetEditor.on")
+                      : t("spending:budgetEditor.off")}
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={!canDelete}
+                  closeOnClick={false}
+                  onClick={() => {
+                    if (canDelete) setConfirmDeleteOpen(true);
+                  }}
+                  className="text-destructive focus:text-destructive text-xs"
+                >
+                  <Icons.Trash className="mr-2 h-3.5 w-3.5" />
+                  {t("spending:budgetEditor.deleteGroup")}
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
@@ -654,12 +663,12 @@ function GroupBudgetSection({
               <AlertDialogCancel>{t("common:cancel")}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={(event) => {
-                  event.preventDefault();
+                  event.preventBaseUIHandler();
                   onDeleteGroup();
                   setConfirmDeleteOpen(false);
                 }}
                 disabled={deletePending}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                variant="destructive"
               >
                 {deletePending ? t("spending:budgetEditor.deleting") : t("common:delete")}
               </AlertDialogAction>
@@ -847,7 +856,7 @@ function AddCategoryRow({
     <>
       {isMobile ? (
         <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger asChild>{trigger}</SheetTrigger>
+          <SheetTrigger render={trigger} />
           <SheetContent side="bottom" showCloseButton={false} className="pb-safe rounded-t-2xl p-0">
             {/* iOS-style drag indicator — backdrop tap and swipe-down dismiss the sheet */}
             <div className="flex justify-center pb-1 pt-2">
@@ -868,13 +877,13 @@ function AddCategoryRow({
         </Sheet>
       ) : (
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+          <PopoverTrigger render={trigger} />
           <PopoverContent className="w-72 p-0" align="start">
             {pool.length === 0 ? (
               emptyState
             ) : (
               <>
-                <div className="text-muted-foreground border-border/60 border-b px-3 py-2 text-[10px] font-medium uppercase tracking-widest">
+                <div className="text-muted-foreground border-border/60 text-2xs border-b px-3 py-2 font-medium uppercase tracking-widest">
                   {t("spending:budgetEditor.moveExistingCategory")}
                 </div>
                 {list}
@@ -1000,7 +1009,7 @@ function GroupEditDialogBody({
 
       <div className="space-y-4 py-2">
         <div className="space-y-1.5">
-          <label className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
+          <label className="text-muted-foreground text-2xs font-semibold uppercase tracking-wide">
             {t("common:name")}
           </label>
           <div className="bg-muted/60 border-border/60 focus-within:ring-ring/50 flex h-9 items-center rounded-md border px-3 transition-shadow focus-within:ring-2">
@@ -1020,14 +1029,14 @@ function GroupEditDialogBody({
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
+          <label className="text-muted-foreground text-2xs font-semibold uppercase tracking-wide">
             {t("spending:category.color")}
           </label>
           <GroupColorSwatchGrid value={draftColor} onChange={setDraftColor} />
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
+          <label className="text-muted-foreground text-2xs font-semibold uppercase tracking-wide">
             {t("spending:category.icon")}
           </label>
           <IconPicker value={draftIcon} accent={draftColor} onChange={setDraftIcon} />
@@ -1039,7 +1048,7 @@ function GroupEditDialogBody({
               <div className="text-foreground text-sm font-medium">
                 {t("spending:budgetEditor.monthlyRollover")}
               </div>
-              <p className="text-muted-foreground text-[11px] leading-snug">
+              <p className="text-muted-foreground text-2xs leading-snug">
                 {t("spending:budgetEditor.rolloverDesc")}
               </p>
             </div>
@@ -1051,13 +1060,10 @@ function GroupEditDialogBody({
           </div>
           {draftRollover && (
             <div className="flex items-center justify-between gap-3 pt-1">
-              <label
-                htmlFor="rollover-starting-balance"
-                className="text-muted-foreground text-[11px]"
-              >
+              <label htmlFor="rollover-starting-balance" className="text-muted-foreground text-2xs">
                 {t("spending:budgetEditor.startingBalance")}
               </label>
-              <div className="w-[120px]">
+              <div className="w-30">
                 <input
                   id="rollover-starting-balance"
                   type="text"
@@ -1131,19 +1137,21 @@ function BudgetCategoryLine({
       </span>
       <span className="text-foreground min-w-0 flex-1 truncate">{row.name}</span>
 
-      <div className="relative w-[80px] shrink-0">
+      <div className="relative w-20 shrink-0">
         <AmountInput value={row.target} onCommit={(value) => onSaveTarget(row, value)} />
         {hasOverride && (
           <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => onDeleteOverride(target)}
-                className="bg-warning/15 text-warning hover:bg-warning/25 border-background absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border transition-colors"
-                aria-label={t("spending:budgetEditor.revertOverride")}
-              >
-                <Icons.X className="h-2 w-2" />
-              </button>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  onClick={() => onDeleteOverride(target)}
+                  className="bg-warning-subtle text-warning-subtle-foreground hover:bg-warning-subtle/70 border-background absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border transition-colors"
+                  aria-label={t("spending:budgetEditor.revertOverride")}
+                />
+              }
+            >
+              <Icons.X className="h-2 w-2" />
             </TooltipTrigger>
             <TooltipContent side="top" sideOffset={4} className="text-xs">
               {t("spending:budgetEditor.monthOverrideRevert")}
@@ -1152,21 +1160,23 @@ function BudgetCategoryLine({
         )}
       </div>
 
-      <span className="text-muted-foreground hidden w-8 shrink-0 text-right text-[10px] tabular-nums sm:inline">
+      <span className="text-muted-foreground text-2xs hidden w-8 shrink-0 text-right tabular-nums sm:inline">
         {numberFormatting.formatPercent(sharePct, { digits: 0 })}
       </span>
 
       <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="bg-muted/50 hidden h-1 w-14 shrink-0 overflow-hidden rounded-full sm:block">
-            <div
-              className="h-full rounded-full transition-all"
-              style={{
-                width: `${usagePct * 100}%`,
-                backgroundColor: overBudget ? "var(--destructive)" : accent,
-              }}
-            />
-          </div>
+        <TooltipTrigger
+          render={
+            <div className="bg-muted/50 hidden h-1 w-14 shrink-0 overflow-hidden rounded-full sm:block" />
+          }
+        >
+          <div
+            className="h-full rounded-full transition-all"
+            style={{
+              width: `${usagePct * 100}%`,
+              backgroundColor: overBudget ? "var(--destructive)" : accent,
+            }}
+          />
         </TooltipTrigger>
         <TooltipContent side="top" sideOffset={4} className="text-xs">
           <PrivacyAmount value={row.actual} currency={currency} />{" "}
@@ -1179,26 +1189,28 @@ function BudgetCategoryLine({
       </Tooltip>
 
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-foreground h-6 w-6 shrink-0 p-0"
-            aria-label={t("spending:budgetEditor.rowOptions")}
-          >
-            <Icons.MoreHorizontal className="h-3.5 w-3.5" />
-          </Button>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground h-6 w-6 shrink-0 p-0"
+              aria-label={t("spending:budgetEditor.rowOptions")}
+            />
+          }
+        >
+          <Icons.MoreHorizontal className="h-3.5 w-3.5" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
           {mode === "setup" && (
             <>
-              <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wide">
-                {t("spending:budgetEditor.moveToGroup")}
-              </DropdownMenuLabel>
               <DropdownMenuRadioGroup
                 value={row.groupId ?? ""}
                 onValueChange={(value) => onMoveCategory(row.categoryId, value)}
               >
+                <DropdownMenuLabel className="text-2xs font-semibold uppercase tracking-wide">
+                  {t("spending:budgetEditor.moveToGroup")}
+                </DropdownMenuLabel>
                 {groups.map((group) => (
                   <DropdownMenuRadioItem key={group.id} value={group.id} className="text-xs">
                     <span className="flex items-center gap-2">
@@ -1214,15 +1226,15 @@ function BudgetCategoryLine({
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 disabled={groupRolloverEnabled}
-                onSelect={(event) => {
-                  event.preventDefault();
+                closeOnClick={false}
+                onClick={() => {
                   onToggleRollover(row, !row.rolloverEnabled);
                 }}
                 className="text-xs"
               >
                 <Icons.Refresh className="mr-2 h-3.5 w-3.5" />
                 <span className="flex-1">{t("spending:budgetEditor.rollover")}</span>
-                <span className="text-muted-foreground text-[10px]">
+                <span className="text-muted-foreground text-2xs">
                   {groupRolloverEnabled
                     ? t("spending:budgetEditor.groupWide")
                     : row.rolloverEnabled
@@ -1236,7 +1248,7 @@ function BudgetCategoryLine({
             <>
               {mode === "setup" && <DropdownMenuSeparator />}
               <DropdownMenuItem
-                onSelect={() => onDeleteOverride(target)}
+                onClick={() => onDeleteOverride(target)}
                 className="text-warning text-xs"
               >
                 <Icons.X className="mr-2 h-3.5 w-3.5" />
@@ -1280,15 +1292,15 @@ function GroupBufferLine({
         aria-hidden
       />
       <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="text-muted-foreground min-w-0 flex-1 truncate">{label}</span>
+        <TooltipTrigger render={<span className="text-muted-foreground min-w-0 flex-1 truncate" />}>
+          {label}
         </TooltipTrigger>
-        <TooltipContent side="top" sideOffset={4} className="max-w-[220px] text-xs">
+        <TooltipContent side="top" sideOffset={4} className="max-w-55 text-xs">
           {t("spending:budgetEditor.groupBufferTooltip")}
         </TooltipContent>
       </Tooltip>
 
-      <div className="relative w-[80px] shrink-0">
+      <div className="relative w-20 shrink-0">
         <AmountInput
           value={row.buffer}
           variant="dashed"
@@ -1298,7 +1310,7 @@ function GroupBufferLine({
           <button
             type="button"
             onClick={() => onDeleteOverride(target)}
-            className="bg-warning/15 text-warning hover:bg-warning/25 border-background absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border transition-colors"
+            className="bg-warning-subtle text-warning-subtle-foreground hover:bg-warning-subtle/70 border-background absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border transition-colors"
             aria-label={t("spending:budgetEditor.revertOverride")}
           >
             <Icons.X className="h-2 w-2" />
@@ -1306,7 +1318,7 @@ function GroupBufferLine({
         )}
       </div>
 
-      <span className="text-muted-foreground hidden w-8 shrink-0 text-right text-[10px] tabular-nums sm:inline">
+      <span className="text-muted-foreground text-2xs hidden w-8 shrink-0 text-right tabular-nums sm:inline">
         {numberFormatting.formatPercent(sharePct, { digits: 0 })}
       </span>
       <span className="hidden w-14 shrink-0 sm:block" aria-hidden />
@@ -1378,13 +1390,13 @@ function IncomeSourcesPanel({
                     <button
                       type="button"
                       onClick={() => onDeleteOverride(target)}
-                      className="text-warning hover:text-warning/80 text-[10px] underline-offset-4 hover:underline"
+                      className="text-warning hover:text-warning/80 text-2xs underline-offset-4 hover:underline"
                     >
                       {t("spending:budgetEditor.revertOverride")}
                     </button>
                   )}
                 </div>
-                <div className="w-[80px] shrink-0">
+                <div className="w-20 shrink-0">
                   <AmountInput value={row.target} onCommit={(value) => onSaveTarget(row, value)} />
                 </div>
               </div>
@@ -1396,7 +1408,7 @@ function IncomeSourcesPanel({
         <button
           type="button"
           onClick={() => setShowAll((v) => !v)}
-          className="text-muted-foreground hover:text-foreground mt-1 inline-flex items-center gap-1 text-[11px] underline-offset-4 hover:underline"
+          className="text-muted-foreground hover:text-foreground text-2xs mt-1 inline-flex items-center gap-1 underline-offset-4 hover:underline"
         >
           <Icons.Plus className="h-3 w-3" />
           {showAll
@@ -1539,7 +1551,7 @@ function OverridesSummary({
           size="sm"
           variant="ghost"
           onClick={() => overrides.forEach((o) => onRevert(o.target))}
-          className="text-muted-foreground hover:text-foreground h-6 gap-1 px-1.5 text-[10px]"
+          className="text-muted-foreground hover:text-foreground text-2xs h-6 gap-1 px-1.5"
         >
           <Icons.X className="h-3 w-3" />
           {tr("spending:budgetEditor.revertAll")}
@@ -1569,7 +1581,7 @@ function OverridesSummary({
                   <Icons.X className="h-3 w-3" />
                 </Button>
               </div>
-              <div className="mt-0.5 flex items-baseline gap-1.5 pl-3 text-[11px] tabular-nums">
+              <div className="text-2xs mt-0.5 flex items-baseline gap-1.5 pl-3 tabular-nums">
                 <span className="text-foreground font-medium">
                   <PrivacyAmount value={o.monthAmount} currency={currency} />
                 </span>
@@ -1630,7 +1642,7 @@ function CopyFromMonthRow({
         title={t("spending:budgetEditor.copyPlanTitle")}
         icon={<Icons.Copy className="h-3.5 w-3.5" />}
       />
-      <p className="text-muted-foreground mt-1 text-[11px]">
+      <p className="text-muted-foreground text-2xs mt-1">
         {t("spending:budgetEditor.copyPlanDesc")}{" "}
         {overwrite
           ? t("spending:budgetEditor.copyOverwrite")
@@ -1644,10 +1656,10 @@ function CopyFromMonthRow({
             value={sourceMonth}
             max={currentPeriodKey}
             onChange={(event) => setSourceMonth(event.target.value || previousMonth)}
-            className="text-foreground h-7 w-[120px] bg-transparent px-2 text-xs outline-none"
+            className="text-foreground w-30 h-7 bg-transparent px-2 text-xs outline-none"
           />
         </div>
-        <label className="text-muted-foreground inline-flex items-center gap-1.5 text-[11px]">
+        <label className="text-muted-foreground text-2xs inline-flex items-center gap-1.5">
           <input
             type="checkbox"
             checked={overwrite}
@@ -1734,7 +1746,7 @@ function TotalLine({
 }) {
   return (
     <div className="flex min-w-0 flex-col">
-      <span className="text-muted-foreground text-[10px] uppercase tracking-wide">{label}</span>
+      <span className="text-muted-foreground text-2xs uppercase tracking-wide">{label}</span>
       <span
         className={cn(
           "truncate text-sm font-semibold tabular-nums",
@@ -1751,7 +1763,7 @@ function PanelHeader({ title, icon }: { title: string; icon: ReactNode }) {
   return (
     <div className="flex items-center gap-1.5">
       <span className="text-muted-foreground">{icon}</span>
-      <h2 className="text-muted-foreground text-[11px] font-semibold uppercase tracking-[0.08em]">
+      <h2 className="text-muted-foreground text-2xs font-semibold uppercase tracking-[0.08em]">
         {title}
       </h2>
     </div>
@@ -1788,7 +1800,7 @@ function BudgetSkeleton() {
   return (
     <div className="space-y-4">
       <Skeleton className="h-40 rounded-xl" />
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22.5rem]">
         <div className="space-y-4">
           <Skeleton className="h-72 rounded-xl" />
           <Skeleton className="h-56 rounded-xl" />

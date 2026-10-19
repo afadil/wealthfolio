@@ -48,7 +48,7 @@ export function CancelConfirmationDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
-            <Icons.AlertTriangle className="h-5 w-5 text-amber-500" />
+            <Icons.AlertTriangle className="text-warning h-5 w-5" />
             {resolvedTitle}
           </AlertDialogTitle>
           <AlertDialogDescription>{resolvedDescription}</AlertDialogDescription>

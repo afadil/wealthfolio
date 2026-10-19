@@ -21,6 +21,7 @@ import { useGoals } from "../hooks/use-goals";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 
 const TAX_BUCKET_COLORS: Record<string, string> = {
   taxable: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
@@ -433,7 +434,7 @@ export function GoalFundingEditor({
             /* ── Edit mode ── */
             <div className="space-y-3">
               {!isRetirement && (
-                <p className="text-muted-foreground text-[10px]">
+                <p className="text-muted-foreground text-2xs">
                   {t("goals:funding.reserved_share_note")}
                 </p>
               )}
@@ -466,7 +467,7 @@ export function GoalFundingEditor({
                           {isRetirement && !isDcLinked && (
                             <button
                               onClick={() => cycleTaxBucket(a.id)}
-                              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                              className={`text-2xs shrink-0 rounded-full px-2 py-0.5 font-medium transition-colors ${
                                 tb
                                   ? (TAX_BUCKET_COLORS[tb] ?? "")
                                   : "bg-muted text-muted-foreground"
@@ -481,7 +482,7 @@ export function GoalFundingEditor({
 
                           {!isDcLinked && allocation && (
                             <span
-                              className={`w-16 shrink-0 text-right text-[11px] font-medium tabular-nums ${allocationLabelClass(allocation)}`}
+                              className={`text-2xs w-16 shrink-0 text-right font-medium tabular-nums ${allocationLabelClass(allocation)}`}
                             >
                               {allocationLabel(allocation, t)}
                             </span>
@@ -499,7 +500,7 @@ export function GoalFundingEditor({
                           {isDcLinked && (
                             <Tooltip>
                               <TooltipTrigger>
-                                <span className="text-muted-foreground flex items-center gap-0.5 text-[10px]">
+                                <span className="text-muted-foreground text-2xs flex items-center gap-0.5">
                                   <Icons.ShieldCheck className="h-3 w-3" />{" "}
                                   {t("goals:funding.pension")}
                                 </span>
@@ -525,7 +526,7 @@ export function GoalFundingEditor({
                         {allocation && !isDcLinked && (
                           <div className="mt-2">
                             {(otherTotal > SHARE_EPSILON || hasOverage) && (
-                              <div className="text-muted-foreground flex items-center justify-between gap-3 text-[10px]">
+                              <div className="text-muted-foreground text-2xs flex items-center justify-between gap-3">
                                 <span className="truncate">
                                   {otherTotal > SHARE_EPSILON
                                     ? t("goals:funding.used_by_other_goals", {
@@ -549,7 +550,7 @@ export function GoalFundingEditor({
                               </div>
                             )}
                             {hasOverage && (
-                              <p className="text-destructive mt-1 text-[10px]">
+                              <p className="text-destructive text-2xs mt-1">
                                 {t("goals:funding.overallocated", {
                                   percent: formatShare(overBy),
                                 })}
@@ -566,7 +567,7 @@ export function GoalFundingEditor({
               {/* Available accounts to add */}
               {availableAccounts.length > 0 && (
                 <div className="space-y-1">
-                  <p className="text-muted-foreground px-1 text-[10px] uppercase tracking-wider">
+                  <p className="text-muted-foreground text-2xs px-1 uppercase tracking-wider">
                     {t("goals:funding.add_accounts")}
                   </p>
                   {availableAccounts.map((a) => (
@@ -577,7 +578,7 @@ export function GoalFundingEditor({
                     >
                       <Icons.Plus className="text-muted-foreground h-3 w-3 shrink-0" />
                       <span className="min-w-0 flex-1 truncate text-xs">{a.name}</span>
-                      <span className="text-muted-foreground text-[10px]">{a.accountType}</span>
+                      <span className="text-muted-foreground text-2xs">{a.accountType}</span>
                     </button>
                   ))}
                 </div>
@@ -590,11 +591,13 @@ export function GoalFundingEditor({
               )}
 
               {hasInvalidAllocations && (
-                <div className="text-destructive bg-destructive/5 rounded-lg px-3 py-2 text-[11px]">
-                  {t("goals:funding.accounts_exceed_share", {
-                    count: invalidAllocationRows.length,
-                  })}
-                </div>
+                <Alert variant="destructive" className="text-2xs px-3 py-2">
+                  <AlertDescription>
+                    {t("goals:funding.accounts_exceed_share", {
+                      count: invalidAllocationRows.length,
+                    })}
+                  </AlertDescription>
+                </Alert>
               )}
             </div>
           ) : (
@@ -630,7 +633,7 @@ export function GoalFundingEditor({
                         </span>
                         {isRetirement && tbLabel && (
                           <span
-                            className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${tb ? (TAX_BUCKET_COLORS[tb] ?? "") : ""}`}
+                            className={`text-2xs shrink-0 rounded-full px-1.5 py-0.5 font-medium ${tb ? (TAX_BUCKET_COLORS[tb] ?? "") : ""}`}
                           >
                             {tbLabel}
                           </span>
@@ -683,9 +686,9 @@ function AllocationDetailsSheet({
             <p className="text-muted-foreground text-sm">{t("goals:funding.no_active_shares")}</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] border-separate border-spacing-0 text-sm">
+              <table className="min-w-160 w-full border-separate border-spacing-0 text-sm">
                 <thead>
-                  <tr className="text-muted-foreground text-left text-[10px] uppercase tracking-[0.18em]">
+                  <tr className="text-muted-foreground text-2xs text-left uppercase tracking-[0.18em]">
                     <th className="border-border border-b py-2 pr-4 font-medium">
                       {t("common:account")}
                     </th>

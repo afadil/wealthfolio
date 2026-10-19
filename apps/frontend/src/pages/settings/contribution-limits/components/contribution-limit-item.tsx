@@ -16,6 +16,8 @@ import { useTranslation } from "react-i18next";
 import { useContributionLimitProgress } from "../use-contribution-limit-mutations";
 import { AccountSelection } from "./account-selection";
 import { ContributionLimitOperations } from "./contribution-limit-operations";
+import { statusSurfaceVariants } from "@wealthfolio/ui/components/ui/status-surface";
+import { cn } from "@/lib/utils";
 
 interface ContributionLimitItemProps {
   limit: ContributionLimit;
@@ -65,7 +67,12 @@ export function ContributionLimitItem({
 
   return (
     <Card
-      className={`w-full ${progressPercentageNumber === 100 ? "border-success/20 bg-success/10 shadow-sm" : isOverLimit ? "border-destructive/20 bg-destructive/10 shadow-sm" : ""}`}
+      className={cn(
+        "w-full",
+        progressPercentageNumber === 100
+          ? statusSurfaceVariants({ status: "success" })
+          : isOverLimit && statusSurfaceVariants({ status: "destructive" }),
+      )}
     >
       <CardHeader className="cursor-pointer pb-3" onClick={toggleExpanded}>
         {/* Mobile Layout */}
@@ -141,7 +148,9 @@ export function ContributionLimitItem({
               {daysRemaining !== null && daysRemaining > 0 && daysRemaining <= 60 && (
                 <span
                   className={`shrink-0 rounded-full px-2 py-0.5 ${
-                    daysRemaining <= 30 ? "bg-amber-100 text-amber-800" : "bg-blue-50 text-blue-700"
+                    daysRemaining <= 30
+                      ? "bg-warning-subtle text-warning-subtle-foreground"
+                      : "bg-info-subtle text-info-subtle-foreground"
                   }`}
                 >
                   {t("settings:limits.day_left", { days: daysRemaining })}
@@ -171,8 +180,8 @@ export function ContributionLimitItem({
                   <span
                     className={`ml-2 rounded-full px-2 py-0.5 text-xs ${
                       daysRemaining <= 30
-                        ? "bg-amber-100 text-amber-800"
-                        : "bg-blue-50 text-blue-700"
+                        ? "bg-warning-subtle text-warning-subtle-foreground"
+                        : "bg-info-subtle text-info-subtle-foreground"
                     }`}
                   >
                     {t("settings:limits_days_left", { days: daysRemaining })}

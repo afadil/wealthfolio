@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { cn } from "@/lib/utils";
+import { Spinner } from "@wealthfolio/ui";
 
 function hasResultMeta(
   result: unknown,
@@ -59,7 +60,7 @@ export const ToolFallback: ToolCallMessagePartComponent = ({
         )}
       >
         {isRunning ? (
-          <Icons.Spinner className="h-3.5 w-3.5 shrink-0 animate-spin" />
+          <Spinner className="h-3.5 w-3.5 shrink-0" />
         ) : notUsed ? (
           <Icons.XCircle className="h-3.5 w-3.5 shrink-0" />
         ) : (

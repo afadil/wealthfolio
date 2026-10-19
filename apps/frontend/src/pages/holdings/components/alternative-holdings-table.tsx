@@ -2,7 +2,17 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import type { AlternativeAssetHolding } from "@/lib/types";
 import { ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES } from "@/lib/types";
 import type { ColumnDef } from "@tanstack/react-table";
-import { AmountDisplay, EmptyPlaceholder, GainPercent, useDateFormatting } from "@wealthfolio/ui";
+import {
+  AmountDisplay,
+  GainPercent,
+  useDateFormatting,
+  Spinner,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@wealthfolio/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -225,14 +235,16 @@ export function AlternativeHoldingsTable({
           return (
             <div className="flex justify-end">
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="hover:bg-muted text-muted-foreground inline-flex h-9 w-9 items-center justify-center rounded-md border transition"
-                    aria-label={t("holdings:open_actions")}
-                  >
-                    <Icons.MoreVertical className="h-4 w-4" />
-                  </button>
+                <DropdownMenuTrigger
+                  render={
+                    <button
+                      type="button"
+                      className="hover:bg-muted text-muted-foreground inline-flex h-9 w-9 items-center justify-center rounded-md border transition"
+                      aria-label={t("holdings:open_actions")}
+                    />
+                  }
+                >
+                  <Icons.MoreVertical className="h-4 w-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {onUpdateValue && (
@@ -258,7 +270,7 @@ export function AlternativeHoldingsTable({
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         className="text-destructive focus:text-destructive"
-                        onSelect={() => setAssetToDelete(holding)}
+                        onClick={() => setAssetToDelete(holding)}
                       >
                         <Icons.Trash className="mr-2 h-4 w-4" />
                         {t("common:delete")}
@@ -288,11 +300,15 @@ export function AlternativeHoldingsTable({
   if (!holdings || holdings.length === 0) {
     return (
       <div className="flex items-center justify-center py-16">
-        <EmptyPlaceholder
-          icon={<Icons.Wallet className="text-muted-foreground h-10 w-10" />}
-          title={resolvedEmptyTitle}
-          description={resolvedEmptyDescription}
-        />
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              {<Icons.Wallet className="text-muted-foreground size-10" />}
+            </EmptyMedia>
+            <EmptyTitle>{resolvedEmptyTitle}</EmptyTitle>
+            <EmptyDescription>{resolvedEmptyDescription}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       </div>
     );
   }
@@ -327,11 +343,11 @@ export function AlternativeHoldingsTable({
             <AlertDialogAction
               onClick={handleConfirmDelete}
               disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
             >
               {isDeleting ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                   {t("holdings:deleting")}
                 </>
               ) : (

@@ -55,17 +55,17 @@ export function QuoteImportProgress({
 
         <div className="grid grid-cols-3 gap-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{totalRows}</div>
+            <div className="text-info text-2xl font-bold">{totalRows}</div>
             <div className="text-muted-foreground text-sm">{t("common:total")}</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{successfulRows}</div>
+            <div className="text-success text-2xl font-bold">{successfulRows}</div>
             <div className="text-muted-foreground text-sm">
               {t("settings:market_data_page.field_successful")}
             </div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-red-600">{failedRows}</div>
+            <div className="text-destructive text-2xl font-bold">{failedRows}</div>
             <div className="text-muted-foreground text-sm">
               {t("settings:market_data_page.field_failed")}
             </div>

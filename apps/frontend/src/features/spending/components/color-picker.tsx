@@ -94,27 +94,29 @@ export function ColorPicker({ value, onChange, presets = [] }: ColorPickerProps)
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "relative flex h-8 w-8 items-center justify-center rounded-full border-2 transition-transform hover:scale-110",
-            isCustom ? "border-foreground ring-2 ring-offset-2" : "border-border/60",
-          )}
-          style={
-            isCustom
-              ? { backgroundColor: value }
-              : {
-                  backgroundImage:
-                    "conic-gradient(from 0deg, #ef4444, #f59e0b, #22c55e, #06b6d4, #6366f1, #d946ef, #ef4444)",
-                }
-          }
-          aria-label={t("spending:category.pickCustomColor")}
-        >
-          {!isCustom && (
-            <Icons.Plus className="text-foreground h-4 w-4 drop-shadow-[0_0_2px_rgba(0,0,0,0.6)]" />
-          )}
-        </button>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            className={cn(
+              "relative flex h-8 w-8 items-center justify-center rounded-full border-2 transition-transform hover:scale-110",
+              isCustom ? "border-foreground ring-2 ring-offset-2" : "border-border/60",
+            )}
+            style={
+              isCustom
+                ? { backgroundColor: value }
+                : {
+                    backgroundImage:
+                      "conic-gradient(from 0deg, #ef4444, #f59e0b, #22c55e, #06b6d4, #6366f1, #d946ef, #ef4444)",
+                  }
+            }
+            aria-label={t("spending:category.pickCustomColor")}
+          />
+        }
+      >
+        {!isCustom && (
+          <Icons.Plus className="text-foreground h-4 w-4 drop-shadow-[0_0_2px_rgba(0,0,0,0.6)]" />
+        )}
       </PopoverTrigger>
       <PopoverContent className="w-64 p-3" align="start">
         <div className="space-y-3">
@@ -140,7 +142,7 @@ export function ColorPicker({ value, onChange, presets = [] }: ColorPickerProps)
             })}
           </div>
           <div className="space-y-1.5">
-            <label className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
+            <label className="text-muted-foreground text-2xs font-semibold uppercase tracking-wide">
               {t("spending:category.hex")}
             </label>
             <div className="flex items-center gap-2">

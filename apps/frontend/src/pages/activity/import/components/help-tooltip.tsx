@@ -5,16 +5,18 @@ import {
   TooltipTrigger,
   TooltipProvider,
 } from "@wealthfolio/ui/components/ui/tooltip";
+import { useTranslation } from "react-i18next";
 
 interface HelpTooltipProps {
   content: React.ReactNode;
 }
 
 export function HelpTooltip({ content }: HelpTooltipProps) {
+  const { t } = useTranslation();
   return (
     <TooltipProvider>
-      <Tooltip delayDuration={300}>
-        <TooltipTrigger className="ml-2 cursor-help">
+      <Tooltip>
+        <TooltipTrigger delay={300} className="ml-2 cursor-help" aria-label={t("common:help")}>
           <Icons.Info className="text-muted-foreground h-4 w-4" />
         </TooltipTrigger>
         <TooltipContent>

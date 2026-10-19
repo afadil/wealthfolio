@@ -12,7 +12,9 @@ import {
 import { Component, type ClipboardEvent, type ErrorInfo, type FC, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
+import { statusSurfaceVariants } from "@wealthfolio/ui/components/ui/status-surface";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { ComposerAddAttachment, ComposerAttachments, UserMessageAttachments } from "./attachment";
 import { MarkdownText } from "./markdown-text";
@@ -215,7 +217,7 @@ const ComposerAction: FC<ComposerActionProps> = ({ composerActions }) => {
             type="submit"
             variant="default"
             size="icon"
-            className="aui-composer-send size-[34px] rounded-full p-1"
+            className="aui-composer-send size-8.5 rounded-full p-1"
             aria-label={t("ai:thread.sendMessage")}
           >
             <Icons.ArrowUp className="aui-composer-send-icon size-5" />
@@ -229,7 +231,7 @@ const ComposerAction: FC<ComposerActionProps> = ({ composerActions }) => {
             type="button"
             variant="default"
             size="icon"
-            className="aui-composer-cancel border-muted-foreground/60 hover:bg-primary/75 dark:border-muted-foreground/90 size-[34px] rounded-full border"
+            className="aui-composer-cancel border-muted-foreground/60 hover:bg-primary/75 dark:border-muted-foreground/90 size-8.5 rounded-full border"
             aria-label={t("ai:thread.stopGenerating")}
           >
             <Icons.Square className="aui-composer-cancel-icon size-3.5 fill-white dark:fill-black" />
@@ -243,7 +245,12 @@ const ComposerAction: FC<ComposerActionProps> = ({ composerActions }) => {
 const MessageError: FC = () => {
   return (
     <MessagePrimitive.Error>
-      <ErrorPrimitive.Root className="aui-message-error-root border-destructive bg-destructive/10 text-destructive dark:bg-destructive/5 mt-2 rounded-md border p-3 text-sm dark:text-red-200">
+      <ErrorPrimitive.Root
+        className={cn(
+          "aui-message-error-root text-destructive-subtle-foreground mt-2 rounded-md p-3 text-sm",
+          statusSurfaceVariants({ status: "destructive" }),
+        )}
+      >
         <ErrorPrimitive.Message className="aui-message-error-message line-clamp-2" />
       </ErrorPrimitive.Root>
     </MessagePrimitive.Error>
@@ -288,10 +295,10 @@ class ToolRenderErrorBoundary extends Component<
 const ToolRenderErrorFallback: FC = () => {
   const { t } = useTranslation();
   return (
-    <div className="border-destructive/30 bg-destructive/5 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-xs">
-      <Icons.AlertCircle className="h-4 w-4 shrink-0" />
-      <span>{t("ai:thread.toolDisplayFailed")}</span>
-    </div>
+    <Alert variant="destructive" className="px-3 py-2 text-xs">
+      <Icons.AlertCircle />
+      <AlertDescription>{t("ai:thread.toolDisplayFailed")}</AlertDescription>
+    </Alert>
   );
 };
 
@@ -392,7 +399,7 @@ const AssistantActionBar: FC = () => {
 const UserMessage: FC = () => {
   return (
     <MessagePrimitive.Root
-      className="aui-user-message-root fade-in slide-in-from-bottom-1 animate-in max-w-(--thread-max-width) mx-auto grid w-full auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] content-start gap-y-2 px-2 py-4 duration-150 ease-out [&:where(>*)]:col-start-2"
+      className="aui-user-message-root fade-in slide-in-from-bottom-1 animate-in max-w-(--thread-max-width) mx-auto grid w-full auto-rows-auto grid-cols-[minmax(4.5rem,1fr)_auto] content-start gap-y-2 px-2 py-4 duration-150 ease-out [&:where(>*)]:col-start-2"
       data-role="user"
     >
       <UserMessageAttachments />
@@ -439,7 +446,7 @@ const EditComposer: FC = () => {
     <MessagePrimitive.Root className="aui-edit-composer-wrapper max-w-(--thread-max-width) mx-auto flex w-full flex-col gap-4 px-2">
       <ComposerPrimitive.Root className="aui-edit-composer-root bg-muted max-w-7/8 ml-auto flex w-full flex-col rounded-xl">
         <ComposerPrimitive.Input
-          className="aui-edit-composer-input text-foreground flex min-h-[60px] w-full resize-none bg-transparent p-4 outline-none"
+          className="aui-edit-composer-input text-foreground min-h-15 flex w-full resize-none bg-transparent p-4 outline-none"
           autoFocus
         />
 

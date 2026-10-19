@@ -120,12 +120,12 @@ function TransactionRowImpl({
       ref={ref}
       data-index={dataIndex}
       data-state={isSelected ? "selected" : undefined}
-      className={cn("group/row cursor-pointer", row.needsReview && "bg-amber-500/5")}
+      className={cn("group/row cursor-pointer", row.needsReview && "bg-warning/5")}
       onClick={(e) => isRowBodyClick(e) && onEdit(row)}
     >
       <TableCell className="relative w-10 px-3 py-2" data-row-click-ignore>
         {row.needsReview && (
-          <span className="absolute inset-y-0 left-0 w-[3px] bg-amber-500" aria-hidden="true" />
+          <span className="bg-warning absolute inset-y-0 left-0 w-[3px]" aria-hidden="true" />
         )}
         <Checkbox
           checked={isSelected}
@@ -149,7 +149,7 @@ function TransactionRowImpl({
               nothing to a reader who cannot separate amber from the row behind
               it. An icon costs a line of width and says it in both registers. */}
           {row.needsReview && (
-            <span className="shrink-0 text-amber-600 dark:text-amber-500">
+            <span className="text-warning shrink-0">
               <Icons.AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
               <span className="sr-only">{t("spending:transactions.review")}</span>
             </span>
@@ -278,15 +278,17 @@ function TransactionRowImpl({
       )}
       <TableCell className="w-10 px-3 py-2" data-row-click-ignore>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("h-7 w-7 data-[state=open]:opacity-100", HOVER_SLOT)}
-              aria-label={t("spending:transactions.rowActions")}
-            >
-              <Icons.MoreVertical className="h-4 w-4" aria-hidden="true" />
-            </Button>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("data-popup-open:opacity-100 h-7 w-7", HOVER_SLOT)}
+                aria-label={t("spending:transactions.rowActions")}
+              />
+            }
+          >
+            <Icons.MoreVertical className="h-4 w-4" aria-hidden="true" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onEdit(row)}>

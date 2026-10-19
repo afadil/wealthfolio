@@ -194,7 +194,7 @@ export function MoneyFlowSection({
           />
         )}
         {!isLoading && !focusedGraph && !isEmpty && graph.totals.income === 0 && (
-          <p className="text-muted-foreground/80 px-2 pt-2 text-[11px]">
+          <p className="text-muted-foreground/80 text-2xs px-2 pt-2">
             {t("spending:whereIAm.noIncome")}
           </p>
         )}
@@ -205,7 +205,7 @@ export function MoneyFlowSection({
 
 function MoneyFlowSkeleton() {
   return (
-    <div className="flex h-[300px] items-stretch gap-6 px-2 py-2">
+    <div className="h-75 flex items-stretch gap-6 px-2 py-2">
       <div className="flex w-1/5 flex-col justify-center gap-3">
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-10 w-full" />

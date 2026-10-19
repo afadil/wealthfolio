@@ -34,6 +34,7 @@ import {
   Skeleton,
   useAmountFormatting,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { useActivityMutations } from "../hooks/use-activity-mutations";
 import { ActivityTypeBadge } from "./activity-type-badge";
@@ -377,7 +378,7 @@ function CandidateButton({
         {candidate.reasons.length > 0 || candidate.warnings.length > 0 ? (
           <div className="space-y-1.5 px-3 pb-2.5">
             {candidate.reasons.length > 0 ? (
-              <div className="text-muted-foreground flex flex-wrap gap-1 text-[11px]">
+              <div className="text-muted-foreground text-2xs flex flex-wrap gap-1">
                 {candidate.reasons.map((reason) => (
                   <Badge key={reason} variant="secondary" className="rounded-sm px-1.5 py-0">
                     {reason}
@@ -386,7 +387,7 @@ function CandidateButton({
               </div>
             ) : null}
             {candidate.warnings.length > 0 ? (
-              <div className="flex items-start gap-1.5 text-[11px] text-amber-600">
+              <div className="text-2xs text-warning flex items-start gap-1.5">
                 <Icons.AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                 <span>{candidate.warnings.join(" ")}</span>
               </div>
@@ -740,7 +741,7 @@ export function TransferMatchDialog({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex w-full flex-col overflow-hidden sm:max-w-[760px]">
+      <SheetContent className="sm:max-w-190 flex w-full flex-col overflow-hidden">
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
@@ -804,8 +805,8 @@ export function TransferMatchDialog({
                 </div>
                 {suggestionsLoading ? (
                   <div className="space-y-2">
-                    <Skeleton className="h-[88px] w-full rounded-md" />
-                    <Skeleton className="h-[88px] w-full rounded-md" />
+                    <Skeleton className="h-22 w-full rounded-md" />
+                    <Skeleton className="h-22 w-full rounded-md" />
                   </div>
                 ) : suggestionsError ? (
                   <div className="text-destructive rounded-md border p-3 text-sm">
@@ -880,7 +881,7 @@ export function TransferMatchDialog({
                     </div>
                     <Button type="submit" disabled={manualLoading}>
                       {manualLoading ? (
-                        <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                        <Spinner className="mr-2 h-4 w-4" />
                       ) : (
                         <Icons.Search className="mr-2 h-4 w-4" />
                       )}
@@ -889,7 +890,19 @@ export function TransferMatchDialog({
                   </div>
 
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                    <Select value={accountId} onValueChange={setAccountId}>
+                    <Select
+                      value={accountId}
+                      items={[
+                        { value: ALL, label: t("activity:all_accounts") },
+                        ...activeAccounts.map((account) => ({
+                          value: account.id,
+                          label: account.name,
+                        })),
+                      ]}
+                      onValueChange={(value) => {
+                        if (value !== null) setAccountId(value);
+                      }}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder={t("activity:filter_account")} />
                       </SelectTrigger>
@@ -903,7 +916,16 @@ export function TransferMatchDialog({
                       </SelectContent>
                     </Select>
 
-                    <Select value={windowDays} onValueChange={setWindowDays}>
+                    <Select
+                      value={windowDays}
+                      items={[7, 30, 90, 180].map((count) => ({
+                        value: `${count}`,
+                        label: t("activity:transfer_match.within_days", { count }),
+                      }))}
+                      onValueChange={(value) => {
+                        if (value !== null) setWindowDays(value);
+                      }}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder={t("activity:transfer_match.date_range")} />
                       </SelectTrigger>
@@ -925,33 +947,44 @@ export function TransferMatchDialog({
                   </div>
 
                   <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
-                    <CollapsibleTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground h-7 px-2 text-xs"
-                      >
-                        <Icons.ChevronDown
-                          className={cn(
-                            "mr-1 h-3.5 w-3.5 transition-transform",
-                            filtersOpen && "rotate-180",
-                          )}
+                    <CollapsibleTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground h-7 px-2 text-xs"
                         />
-                        {t("activity:transfer_match.more_filters")}
-                        {advancedFilterCount > 0 ? (
-                          <Badge
-                            variant="secondary"
-                            className="ml-1.5 rounded-sm px-1.5 py-0 text-[10px]"
-                          >
-                            {advancedFilterCount}
-                          </Badge>
-                        ) : null}
-                      </Button>
+                      }
+                    >
+                      <Icons.ChevronDown
+                        className={cn(
+                          "mr-1 h-3.5 w-3.5 transition-transform",
+                          filtersOpen && "rotate-180",
+                        )}
+                      />
+                      {t("activity:transfer_match.more_filters")}
+                      {advancedFilterCount > 0 ? (
+                        <Badge
+                          variant="secondary"
+                          className="text-2xs ml-1.5 rounded-sm px-1.5 py-0"
+                        >
+                          {advancedFilterCount}
+                        </Badge>
+                      ) : null}
                     </CollapsibleTrigger>
                     <CollapsibleContent className="pt-2">
                       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                        <Select value={accountType} onValueChange={setAccountType}>
+                        <Select
+                          value={accountType}
+                          items={[
+                            { value: ALL, label: t("activity:transfer_match.all_account_types") },
+                            ...accountTypeOptions.map((type) => ({ value: type, label: type })),
+                          ]}
+                          onValueChange={(value) => {
+                            if (value !== null) setAccountType(value);
+                          }}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder={t("activity:transfer_match.account_type")} />
                           </SelectTrigger>
@@ -967,7 +1000,16 @@ export function TransferMatchDialog({
                           </SelectContent>
                         </Select>
 
-                        <Select value={currency} onValueChange={setCurrency}>
+                        <Select
+                          value={currency}
+                          items={[
+                            { value: ALL, label: t("activity:transfer_match.all_currencies") },
+                            ...currencyOptions.map((option) => ({ value: option, label: option })),
+                          ]}
+                          onValueChange={(value) => {
+                            if (value !== null) setCurrency(value);
+                          }}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder={t("activity:table_currency")} />
                           </SelectTrigger>
@@ -983,7 +1025,17 @@ export function TransferMatchDialog({
                           </SelectContent>
                         </Select>
 
-                        <Select value={assetFilter} onValueChange={setAssetFilter}>
+                        <Select
+                          value={assetFilter}
+                          items={[
+                            { value: ALL, label: t("activity:transfer_match.all_assets") },
+                            { value: SAME_ASSET, label: t("activity:transfer_match.same_asset") },
+                            { value: CASH_ASSET, label: t("activity:transfer_match.cash_only") },
+                          ]}
+                          onValueChange={(value) => {
+                            if (value !== null) setAssetFilter(value);
+                          }}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder={t("activity:transfer_match.asset")} />
                           </SelectTrigger>
@@ -1003,7 +1055,16 @@ export function TransferMatchDialog({
                           </SelectContent>
                         </Select>
 
-                        <Select value={matchMode} onValueChange={setMatchMode}>
+                        <Select
+                          value={matchMode}
+                          items={[
+                            { value: STRICT, label: t("activity:transfer_match.exact_amount") },
+                            { value: ANY, label: t("activity:transfer_match.any_eligible") },
+                          ]}
+                          onValueChange={(value) => {
+                            if (value !== null) setMatchMode(value);
+                          }}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder={t("activity:transfer_match.match_mode")} />
                           </SelectTrigger>
@@ -1070,7 +1131,7 @@ export function TransferMatchDialog({
               disabled={!selectedCandidate || isProcessing}
             >
               {isProcessing ? (
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
               ) : (
                 <Icons.Link className="mr-2 h-4 w-4" />
               )}
@@ -1084,7 +1145,7 @@ export function TransferMatchDialog({
               }
             >
               {isProcessing ? (
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
               ) : (
                 <Icons.Unlink className="mr-2 h-4 w-4" />
               )}

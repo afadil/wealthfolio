@@ -34,7 +34,7 @@ const MAPPING_TRIGGER_CLASS = "h-8 rounded-md text-xs font-normal";
 
 // Dashed style for unmapped/empty mapping triggers — orange dashed border to signal action needed
 const MAPPING_TRIGGER_UNMAPPED_CLASS =
-  "h-8 rounded-md text-xs font-normal !border-dashed !border-orange-300 !text-orange-500 !bg-transparent !shadow-none hover:!bg-orange-50 dark:!border-orange-400 dark:!text-orange-400 dark:hover:!bg-orange-950";
+  "h-8 rounded-md text-xs font-normal !border-dashed !border-warning !text-warning !bg-transparent !shadow-none hover:!bg-warning-subtle";
 
 export function MappingHeaderCell({
   field,
@@ -56,24 +56,32 @@ export function MappingHeaderCell({
   const isMapped = displayHeader ? headers.includes(displayHeader) : false;
   const isEditing = editingHeader === field || !isMapped;
   const isRequired = requiredFields.includes(field);
+  const skipLabel =
+    field === ImportFormat.CURRENCY
+      ? t("activity:import.mapping.accountCurrency")
+      : field === ImportFormat.ACCOUNT
+        ? t("activity:import.mapping.defaultAccount")
+        : t("activity:import.mapping.ignore");
 
   return (
     <div>
       <div className="flex items-center gap-2 pb-0 pt-2">
         <span className="font-bold">
           {field}
-          {isRequired && !isMapped && (
-            <span className="ml-1 text-amber-600 dark:text-amber-400">*</span>
-          )}
+          {isRequired && !isMapped && <span className="text-warning ml-1">*</span>}
         </span>
       </div>
       {isEditing ? (
         <Select
           onValueChange={(val) => {
+            if (val === null) return;
             handleColumnMapping(field, val === SKIP_FIELD_VALUE ? "" : val);
             setEditingHeader(null);
           }}
-          value={displayHeader || SKIP_FIELD_VALUE}
+          // A required field has no skip item: unmapped, its value is null so the
+          // trigger shows the "Select column" placeholder instead of an empty label.
+          value={displayHeader || (isRequired ? null : SKIP_FIELD_VALUE)}
+          items={isRequired ? undefined : { [SKIP_FIELD_VALUE]: skipLabel }}
           onOpenChange={(open) => !open && setEditingHeader(null)}
         >
           <SelectTrigger className={cn(MAPPING_TRIGGER_CLASS, "text-muted-foreground !h-8 w-full")}>
@@ -85,16 +93,10 @@ export function MappingHeaderCell({
               }
             />
           </SelectTrigger>
-          <SelectContent className="max-h-[300px] overflow-y-auto">
+          <SelectContent className="max-h-[min(18.75rem,var(--available-height))] overflow-y-auto">
             {!isRequired && (
               <>
-                <SelectItem value={SKIP_FIELD_VALUE}>
-                  {field === ImportFormat.CURRENCY
-                    ? t("activity:import.mapping.accountCurrency")
-                    : field === ImportFormat.ACCOUNT
-                      ? t("activity:import.mapping.defaultAccount")
-                      : t("activity:import.mapping.ignore")}
-                </SelectItem>
+                <SelectItem value={SKIP_FIELD_VALUE}>{skipLabel}</SelectItem>
                 <SelectSeparator />
               </>
             )}
@@ -154,7 +156,7 @@ function ActivityTypeDisplayCell({
         >
           {displayValue}
         </span>
-        {showSubtype && <span className="text-muted-foreground ml-1 text-[10px]">{subtype}</span>}
+        {showSubtype && <span className="text-muted-foreground text-2xs ml-1">{subtype}</span>}
       </div>
       <span className="text-muted-foreground shrink-0">→</span>
       <div className="ml-auto">
@@ -194,8 +196,8 @@ function ActivityTypeDisplayCell({
               handleActivityTypeMapping(trimmedCsvType, newType as ActivityType)
             }
             placeholder={t("activity:import.mapping.mapType")}
-            className={cn(MAPPING_TRIGGER_UNMAPPED_CLASS, "w-[140px]")}
-            contentClassName="w-[220px]"
+            className={cn(MAPPING_TRIGGER_UNMAPPED_CLASS, "w-35")}
+            contentClassName="w-55"
           />
         )}
       </div>
@@ -263,7 +265,7 @@ function AccountIdDisplayCell({
         {sourceLabel}
       </span>
       <span className="text-muted-foreground shrink-0">→</span>
-      <div className="ml-auto min-w-[180px]">
+      <div className="min-w-45 ml-auto">
         <AccountSelector
           selectedAccount={selectedAccount}
           setSelectedAccount={(account) => {
@@ -318,7 +320,7 @@ function SymbolDisplayCell({
           {csvSymbol || "-"}
         </span>
         <span className="text-muted-foreground shrink-0">→</span>
-        <div className="ml-auto min-w-[180px]">
+        <div className="min-w-45 ml-auto">
           <TickerSearchInput
             defaultValue={mappedSymbol || ""}
             placeholder={t("activity:import.mapping.mapSymbol")}

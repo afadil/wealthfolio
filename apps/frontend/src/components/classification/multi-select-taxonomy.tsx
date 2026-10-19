@@ -13,7 +13,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Input } from "@wealthfolio/ui/components/ui/input";
-import { Icons } from "@wealthfolio/ui";
+import { Icons, Spinner } from "@wealthfolio/ui";
 import { cn } from "@/lib/utils";
 import {
   useTaxonomy,
@@ -255,17 +255,19 @@ export function MultiSelectTaxonomy({
             }}
             modal={true}
           >
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors"
-                disabled={isPending}
-              >
-                <Icons.Plus className="h-3.5 w-3.5" />
-                {t("asset:classification.add")}
-              </button>
+            <PopoverTrigger
+              render={
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors"
+                  disabled={isPending}
+                />
+              }
+            >
+              <Icons.Plus className="h-3.5 w-3.5" />
+              {t("asset:classification.add")}
             </PopoverTrigger>
-            <PopoverContent className="w-[450px] p-0" align="end" sideOffset={4}>
+            <PopoverContent className="w-112.5 p-0" align="end" sideOffset={4}>
               {/* Pending category weight input */}
               {pendingCategory && (
                 <div className="border-b p-3">
@@ -309,7 +311,7 @@ export function MultiSelectTaxonomy({
                       disabled={isPending}
                     >
                       {isPending ? (
-                        <Icons.Loader className="h-3 w-3 animate-spin" />
+                        <Spinner className="h-3 w-3" />
                       ) : (
                         <Icons.Check className="h-3 w-3" />
                       )}
@@ -455,10 +457,10 @@ export function MultiSelectTaxonomy({
                 className={cn(
                   "w-20 text-right text-sm font-semibold",
                   totalWeight === 100
-                    ? "text-green-600 dark:text-green-400"
+                    ? "text-success"
                     : totalWeight > 100
-                      ? "text-red-600 dark:text-red-400"
-                      : "text-amber-600 dark:text-amber-400",
+                      ? "text-destructive"
+                      : "text-warning",
                 )}
               >
                 {totalWeight % 1 === 0 ? totalWeight : totalWeight.toFixed(1)}%

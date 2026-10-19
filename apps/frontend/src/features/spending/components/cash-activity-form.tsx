@@ -41,6 +41,7 @@ import {
   SheetHeader,
   SheetTitle,
   Textarea,
+  Spinner,
 } from "@wealthfolio/ui";
 
 import {
@@ -504,7 +505,14 @@ export function CashActivityForm({
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>{t("common:account")}</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select
+                            items={spendingAccounts.map((acc) => ({
+                              value: acc.id,
+                              label: `${acc.name} (${acc.currency})`,
+                            }))}
+                            onValueChange={field.onChange}
+                            value={field.value}
+                          >
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder={t("spending:cashForm.selectAccount")} />
@@ -547,7 +555,7 @@ export function CashActivityForm({
                                         className={cn(
                                           "flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-all",
                                           "hover:bg-muted/50",
-                                          "peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5",
+                                          "peer-data-checked:border-primary peer-data-checked:bg-primary/5",
                                           "active:scale-[0.98]",
                                         )}
                                       >
@@ -580,7 +588,14 @@ export function CashActivityForm({
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>{t("common:type")}</FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
+                              <Select
+                                items={mobileTypeOptions.map(({ type, label }) => ({
+                                  value: type,
+                                  label,
+                                }))}
+                                onValueChange={field.onChange}
+                                value={field.value}
+                              >
                                 <FormControl>
                                   <SelectTrigger>
                                     <SelectValue />
@@ -890,7 +905,7 @@ export function CashActivityForm({
                       disabled={saveMutation.isPending}
                     >
                       {saveMutation.isPending ? (
-                        <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                        <Spinner className="mr-2 h-4 w-4" />
                       ) : (
                         <Icons.Check className="mr-2 h-4 w-4" />
                       )}
@@ -914,7 +929,7 @@ export function CashActivityForm({
                 <Button type="submit" disabled={saveMutation.isPending}>
                   {saveMutation.isPending ? (
                     <>
-                      <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                      <Spinner className="mr-2 h-4 w-4" />
                       {t("spending:common.saving")}
                     </>
                   ) : isEditing ? (

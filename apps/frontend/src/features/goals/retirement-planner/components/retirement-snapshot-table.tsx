@@ -66,7 +66,7 @@ export function RetirementSnapshotTable({
     <Card>
       <CardHeader className="flex-row items-start justify-between pb-3">
         <div>
-          <div className="text-muted-foreground mb-0.5 text-[10px] font-semibold uppercase tracking-wider">
+          <div className="text-muted-foreground text-2xs mb-0.5 font-semibold uppercase tracking-wider">
             {t("goals:snapshot.table")}
           </div>
           <CardTitle className="text-sm">{t("goals:snapshot.title")}</CardTitle>
@@ -108,9 +108,9 @@ export function RetirementSnapshotTable({
             const isIncomeRow = incomeStartAges.has(snap.age);
             const plannedSpending = snap.plannedExpenses ?? snap.annualExpenses;
             const rowClassName = isFireRow
-              ? "border-l-green-500 bg-green-50/70 dark:bg-green-950/20"
+              ? "border-l-success bg-success-subtle"
               : isIncomeRow
-                ? "border-l-blue-500 bg-blue-50/70 dark:bg-blue-950/20"
+                ? "border-l-info bg-info-subtle"
                 : "border-l-transparent bg-background/40";
             const phaseText = isFire ? phaseLabel : t("goals:snapshot.phase_acc");
             const mobileMetrics = [
@@ -133,7 +133,7 @@ export function RetirementSnapshotTable({
                     <span className="text-xs font-medium tabular-nums">{snap.year}</span>
                     <Badge
                       variant={isFire ? "default" : "secondary"}
-                      className="h-5 shrink-0 px-2 text-[10px]"
+                      className="text-2xs h-5 shrink-0 px-2"
                     >
                       {phaseText}
                     </Badge>
@@ -149,7 +149,7 @@ export function RetirementSnapshotTable({
                   </div>
                 </div>
 
-                <div className="mt-1.5 grid grid-cols-4 gap-2 pl-[2.75rem] text-[10px]">
+                <div className="text-2xs mt-1.5 grid grid-cols-4 gap-2 pl-[2.75rem]">
                   {mobileMetrics.map((metric) => (
                     <div key={metric.label} className="min-w-0">
                       <div className="text-muted-foreground leading-3">{metric.label}</div>
@@ -185,7 +185,7 @@ export function RetirementSnapshotTable({
         </div>
 
         <div className="hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[860px] text-xs">
+          <table className="min-w-215 w-full text-xs">
             <thead>
               <tr className="text-muted-foreground border-b">
                 <th className="pb-2 text-left">{t("goals:snapshot.col_age")}</th>
@@ -213,9 +213,9 @@ export function RetirementSnapshotTable({
                     key={snap.age}
                     className={`border-b last:border-0 ${
                       isFireRow
-                        ? "bg-green-50 font-semibold dark:bg-green-950/20"
+                        ? "bg-success-subtle font-semibold"
                         : isIncomeRow
-                          ? "bg-blue-50 dark:bg-blue-950/20"
+                          ? "bg-info-subtle"
                           : ""
                     }`}
                   >

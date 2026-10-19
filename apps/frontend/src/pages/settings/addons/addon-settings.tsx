@@ -8,7 +8,6 @@ import {
   Badge,
   Button,
   DeleteConfirm,
-  EmptyPlaceholder,
   Icons,
   Popover,
   PopoverContent,
@@ -21,6 +20,13 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
+  Spinner,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
 } from "@wealthfolio/ui";
 import { useToast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useEffect, useMemo, useState } from "react";
@@ -138,10 +144,8 @@ export default function AddonSettingsPage() {
 
         <div className="flex items-center gap-3">
           <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Icons.Info className="h-4 w-4" />
-              </Button>
+            <PopoverTrigger render={<Button variant="ghost" size="icon" />}>
+              <Icons.Info className="h-4 w-4" />
             </PopoverTrigger>
             <PopoverContent className="w-80">
               <div className="space-y-3">
@@ -153,9 +157,9 @@ export default function AddonSettingsPage() {
                 </div>
                 <div className="border-t pt-2">
                   <div className="flex items-start gap-2">
-                    <Icons.AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                    <Icons.AlertTriangle className="text-warning mt-0.5 h-4 w-4 shrink-0" />
                     <p className="text-muted-foreground text-xs">
-                      <span className="font-medium text-amber-600">
+                      <span className="text-warning font-medium">
                         {t("settings:addons_security_notice")}
                       </span>{" "}
                       {t("settings:addons_security_message")}
@@ -221,26 +225,24 @@ export default function AddonSettingsPage() {
               <div className="flex flex-wrap items-center gap-2">
                 {/* Check Updates */}
                 <Popover>
-                  <PopoverTrigger asChild>
-                    <div>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={handleCheckUpdates}
-                        disabled={isCheckingUpdates || installedAddons.length === 0}
-                        className="hover:bg-muted/50 relative"
-                        title={t("settings:addons_check_updates")}
-                      >
-                        {isCheckingUpdates ? (
-                          <Icons.Loader className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Icons.Refresh className="h-4 w-4" />
-                        )}
-                        {hasUpdates() && (
-                          <div className="bg-destructive absolute -right-1 -top-1 h-2 w-2 rounded-full" />
-                        )}
-                      </Button>
-                    </div>
+                  <PopoverTrigger nativeButton={false} render={<div />}>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleCheckUpdates}
+                      disabled={isCheckingUpdates || installedAddons.length === 0}
+                      className="hover:bg-muted/50 relative"
+                      title={t("settings:addons_check_updates")}
+                    >
+                      {isCheckingUpdates ? (
+                        <Spinner className="h-4 w-4" />
+                      ) : (
+                        <Icons.Refresh className="h-4 w-4" />
+                      )}
+                      {hasUpdates() && (
+                        <div className="bg-destructive absolute -right-1 -top-1 h-2 w-2 rounded-full" />
+                      )}
+                    </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-64" side="bottom" align="end">
                     <div className="space-y-2">
@@ -267,23 +269,21 @@ export default function AddonSettingsPage() {
 
                 {/* Install from File */}
                 <Popover>
-                  <PopoverTrigger asChild>
-                    <div>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={handleLoadAddon}
-                        disabled={isLoading}
-                        className="hover:bg-muted/50"
-                        title={t("settings:addons_install_from_file")}
-                      >
-                        {isLoading ? (
-                          <Icons.Loader className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Icons.Plus className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
+                  <PopoverTrigger nativeButton={false} render={<div />}>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleLoadAddon}
+                      disabled={isLoading}
+                      className="hover:bg-muted/50"
+                      title={t("settings:addons_install_from_file")}
+                    >
+                      {isLoading ? (
+                        <Spinner className="h-4 w-4" />
+                      ) : (
+                        <Icons.Plus className="h-4 w-4" />
+                      )}
+                    </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-64" side="bottom" align="end">
                     <div className="space-y-2">
@@ -315,34 +315,38 @@ export default function AddonSettingsPage() {
 
             {isLoadingAddons ? (
               <div className="flex items-center justify-center py-12">
-                <Icons.Loader className="text-muted-foreground h-8 w-8 animate-spin" />
+                <Spinner className="text-muted-foreground h-8 w-8" />
                 <span className="text-muted-foreground ml-2 text-sm sm:text-base">
                   {t("settings:addons_loading")}
                 </span>
               </div>
             ) : installedAddons.length === 0 ? (
-              <EmptyPlaceholder>
-                <EmptyPlaceholder.Icon name="Package" />
-                <EmptyPlaceholder.Title>{t("settings:addons_empty_title")}</EmptyPlaceholder.Title>
-                <EmptyPlaceholder.Description>
-                  {t("settings:addons_empty_description")}
-                </EmptyPlaceholder.Description>
-                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:gap-3">
-                  <Button onClick={() => setActiveTab("store")} className="w-full sm:w-auto">
-                    <Icons.Store className="mr-2 h-4 w-4" />
-                    {t("settings:addons_browse_button")}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleLoadAddon}
-                    disabled={isLoading}
-                    className="w-full sm:w-auto"
-                  >
-                    <Icons.Plus className="mr-2 h-4 w-4" />
-                    {t("settings:addons_install_from_file")}
-                  </Button>
-                </div>
-              </EmptyPlaceholder>
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Icons.Package />
+                  </EmptyMedia>
+                  <EmptyTitle>{t("settings:addons_empty_title")}</EmptyTitle>
+                  <EmptyDescription>{t("settings:addons_empty_description")}</EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:gap-3">
+                    <Button onClick={() => setActiveTab("store")} className="w-full sm:w-auto">
+                      <Icons.Store className="mr-2 h-4 w-4" />
+                      {t("settings:addons_browse_button")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleLoadAddon}
+                      disabled={isLoading}
+                      className="w-full sm:w-auto"
+                    >
+                      <Icons.Plus className="mr-2 h-4 w-4" />
+                      {t("settings:addons_install_from_file")}
+                    </Button>
+                  </div>
+                </EmptyContent>
+              </Empty>
             ) : (
               <div className="space-y-3">
                 {installedAddons.map((addon) => {
@@ -381,10 +385,7 @@ export default function AddonSettingsPage() {
                               v{addon.metadata.version}
                             </Badge>
                             {!addon.metadata.enabled && (
-                              <Badge
-                                variant="secondary"
-                                className="bg-warning/10 text-warning border-warning/20 shrink-0 text-xs"
-                              >
+                              <Badge variant="warning-subtle" className="shrink-0">
                                 <Icons.AlertCircle className="mr-1 h-3 w-3" />
                                 {t("settings:addons_disabled_badge")}
                               </Badge>
@@ -473,7 +474,7 @@ export default function AddonSettingsPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive h-9 w-9 p-0 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"
+                                  className="text-muted-foreground hover:bg-destructive-subtle hover:text-destructive-subtle-foreground h-9 w-9 p-0 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"
                                 >
                                   <Icons.Trash className="h-4 w-4" />
                                   <span className="sr-only">
@@ -485,32 +486,34 @@ export default function AddonSettingsPage() {
 
                             {addon.metadata.enabled && addonNavItem && (
                               <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant={isPinned ? "default" : "outline"}
-                                    size="sm"
-                                    onClick={() => setAddonPinned(addonNavItem, !isPinned)}
-                                    className={
-                                      isPinned
-                                        ? "h-9 w-9 p-0"
-                                        : "text-muted-foreground hover:bg-accent hover:text-foreground h-9 w-9 p-0"
-                                    }
-                                    aria-label={
-                                      isPinned
-                                        ? t("settings:addons_unpin_from_navigation", {
-                                            name: addon.metadata.name,
-                                          })
-                                        : t("settings:addons_pin_to_navigation", {
-                                            name: addon.metadata.name,
-                                          })
-                                    }
-                                  >
-                                    {isPinned ? (
-                                      <Icons.PinOff className="h-4 w-4" />
-                                    ) : (
-                                      <Icons.Pin className="h-4 w-4" />
-                                    )}
-                                  </Button>
+                                <TooltipTrigger
+                                  render={
+                                    <Button
+                                      variant={isPinned ? "default" : "outline"}
+                                      size="sm"
+                                      onClick={() => setAddonPinned(addonNavItem, !isPinned)}
+                                      className={
+                                        isPinned
+                                          ? "h-9 w-9 p-0"
+                                          : "text-muted-foreground hover:bg-accent hover:text-foreground h-9 w-9 p-0"
+                                      }
+                                      aria-label={
+                                        isPinned
+                                          ? t("settings:addons_unpin_from_navigation", {
+                                              name: addon.metadata.name,
+                                            })
+                                          : t("settings:addons_pin_to_navigation", {
+                                              name: addon.metadata.name,
+                                            })
+                                      }
+                                    />
+                                  }
+                                >
+                                  {isPinned ? (
+                                    <Icons.PinOff className="h-4 w-4" />
+                                  ) : (
+                                    <Icons.Pin className="h-4 w-4" />
+                                  )}
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom">
                                   {isPinned
@@ -527,7 +530,7 @@ export default function AddonSettingsPage() {
                               onCheckedChange={(checked) =>
                                 handleToggleAddon(addon.metadata.id, !checked)
                               }
-                              className="data-[state=checked]:bg-green-600"
+                              className="data-checked:bg-success"
                               disabled={togglingAddonId === addon.metadata.id}
                             />
                           </div>

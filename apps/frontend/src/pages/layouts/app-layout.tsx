@@ -46,7 +46,7 @@ const AppLayoutContent = () => {
   // platform lookup: until it resolves, usePlatform reports a desktop.
   const hasWindowDragRegion = isTauri && platform?.is_desktop === true;
   const launchBarHeight =
-    !shouldUseMobileNavigation && isLaunchBar && !isFocusMode ? "56px" : undefined;
+    !shouldUseMobileNavigation && isLaunchBar && !isFocusMode ? "3.5rem" : undefined;
   const isAppShellReady = !!settings?.onboardingCompleted;
   const pageScrollKey =
     location.pathname.startsWith("/addon/") || location.pathname.startsWith("/addons/")

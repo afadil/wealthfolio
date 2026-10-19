@@ -5,7 +5,7 @@ import {
   useAssistantApi,
   useAssistantState,
 } from "@assistant-ui/react";
-import { PropsWithChildren, useEffect, useState, type FC } from "react";
+import { useEffect, useState, type FC, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Icons, type Icon } from "@wealthfolio/ui/components/ui/icons";
@@ -76,7 +76,7 @@ const AttachmentPreview: FC<AttachmentPreviewProps> = ({ src }) => {
   );
 };
 
-const AttachmentPreviewDialog: FC<PropsWithChildren> = ({ children }) => {
+const AttachmentPreviewDialog: FC<{ children: ReactElement }> = ({ children }) => {
   const { t } = useTranslation();
   const src = useAttachmentSrc();
 
@@ -86,10 +86,9 @@ const AttachmentPreviewDialog: FC<PropsWithChildren> = ({ children }) => {
     <Dialog>
       <DialogTrigger
         className="aui-attachment-preview-trigger hover:bg-accent/50 cursor-pointer transition-colors"
-        asChild
-      >
-        {children}
-      </DialogTrigger>
+        nativeButton={false}
+        render={children}
+      />
       <DialogContent className="aui-attachment-preview-dialog-content [&>button]:bg-foreground/60 [&_svg]:text-background [&>button]:hover:[&_svg]:text-destructive [&>button]:ring-0! p-2 sm:max-w-3xl [&>button]:rounded-full [&>button]:p-1 [&>button]:opacity-100">
         <DialogTitle className="aui-sr-only sr-only">
           {t("ai:attachment.imageAttachmentPreview")}
@@ -114,7 +113,7 @@ const AttachmentThumb: FC = () => {
         alt={t("ai:attachment.attachmentPreview")}
         className="aui-attachment-tile-image object-cover"
       />
-      <AvatarFallback delayMs={isImage ? 200 : 0}>
+      <AvatarFallback delay={isImage ? 200 : 0}>
         <Icons.FileText className="aui-attachment-tile-fallback-icon text-muted-foreground size-8" />
       </AvatarFallback>
     </Avatar>
@@ -188,7 +187,7 @@ const ComposerFileAttachment: FC = () => {
       <span className="aui-attachment-file-chip-name min-w-0 flex-1 truncate text-sm font-medium">
         {name}
       </span>
-      <span className="aui-attachment-file-chip-extension text-muted-foreground shrink-0 text-[10px] font-semibold uppercase leading-none">
+      <span className="aui-attachment-file-chip-extension text-muted-foreground text-2xs shrink-0 font-semibold uppercase leading-none">
         {extension}
       </span>
     </div>
@@ -225,23 +224,25 @@ const AttachmentUI: FC = () => {
         )}
       >
         <AttachmentPreviewDialog>
-          <TooltipTrigger asChild>
-            {isComposer && !isImage ? (
-              <ComposerFileAttachment />
-            ) : (
-              <div
-                className={cn(
-                  "aui-attachment-tile bg-muted size-14 cursor-pointer overflow-hidden rounded-[14px] border transition-opacity hover:opacity-75",
-                  isComposer && "aui-attachment-tile-composer border-foreground/20",
-                )}
-                role="button"
-                id="attachment-tile"
-                aria-label={t("ai:attachment.typedAttachment", { type: typeLabel })}
-              >
-                <AttachmentThumb />
-              </div>
-            )}
-          </TooltipTrigger>
+          <TooltipTrigger
+            render={
+              isComposer && !isImage ? (
+                <ComposerFileAttachment />
+              ) : (
+                <div
+                  className={cn(
+                    "aui-attachment-tile bg-muted size-14 cursor-pointer overflow-hidden rounded-[0.875rem] border transition-opacity hover:opacity-75",
+                    isComposer && "aui-attachment-tile-composer border-foreground/20",
+                  )}
+                  role="button"
+                  id="attachment-tile"
+                  aria-label={t("ai:attachment.typedAttachment", { type: typeLabel })}
+                >
+                  <AttachmentThumb />
+                </div>
+              )
+            }
+          />
         </AttachmentPreviewDialog>
         {isComposer && <AttachmentRemove variant={isImage ? "tile" : "chip"} />}
       </AttachmentPrimitive.Root>
@@ -306,7 +307,7 @@ export const ComposerAddAttachment: FC = () => {
         side="bottom"
         variant="ghost"
         size="icon"
-        className="aui-composer-add-attachment hover:bg-muted-foreground/15 dark:border-muted-foreground/15 dark:hover:bg-muted-foreground/30 size-[34px] rounded-full p-1 text-xs font-semibold"
+        className="aui-composer-add-attachment hover:bg-muted-foreground/15 dark:border-muted-foreground/15 dark:hover:bg-muted-foreground/30 size-8.5 rounded-full p-1 text-xs font-semibold"
         aria-label={t("ai:attachment.addAttachment")}
       >
         <Icons.Plus className="aui-attachment-add-icon size-5 stroke-[1.5px]" />

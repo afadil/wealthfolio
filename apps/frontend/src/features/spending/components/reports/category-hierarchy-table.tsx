@@ -19,6 +19,7 @@ import {
   type GroupNode,
   type NodeRow,
 } from "./category-hierarchy/builders";
+import { badgeVariants } from "@wealthfolio/ui";
 
 export type { CategorySort };
 
@@ -202,7 +203,7 @@ export function CategoryHierarchyTable({
         </ul>
         <div className="mt-4">
           <div className="border-border/30 flex items-baseline justify-between gap-3 border-t pt-4">
-            <span className="text-muted-foreground/80 text-[10px] font-semibold uppercase tracking-[0.14em]">
+            <span className="text-muted-foreground/80 text-2xs font-semibold uppercase tracking-[0.14em]">
               {tr("spending:hierarchy.totalSpent")}
             </span>
             <span className="text-foreground text-xl font-semibold tabular-nums tracking-tight">
@@ -210,7 +211,7 @@ export function CategoryHierarchyTable({
             </span>
           </div>
           {totals.budgeted > 0 && (
-            <div className="text-muted-foreground/60 mt-0.5 text-right text-[11px] tabular-nums">
+            <div className="text-muted-foreground/60 text-2xs mt-0.5 text-right tabular-nums">
               {tr("spending:hierarchy.of")}{" "}
               <PrivacyAmount value={totals.budgeted} currency={currency} />{" "}
               {tr("spending:hierarchy.budgeted")}
@@ -225,7 +226,7 @@ export function CategoryHierarchyTable({
     <div className="overflow-x-auto">
       <table className="text-foreground w-full text-sm">
         <thead>
-          <tr className="border-border/60 text-muted-foreground/80 border-b text-[11px] uppercase tracking-wide">
+          <tr className="border-border/60 text-muted-foreground/80 text-2xs border-b uppercase tracking-wide">
             <th className="px-3 py-2 text-left font-medium">
               <div className="flex items-center gap-3">
                 <span>{tr("spending:filters.category")}</span>
@@ -234,7 +235,7 @@ export function CategoryHierarchyTable({
                     type="button"
                     onClick={toggleAll}
                     aria-pressed={allExpanded}
-                    className="text-muted-foreground hover:text-foreground hover:bg-muted/60 -my-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal transition-colors"
+                    className="text-muted-foreground hover:text-foreground hover:bg-muted/60 text-2xs -my-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium normal-case tracking-normal transition-colors"
                     title={
                       allExpanded
                         ? tr("spending:hierarchy.collapseAllRows")
@@ -341,7 +342,7 @@ function ProgressBar({ spent, budget }: { spent: number; budget: number }) {
       : "var(--success)";
   return (
     <div className="flex items-center gap-2">
-      <div className="bg-foreground/10 relative h-1.5 min-w-[60px] flex-1 overflow-hidden rounded-full">
+      <div className="bg-foreground/10 min-w-15 relative h-1.5 flex-1 overflow-hidden rounded-full">
         <div
           className="h-full rounded-full transition-all"
           style={{ width: `${Math.min(100, pct)}%`, backgroundColor: fillColor, opacity: 0.65 }}
@@ -349,7 +350,7 @@ function ProgressBar({ spent, budget }: { spent: number; budget: number }) {
       </div>
       <span
         className={cn(
-          "w-10 shrink-0 text-right text-[11px] tabular-nums",
+          "text-2xs w-10 shrink-0 text-right tabular-nums",
           isOver ? "text-destructive font-medium" : "text-muted-foreground/80",
         )}
       >
@@ -409,7 +410,7 @@ const GroupRow = memo(function GroupRow({
             <span className="text-foreground text-sm font-semibold uppercase tracking-wide">
               {group.name}
             </span>
-            <span className="text-muted-foreground/70 text-[11px] font-medium tabular-nums">
+            <span className="text-muted-foreground/70 text-2xs font-medium tabular-nums">
               {numberFormatting.formatPercent(sharePct / 100, { digits: 1 })}
             </span>
           </div>
@@ -586,7 +587,7 @@ const ChildRow = memo(function ChildRow({
   return (
     <tr
       className={cn(
-        "border-border/30 hover:bg-muted/20 border-b text-[13px]",
+        "border-border/30 hover:bg-muted/20 border-b text-sm",
         clickable && "cursor-pointer",
       )}
       onClick={clickable ? () => onCategoryClick?.(node.id) : undefined}
@@ -614,7 +615,7 @@ function DeltaPill({ delta, priorSpent }: { delta: number; priorSpent: number })
   const numberFormatting = useNumberFormatting();
   if (priorSpent === 0 || delta === 0) {
     return (
-      <span className="text-muted-foreground/60 shrink-0 text-[11px] tabular-nums">
+      <span className="text-muted-foreground/60 text-2xs shrink-0 tabular-nums">
         {formatDelta(delta, priorSpent, numberFormatting)}
       </span>
     );
@@ -623,8 +624,8 @@ function DeltaPill({ delta, priorSpent }: { delta: number; priorSpent: number })
   return (
     <span
       className={cn(
-        "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums",
-        up ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success",
+        badgeVariants({ variant: up ? "destructive-subtle" : "success-subtle" }),
+        "text-2xs px-1.5 tabular-nums",
       )}
     >
       {formatDelta(delta, priorSpent, numberFormatting)}
@@ -662,7 +663,7 @@ const MobileGroupRow = memo(function MobileGroupRow({
     return (
       <li className={cn(MOBILE_CARD, "flex items-center gap-2.5 px-4 py-3")}>
         <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: accent }} />
-        <span className="text-foreground/75 flex-1 truncate text-[10.5px] font-semibold uppercase tracking-[0.14em]">
+        <span className="text-foreground/75 text-2xs flex-1 truncate font-semibold uppercase tracking-[0.14em]">
           {group.name}
         </span>
         <span className="text-foreground/90 shrink-0 text-sm font-medium tabular-nums">
@@ -686,7 +687,7 @@ const MobileGroupRow = memo(function MobileGroupRow({
             className="block h-1.5 w-1.5 shrink-0 rounded-full"
             style={{ backgroundColor: accent }}
           />
-          <span className="text-foreground/75 flex-1 truncate text-[10.5px] font-semibold uppercase tracking-[0.14em]">
+          <span className="text-foreground/75 text-2xs flex-1 truncate font-semibold uppercase tracking-[0.14em]">
             {group.name}
           </span>
           <DeltaPill delta={delta} priorSpent={group.priorSpent} />
@@ -700,11 +701,11 @@ const MobileGroupRow = memo(function MobileGroupRow({
           )}
         </div>
         <div className="mt-1.5 flex items-baseline justify-between gap-3 pl-4">
-          <span className="text-foreground text-[15px] font-semibold tabular-nums tracking-tight">
+          <span className="text-foreground text-base font-semibold tabular-nums tracking-tight">
             <PrivacyAmount value={group.spent} currency={currency} />
           </span>
           {hasBudget && (
-            <span className="text-muted-foreground/60 shrink-0 text-[11px] tabular-nums">
+            <span className="text-muted-foreground/60 text-2xs shrink-0 tabular-nums">
               {t("spending:hierarchy.of")}{" "}
               <PrivacyAmount value={group.budgeted} currency={currency} />
             </span>
@@ -785,12 +786,12 @@ const MobileCategoryRow = memo(function MobileCategoryRow({
           style={{ backgroundColor: tintBg, color: accent }}
           aria-hidden
         >
-          <CategoryIcon icon={node.icon} fallback={node.name} className="h-[18px] w-[18px]" />
+          <CategoryIcon icon={node.icon} fallback={node.name} className="h-4.5 w-4.5" />
         </span>
         <div className="min-w-0 flex-1">
           <div className="text-foreground truncate text-sm font-semibold">{node.name}</div>
           {subtitle && (
-            <div className="text-muted-foreground/70 mt-0.5 truncate text-[11px] tabular-nums">
+            <div className="text-muted-foreground/70 text-2xs mt-0.5 truncate tabular-nums">
               {subtitle}
             </div>
           )}
@@ -822,7 +823,7 @@ const MobileCategoryRow = memo(function MobileCategoryRow({
         <ul
           className={cn(
             "border-border/30 divide-border/30 mt-1 divide-y border-t pt-1",
-            standalone ? "mx-4 mb-3" : "ml-[52px]",
+            standalone ? "mx-4 mb-3" : "ml-13",
           )}
         >
           {node.children.map((child) => (
@@ -855,7 +856,7 @@ function MobileSubcategoryRow({
   return (
     <li
       className={cn(
-        "hover:bg-muted/20 flex items-center gap-2 py-1.5 text-[13px] transition-colors",
+        "hover:bg-muted/20 flex items-center gap-2 py-1.5 text-sm transition-colors",
         clickable && "cursor-pointer",
       )}
       onClick={clickable ? () => onCategoryClick?.(node.id) : undefined}

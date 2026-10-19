@@ -44,7 +44,7 @@ export function DataTableToolbar<TData>({
             placeholder={t("ui:dataTable.search", "Search ...")}
             value={table.getState().globalFilter ?? ""}
             onChange={(value) => table.setGlobalFilter(value)}
-            className="w-[150px] lg:w-[250px]"
+            className="w-37.5 lg:w-62.5"
           />
         )}
         {filters?.map((filter) => (
@@ -75,14 +75,16 @@ export function DataTableToolbar<TData>({
         {actions}
         {showColumnToggle && hideableColumns.length > 0 && (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="bg-secondary/30 hover:bg-muted/80 ml-auto gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium"
-              >
-                {t("ui:dataTable.columns", "Columns")} <Icons.ChevronDown className="ml-2 h-4 w-4" />
-              </Button>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="bg-secondary/30 hover:bg-muted/80 ml-auto gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium"
+                />
+              }
+            >
+              {t("ui:dataTable.columns", "Columns")} <Icons.ChevronDown className="ml-2 h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {hideableColumns.map((column) => {
@@ -154,7 +156,7 @@ function SearchInput({
         className={cn(
           "shadow-inner-xs bg-muted/90 hover:bg-muted/80 h-8 w-full rounded-md pl-8 pr-8 text-sm outline-none transition-colors",
           "placeholder:text-muted-foreground",
-          "focus:ring-ring/50 focus:ring-2",
+          "focus-visible:outline-solid focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-2",
         )}
       />
       {value && (

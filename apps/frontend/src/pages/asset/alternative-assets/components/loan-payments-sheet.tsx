@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDays, parseISO } from "date-fns";
-import { Button, Icons, useAmountFormatting, useDateFormatting } from "@wealthfolio/ui";
+import { Button, useAmountFormatting, useDateFormatting, Spinner } from "@wealthfolio/ui";
 import { Sheet, SheetDescription, SheetTitle } from "@wealthfolio/ui/components/ui/sheet";
 import { linkLoanPayment, searchActivities } from "@/adapters";
 import type { PaymentAllocation } from "@/adapters/shared/alternative-assets";
@@ -133,9 +133,7 @@ export function LoanPaymentsSheet({
                       disabled={busy != null}
                       onClick={() => change(allocation.activityId, { type: "unlink" })}
                     >
-                      {busy === allocation.activityId && (
-                        <Icons.Spinner className="mr-1 size-3 animate-spin" />
-                      )}
+                      {busy === allocation.activityId && <Spinner className="mr-1 size-3" />}
                       {t("asset:loanPayments.unlink")}
                     </Button>
                   </span>
@@ -151,7 +149,7 @@ export function LoanPaymentsSheet({
                   {t("asset:loanPayments.needs_account")}
                 </p>
               ) : isLoading ? (
-                <Icons.Spinner className="text-muted-foreground size-4 animate-spin" />
+                <Spinner className="text-muted-foreground size-4" />
               ) : candidates.length === 0 ? (
                 <p className="text-muted-foreground text-sm">
                   {t("asset:loanPayments.no_candidates", {
@@ -180,9 +178,7 @@ export function LoanPaymentsSheet({
                           change(activity.id, { type: "link", loanId, appliesTo: dueDate })
                         }
                       >
-                        {busy === activity.id && (
-                          <Icons.Spinner className="mr-1 size-3 animate-spin" />
-                        )}
+                        {busy === activity.id && <Spinner className="mr-1 size-3" />}
                         {t("asset:loanPayments.link")}
                       </Button>
                     </span>

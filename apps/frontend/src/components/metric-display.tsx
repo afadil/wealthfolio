@@ -103,15 +103,17 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
         <span className="text-center">{label}</span>
       </div>
       <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground hover:text-foreground absolute right-2 top-2 hidden h-4 w-4 rounded-full p-0 md:inline-flex"
-          >
-            <Icons.Info className="h-3 w-3" />
-            <span className="sr-only">{t("common:component.more_info_about", { label })}</span>
-          </Button>
+        <PopoverTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-foreground absolute right-2 top-2 hidden h-4 w-4 rounded-full p-0 md:inline-flex"
+            />
+          }
+        >
+          <Icons.Info className="h-3 w-3" />
+          <span className="sr-only">{t("common:component.more_info_about", { label })}</span>
         </PopoverTrigger>
         <PopoverContent className="w-60 text-xs" side="top" align="end">
           {infoText}
@@ -144,12 +146,10 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
       {labelContent}
 
       {valueTooltipRows.length > 0 ? (
-        <TooltipProvider delayDuration={100}>
+        <TooltipProvider delay={100}>
           <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="cursor-help">{displayValue}</div>
-            </TooltipTrigger>
-            <TooltipContent className="space-y-1">
+            <TooltipTrigger render={<div className="cursor-help" />}>{displayValue}</TooltipTrigger>
+            <TooltipContent className="flex flex-col gap-1">
               {valueTooltipRows.map((row) => (
                 <p key={row.label} className="text-xs">
                   {row.label}: {formatTooltipValue(row.value)}
@@ -167,7 +167,7 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
           to="/health"
           title={emptyReason}
           aria-label={t("common:component.open_health_center_for", { label })}
-          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring line-clamp-2 max-w-[11rem] rounded-sm text-center text-[10px] leading-tight underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring text-2xs line-clamp-2 max-w-[11rem] rounded-sm text-center leading-tight underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
           onClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => event.stopPropagation()}
         >
@@ -179,16 +179,19 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
 
   return (
     <Popover open={mobilePopoverOpen} onOpenChange={setMobilePopoverOpen}>
-      <PopoverTrigger asChild>
-        <div
-          className={cn(
-            "flex min-h-16 flex-col items-center justify-center space-y-1 p-4 md:cursor-default md:p-4",
-            "relative cursor-pointer md:cursor-auto",
-            className,
-          )}
-        >
-          {content}
-        </div>
+      <PopoverTrigger
+        nativeButton={false}
+        render={
+          <div
+            className={cn(
+              "flex min-h-16 flex-col items-center justify-center space-y-1 p-4 md:cursor-default md:p-4",
+              "relative cursor-pointer md:cursor-auto",
+              className,
+            )}
+          />
+        }
+      >
+        {content}
       </PopoverTrigger>
       <PopoverContent className="w-60 text-xs md:hidden" side="top" align="center">
         {infoText}
@@ -286,26 +289,28 @@ export const MetricLabelWithInfo: React.FC<MetricLabelWithInfoProps> = ({
     <div className={cn("text-muted-foreground flex items-center text-xs font-light", className)}>
       <span>{label}</span>
       <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "ml-1 h-4 w-4 rounded-full p-0",
-              hasWarnings && "text-warning hover:text-warning",
-            )}
-          >
-            {hasWarnings ? (
-              <Icons.AlertTriangle className="h-3 w-3" />
-            ) : (
-              <Icons.Info className="h-3 w-3" />
-            )}
-            <span className="sr-only">
-              {hasWarnings
-                ? t("common:component.calculation_note_for", { label })
-                : t("common:component.more_info_about", { label })}
-            </span>
-          </Button>
+        <PopoverTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "ml-1 h-4 w-4 rounded-full p-0",
+                hasWarnings && "text-warning hover:text-warning",
+              )}
+            />
+          }
+        >
+          {hasWarnings ? (
+            <Icons.AlertTriangle className="h-3 w-3" />
+          ) : (
+            <Icons.Info className="h-3 w-3" />
+          )}
+          <span className="sr-only">
+            {hasWarnings
+              ? t("common:component.calculation_note_for", { label })
+              : t("common:component.more_info_about", { label })}
+          </span>
         </PopoverTrigger>
         <PopoverContent
           className="w-[40rem] max-w-[calc(100vw-2rem)] p-0 text-sm"

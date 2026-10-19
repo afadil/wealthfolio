@@ -16,6 +16,7 @@ import {
   SheetHeader,
   SheetTitle,
   useAmountFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 
 import {
@@ -345,7 +346,7 @@ export function SplitTransactionSheet({
               const showNoteInput = line.note.trim().length > 0 || expandedNoteLineIds.has(line.id);
               return (
                 <div key={line.id} className="py-2.5">
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto_96px_32px] items-start gap-2">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto_6rem_2rem] items-start gap-2">
                     <div className="min-w-0">
                       <QuickCategorizePopover
                         scope={scopeForTaxonomy(taxonomyId)}
@@ -460,7 +461,7 @@ export function SplitTransactionSheet({
           {isMobile ? (
             <div className="flex w-full flex-col gap-2">
               <Button type="button" onClick={handleSave} disabled={!canSave || isSaving}>
-                {isSaving && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+                {isSaving && <Spinner className="mr-2 h-4 w-4" />}
                 {t("common:save")}
               </Button>
               <div className="flex gap-2">
@@ -508,7 +509,7 @@ export function SplitTransactionSheet({
                 {t("common:cancel")}
               </Button>
               <Button type="button" onClick={handleSave} disabled={!canSave || isSaving}>
-                {isSaving && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+                {isSaving && <Spinner className="mr-2 h-4 w-4" />}
                 {t("common:save")}
               </Button>
             </>

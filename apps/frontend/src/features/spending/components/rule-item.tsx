@@ -143,12 +143,12 @@ export function RuleItem({
             <span className="text-foreground truncate text-sm font-medium">{rule.name}</span>
             {rule.presetId && presetBadgeTitle ? (
               <span
-                className="border-muted-foreground/20 text-muted-foreground inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] leading-none"
+                className="border-muted-foreground/20 text-muted-foreground text-2xs inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 leading-none"
                 title={presetBadgeTitle}
                 aria-label={presetBadgeTitle}
               >
                 {preset?.flag && (
-                  <span className="text-[11px] leading-none" aria-hidden="true">
+                  <span className="text-2xs leading-none" aria-hidden="true">
                     {preset.flag}
                   </span>
                 )}
@@ -164,14 +164,14 @@ export function RuleItem({
             ) : null}
             {scopedAccountName ? (
               <span
-                className="border-muted-foreground/20 text-muted-foreground inline-flex min-w-0 shrink items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] leading-none"
+                className="border-muted-foreground/20 text-muted-foreground text-2xs inline-flex min-w-0 shrink items-center gap-1 rounded-full border px-1.5 py-0.5 leading-none"
                 title={t("spending:rules.scopedToAccount", { name: scopedAccountName })}
                 aria-label={t("spending:rules.scopedToAccount", { name: scopedAccountName })}
               >
                 <span className="truncate">{scopedAccountName}</span>
               </span>
             ) : null}
-            <span className="text-muted-foreground shrink-0 text-[11px]">
+            <span className="text-muted-foreground text-2xs shrink-0">
               {matchLabel}
               {rule.priority > 0 && (
                 <> · {t("spending:rules.priority", { value: rule.priority })}</>
@@ -194,8 +194,8 @@ export function RuleItem({
             <code
               className={
                 patternExpanded
-                  ? "block whitespace-pre-wrap break-all font-mono text-[11px]"
-                  : "block truncate font-mono text-[11px]"
+                  ? "text-2xs block whitespace-pre-wrap break-all font-mono"
+                  : "text-2xs block truncate font-mono"
               }
             >
               {rule.pattern}
@@ -204,7 +204,7 @@ export function RuleItem({
 
           {/* Line 3: amount condition, spelled out in words */}
           {amountLabel && (
-            <span className="border-border text-muted-foreground inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px]">
+            <span className="border-border text-muted-foreground text-2xs inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5">
               <Icons.Coins className="h-3 w-3 shrink-0" aria-hidden="true" />
               {amountLabel}
             </span>
@@ -215,7 +215,7 @@ export function RuleItem({
         <div className="flex shrink-0 items-center gap-2 pt-0.5">
           {target && targetLabel ? (
             <span
-              className="bg-muted/60 inline-flex max-w-[200px] items-center gap-1.5 rounded-full px-2 py-0.5 text-xs"
+              className="bg-muted/60 max-w-50 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs"
               title={targetLabel}
             >
               <span
@@ -236,15 +236,17 @@ export function RuleItem({
           )}
 
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
-                aria-label={t("spending:rules.ruleActions")}
-              >
-                <Icons.MoreVertical className="h-4 w-4" aria-hidden="true" />
-              </Button>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="data-popup-open:opacity-100 h-8 w-8 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                  aria-label={t("spending:rules.ruleActions")}
+                />
+              }
+            >
+              <Icons.MoreVertical className="h-4 w-4" aria-hidden="true" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => onEdit(rule)}>
@@ -273,10 +275,7 @@ export function RuleItem({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common:cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
+            <AlertDialogAction onClick={handleDelete} variant="destructive">
               {t("common:delete")}
             </AlertDialogAction>
           </AlertDialogFooter>

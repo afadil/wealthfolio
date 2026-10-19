@@ -46,7 +46,7 @@ export function OverallBudgetMeter({
   }, [pct]);
 
   if (isLoading) {
-    return <Skeleton className="h-[88px] w-full rounded-xl" />;
+    return <Skeleton className="h-22 w-full rounded-xl" />;
   }
 
   if (monthlyTarget <= 0) {
@@ -94,7 +94,7 @@ export function OverallBudgetMeter({
           </div>
           <div
             className={cn(
-              "text-[11px] font-medium tabular-nums",
+              "text-2xs font-medium tabular-nums",
               isOver ? "text-destructive" : "text-success",
             )}
           >
@@ -130,7 +130,7 @@ export function OverallBudgetMeter({
         )}
       </div>
 
-      <div className="text-muted-foreground/70 mt-1.5 flex justify-between text-[11px] tabular-nums">
+      <div className="text-muted-foreground/70 text-2xs mt-1.5 flex justify-between tabular-nums">
         <span>
           <PrivacyAmount value={spent} currency={currency} /> {t("spending:overallBudget.spent")}
         </span>

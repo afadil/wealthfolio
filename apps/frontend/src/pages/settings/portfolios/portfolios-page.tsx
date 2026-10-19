@@ -31,8 +31,21 @@ import {
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
-import { Button, Checkbox, EmptyPlaceholder, Icons, Separator, Skeleton } from "@wealthfolio/ui";
+import {
+  Button,
+  Checkbox,
+  Icons,
+  Separator,
+  Skeleton,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "@wealthfolio/ui";
 import { SettingsHeader } from "../settings-header";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 
 export default function PortfoliosPage() {
   const { t } = useTranslation();
@@ -101,17 +114,21 @@ export default function PortfoliosPage() {
         <Separator />
 
         {portfolios.length === 0 ? (
-          <EmptyPlaceholder>
-            <EmptyPlaceholder.Icon name="Folder" />
-            <EmptyPlaceholder.Title>{t("settings:portfolios.empty_title")}</EmptyPlaceholder.Title>
-            <EmptyPlaceholder.Description>
-              {t("settings:portfolios.empty_description")}
-            </EmptyPlaceholder.Description>
-            <Button onClick={openCreate}>
-              <Icons.Plus className="mr-2 h-4 w-4" />
-              {t("settings:portfolios.add_first")}
-            </Button>
-          </EmptyPlaceholder>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Icons.Folder />
+              </EmptyMedia>
+              <EmptyTitle>{t("settings:portfolios.empty_title")}</EmptyTitle>
+              <EmptyDescription>{t("settings:portfolios.empty_description")}</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button onClick={openCreate}>
+                <Icons.Plus className="mr-2 h-4 w-4" />
+                {t("settings:portfolios.add_first")}
+              </Button>
+            </EmptyContent>
+          </Empty>
         ) : (
           <div className="divide-border bg-card divide-y rounded-md border">
             {portfolios.map((p) => {
@@ -178,7 +195,7 @@ export default function PortfoliosPage() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive focus:text-destructive flex cursor-pointer items-center"
-                          onSelect={() => setDeleting(p)}
+                          onClick={() => setDeleting(p)}
                         >
                           {t("common:delete")}
                         </DropdownMenuItem>
@@ -224,7 +241,7 @@ export default function PortfoliosPage() {
               {t("common:cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
               disabled={deleteMutation.isPending}
               onClick={handleDelete}
             >
@@ -349,19 +366,17 @@ function PortfolioDialog({
               </p>
             )}
             {missingAccountIds.length > 0 && (
-              <div className="border-warning/30 bg-warning/10 text-warning rounded-md border p-3 text-xs">
-                <div className="mb-2 flex items-center gap-2 font-medium">
-                  <Icons.AlertTriangle className="h-3.5 w-3.5" />
-                  {t("settings:portfolios.remove_deleted_links")}
-                </div>
-                <div className="text-muted-foreground space-y-1">
+              <Alert variant="warning" className="p-3 text-xs">
+                <Icons.AlertTriangle className="size-3.5" />
+                <AlertTitle>{t("settings:portfolios.remove_deleted_links")}</AlertTitle>
+                <AlertDescription className="mt-1 space-y-1">
                   {missingAccountIds.map((id) => (
                     <div key={id} className="break-all">
                       {t("settings:portfolios.deleted_account", { id })}
                     </div>
                   ))}
-                </div>
-              </div>
+                </AlertDescription>
+              </Alert>
             )}
           </div>
         </div>

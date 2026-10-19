@@ -158,7 +158,7 @@ function CsvPreviewTable({ headers, rows, mapping }: CsvPreviewProps) {
 
   // `isolate` stops WebKitGTK painting the sticky header over this scrollbar inside a scrolling parent
   return (
-    <div className="isolate max-h-[300px] overflow-auto rounded-lg border">
+    <div className="max-h-75 isolate overflow-auto rounded-lg border">
       <table className="w-full text-sm">
         <thead className="bg-muted/50 sticky top-0">
           <tr>
@@ -483,13 +483,13 @@ export function HoldingsMappingStep() {
                   className={cn(
                     "flex items-center gap-2 rounded-md border px-2.5 py-1",
                     isMapped
-                      ? "border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20"
+                      ? "border-success-subtle-border bg-success-subtle"
                       : "bg-muted/30 border-dashed",
                   )}
                 >
                   {/* Status icon */}
                   {isMapped ? (
-                    <Icons.CheckCircle className="h-4 w-4 shrink-0 text-green-600" />
+                    <Icons.CheckCircle className="text-success h-4 w-4 shrink-0" />
                   ) : (
                     <div className="border-muted-foreground/30 h-4 w-4 shrink-0 rounded-full border-2" />
                   )}
@@ -515,6 +515,25 @@ export function HoldingsMappingStep() {
                   {/* Field Selector */}
                   <Select
                     value={column.mappedField || SKIP_FIELD_VALUE}
+                    items={[
+                      {
+                        value: SKIP_FIELD_VALUE,
+                        label: (
+                          <span className="text-muted-foreground">
+                            {t("activity:import.holdings.skip")}
+                          </span>
+                        ),
+                      },
+                      ...HOLDINGS_TARGET_FIELDS.map((field) => ({
+                        value: field.value,
+                        label: (
+                          <>
+                            {t(field.labelKey)}
+                            {field.required && <span className="text-warning ml-1">*</span>}
+                          </>
+                        ),
+                      })),
+                    ]}
                     onValueChange={(value) => {
                       handleMapColumn(
                         column.csvColumn,
@@ -524,7 +543,7 @@ export function HoldingsMappingStep() {
                   >
                     <SelectTrigger
                       className={cn(
-                        "!h-7 w-[130px] shrink-0 !py-0 text-xs",
+                        "w-32.5 !h-7 shrink-0 !py-0 text-xs",
                         !isMapped && "text-muted-foreground border-dashed",
                       )}
                     >
@@ -543,7 +562,7 @@ export function HoldingsMappingStep() {
                         return (
                           <SelectItem key={field.value} value={field.value} disabled={isUsed}>
                             {t(field.labelKey)}
-                            {field.required && <span className="ml-1 text-amber-600">*</span>}
+                            {field.required && <span className="text-warning ml-1">*</span>}
                             {isUsed && (
                               <span className="text-muted-foreground ml-1 text-xs">
                                 {t("activity:import.holdings.used")}

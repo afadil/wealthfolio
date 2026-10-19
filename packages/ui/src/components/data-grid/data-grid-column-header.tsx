@@ -1,5 +1,6 @@
 "use client";
 
+import type { BaseUIEvent } from "@base-ui/react/types";
 import type { Header, SortDirection, Table } from "@tanstack/react-table";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
@@ -77,7 +78,7 @@ export function DataGridColumnHeader<TData, TValue>({
   }, [column]);
 
   const onTriggerPointerDown = React.useCallback(
-    (event: React.PointerEvent<HTMLButtonElement>) => {
+    (event: BaseUIEvent<React.PointerEvent<HTMLButtonElement>>) => {
       onPointerDown?.(event);
       if (event.defaultPrevented) return;
 
@@ -94,7 +95,7 @@ export function DataGridColumnHeader<TData, TValue>({
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger
           className={cn(
-            "hover:bg-accent/40 data-[state=open]:bg-accent/40 flex size-full items-center justify-between gap-2 p-2 text-sm [&_svg]:size-4",
+            "hover:bg-accent/40 data-popup-open:bg-accent/40 flex size-full items-center justify-between gap-2 p-2 text-sm [&_svg]:size-4",
             isAnyColumnResizing && "pointer-events-none",
             className,
           )}
@@ -103,10 +104,11 @@ export function DataGridColumnHeader<TData, TValue>({
         >
           <div className="flex min-w-0 flex-1 items-center gap-1.5">
             {columnVariant && (
-              <Tooltip delayDuration={100}>
-                <TooltipTrigger asChild>
-                  <columnVariant.icon className="text-muted-foreground size-3.5 shrink-0" />
-                </TooltipTrigger>
+              <Tooltip>
+                <TooltipTrigger
+                  delay={100}
+                  render={<columnVariant.icon className="text-muted-foreground size-3.5 shrink-0" />}
+                />
                 <TooltipContent side="top">
                   <p>{t(columnVariant.labelKey, columnVariant.label)}</p>
                 </TooltipContent>
@@ -114,10 +116,11 @@ export function DataGridColumnHeader<TData, TValue>({
             )}
             <span className="truncate">{label}</span>
             {helpText && (
-              <Tooltip delayDuration={100}>
-                <TooltipTrigger asChild>
-                  <Icons.Info className="text-muted-foreground/70 hover:text-foreground size-3.5 shrink-0" />
-                </TooltipTrigger>
+              <Tooltip>
+                <TooltipTrigger
+                  delay={100}
+                  render={<Icons.Info className="text-muted-foreground/70 hover:text-foreground size-3.5 shrink-0" />}
+                />
                 <TooltipContent side="top" className="max-w-xs text-xs">
                   {helpText}
                 </TooltipContent>
@@ -235,7 +238,7 @@ function DataGridColumnResizerImpl<TData, TValue>({ header, table, label }: Data
       aria-valuemax={defaultColumnDef.maxSize}
       tabIndex={0}
       className={cn(
-        "bg-border hover:bg-primary focus:bg-primary absolute -end-px top-0 z-50 h-full w-0.5 cursor-ew-resize touch-none select-none transition-opacity after:absolute after:inset-y-0 after:start-1/2 after:h-full after:w-[18px] after:-translate-x-1/2 after:content-[''] focus:outline-none",
+        "bg-border hover:bg-primary focus:bg-primary after:w-4.5 absolute -end-px top-0 z-50 h-full w-0.5 cursor-ew-resize touch-none select-none transition-opacity after:absolute after:inset-y-0 after:start-1/2 after:h-full after:-translate-x-1/2 after:content-[''] focus:outline-none",
         header.column.getIsResizing() ? "bg-primary" : "opacity-0 hover:opacity-100",
       )}
       onDoubleClick={onDoubleClick}

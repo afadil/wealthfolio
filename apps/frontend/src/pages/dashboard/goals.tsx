@@ -43,7 +43,7 @@ function sortDashboardGoals(a: Goal, b: Goal) {
 
 function statusDotClass(status: Goal["statusHealth"]) {
   if (status === "off_track") return "bg-destructive";
-  if (status === "at_risk") return "bg-amber-500";
+  if (status === "at_risk") return "bg-warning";
   if (status === "on_track") return "bg-success";
   return "bg-muted-foreground/35";
 }
@@ -72,7 +72,7 @@ function ViewAllLink() {
   return (
     <Link
       to="/goals"
-      className="text-muted-foreground hover:bg-success/10 inline-flex h-8 items-center rounded-md px-3 text-xs font-medium transition-colors"
+      className="text-muted-foreground hover:bg-success-subtle inline-flex h-8 items-center rounded-md px-3 text-xs font-medium transition-colors"
     >
       {t("dashboard:view_all")}
       <Icons.ChevronRight className="ml-1 h-3 w-3" />
@@ -175,7 +175,7 @@ export function SavingGoals() {
                 </div>
 
                 {/* Amounts directly under title */}
-                <div className="text-muted-foreground mt-0.5 text-[11px] tabular-nums">
+                <div className="text-muted-foreground text-2xs mt-0.5 tabular-nums">
                   {currentDisplay} / {targetDisplay}
                 </div>
               </div>
@@ -185,7 +185,7 @@ export function SavingGoals() {
                 <div className="text-base font-semibold tabular-nums leading-none">
                   {pctDisplay}
                 </div>
-                <div className="text-muted-foreground mt-1 text-[10px] tracking-[0.1em]">
+                <div className="text-muted-foreground text-2xs mt-1 tracking-[0.1em]">
                   {timeStr}
                 </div>
               </div>

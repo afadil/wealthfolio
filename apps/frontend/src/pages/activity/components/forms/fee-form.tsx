@@ -19,6 +19,7 @@ import {
   NotesInput,
   type AccountSelectOption,
 } from "./fields";
+import { Spinner } from "@wealthfolio/ui";
 
 // Translated message helper (see buy-form for rationale).
 type MsgFn = TFunction | undefined;
@@ -162,7 +163,7 @@ export function FeeForm({
             </Button>
           )}
           <Button type="submit" disabled={isLoading}>
-            {isLoading && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+            {isLoading && <Spinner className="mr-2 h-4 w-4" />}
             {isEditing ? (
               <Icons.Check className="mr-2 h-4 w-4" />
             ) : (

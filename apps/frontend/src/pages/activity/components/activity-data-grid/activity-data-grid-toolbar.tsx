@@ -3,10 +3,12 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Icons,
+  Spinner,
 } from "@wealthfolio/ui";
 import type { Table } from "@tanstack/react-table";
 import { useTranslation } from "react-i18next";
@@ -156,7 +158,7 @@ export function ActivityDataGridToolbar({
                 </span>
               )}
               {changesSummary.updatedCount > 0 && (
-                <span className="flex items-center gap-1 text-blue-500 dark:text-blue-400">
+                <span className="text-info flex items-center gap-1">
                   <Icons.Pencil className="h-3 w-3" />
                   <span className="font-medium">{changesSummary.updatedCount}</span>
                 </span>
@@ -188,35 +190,40 @@ export function ActivityDataGridToolbar({
 
         {/* Column visibility dropdown */}
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="xs"
-              className="shrink-0 rounded-md px-2"
-              title={t("activity:table_toggle_columns")}
-              aria-label={t("activity:table_toggle_columns")}
-            >
-              <Icons.Settings2 className="h-3.5 w-3.5" />
-            </Button>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="outline"
+                size="xs"
+                className="shrink-0 rounded-md px-2"
+                title={t("activity:table_toggle_columns")}
+                aria-label={t("activity:table_toggle_columns")}
+              />
+            }
+          >
+            <Icons.Settings2 className="h-3.5 w-3.5" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuLabel className="text-xs">
-              {t("activity:table_toggle_columns")}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {table
-              .getAllColumns()
-              .filter((column) => TOGGLEABLE_COLUMNS.includes(column.id))
-              .map((column) => (
-                <DropdownMenuCheckboxItem
-                  key={column.id}
-                  className="text-xs"
-                  checked={column.getIsVisible()}
-                  onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                >
-                  {columnDisplayNames[column.id] || column.id}
-                </DropdownMenuCheckboxItem>
-              ))}
+            {/* A menu label must sit inside a group; it then names the group. */}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="text-xs">
+                {t("activity:table_toggle_columns")}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {table
+                .getAllColumns()
+                .filter((column) => TOGGLEABLE_COLUMNS.includes(column.id))
+                .map((column) => (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="text-xs"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                  >
+                    {columnDisplayNames[column.id] || column.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -228,7 +235,7 @@ export function ActivityDataGridToolbar({
                 onClick={onApproveSelected}
                 size="xs"
                 variant="outline"
-                className="shrink-0 rounded-md border-green-200 bg-green-50 text-xs text-green-700 hover:bg-green-100 hover:text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/40"
+                className="border-success-subtle-border bg-success-subtle text-success-subtle-foreground hover:bg-success-subtle-border/50 shrink-0 rounded-md text-xs"
                 title={t("activity:datagrid.approve_selected")}
                 aria-label={t("activity:datagrid.approve_selected")}
                 disabled={isSaving}
@@ -252,7 +259,7 @@ export function ActivityDataGridToolbar({
                 disabled={!canUnlinkSelected || isUnlinking || isSaving}
               >
                 {isUnlinking ? (
-                  <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+                  <Spinner className="h-3.5 w-3.5" />
                 ) : (
                   <Icons.Unlink className="h-3.5 w-3.5" />
                 )}
@@ -273,7 +280,7 @@ export function ActivityDataGridToolbar({
                 disabled={!canLinkSelected || isLinking || isSaving}
               >
                 {isLinking ? (
-                  <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+                  <Spinner className="h-3.5 w-3.5" />
                 ) : (
                   <Icons.Link className="h-3.5 w-3.5" />
                 )}
@@ -307,7 +314,7 @@ export function ActivityDataGridToolbar({
               disabled={isSaving}
             >
               {isSaving ? (
-                <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+                <Spinner className="h-3.5 w-3.5" />
               ) : (
                 <Icons.Save className="h-3.5 w-3.5" />
               )}
