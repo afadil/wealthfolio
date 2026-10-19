@@ -64,10 +64,11 @@ impl IncomeSummary {
         }
     }
 
-    pub fn add_income(&mut self, data: &IncomeData, converted_amount: Decimal) {
+    /// Counts converted income toward `month` (`YYYY-MM`).
+    pub fn add_income(&mut self, data: &IncomeData, month: &str, converted_amount: Decimal) {
         *self
             .by_month
-            .entry(data.date.to_string())
+            .entry(month.to_string())
             .or_insert_with(|| Decimal::ZERO) += &converted_amount;
         *self
             .by_type
@@ -96,13 +97,13 @@ impl IncomeSummary {
             .and_modify(|entry| {
                 *entry
                     .by_month
-                    .entry(data.date.clone())
+                    .entry(month.to_string())
                     .or_insert(Decimal::ZERO) += converted_amount;
                 entry.total += converted_amount;
             })
             .or_insert_with(|| {
                 let mut by_month = HashMap::new();
-                by_month.insert(data.date.clone(), converted_amount);
+                by_month.insert(month.to_string(), converted_amount);
                 IncomeByAccount {
                     account_id: data.account_id.clone(),
                     account_name: data.account_name.clone(),

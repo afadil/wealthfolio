@@ -4,7 +4,7 @@ use crate::{
     activities::{ActivityError, ActivityRepositoryTrait, IncomeData},
     Error, Result,
 };
-use chrono::{Datelike, NaiveDate};
+use chrono::Datelike;
 use chrono_tz::Tz;
 
 use super::IncomeSummary;
@@ -145,14 +145,9 @@ impl IncomeServiceTrait for IncomeService {
         let mut two_years_ago_summary = IncomeSummary::new("TWO_YEARS_AGO", base_currency.clone());
 
         for activity in activities {
-            let date = match NaiveDate::parse_from_str(&format!("{}-01", activity.date), "%Y-%m-%d")
-            {
-                Ok(d) => d,
-                Err(e) => {
-                    error!("Error parsing date {}: {:?}", activity.date, e);
-                    continue;
-                }
-            };
+            // Income counts toward the month and year of its UTC date.
+            let date = activity.activity_date.date_naive();
+            let month = date.format("%Y-%m").to_string();
 
             // Income converts at the rate on the day it was received, as the
             // holdings income column does, so past totals don't move with
@@ -161,7 +156,7 @@ impl IncomeServiceTrait for IncomeService {
                 activity.amount,
                 &activity.currency,
                 &base_currency,
-                activity_date_in_tz(activity.activity_instant, timezone),
+                activity_date_in_tz(activity.activity_date, timezone),
             ) {
                 Ok(amount) => Some(amount),
                 Err(e) => {
@@ -175,8 +170,7 @@ impl IncomeServiceTrait for IncomeService {
 
             // Create a copy of the activity with cloned fields to avoid ownership issues
             let activity_copy = IncomeData {
-                date: activity.date.clone(),
-                activity_instant: activity.activity_instant,
+                activity_date: activity.activity_date,
                 income_type: activity.income_type.clone(),
                 asset_id: activity.asset_id.clone(),
                 asset_kind: activity.asset_kind.clone(),
@@ -189,7 +183,7 @@ impl IncomeServiceTrait for IncomeService {
             };
 
             let add = |summary: &mut IncomeSummary| match converted_amount {
-                Some(amount) => summary.add_income(&activity_copy, amount),
+                Some(amount) => summary.add_income(&activity_copy, &month, amount),
                 None => summary.add_unconverted_income(&activity_copy),
             };
             add(&mut total_summary);
