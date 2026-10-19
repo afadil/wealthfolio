@@ -846,6 +846,7 @@
     "duration_month_one": "{{count}} mois",
     "duration_month_other": "{{count}} mois",
     "duration_year_many": "{{count}} ans",
+    "duration_years_months": "{{years}} {{months}}",
     "duration_month_many": "{{count}} mois",
     "confirm_balance": "Confirmer le solde",
     "edit_details": "Modifier les détails du prêt",

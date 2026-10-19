@@ -835,6 +835,7 @@
     "balance_at_renewal": "Saldo bei Verlängerung",
     "duration_year_one": "{{count}} Jahr",
     "duration_year_other": "{{count}} Jahre",
+    "duration_years_months": "{{years}} {{months}}",
     "duration_month_one": "{{count}} Monat",
     "duration_month_other": "{{count}} Monate",
     "confirm_balance": "Saldo bestätigen",
