@@ -29,7 +29,7 @@
   "assets_need_valuations_many": "{{count}} أصلًا يحتاج إلى تحديث تقييماته",
   "assets_need_valuations_one": "{{count}} أصل يحتاج إلى تقييمات محدّثة",
   "assets_need_valuations_other": "{{count}} أصل يحتاج إلى تحديث تقييماته",
-  "assets_need_valuations_two": "{{count}} أصول تحتاج إلى تقييمات محدّثة",
+  "assets_need_valuations_two": "أصلان يحتاجان إلى تحديث تقييماتهما",
   "assets_need_valuations_zero": "{{count}} أصول تحتاج إلى تقييمات محدّثة",
   "avg_cost": "متوسط التكلفة",
   "avg_price": "متوسط السعر",
