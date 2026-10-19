@@ -99,7 +99,7 @@ export function ProgressIndicator({
         <div className="mt-6">
           <div className="relative h-2.5">
             {/* Beautiful gradient progress bar */}
-            <div className="bg-secondary/30 h-2.5 w-full overflow-hidden rounded-full">
+            <div className="bg-secondary/30 h-2.5 w-full overflow-hidden rounded-full rtl:-scale-x-100">
               <motion.div
                 className="bg-primary h-full rounded-full"
                 initial={{ x: "-100%" }}

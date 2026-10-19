@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "./button";
 import { cn } from "../../lib/utils";
+import { useDirection } from "./direction";
 import { Icons } from "./icons";
 
 type CarouselApi = UseEmblaCarouselType[1];
@@ -41,8 +42,10 @@ function useCarousel() {
 
 const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement> & CarouselProps>(
   ({ orientation = "horizontal", opts, setApi, plugins, className, children, ...props }, ref) => {
+    const direction = useDirection();
     const [carouselRef, api] = useEmblaCarousel(
       {
+        direction,
         ...opts,
         axis: orientation === "horizontal" ? "x" : "y",
       },
@@ -70,15 +73,17 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
 
     const handleKeyDown = React.useCallback(
       (event: React.KeyboardEvent<HTMLDivElement>) => {
-        if (event.key === "ArrowLeft") {
+        const back = direction === "rtl" ? "ArrowRight" : "ArrowLeft";
+        const forward = direction === "rtl" ? "ArrowLeft" : "ArrowRight";
+        if (event.key === back) {
           event.preventDefault();
           scrollPrev();
-        } else if (event.key === "ArrowRight") {
+        } else if (event.key === forward) {
           event.preventDefault();
           scrollNext();
         }
       },
-      [scrollPrev, scrollNext],
+      [direction, scrollPrev, scrollNext],
     );
 
     React.useEffect(() => {
@@ -141,7 +146,7 @@ const CarouselContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
       <div ref={carouselRef} className="overflow-hidden" data-slot="carousel-content">
         <div
           ref={ref}
-          className={cn("flex", orientation === "horizontal" ? "-ml-4" : "-mt-4 flex-col", className)}
+          className={cn("flex", orientation === "horizontal" ? "-ms-4" : "-mt-4 flex-col", className)}
           style={{
             overflowX: "visible",
           }}
@@ -163,7 +168,7 @@ const CarouselItem = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLD
         role="group"
         data-slot="carousel-item"
         aria-roledescription="slide"
-        className={cn("min-w-0 shrink-0 grow-0 basis-full", orientation === "horizontal" ? "pl-4" : "pt-4", className)}
+        className={cn("min-w-0 shrink-0 grow-0 basis-full", orientation === "horizontal" ? "ps-4" : "pt-4", className)}
         {...props}
       />
     );
@@ -185,7 +190,7 @@ const CarouselPrevious = React.forwardRef<HTMLButtonElement, React.ComponentProp
         className={cn(
           "absolute h-8 w-8 rounded-full",
           orientation === "horizontal"
-            ? "-left-12 top-1/2 -translate-y-1/2"
+            ? "-start-12 top-1/2 -translate-y-1/2"
             : "-top-12 left-1/2 -translate-x-1/2 rotate-90",
           className,
         )}
@@ -193,7 +198,7 @@ const CarouselPrevious = React.forwardRef<HTMLButtonElement, React.ComponentProp
         onClick={scrollPrev}
         {...props}
       >
-        <Icons.ArrowLeft className="h-4 w-4" />
+        <Icons.ArrowLeft className={cn("h-4 w-4", orientation === "horizontal" && "rtl:rotate-180")} />
         <span className="sr-only">{t("ui:carousel.previous", "Previous slide")}</span>
       </Button>
     );
@@ -215,7 +220,7 @@ const CarouselNext = React.forwardRef<HTMLButtonElement, React.ComponentProps<ty
         className={cn(
           "absolute h-8 w-8 rounded-full",
           orientation === "horizontal"
-            ? "-right-12 top-1/2 -translate-y-1/2"
+            ? "-end-12 top-1/2 -translate-y-1/2"
             : "-bottom-12 left-1/2 -translate-x-1/2 rotate-90",
           className,
         )}
@@ -223,7 +228,7 @@ const CarouselNext = React.forwardRef<HTMLButtonElement, React.ComponentProps<ty
         onClick={scrollNext}
         {...props}
       >
-        <Icons.ArrowRight className="h-4 w-4" />
+        <Icons.ArrowRight className={cn("h-4 w-4", orientation === "horizontal" && "rtl:rotate-180")} />
         <span className="sr-only">{t("ui:carousel.next", "Next slide")}</span>
       </Button>
     );

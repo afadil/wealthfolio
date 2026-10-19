@@ -9,6 +9,7 @@ import { useDateFnsLocale } from "../../hooks/use-date-fns-locale";
 import { cn } from "../../lib/utils";
 import { Button } from "./button";
 import { buttonVariants } from "./button-variants";
+import { useDirection } from "./direction";
 import { Icons } from "./icons";
 
 function Calendar({
@@ -21,6 +22,7 @@ function Calendar({
   labels,
   components,
   locale: localeProp,
+  dir: dirProp,
   ...props
 }: React.ComponentProps<typeof DayPicker> & {
   buttonVariant?: React.ComponentProps<typeof Button>["variant"];
@@ -29,15 +31,17 @@ function Calendar({
   const { t } = useTranslation();
   const fallbackLocale = useDateFnsLocale();
   const locale = localeProp ?? fallbackLocale;
+  const direction = useDirection();
 
   return (
     <DayPicker
       locale={locale}
+      // With `dir`, react-day-picker swaps its previous/next chevrons and the
+      // ArrowLeft/ArrowRight day keys itself.
+      dir={dirProp ?? direction}
       showOutsideDays={showOutsideDays}
       className={cn(
         "bg-background group/calendar in-data-[slot=card-content]:bg-transparent in-data-[slot=popover-content]:bg-transparent p-3 [--cell-size:2rem]",
-        String.raw`rtl:**:[.rdp-button\_next>svg]:rotate-180`,
-        String.raw`rtl:**:[.rdp-button\_previous>svg]:rotate-180`,
         className,
       )}
       captionLayout={captionLayout}
@@ -84,7 +88,7 @@ function Calendar({
           "select-none font-medium",
           captionLayout === "label"
             ? "text-sm"
-            : "[&>svg]:text-muted-foreground flex h-8 items-center gap-1 rounded-md pl-2 pr-1 text-sm [&>svg]:size-3.5",
+            : "[&>svg]:text-muted-foreground flex h-8 items-center gap-1 rounded-md ps-2 pe-1 text-sm [&>svg]:size-3.5",
           defaultClassNames.caption_label,
         ),
         table: "w-full border-collapse",
@@ -97,12 +101,12 @@ function Calendar({
         week_number_header: cn("w-(--cell-size) select-none", defaultClassNames.week_number_header),
         week_number: cn("text-muted-foreground select-none text-xs", defaultClassNames.week_number),
         day: cn(
-          "group/day relative aspect-square h-full w-full select-none p-0 text-center [&:first-child[data-selected=true]_button]:rounded-l-md [&:last-child[data-selected=true]_button]:rounded-r-md",
+          "group/day relative aspect-square h-full w-full select-none p-0 text-center [&:first-child[data-selected=true]_button]:rounded-s-md [&:last-child[data-selected=true]_button]:rounded-e-md",
           defaultClassNames.day,
         ),
-        range_start: cn("bg-accent rounded-l-md", defaultClassNames.range_start),
+        range_start: cn("bg-accent rounded-s-md", defaultClassNames.range_start),
         range_middle: cn("rounded-none", defaultClassNames.range_middle),
-        range_end: cn("bg-accent rounded-r-md", defaultClassNames.range_end),
+        range_end: cn("bg-accent rounded-e-md", defaultClassNames.range_end),
         today: cn(
           "bg-accent text-accent-foreground rounded-md data-[selected=true]:rounded-none",
           defaultClassNames.today,

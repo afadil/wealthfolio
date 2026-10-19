@@ -25,14 +25,14 @@ export function FacetedSearchInput({
 
   return (
     <div className={cn("relative", className)}>
-      <Icons.Search className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
+      <Icons.Search className="text-muted-foreground pointer-events-none absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className={cn(
-          "shadow-inner-xs bg-muted/90 hover:bg-muted/80 h-8 w-full rounded-md pl-8 pr-8 text-sm outline-none transition-colors",
+          "shadow-inner-xs bg-muted/90 hover:bg-muted/80 h-8 w-full rounded-md pe-8 ps-8 text-sm outline-none transition-colors",
           "placeholder:text-muted-foreground",
           "focus-visible:outline-solid focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-2",
         )}
@@ -42,7 +42,7 @@ export function FacetedSearchInput({
         <button
           type="button"
           onClick={handleClear}
-          className="text-muted-foreground hover:text-foreground absolute right-2 top-1/2 -translate-y-1/2"
+          className="text-muted-foreground hover:text-foreground absolute end-2 top-1/2 -translate-y-1/2"
         >
           <Icons.Close className="h-4 w-4" />
           <span className="sr-only">{t("ui:search.clear", "Clear search")}</span>

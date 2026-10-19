@@ -80,7 +80,7 @@ export const ActionConfirm = ({
             <Button variant={confirmButtonVariant} size="sm" disabled={isPending} onClick={handleConfirm}>
               {isPending ? (
                 <>
-                  <Spinner className="mr-2 h-4 w-4" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {pendingText}
                 </>
               ) : (

@@ -65,7 +65,7 @@ function TreeItem({ node, level, selectedId, onSelect, expandedIds, onToggle }: 
               }
             >
               <Icons.ChevronRight
-                className={cn("h-4 w-4 transition-transform duration-200", isExpanded && "rotate-90")}
+                className={cn("h-4 w-4 transition-transform duration-200", isExpanded ? "rotate-90" : "rtl:rotate-180")}
               />
             </CollapsibleTrigger>
           ) : (

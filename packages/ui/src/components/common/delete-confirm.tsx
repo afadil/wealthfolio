@@ -62,7 +62,7 @@ export const DeleteConfirm = ({
             <Button variant="destructive" size="sm" disabled={isPending} onClick={handleDeleteConfirm}>
               {isPending ? (
                 <>
-                  <Spinner className="mr-2 h-4 w-4" />
+                  <Spinner className="me-2 h-4 w-4" />
                   Deleting...
                 </>
               ) : (

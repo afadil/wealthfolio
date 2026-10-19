@@ -222,7 +222,7 @@ export function DateRangeSelector({ value, onChange, hiddenRanges = [], asOf = n
               </Button>
               <Button
                 type="button"
-                className="ml-auto"
+                className="ms-auto"
                 onClick={handleApplyDraftRange}
                 disabled={!isDraftRangeComplete}
               >
