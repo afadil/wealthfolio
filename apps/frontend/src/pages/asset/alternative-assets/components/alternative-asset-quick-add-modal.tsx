@@ -703,6 +703,7 @@ export function AlternativeAssetQuickAddModal({
                           {t("asset:quickAdd.original_amount")}
                         </Label>
                         <MoneyInput
+                          aria-label={t("asset:quickAdd.original_amount")}
                           aria-describedby={describedBy("originalAmount")}
                           value={formData.purchasePrice || ""}
                           onValueChange={(value) => updateFormData("purchasePrice", value)}
@@ -720,6 +721,7 @@ export function AlternativeAssetQuickAddModal({
                           </LoanFieldInfo>
                         </div>
                         <DatePickerInput
+                          aria-label={t("asset:quickAdd.origination_date")}
                           aria-describedby={describedBy("originationDate")}
                           value={formData.purchaseDate}
                           onChange={(date) => date && updateFormData("purchaseDate", date)}
@@ -859,6 +861,7 @@ export function AlternativeAssetQuickAddModal({
                                 {t("asset:loanActions.first_payment_date")}
                               </Label>
                               <DatePickerInput
+                                aria-label={t("asset:loanActions.first_payment_date")}
                                 aria-describedby={describedBy("firstPaymentDate")}
                                 value={firstPaymentDate}
                                 onChange={(date) => updateFormData("firstPaymentDate", date)}
@@ -884,6 +887,7 @@ export function AlternativeAssetQuickAddModal({
                       )}
                     </Label>
                     <MoneyInput
+                      aria-label={t("asset:quickAdd.current_value")}
                       value={formData.currentValue}
                       onValueChange={(value) => updateFormData("currentValue", value)}
                       className="h-11"
@@ -906,6 +910,7 @@ export function AlternativeAssetQuickAddModal({
                       )}
                     </Label>
                     <DatePickerInput
+                      aria-label={t("asset:quickAdd.value_date")}
                       value={formData.valueDate}
                       onChange={(date) => date && updateFormData("valueDate", date)}
                     />
@@ -923,6 +928,7 @@ export function AlternativeAssetQuickAddModal({
                         </span>
                       </Label>
                       <MoneyInput
+                        aria-label={t("asset:quickAdd.purchase_price")}
                         value={formData.purchasePrice || ""}
                         onValueChange={(value) => updateFormData("purchasePrice", value)}
                         className="h-11"
@@ -939,6 +945,7 @@ export function AlternativeAssetQuickAddModal({
                         </span>
                       </Label>
                       <DatePickerInput
+                        aria-label={t("asset:quickAdd.purchase_date")}
                         value={formData.purchaseDate}
                         onChange={(date) => date && updateFormData("purchaseDate", date)}
                       />

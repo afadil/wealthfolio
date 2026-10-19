@@ -540,6 +540,7 @@ export function EventFormDialog({
                   <FormItem className="flex flex-col">
                     <FormLabel>{t("spending:eventForm.startDate")}</FormLabel>
                     <DatePickerInput
+                      aria-label={t("spending:eventForm.startDate")}
                       onChange={(date: Date | undefined) => field.onChange(date)}
                       value={field.value}
                       disabled={field.disabled}
@@ -555,6 +556,7 @@ export function EventFormDialog({
                   <FormItem className="flex flex-col">
                     <FormLabel>{t("spending:eventForm.endDate")}</FormLabel>
                     <DatePickerInput
+                      aria-label={t("spending:eventForm.endDate")}
                       onChange={(date: Date | undefined) => field.onChange(date)}
                       value={field.value}
                       disabled={field.disabled}

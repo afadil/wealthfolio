@@ -114,7 +114,10 @@ export function ActivityDataGridPagination({
               onPageSizeChange(Number(value));
             }}
           >
-            <SelectTrigger className="h-7 w-[4.0625rem] text-xs">
+            <SelectTrigger
+              className="h-7 w-[4.0625rem] text-xs"
+              aria-label={t("activity:datagrid.pagination.rows_per_page")}
+            >
               <SelectValue placeholder={pageSize} />
             </SelectTrigger>
             <SelectContent side="top">

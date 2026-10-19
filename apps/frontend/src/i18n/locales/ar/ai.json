@@ -463,7 +463,8 @@
     "volatility": "التقلب"
   },
   "provider": {
-    "noProvidersConfigured": "لم يتم إعداد أي مزودين"
+    "noProvidersConfigured": "لم يتم إعداد أي مزودين",
+    "label": "مزود الذكاء الاصطناعي"
   },
   "providerSettings": {
     "add": "إضافة",

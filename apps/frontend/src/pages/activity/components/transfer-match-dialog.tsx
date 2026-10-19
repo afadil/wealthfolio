@@ -903,7 +903,7 @@ export function TransferMatchDialog({
                         if (value !== null) setAccountId(value);
                       }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger aria-label={t("activity:filter_account")}>
                         <SelectValue placeholder={t("activity:filter_account")} />
                       </SelectTrigger>
                       <SelectContent>
@@ -926,7 +926,7 @@ export function TransferMatchDialog({
                         if (value !== null) setWindowDays(value);
                       }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger aria-label={t("activity:transfer_match.date_range")}>
                         <SelectValue placeholder={t("activity:transfer_match.date_range")} />
                       </SelectTrigger>
                       <SelectContent>
@@ -985,7 +985,7 @@ export function TransferMatchDialog({
                             if (value !== null) setAccountType(value);
                           }}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger aria-label={t("activity:transfer_match.account_type")}>
                             <SelectValue placeholder={t("activity:transfer_match.account_type")} />
                           </SelectTrigger>
                           <SelectContent>
@@ -1010,7 +1010,7 @@ export function TransferMatchDialog({
                             if (value !== null) setCurrency(value);
                           }}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger aria-label={t("activity:table_currency")}>
                             <SelectValue placeholder={t("activity:table_currency")} />
                           </SelectTrigger>
                           <SelectContent>
@@ -1036,7 +1036,7 @@ export function TransferMatchDialog({
                             if (value !== null) setAssetFilter(value);
                           }}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger aria-label={t("activity:transfer_match.asset")}>
                             <SelectValue placeholder={t("activity:transfer_match.asset")} />
                           </SelectTrigger>
                           <SelectContent>
@@ -1065,7 +1065,7 @@ export function TransferMatchDialog({
                             if (value !== null) setMatchMode(value);
                           }}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger aria-label={t("activity:transfer_match.match_mode")}>
                             <SelectValue placeholder={t("activity:transfer_match.match_mode")} />
                           </SelectTrigger>
                           <SelectContent>

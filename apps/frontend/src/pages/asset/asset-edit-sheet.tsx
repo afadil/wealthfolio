@@ -210,8 +210,16 @@ function PricingModeToggle({
           </p>
         </div>
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger render={<button type="button" className="shrink-0" />}>
-            <Switch checked={isAutomatic} />
+          <PopoverTrigger
+            render={
+              <button
+                type="button"
+                className="shrink-0"
+                aria-label={t("asset:editSheet.automatic_updates")}
+              />
+            }
+          >
+            <Switch checked={isAutomatic} tabIndex={-1} aria-hidden="true" />
           </PopoverTrigger>
           <PopoverContent className="w-90 p-4" align="end">
             <div className="space-y-4">
@@ -782,6 +790,7 @@ export function AssetEditSheet({
                             {t("asset:editSheet.base_currency")}
                           </label>
                           <Input
+                            aria-label={t("asset:editSheet.base_currency")}
                             value={asset.instrumentSymbol ?? ""}
                             disabled
                             className="bg-muted/50"
@@ -791,7 +800,12 @@ export function AssetEditSheet({
                           <label className="text-sm font-medium">
                             {t("asset:editSheet.quote_currency")}
                           </label>
-                          <Input value={asset.quoteCcy ?? ""} disabled className="bg-muted/50" />
+                          <Input
+                            aria-label={t("asset:editSheet.quote_currency")}
+                            value={asset.quoteCcy ?? ""}
+                            disabled
+                            className="bg-muted/50"
+                          />
                         </div>
                       </div>
 
@@ -868,7 +882,12 @@ export function AssetEditSheet({
                           <label className="text-sm font-medium">
                             {t("asset:editSheet.symbol")}
                           </label>
-                          <Input value={asset.displayCode ?? ""} disabled className="bg-muted/50" />
+                          <Input
+                            aria-label={t("asset:editSheet.symbol")}
+                            value={asset.displayCode ?? ""}
+                            disabled
+                            className="bg-muted/50"
+                          />
                         </div>
                         <FormField
                           control={form.control}

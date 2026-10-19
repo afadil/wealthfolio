@@ -255,6 +255,7 @@ export function TargetWeightEditor({
                   {row.isEditing ? (
                     <input
                       type="number"
+                      aria-label={`${row.cat.name} ${t("allocation:vsTarget.target")}`}
                       min={0}
                       max={100}
                       step={1}

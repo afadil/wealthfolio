@@ -405,6 +405,7 @@ export function MultiSelectTaxonomy({
                 {editingId === assignment.id ? (
                   <Input
                     type="text"
+                    aria-label={t("holdings:weight")}
                     value={editingValue}
                     onChange={(e) => setEditingValue(e.target.value)}
                     onBlur={() => handleWeightBlur(assignment)}

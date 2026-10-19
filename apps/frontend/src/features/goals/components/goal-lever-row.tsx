@@ -1,6 +1,6 @@
 import { MoneyInput } from "@wealthfolio/ui";
 import type { ReactNode } from "react";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 export function sliderMaxFor(value: number, baseMax: number, increment: number) {
   const valueInclusiveMax = Math.ceil((value + increment) / increment) * increment;
@@ -50,6 +50,7 @@ export function GoalLeverRow({
   warning,
   inputWidthClassName,
 }: GoalLeverRowProps) {
+  const labelId = useId();
   const inputScale = suffix === "%" ? 100 : 1;
   // Money fields have no natural hard cap (currencies vary by orders of
   // magnitude, e.g. IDR vs USD), so typed amounts stay unclamped unless the
@@ -115,7 +116,9 @@ export function GoalLeverRow({
     <div className="py-4 first:pt-1 last:pb-1">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-foreground text-sm font-semibold leading-tight">{label}</div>
+          <div id={labelId} className="text-foreground text-sm font-semibold leading-tight">
+            {label}
+          </div>
           {hint && <div className="text-muted-foreground mt-1 text-xs leading-tight">{hint}</div>}
         </div>
         <div
@@ -135,6 +138,7 @@ export function GoalLeverRow({
           {prefix && <span className="text-muted-foreground text-xs tabular-nums">{prefix}</span>}
           {kind === "money" ? (
             <MoneyInput
+              aria-labelledby={labelId}
               value={moneyInputFocused ? moneyDraftValue : value}
               onValueChange={setMoneyDraftValue}
               thousandSeparator
@@ -154,6 +158,7 @@ export function GoalLeverRow({
           ) : (
             <input
               type="text"
+              aria-labelledby={labelId}
               inputMode={suffix === "%" ? "decimal" : "numeric"}
               value={displayValue}
               onFocus={() => {
@@ -187,6 +192,7 @@ export function GoalLeverRow({
       </div>
       <input
         type="range"
+        aria-labelledby={labelId}
         value={clampedValue}
         min={min}
         max={sliderUpperBound}

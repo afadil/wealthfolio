@@ -31,7 +31,8 @@
     "addModels": "Add models..."
   },
   "provider": {
-    "noProvidersConfigured": "No providers configured"
+    "noProvidersConfigured": "No providers configured",
+    "label": "AI provider"
   },
   "reasoning": {
     "thinking": "Thinking...",

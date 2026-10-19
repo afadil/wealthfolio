@@ -257,7 +257,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                               }
                             }}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger aria-label={t("common:component.asset_type")}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
