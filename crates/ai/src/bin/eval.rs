@@ -16,6 +16,7 @@
 //!     WF_EVAL_PROVIDER_URL   - provider base URL (default: http://localhost:11434 for ollama)
 //!     WF_EVAL_THINKING       - on / off: force the model's thinking (default: the app's choice)
 //!     WF_EVAL_TRIALS         - runs per case (default: 1); P0 gating needs every run to pass
+//!     WF_EVAL_TITLES         - on / off: title the thread on the first turn (default: on, as the app)
 //!     WF_EVAL_JUDGE_PROVIDER - provider that grades rubrics (default: WF_EVAL_PROVIDER)
 //!     WF_EVAL_JUDGE_MODEL    - judge model (default: the case's judge_model, else WF_EVAL_MODEL)
 //!     WF_EVAL_JUDGE_PROVIDER_URL - judge base URL
@@ -124,6 +125,9 @@ async fn run() -> ExitCode {
             .as_deref()
             .unwrap_or("case judge_model, else the model under test")
     );
+    if !cfg.titles {
+        println!("    titles:   off (WF_EVAL_TITLES)");
+    }
     println!("    trials:   {trials}");
     println!("    cases:    {}", cases_dir.display());
     if let Some(f) = &filter {
@@ -179,6 +183,7 @@ async fn run() -> ExitCode {
         model: cfg.model.clone(),
         thinking_override: cfg.thinking,
         thinking: capabilities.thinking,
+        titles: cfg.titles,
         judge_provider: cfg.judge.provider.clone(),
         judge_model: cfg.judge.model.clone(),
         trials,
@@ -389,10 +394,11 @@ fn compare_files(before_path: &Path, after_path: &Path) -> ExitCode {
 
     let describe = |r: &RunResults| {
         format!(
-            "{} / {} (thinking {}), {} trial(s), started {}",
+            "{} / {} (thinking {}{}), {} trial(s), started {}",
             r.provider,
             r.model,
             if r.thinking { "on" } else { "off" },
+            if r.titles { "" } else { ", titles off" },
             r.trials,
             r.started_at
         )

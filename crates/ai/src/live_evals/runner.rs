@@ -69,6 +69,10 @@ pub struct RunnerConfig {
     /// Forces the model's thinking on or off. `None` keeps what the app
     /// would use.
     pub thinking: Option<bool>,
+    /// Whether the first turn titles the thread, as the app does. The app
+    /// titles with the provider's title model (`gemma4:e4b` for Ollama), so
+    /// with another model Ollama may swap models on every case.
+    pub titles: bool,
     /// What Ollama's model list reports for a model the catalog doesn't
     /// list. The app saves this as the model's capability overrides when the
     /// user adds the model from that list.
@@ -101,13 +105,17 @@ impl RunnerConfig {
         let provider = var("WF_EVAL_PROVIDER").unwrap_or_else(|| DEFAULT_PROVIDER.to_string());
         let model = var("WF_EVAL_MODEL").unwrap_or_else(|| default_model.to_string());
         let provider_url = var("WF_EVAL_PROVIDER_URL").or_else(|| default_provider_url(&provider));
-        let thinking = var("WF_EVAL_THINKING")
-            .map(|value| match value.to_ascii_lowercase().as_str() {
-                "on" | "true" | "1" => Ok(true),
-                "off" | "false" | "0" => Ok(false),
-                _ => Err(format!("WF_EVAL_THINKING must be on or off, got `{value}`")),
-            })
-            .transpose()?;
+        let switch = |name: &str| {
+            var(name)
+                .map(|value| match value.to_ascii_lowercase().as_str() {
+                    "on" | "true" | "1" => Ok(true),
+                    "off" | "false" | "0" => Ok(false),
+                    _ => Err(format!("{name} must be on or off, got `{value}`")),
+                })
+                .transpose()
+        };
+        let thinking = switch("WF_EVAL_THINKING")?;
+        let titles = switch("WF_EVAL_TITLES")?.unwrap_or(true);
 
         let judge_model = var("WF_EVAL_JUDGE_MODEL");
         let judge_provider = match var("WF_EVAL_JUDGE_PROVIDER") {
@@ -133,6 +141,7 @@ impl RunnerConfig {
             model,
             provider_url,
             thinking,
+            titles,
             listed_capabilities: None,
             judge: JudgeConfig {
                 provider: judge_provider,
@@ -382,6 +391,22 @@ async fn run_case_once(case: &Case, cfg: &RunnerConfig) -> CaseResult {
             );
         }
     };
+    // The chat titles only a thread that has no title yet.
+    if !cfg.titles {
+        if let Err(e) = service
+            .update_thread_title(&thread.id, case.id.clone())
+            .await
+        {
+            return fail_case(
+                case,
+                vec![AssertionFailure {
+                    kind: AssertionKind::StreamError,
+                    message: format!("update_thread_title failed: {e}"),
+                }],
+                ToolTrace::default(),
+            );
+        }
+    }
 
     let request = SendMessageRequest {
         thread_id: Some(thread.id.clone()),
@@ -1349,6 +1374,9 @@ mod tests {
         assert_eq!(cfg.provider_url.as_deref(), Some(DEFAULT_OLLAMA_URL));
 
         assert!(config(&[("WF_EVAL_THINKING", "maybe")]).is_err());
+        assert!(config(&[]).unwrap().titles);
+        assert!(!config(&[("WF_EVAL_TITLES", "off")]).unwrap().titles);
+        assert!(config(&[("WF_EVAL_TITLES", "no")]).is_err());
     }
 
     #[test]

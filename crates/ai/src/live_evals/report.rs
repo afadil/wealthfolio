@@ -31,6 +31,10 @@ pub struct RunResults {
     pub thinking_override: Option<bool>,
     /// Whether the model thought, after the override.
     pub thinking: bool,
+    /// `WF_EVAL_TITLES`: whether turns titled their thread. Files written
+    /// before the option existed did.
+    #[serde(default = "titled_by_default")]
+    pub titles: bool,
     pub judge_provider: String,
     /// `None`: each case's `judge_model`, else the model under test.
     pub judge_model: Option<String>,
@@ -66,6 +70,10 @@ pub struct TrialRecord {
 pub struct FailureRecord {
     pub kind: String,
     pub message: String,
+}
+
+fn titled_by_default() -> bool {
+    true
 }
 
 impl TrialRecord {
@@ -340,6 +348,7 @@ mod tests {
             model: "m".to_string(),
             thinking_override: None,
             thinking: false,
+            titles: true,
             judge_provider: "ollama".to_string(),
             judge_model: None,
             trials: 3,
@@ -448,6 +457,14 @@ mod tests {
         // A file where the directory should be.
         assert!(write_results(&path.join("run.json"), &results).is_err());
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn results_written_before_the_titles_option_read_as_titled() {
+        let mut json = serde_json::to_value(run(Vec::new())).unwrap();
+        json.as_object_mut().unwrap().remove("titles");
+        let back: RunResults = serde_json::from_value(json).unwrap();
+        assert!(back.titles);
     }
 
     #[test]
