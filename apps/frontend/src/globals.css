@@ -15,6 +15,23 @@
 @import "@fontsource/jetbrains-mono/600.css";
 @import "@fontsource/jetbrains-mono/700.css";
 
+/* Rubik (Arabic) - none of the fonts above has Arabic letters. Only its Arabic file is
+   registered, as a fallback in each stack: the first font still draws Latin text and digits,
+   and the file loads only when Arabic text is on screen. */
+@font-face {
+  font-family: "Rubik Arabic";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 900;
+  src: url("@fontsource-variable/rubik/files/rubik-arabic-wght-normal.woff2")
+    format("woff2-variations");
+  /* Arabic letters, digits and punctuation only: no direction marks or hyphens, which
+     Latin text uses too. */
+  unicode-range:
+    U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+204F, U+2E41,
+    U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
+}
+
 /* Enable class-based dark mode across the subtree (Tailwind v4 pattern) */
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -76,9 +93,12 @@
   --breakpoint-xs: 26.875rem;
 
   /* Font families */
-  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Merriweather", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-sans: "Inter Variable", "Inter", "Rubik Arabic", ui-sans-serif, system-ui, sans-serif;
+  --font-serif:
+    "Merriweather", "Rubik Arabic", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-mono:
+    "JetBrains Mono", "Rubik Arabic", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    monospace;
 
   /* Type scale. 11px is the floor, and every step is rem so text follows the
      root font size. Steps outside the scale (text-4xl and up) don't exist. */
