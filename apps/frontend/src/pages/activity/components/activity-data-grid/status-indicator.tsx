@@ -41,9 +41,9 @@ export function StatusIndicator({ transaction }: StatusIndicatorProps) {
         >
           <span aria-hidden="true">●</span>
         </TooltipTrigger>
-        <TooltipContent side="right" className="max-w-80">
+        <TooltipContent side="inline-end" className="max-w-80">
           {mappingReasons.length > 0 ? (
-            <ul className="list-disc space-y-1 pl-4">
+            <ul className="list-disc space-y-1 ps-4">
               {mappingReasons.map((reason) => (
                 <li key={reason}>{reason}</li>
               ))}

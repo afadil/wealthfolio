@@ -46,7 +46,7 @@ export function FontSelector({ value, onChange, className }: FontSelectorProps) 
           </div>
           <div className="text-xs font-medium sm:text-sm">{t(`common:${font.labelKey}`)}</div>
           {value === font.value && (
-            <div className="bg-primary absolute right-2 top-2 h-1.5 w-1.5 rounded-full" />
+            <div className="bg-primary absolute end-2 top-2 h-1.5 w-1.5 rounded-full" />
           )}
         </button>
       ))}

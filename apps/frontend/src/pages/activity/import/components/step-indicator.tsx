@@ -126,7 +126,7 @@ export const StepIndicator = ({ steps, currentStep }: StepIndicatorProps) => {
                 initial={{ opacity: 0, y: 3 }}
                 animate={{ opacity: 1, y: 0, fontWeight: isCurrent ? 600 : 500 }}
                 transition={{ duration: 0.3, delay: 0.1 }}
-                className={`ml-3 text-sm ${isCurrent ? "text-primary" : isCompleted ? "text-foreground" : "text-muted-foreground"}`}
+                className={`ms-3 text-sm ${isCurrent ? "text-primary" : isCompleted ? "text-foreground" : "text-muted-foreground"}`}
               >
                 {step.title}
               </motion.span>

@@ -34,7 +34,7 @@ export const AllocationBreadcrumb: React.FC<AllocationBreadcrumbProps> = ({
       </button>
       {path.map((item, index) => (
         <span key={item.id} className="flex items-center gap-1.5">
-          <Icons.ChevronRight className="text-muted-foreground h-3.5 w-3.5" />
+          <Icons.ChevronRight className="text-muted-foreground h-3.5 w-3.5 rtl:rotate-180" />
           {index === path.length - 1 ? (
             <span className="text-foreground font-semibold">{item.name}</span>
           ) : (

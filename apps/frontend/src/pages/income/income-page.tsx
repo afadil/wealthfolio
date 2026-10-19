@@ -101,7 +101,7 @@ export default function IncomePage() {
   // through loading, empty, populated and error states.
   const filters = (
     <>
-      <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden items-center gap-2 md:flex lg:right-4">
+      <div className="pointer-events-auto fixed end-2 top-4 z-20 hidden items-center gap-2 md:flex lg:end-4">
         <AccountScopeSelector value={accountFilter} onChange={setAccountScope} />
         <IncomePeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
       </div>
@@ -252,10 +252,10 @@ export default function IncomePage() {
                       <div className="flex items-center text-xs">
                         <GainPercent
                           value={periodSummary.yoyGrowth}
-                          className="text-left text-xs"
+                          className="text-start text-xs"
                           animated={true}
                         />
-                        <span className="text-muted-foreground ml-2 text-xs">
+                        <span className="text-muted-foreground ms-2 text-xs">
                           {t("income:year_over_year")}
                         </span>
                       </div>
@@ -348,8 +348,8 @@ export default function IncomePage() {
                 />
               </div>
               <div className="flex items-center text-xs">
-                <GainPercent value={monthlyAverageChange} className="text-left text-xs" />
-                <span className="text-muted-foreground ml-2 text-xs">
+                <GainPercent value={monthlyAverageChange} className="text-start text-xs" />
+                <span className="text-muted-foreground ms-2 text-xs">
                   {t("income:since_last_period_label")}
                 </span>
               </div>
@@ -512,7 +512,7 @@ export default function IncomePage() {
                                   })}
                                 </div>
                                 {/* Tooltip arrow */}
-                                <div className="border-t-border absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 transform border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent"></div>
+                                <div className="border-t-border absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 transform border-e-4 border-s-4 border-t-4 border-e-transparent border-s-transparent"></div>
                               </div>
                             </div>
                           </div>
@@ -524,10 +524,10 @@ export default function IncomePage() {
                   {topDividendStocks.map((asset) => (
                     <div key={asset.assetId} className="flex items-center justify-between">
                       <div className="flex items-center">
-                        <Badge className="bg-primary mr-2 flex min-w-[3.4375rem] items-center justify-center rounded-sm text-xs">
+                        <Badge className="bg-primary me-2 flex min-w-[3.4375rem] items-center justify-center rounded-sm text-xs">
                           {asset.symbol}
                         </Badge>
-                        <span className="text-muted-foreground mr-16 text-xs">{asset.name}</span>
+                        <span className="text-muted-foreground me-16 text-xs">{asset.name}</span>
                       </div>
                       <div className="text-success text-sm">
                         <PrivacyAmount value={asset.income} currency={currency} />

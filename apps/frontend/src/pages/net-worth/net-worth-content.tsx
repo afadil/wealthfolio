@@ -268,7 +268,7 @@ export function NetWorthContent() {
               {isHistoryLoading ? (
                 <div className="flex items-center gap-3 pt-1">
                   <Skeleton className="h-4 w-24" />
-                  <div className="border-secondary my-1 border-r pr-2" />
+                  <div className="border-secondary my-1 border-e pe-2" />
                   <Skeleton className="h-4 w-16" />
                 </div>
               ) : (
@@ -281,7 +281,7 @@ export function NetWorthContent() {
                   />
                   {showChangeRatio && (
                     <>
-                      <div className="border-secondary my-1 border-r pr-2" />
+                      <div className="border-secondary my-1 border-e pe-2" />
                       {isPlainPercent(netWorthChange.percent) ? (
                         <GainPercent
                           className="lg:text-md text-sm font-light"
@@ -304,7 +304,7 @@ export function NetWorthContent() {
                 </>
               )}
               {periodCode && (
-                <span className="lg:text-md text-muted-foreground ml-1 text-sm font-light">
+                <span className="lg:text-md text-muted-foreground ms-1 text-sm font-light">
                   {t(`ui:interval.${periodCode}`)}
                 </span>
               )}
@@ -383,7 +383,7 @@ export function NetWorthContent() {
                     className="text-muted-foreground hover:text-foreground mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
                   >
                     {t("insights:networth.add_first_asset")}
-                    <Icons.ChevronRight className="h-3 w-3" />
+                    <Icons.ChevronRight className="h-3 w-3 rtl:rotate-180" />
                   </Link>
                 </div>
               )}

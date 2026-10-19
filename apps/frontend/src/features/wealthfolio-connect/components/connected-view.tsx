@@ -211,7 +211,7 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
               </>
             )}
             {/* Sync time inline on sm+ */}
-            <span className="ml-auto hidden shrink-0 pl-2 sm:inline">{lastSyncedText}</span>
+            <span className="ms-auto hidden shrink-0 ps-2 sm:inline">{lastSyncedText}</span>
           </div>
           {/* Row 3: Sync time on its own line on mobile */}
           <p className="text-muted-foreground text-2xs mt-0.5 sm:hidden">{lastSyncedText}</p>
@@ -597,7 +597,7 @@ export function ConnectedView() {
                 }
               >
                 {t("connect:upgrade.button")}
-                <Icons.ExternalLink className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
+                <Icons.ExternalLink className="ms-1 h-3.5 w-3.5" aria-hidden="true" />
               </Button>
             </div>
           </CardContent>

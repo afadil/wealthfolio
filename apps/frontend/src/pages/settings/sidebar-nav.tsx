@@ -28,8 +28,8 @@ export function SidebarNav({ className, items, ...props }: SidebarNavProps) {
           )}
           title={item.title}
         >
-          {item.icon && <span className="mr-1.5 hidden lg:inline-block">{item.icon}</span>}
-          <span className="min-w-0 flex-1 truncate text-left">{item.title}</span>
+          {item.icon && <span className="me-1.5 hidden lg:inline-block">{item.icon}</span>}
+          <span className="min-w-0 flex-1 truncate text-start">{item.title}</span>
         </NavLink>
       ))}
     </nav>

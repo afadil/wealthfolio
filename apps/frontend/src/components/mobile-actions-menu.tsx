@@ -55,7 +55,7 @@ export function MobileActionsMenu({
                   action.onClick();
                   onOpenChange(false);
                 }}
-                className="hover:bg-accent active:bg-accent/80 focus:ring-primary flex items-center gap-4 rounded-lg border p-4 text-left transition-colors focus:outline-none focus:ring-2"
+                className="hover:bg-accent active:bg-accent/80 focus:ring-primary flex items-center gap-4 rounded-lg border p-4 text-start transition-colors focus:outline-none focus:ring-2"
               >
                 <div className="bg-primary/10 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full">
                   <IconComponent className="text-primary h-5 w-5" />
@@ -64,7 +64,7 @@ export function MobileActionsMenu({
                   <div className="text-foreground font-medium">{action.label}</div>
                   <div className="text-muted-foreground text-sm">{action.description}</div>
                 </div>
-                <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0" />
+                <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0 rtl:rotate-180" />
               </button>
             );
           })}

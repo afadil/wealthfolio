@@ -114,7 +114,7 @@ export default function GoalsDashboardPage() {
         actions={
           <Link to="/goals/new">
             <Button size="sm">
-              <Icons.Plus className="mr-1 h-4 w-4" />
+              <Icons.Plus className="me-1 h-4 w-4" />
               {t("goals:dashboard.new_goal")}
             </Button>
           </Link>
@@ -134,7 +134,7 @@ export default function GoalsDashboardPage() {
             </div>
             <Link to="/goals/new">
               <Button size="lg" className="mt-2">
-                <Icons.Plus className="mr-2 h-4 w-4" />
+                <Icons.Plus className="me-2 h-4 w-4" />
                 {t("goals:dashboard.create_first_goal")}
               </Button>
             </Link>
@@ -155,7 +155,7 @@ export default function GoalsDashboardPage() {
                   className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-xs font-medium transition-colors"
                 >
                   <Icons.ChevronRight
-                    className={`h-3.5 w-3.5 transition-transform ${archivedOpen ? "rotate-90" : ""}`}
+                    className={`h-3.5 w-3.5 transition-transform ${archivedOpen ? "rotate-90" : "rtl:rotate-180"}`}
                   />
                   {t("goals:dashboard.archived_count", { count: archived.length })}
                 </button>

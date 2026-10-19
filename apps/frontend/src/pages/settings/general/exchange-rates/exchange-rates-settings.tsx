@@ -130,7 +130,7 @@ export function ExchangeRatesSettings() {
                   />
                 </p>
                 <p className="text-warning text-xs">
-                  <Icons.AlertTriangle className="mr-1 inline h-3 w-3" />
+                  <Icons.AlertTriangle className="me-1 inline h-3 w-3" />
                   {t("settings:fx_delete_warning", { currency: rate.fromCurrency })}
                 </p>
               </>
@@ -161,7 +161,7 @@ export function ExchangeRatesSettings() {
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger render={<Button />}>
-              <Icons.PlusCircle className="mr-2 h-4 w-4" />
+              <Icons.PlusCircle className="me-2 h-4 w-4" />
               {t("settings:fx_add")}
             </DialogTrigger>
             <DialogContent className="max-h-[90vh] overflow-y-auto">
@@ -191,7 +191,7 @@ export function ExchangeRatesSettings() {
             <h3 className="mt-4 text-lg font-semibold">{t("settings:fx_empty")}</h3>
 
             <Button className="mt-4" onClick={() => setIsAddDialogOpen(true)}>
-              <Icons.PlusCircle className="mr-2 h-4 w-4" />
+              <Icons.PlusCircle className="me-2 h-4 w-4" />
               {t("settings:fx_add")}
             </Button>
           </div>

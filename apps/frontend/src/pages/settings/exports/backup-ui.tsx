@@ -221,7 +221,7 @@ export function BackupRow({
           {parts.map(({ part, detail }, index) => (
             <span
               key={index}
-              className={`[&_svg]:mr-1 [&_svg]:inline [&_svg]:align-[-2px] ${detail ? "max-md:hidden" : ""}`}
+              className={`[&_svg]:me-1 [&_svg]:inline [&_svg]:align-[-2px] ${detail ? "max-md:hidden" : ""}`}
             >
               {index > 0 && <span aria-hidden> · </span>}
               {part}
@@ -421,7 +421,7 @@ export function BackupDeleteDialog({
         mobileClassName="h-auto max-h-[85dvh] overflow-y-auto"
         showCloseButton={!pending}
       >
-        <DialogHeader className="text-left">
+        <DialogHeader className="text-start">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>

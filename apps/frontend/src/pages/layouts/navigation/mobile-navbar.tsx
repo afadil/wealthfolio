@@ -219,7 +219,7 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                   className="hover:bg-muted flex size-11 shrink-0 items-center justify-center rounded-full"
                   aria-label={t("common:back")}
                 >
-                  <Icons.ArrowLeft className="size-5" />
+                  <Icons.ArrowLeft className="size-5 rtl:rotate-180" />
                 </button>
               )}
               <SheetTitle
@@ -252,7 +252,7 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                       aria-label={t("common:profiles.menuLabel", {
                         name: profileContext.profile.name,
                       })}
-                      className="hover:bg-muted flex min-h-14 w-full items-center gap-4 rounded-lg text-left"
+                      className="hover:bg-muted flex min-h-14 w-full items-center gap-4 rounded-lg text-start"
                     >
                       <ProfileAvatar
                         id={profileContext.profile.avatarId}
@@ -261,7 +261,7 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                       <span className="min-w-0 flex-1 truncate font-semibold">
                         {profileContext.profile.name}
                       </span>
-                      <Icons.ChevronRight className="text-muted-foreground size-5 shrink-0" />
+                      <Icons.ChevronRight className="text-muted-foreground size-5 shrink-0 rtl:rotate-180" />
                     </button>
                   </div>
                 )}
@@ -289,7 +289,7 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                         <span className="min-w-0 flex-1 truncate text-lg font-semibold">
                           {item.title}
                         </span>
-                        <Icons.ChevronRight className="text-muted-foreground/50 size-5 shrink-0 transition-transform group-hover:translate-x-0.5" />
+                        <Icons.ChevronRight className="text-muted-foreground/50 size-5 shrink-0 transition-transform group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
                       </Link>
                     );
                   })}
@@ -324,7 +324,7 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                             <span className="min-w-0 flex-1 truncate text-lg font-semibold">
                               {item.title}
                             </span>
-                            <Icons.ChevronRight className="text-muted-foreground/50 size-5 shrink-0 transition-transform group-hover:translate-x-0.5" />
+                            <Icons.ChevronRight className="text-muted-foreground/50 size-5 shrink-0 transition-transform group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
                           </Link>
                         );
                       })}

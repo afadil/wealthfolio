@@ -161,7 +161,7 @@ function SuccessCard({ count }: { count: number }) {
           {t("ai:importCsv.importedActivities", { count })}
         </p>
         <Link to="/activities" className={buttonVariants({ variant: "outline", size: "sm" })}>
-          <Icons.ExternalLink className="mr-2 h-4 w-4" />
+          <Icons.ExternalLink className="me-2 h-4 w-4" />
           {t("ai:importCsv.viewActivities")}
         </Link>
       </CardContent>
@@ -427,9 +427,9 @@ function ImportCsvToolUIContentImpl({
               disabled={!session.canConfirm || session.isSubmitting}
             >
               {session.isSubmitting ? (
-                <Spinner className="mr-2 h-4 w-4" />
+                <Spinner className="me-2 h-4 w-4" />
               ) : (
-                <Icons.Download className="mr-2 h-4 w-4" />
+                <Icons.Download className="me-2 h-4 w-4" />
               )}
               {t("ai:importCsv.import", { count: session.stats.toImport })}
             </Button>

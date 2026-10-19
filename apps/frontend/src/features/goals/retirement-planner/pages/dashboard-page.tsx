@@ -606,7 +606,7 @@ export default function DashboardPage({
                         </Badge>
                       )}
                     </div>
-                    <div className="ml-auto flex items-center gap-2">
+                    <div className="ms-auto flex items-center gap-2">
                       <ValueModeToggle value={chartValueMode} onChange={setChartValueMode} />
                       <Tooltip>
                         <TooltipTrigger
@@ -883,7 +883,7 @@ export default function DashboardPage({
                     </div>
                     <div className="bg-muted/60 relative h-2.5 overflow-hidden rounded-md border">
                       <div
-                        className="bg-success absolute inset-y-0 left-0 transition-[width] duration-500"
+                        className="bg-success absolute inset-y-0 start-0 transition-[width] duration-500"
                         style={{ width: `${Math.min(progress * 100, 100)}%` }}
                       />
                       {!isTraditionalMode &&
@@ -892,7 +892,7 @@ export default function DashboardPage({
                         coastAmountDisplay > 0 && (
                           <div
                             className="bg-foreground/55 absolute -bottom-0.5 -top-0.5 w-[2px]"
-                            style={{ left: `${coastPct}%` }}
+                            style={{ insetInlineStart: `${coastPct}%` }}
                             title={t("goals:dashboard.milestone.coast_fire")}
                           />
                         )}
@@ -1131,7 +1131,7 @@ export default function DashboardPage({
 
           {/* Retirement spending coverage */}
           <Card>
-            <CardHeader className="relative pb-4 sm:pr-56">
+            <CardHeader className="relative pb-4 sm:pe-56">
               <div className="min-w-0">
                 <div className="mb-1 flex items-center gap-2">
                   <Icons.CreditCard className="text-muted-foreground h-3.5 w-3.5" />
@@ -1192,7 +1192,7 @@ export default function DashboardPage({
                 ]}
                 size="xs"
                 rounded="md"
-                className="bg-muted/30 mt-4 w-fit border sm:absolute sm:right-5 sm:top-5 sm:mt-0"
+                className="bg-muted/30 mt-4 w-fit border sm:absolute sm:end-5 sm:top-5 sm:mt-0"
               />
             </CardHeader>
             <CardContent className="space-y-3.5">
@@ -1338,7 +1338,7 @@ export default function DashboardPage({
                     </div>
 
                     {/* Income schedule + current-age funding sources */}
-                    <div className="min-w-0 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+                    <div className="min-w-0 border-t pt-3 lg:border-s lg:border-t-0 lg:ps-4 lg:pt-0">
                       <div className="text-muted-foreground text-2xs mb-1.5 font-semibold uppercase tracking-[0.14em]">
                         {t("goals:dashboard.coverage.income_schedule")}
                       </div>
@@ -1392,7 +1392,7 @@ export default function DashboardPage({
                                   amount: formatting.formatCompactAmount(monthlyAmount, currency),
                                 })}{" "}
                                 {isActive && matchedBudgetStream ? (
-                                  <span className="text-muted-foreground text-2xs ml-1">
+                                  <span className="text-muted-foreground text-2xs ms-1">
                                     {numberFormatting.formatPercent(
                                       matchedBudgetStream.percentageOfBudget,
                                       { digits: 0 },
@@ -1458,7 +1458,7 @@ export default function DashboardPage({
                                   currency,
                                 ),
                               })}{" "}
-                              <span className="text-muted-foreground text-2xs ml-1">
+                              <span className="text-muted-foreground text-2xs ms-1">
                                 {numberFormatting.formatPercent(coveragePortfolioPct / 100, {
                                   digits: 0,
                                 })}
@@ -1481,7 +1481,7 @@ export default function DashboardPage({
                                   currency,
                                 ),
                               })}{" "}
-                              <span className="text-muted-foreground text-2xs ml-1">
+                              <span className="text-muted-foreground text-2xs ms-1">
                                 {numberFormatting.formatPercent(coverageShortfallPct / 100, {
                                   digits: 0,
                                 })}

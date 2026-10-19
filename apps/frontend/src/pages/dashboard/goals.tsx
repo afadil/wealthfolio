@@ -75,7 +75,7 @@ function ViewAllLink() {
       className="text-muted-foreground hover:bg-success-subtle inline-flex h-8 items-center rounded-md px-3 text-xs font-medium transition-colors"
     >
       {t("dashboard:view_all")}
-      <Icons.ChevronRight className="ml-1 h-3 w-3" />
+      <Icons.ChevronRight className="ms-1 h-3 w-3 rtl:rotate-180" />
     </Link>
   );
 }
@@ -124,7 +124,7 @@ export function SavingGoals() {
             className="text-muted-foreground hover:text-foreground mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
           >
             {t("dashboard:goals.create_first_goal")}
-            <Icons.ChevronRight className="h-3 w-3" />
+            <Icons.ChevronRight className="h-3 w-3 rtl:rotate-180" />
           </Link>
         </div>
       </DashboardCard>
@@ -181,7 +181,7 @@ export function SavingGoals() {
               </div>
 
               {/* Right: big % + time */}
-              <div className="shrink-0 text-right">
+              <div className="shrink-0 text-end">
                 <div className="text-base font-semibold tabular-nums leading-none">
                   {pctDisplay}
                 </div>
@@ -207,7 +207,7 @@ export function SavingGoals() {
           className="text-muted-foreground hover:text-foreground flex items-center justify-between pt-3 text-xs transition-colors"
         >
           <span>{t("dashboard:goals.more_goals", { count: hiddenGoalsCount })}</span>
-          <Icons.ChevronRight className="h-4 w-4" />
+          <Icons.ChevronRight className="h-4 w-4 rtl:rotate-180" />
         </Link>
       )}
     </DashboardCard>

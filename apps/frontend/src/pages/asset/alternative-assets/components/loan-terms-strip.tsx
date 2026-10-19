@@ -124,9 +124,9 @@ export function LoanTermsStrip({
               return (
                 <div
                   key={term.key}
-                  className="bg-success/15 border-background absolute inset-y-0 border-r-2 last:border-r-0"
+                  className="bg-success/15 border-background absolute inset-y-0 border-e-2 last:border-e-0"
                   style={{
-                    left: `${position(term.start)}%`,
+                    insetInlineStart: `${position(term.start)}%`,
                     width: `${position(term.end) - position(term.start)}%`,
                   }}
                 >
@@ -144,7 +144,7 @@ export function LoanTermsStrip({
               <div
                 className="border-muted-foreground/40 bg-muted/30 absolute inset-y-0 border border-dashed"
                 style={{
-                  left: `${position(future.start)}%`,
+                  insetInlineStart: `${position(future.start)}%`,
                   width: `${position(future.end) - position(future.start)}%`,
                 }}
               />
@@ -154,7 +154,7 @@ export function LoanTermsStrip({
             <div
               data-testid="loan-term-today"
               className="absolute bottom-0 top-0 w-px"
-              style={{ left: `${todayPosition}%` }}
+              style={{ insetInlineStart: `${todayPosition}%` }}
             >
               <Tooltip>
                 <TooltipTrigger
@@ -164,10 +164,10 @@ export function LoanTermsStrip({
                       className={cn(
                         "text-success focus-visible:ring-ring absolute whitespace-nowrap rounded-sm text-xs font-medium focus-visible:outline-none focus-visible:ring-2",
                         todayPosition < 20
-                          ? "left-0"
+                          ? "start-0"
                           : todayPosition > 80
-                            ? "right-0"
-                            : "-translate-x-1/2",
+                            ? "end-0"
+                            : "-translate-x-1/2 rtl:translate-x-1/2",
                       )}
                     />
                   }
@@ -182,8 +182,8 @@ export function LoanTermsStrip({
                   })}
                 </TooltipContent>
               </Tooltip>
-              <span className="bg-success absolute bottom-0 left-0 h-4 w-px -translate-x-1/2" />
-              <span className="border-background bg-success absolute -bottom-0.5 left-0 size-3 -translate-x-1/2 rounded-full border-2" />
+              <span className="bg-success absolute bottom-0 start-0 h-4 w-px -translate-x-1/2 rtl:translate-x-1/2" />
+              <span className="border-background bg-success absolute -bottom-0.5 start-0 size-3 -translate-x-1/2 rounded-full border-2 rtl:translate-x-1/2" />
             </div>
           )}
         </div>
@@ -198,7 +198,7 @@ export function LoanTermsStrip({
               key={term.key}
               type="button"
               onClick={term.onEdit}
-              className="hover:bg-muted/50 -m-1.5 rounded-md p-1.5 text-left transition-colors"
+              className="hover:bg-muted/50 -m-1.5 rounded-md p-1.5 text-start transition-colors"
             >
               <span
                 className={cn(

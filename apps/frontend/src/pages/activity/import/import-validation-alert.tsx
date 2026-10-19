@@ -29,7 +29,7 @@ const ValidationAlert: React.FC<ValidationAlertProps> = ({
       <Alert className="mb-4 flex flex-col" variant="warning">
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center">
-            <Icons.AlertCircle className="mr-2 h-4 w-4" />
+            <Icons.AlertCircle className="me-2 h-4 w-4" />
             <AlertTitle>
               {t("activity:import.validationAlert.issuesTitle", { count: warnings })}
               <p className="pt-1 text-sm font-normal">
@@ -42,7 +42,7 @@ const ValidationAlert: React.FC<ValidationAlertProps> = ({
           </div>
         </div>
         <div className="mt-2 flex justify-start">
-          <Button className="mr-2" onClick={onCancel}>
+          <Button className="me-2" onClick={onCancel}>
             {t("activity:import.validationAlert.retry")}
           </Button>
         </div>
@@ -54,7 +54,7 @@ const ValidationAlert: React.FC<ValidationAlertProps> = ({
       <Alert className="mb-4 flex flex-col" variant="success">
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center">
-            <Icons.CheckCircle className="mr-2 h-4 w-4" />
+            <Icons.CheckCircle className="me-2 h-4 w-4" />
             <div>
               <AlertTitle>{t("activity:import.validationAlert.allValidTitle")}</AlertTitle>
               <AlertDescription>
@@ -66,21 +66,21 @@ const ValidationAlert: React.FC<ValidationAlertProps> = ({
           </div>
         </div>
         <div className="mt-2 flex justify-start">
-          <Button variant="secondary" className="mr-2" disabled={isConfirming} onClick={onCancel}>
+          <Button variant="secondary" className="me-2" disabled={isConfirming} onClick={onCancel}>
             {t("activity:import.validationAlert.cancel")}
           </Button>
           <Button onClick={onConfirm} disabled={isConfirming}>
             {isConfirming ? (
               <>
-                <Spinner className="mr-2 h-4 w-4" />
-                <span className="hidden sm:ml-2 sm:inline">
+                <Spinner className="me-2 h-4 w-4" />
+                <span className="hidden sm:ms-2 sm:inline">
                   {t("activity:import.validationAlert.importing")}
                 </span>
               </>
             ) : (
               <>
-                <Icons.Import className="mr-2 h-4 w-4" />
-                <span className="hidden sm:ml-2 sm:inline">
+                <Icons.Import className="me-2 h-4 w-4" />
+                <span className="hidden sm:ms-2 sm:inline">
                   {t("activity:import.validationAlert.confirmImport")}
                 </span>
               </>
@@ -95,12 +95,12 @@ const ValidationAlert: React.FC<ValidationAlertProps> = ({
       <Alert className="mb-4 flex flex-col" variant="destructive">
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center">
-            <Icons.AlertCircle className="mr-2 h-4 w-4" />
+            <Icons.AlertCircle className="me-2 h-4 w-4" />
             <AlertTitle>{error}</AlertTitle>
           </div>
         </div>
         <div className="mt-2 flex justify-start">
-          <Button className="mr-2" onClick={onCancel}>
+          <Button className="me-2" onClick={onCancel}>
             {t("activity:import.validationAlert.retry")}
           </Button>
         </div>

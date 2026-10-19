@@ -32,9 +32,9 @@ export function StartupError({ error, isRetrying = false, onRetry }: StartupErro
 
         <Button onClick={onRetry} disabled={isRetrying}>
           {isRetrying ? (
-            <Spinner className="mr-2 h-4 w-4" />
+            <Spinner className="me-2 h-4 w-4" />
           ) : (
-            <Icons.RefreshCw className="mr-2 h-4 w-4" />
+            <Icons.RefreshCw className="me-2 h-4 w-4" />
           )}
           {t("common:retry")}
         </Button>

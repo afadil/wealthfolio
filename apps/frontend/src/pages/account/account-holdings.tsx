@@ -172,7 +172,7 @@ const AccountHoldings = ({
                     )
                   }
                 >
-                  <Icons.Plus className="mr-2 h-4 w-4" />
+                  <Icons.Plus className="me-2 h-4 w-4" />
                   {t("account:actions_add_transaction")}
                 </Button>
                 <Button
@@ -180,7 +180,7 @@ const AccountHoldings = ({
                   variant="outline"
                   onClick={() => navigate(`/import?account=${accountId}`)}
                 >
-                  <Icons.Import className="mr-2 h-4 w-4" />
+                  <Icons.Import className="me-2 h-4 w-4" />
                   {t("account:actions_import_csv")}
                 </Button>
               </div>
@@ -210,7 +210,7 @@ const AccountHoldings = ({
               {canEditHoldingsDirectly && (
                 <div className="flex flex-col items-center gap-3 sm:flex-row">
                   <Button size="default" onClick={onAddHoldings}>
-                    <Icons.Plus className="mr-2 h-4 w-4" />
+                    <Icons.Plus className="me-2 h-4 w-4" />
                     {t("account:actions_add_holdings")}
                   </Button>
                   <Button
@@ -218,7 +218,7 @@ const AccountHoldings = ({
                     variant="outline"
                     onClick={() => navigate(`/import?account=${accountId}`)}
                   >
-                    <Icons.Import className="mr-2 h-4 w-4" />
+                    <Icons.Import className="me-2 h-4 w-4" />
                     {t("account:actions_import_csv")}
                   </Button>
                 </div>
@@ -251,7 +251,7 @@ const AccountHoldings = ({
                   )
                 }
               >
-                <Icons.Plus className="mr-2 h-4 w-4" />
+                <Icons.Plus className="me-2 h-4 w-4" />
                 {t("account:actions_add_transaction")}
               </Button>
               <Button
@@ -259,7 +259,7 @@ const AccountHoldings = ({
                 variant="outline"
                 onClick={() => navigate(`/import?account=${accountId}`)}
               >
-                <Icons.Import className="mr-2 h-4 w-4" />
+                <Icons.Import className="me-2 h-4 w-4" />
                 {t("account:actions_import_csv")}
               </Button>
             </div>

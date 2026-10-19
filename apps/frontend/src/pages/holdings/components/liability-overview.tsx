@@ -276,15 +276,15 @@ function LiabilityCard({
                   <Link to={`/holdings/${encodeURIComponent(holding.id)}?action=confirm-balance`} />
                 }
               >
-                <Icons.DollarSign className="mr-2 size-4" />
+                <Icons.DollarSign className="me-2 size-4" />
                 {t("holdings:liability_cards.update_balance")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onViewHistory(holding)}>
-                <Icons.History className="mr-2 size-4" />
+                <Icons.History className="me-2 size-4" />
                 {t("holdings:liability_cards.schedule")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onEdit(holding)}>
-                <Icons.Pencil className="mr-2 size-4" />
+                <Icons.Pencil className="me-2 size-4" />
                 {t("holdings:edit_details")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
@@ -292,7 +292,7 @@ function LiabilityCard({
                 className="text-destructive focus:text-destructive"
                 onClick={() => onDelete(holding)}
               >
-                <Icons.Trash className="mr-2 size-4" />
+                <Icons.Trash className="me-2 size-4" />
                 {t("common:delete")}
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -315,7 +315,7 @@ function LiabilityCard({
             </p>
           </div>
           {model.paidShare != null && (
-            <div className="text-right">
+            <div className="text-end">
               <div className="text-success text-lg font-semibold tabular-nums leading-none">
                 {numbers.formatPercent(model.paidShare, { digits: 1 })}
               </div>
@@ -337,7 +337,7 @@ function LiabilityCard({
                 : t("holdings:liability_cards.owed_now")}
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-end">
             {model.payment != null && model.frequency ? (
               <>
                 <div className="text-sm font-semibold tabular-nums">{money(model.payment)}</div>

@@ -202,7 +202,7 @@ export function AssetsTableMobile({
         >
           <Icons.ListFilter className="h-4 w-4" />
           {hasActiveFilters && (
-            <span className="bg-destructive absolute right-0 top-0.5 h-2 w-2 rounded-full" />
+            <span className="bg-destructive absolute end-0 top-0.5 h-2 w-2 rounded-full" />
           )}
         </Button>
       </div>
@@ -214,7 +214,7 @@ export function AssetsTableMobile({
               <button
                 type="button"
                 onClick={() => navigate(`/holdings/${encodeURIComponent(asset.id)}`)}
-                className="hover:bg-muted/60 focus-visible:ring-ring flex flex-1 items-center gap-3 overflow-hidden rounded-md text-left transition"
+                className="hover:bg-muted/60 focus-visible:ring-ring flex flex-1 items-center gap-3 overflow-hidden rounded-md text-start transition"
               >
                 {(() => {
                   const rawSymbol = asset.displayCode ?? "";
@@ -258,7 +258,7 @@ export function AssetsTableMobile({
               </button>
 
               <div className="flex flex-shrink-0 items-center gap-2">
-                <div className="text-right text-sm">
+                <div className="text-end text-sm">
                   {(() => {
                     const snapshot = latestQuotes[asset.id];
                     const quote = snapshot?.quote;
@@ -366,7 +366,7 @@ export function AssetsTableMobile({
       {/* Filter Sheet */}
       <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
         <SheetContent side="bottom" className="rounded-t-4xl mx-1 flex h-[70vh] flex-col">
-          <SheetHeader className="text-left">
+          <SheetHeader className="text-start">
             <SheetTitle>{t("asset:mobileTable.filter_options")}</SheetTitle>
           </SheetHeader>
           <ScrollArea className="flex-1 py-4">
@@ -429,7 +429,7 @@ export function AssetsTableMobile({
                           </div>
                           <span className="font-medium">{option.label}</span>
                         </div>
-                        <Badge variant="secondary" className="ml-auto">
+                        <Badge variant="secondary" className="ms-auto">
                           {count}
                         </Badge>
                       </button>
@@ -490,7 +490,7 @@ export function AssetsTableMobile({
                           </div>
                           <span className="font-medium uppercase">{mode}</span>
                         </div>
-                        <Badge variant="secondary" className="ml-auto">
+                        <Badge variant="secondary" className="ms-auto">
                           {count}
                         </Badge>
                       </button>
@@ -553,7 +553,7 @@ export function AssetsTableMobile({
                             {ASSET_KIND_DISPLAY_NAMES[kind] ?? kind}
                           </span>
                         </div>
-                        <Badge variant="secondary" className="ml-auto">
+                        <Badge variant="secondary" className="ms-auto">
                           {count}
                         </Badge>
                       </button>
@@ -623,7 +623,7 @@ export function AssetsTableMobile({
                           </div>
                           <span className="font-medium">{option.label}</span>
                         </div>
-                        <Badge variant="secondary" className="ml-auto">
+                        <Badge variant="secondary" className="ms-auto">
                           {count}
                         </Badge>
                       </button>

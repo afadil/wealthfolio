@@ -204,7 +204,7 @@ function ProviderSettings({
               )}
               {provider.enabled && provider.requiresApiKey && !provider.hasApiKey && (
                 <Badge variant="warning-subtle" className="shrink-0">
-                  <Icons.AlertTriangle className="mr-1 h-3 w-3" />
+                  <Icons.AlertTriangle className="me-1 h-3 w-3" />
                   {t("settings:market_data_page.api_key_required")}
                 </Badge>
               )}
@@ -224,7 +224,7 @@ function ProviderSettings({
                       />
                     }
                   >
-                    <Icons.XCircle className="mr-1 h-3 w-3" />
+                    <Icons.XCircle className="me-1 h-3 w-3" />
                     {t("settings:market_data_page.errors_count", { count: provider.errorCount })}
                   </PopoverTrigger>
                   <PopoverContent className="w-80 p-0" align="start">
@@ -454,7 +454,7 @@ function ProviderSettings({
                       <Button
                         variant="outline"
                         size="icon"
-                        className="h-7 w-7 rounded-r-none"
+                        className="h-7 w-7 rounded-e-none"
                         onClick={() => {
                           const newVal = Math.max(1, (priorityValue ?? 1) - 1);
                           onPriorityChange(String(newVal));
@@ -469,7 +469,7 @@ function ProviderSettings({
                       <Button
                         variant="outline"
                         size="icon"
-                        className="h-7 w-7 rounded-l-none"
+                        className="h-7 w-7 rounded-s-none"
                         onClick={() => {
                           const newVal = (priorityValue ?? 1) + 1;
                           onPriorityChange(String(newVal));
@@ -881,7 +881,7 @@ export default function MarketDataSettingsPage() {
                 onClick={() => window.location.reload()}
                 className="text-foreground"
               >
-                <Icons.Refresh className="mr-2 h-4 w-4" />
+                <Icons.Refresh className="me-2 h-4 w-4" />
                 {t("settings:market_data_page.retry")}
               </Button>
             </div>
@@ -965,9 +965,9 @@ export default function MarketDataSettingsPage() {
             onClick={() => updatePortfolio()}
           >
             {isUpdating ? (
-              <Spinner className="mr-2 h-4 w-4" />
+              <Spinner className="me-2 h-4 w-4" />
             ) : (
-              <Icons.Refresh className="mr-2 h-4 w-4" />
+              <Icons.Refresh className="me-2 h-4 w-4" />
             )}
             {t("settings:market_data_page.update")}
           </Button>
@@ -1029,7 +1029,7 @@ export default function MarketDataSettingsPage() {
             <TabsTrigger value="builtin">
               {t("settings:market_data_page.tab_builtin")}
               {builtinProviders.filter((p) => p.enabled).length > 0 && (
-                <Badge variant="secondary" className="text-2xs ml-1.5 h-5 px-1.5 font-normal">
+                <Badge variant="secondary" className="text-2xs ms-1.5 h-5 px-1.5 font-normal">
                   {builtinProviders.filter((p) => p.enabled).length}
                 </Badge>
               )}
@@ -1037,7 +1037,7 @@ export default function MarketDataSettingsPage() {
             <TabsTrigger value="custom">
               {t("settings:market_data_page.tab_custom")}
               {customProviders.filter((p) => p.enabled).length > 0 && (
-                <Badge variant="secondary" className="text-2xs ml-1.5 h-5 px-1.5 font-normal">
+                <Badge variant="secondary" className="text-2xs ms-1.5 h-5 px-1.5 font-normal">
                   {customProviders.filter((p) => p.enabled).length}
                 </Badge>
               )}

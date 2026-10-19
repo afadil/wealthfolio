@@ -59,7 +59,7 @@ export function BudgetOverviewCard() {
             </p>
           </div>
           <Link to="/settings/spending/setup" className={buttonVariants({ size: "sm" })}>
-            <Icons.Plus className="mr-1.5 h-3.5 w-3.5" />
+            <Icons.Plus className="me-1.5 h-3.5 w-3.5" />
             {t("settings:spending.budget_overview.setup_cta")}
           </Link>
         </div>
@@ -90,7 +90,7 @@ export function BudgetOverviewCard() {
                 {fmt(spendingPlanned, currency)}
               </span>
               {incomePlanned > 0 && (
-                <span className="text-muted-foreground ml-1 text-sm font-normal sm:text-base">
+                <span className="text-muted-foreground ms-1 text-sm font-normal sm:text-base">
                   / {fmt(incomePlanned, currency)}
                 </span>
               )}
@@ -157,9 +157,9 @@ export function BudgetOverviewCard() {
       </div>
 
       {/* CTA — bottom bar on mobile, right rail on desktop */}
-      <div className="bg-muted/30 group-hover:bg-foreground group-hover:text-background text-muted-foreground flex shrink-0 items-center justify-center gap-1.5 border-t px-4 py-3 text-xs font-medium uppercase tracking-widest transition-colors sm:w-24 sm:flex-col sm:gap-2 sm:border-l sm:border-t-0 sm:px-0 sm:py-0">
+      <div className="bg-muted/30 group-hover:bg-foreground group-hover:text-background text-muted-foreground flex shrink-0 items-center justify-center gap-1.5 border-t px-4 py-3 text-xs font-medium uppercase tracking-widest transition-colors sm:w-24 sm:flex-col sm:gap-2 sm:border-s sm:border-t-0 sm:px-0 sm:py-0">
         <span>{t("settings:spending.budget_overview.open")}</span>
-        <Icons.ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+        <Icons.ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
       </div>
     </Link>
   );

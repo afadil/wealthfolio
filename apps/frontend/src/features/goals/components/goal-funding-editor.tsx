@@ -135,7 +135,7 @@ function SharePercentInput({
             e.currentTarget.blur();
           }
         }}
-        className="text-foreground min-w-0 flex-1 bg-transparent text-right text-sm tabular-nums outline-none"
+        className="text-foreground min-w-0 flex-1 bg-transparent text-end text-sm tabular-nums outline-none"
       />
       <span className="text-muted-foreground text-xs tabular-nums">%</span>
     </div>
@@ -482,7 +482,7 @@ export function GoalFundingEditor({
 
                           {!isDcLinked && allocation && (
                             <span
-                              className={`text-2xs w-16 shrink-0 text-right font-medium tabular-nums ${allocationLabelClass(allocation)}`}
+                              className={`text-2xs w-16 shrink-0 text-end font-medium tabular-nums ${allocationLabelClass(allocation)}`}
                             >
                               {allocationLabel(allocation, t)}
                             </span>
@@ -574,7 +574,7 @@ export function GoalFundingEditor({
                     <button
                       key={a.id}
                       onClick={() => addAccount(a.id)}
-                      className="hover:bg-muted/50 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors"
+                      className="hover:bg-muted/50 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-start transition-colors"
                     >
                       <Icons.Plus className="text-muted-foreground h-3 w-3 shrink-0" />
                       <span className="min-w-0 flex-1 truncate text-xs">{a.name}</span>
@@ -688,22 +688,22 @@ function AllocationDetailsSheet({
             <div className="overflow-x-auto">
               <table className="min-w-160 w-full border-separate border-spacing-0 text-sm">
                 <thead>
-                  <tr className="text-muted-foreground text-2xs text-left uppercase tracking-[0.18em]">
-                    <th className="border-border border-b py-2 pr-4 font-medium">
+                  <tr className="text-muted-foreground text-2xs text-start uppercase tracking-[0.18em]">
+                    <th className="border-border border-b py-2 pe-4 font-medium">
                       {t("common:account")}
                     </th>
                     {goalColumns.map((goal) => (
                       <th
                         key={goal.id}
-                        className="border-border border-b px-3 py-2 text-right font-medium"
+                        className="border-border border-b px-3 py-2 text-end font-medium"
                       >
                         {goal.id === currentGoalId ? t("goals:funding.this_goal") : goal.title}
                       </th>
                     ))}
-                    <th className="border-border border-b px-3 py-2 text-right font-medium">
+                    <th className="border-border border-b px-3 py-2 text-end font-medium">
                       {t("goals:funding.free")}
                     </th>
-                    <th className="border-border border-b py-2 pl-3 text-right font-medium">
+                    <th className="border-border border-b py-2 ps-3 text-end font-medium">
                       {t("common:total")}
                     </th>
                   </tr>
@@ -713,7 +713,7 @@ function AllocationDetailsSheet({
                     const isOver = row.overBy > SHARE_EPSILON;
                     return (
                       <tr key={row.account.id}>
-                        <td className="border-border border-b py-3 pr-4">
+                        <td className="border-border border-b py-3 pe-4">
                           <div className="font-medium">{row.account.name}</div>
                           <div className="text-muted-foreground text-xs">
                             {row.account.accountType}
@@ -722,16 +722,16 @@ function AllocationDetailsSheet({
                         {goalColumns.map((goal) => (
                           <td
                             key={goal.id}
-                            className="border-border border-b px-3 py-3 text-right tabular-nums"
+                            className="border-border border-b px-3 py-3 text-end tabular-nums"
                           >
                             {formatShare(shareForGoal(row, goal.id, currentGoalId))}%
                           </td>
                         ))}
-                        <td className="border-border border-b px-3 py-3 text-right tabular-nums">
+                        <td className="border-border border-b px-3 py-3 text-end tabular-nums">
                           {formatShare(row.left)}%
                         </td>
                         <td
-                          className={`border-border border-b py-3 pl-3 text-right font-semibold tabular-nums ${
+                          className={`border-border border-b py-3 ps-3 text-end font-semibold tabular-nums ${
                             isOver ? "text-destructive" : ""
                           }`}
                         >

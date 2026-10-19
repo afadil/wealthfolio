@@ -493,7 +493,7 @@ function SuccessState({ draft, createdActivityId, currency }: SuccessStateProps)
             to={createdActivityId ? `/activities?id=${createdActivityId}` : "/activities"}
             className={buttonVariants({ variant: "outline", size: "sm" })}
           >
-            <Icons.ArrowRight className="mr-2 h-4 w-4" />
+            <Icons.ArrowRight className="me-2 h-4 w-4 rtl:rotate-180" />
             {t("ai:recordActivity.viewInActivities")}
           </Link>
         </div>
@@ -630,7 +630,7 @@ function ValidationHints({ validation }: ValidationHintsProps) {
       <Icons.AlertTriangle />
       <AlertTitle>{t("ai:recordActivity.flaggedIssues")}</AlertTitle>
       <AlertDescription>
-        <ul className="list-disc pl-4">
+        <ul className="list-disc ps-4">
           {validation.errors.map((e, i) => (
             <li key={`err-${i}`}>
               <span className="font-medium">{e.field}:</span> {e.message}
@@ -779,7 +779,7 @@ function DraftReview({
           {t("ai:recordActivity.edit")}
         </Button>
         <Button type="button" size="sm" onClick={onConfirm} disabled={isLoading || !canConfirm}>
-          {isLoading && <Spinner className="mr-2 h-4 w-4" />}
+          {isLoading && <Spinner className="me-2 h-4 w-4" />}
           {t("ai:recordActivity.confirm")}
         </Button>
       </div>
@@ -954,7 +954,7 @@ function DraftForm({
             )}
           </div>
           {headerAmountLabel && (
-            <div className="text-right">
+            <div className="text-end">
               <div className="text-muted-foreground text-xs font-medium">
                 {t("ai:recordActivity.estimatedTotal")}
               </div>

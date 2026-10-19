@@ -339,7 +339,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
         onSubmit={form.handleSubmit(onSubmit)}
         className="flex flex-col gap-6 p-5 sm:p-6"
       >
-        <DialogHeader className="pr-10 text-left">
+        <DialogHeader className="pe-10 text-start">
           <div className="flex items-start gap-3">
             <div className="bg-muted flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
               <AccountTypeIcon className="text-muted-foreground h-5 w-5" />
@@ -486,7 +486,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                       <div className="min-w-0">
                         <FormLabel className="text-sm font-normal">
                           {t("settings:accounts.form_hide_label")}
-                          <span className="text-muted-foreground ml-1 text-xs font-normal">
+                          <span className="text-muted-foreground ms-1 text-xs font-normal">
                             {t("settings:accounts.form_hide_hint")}
                           </span>
                         </FormLabel>
@@ -511,7 +511,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                         <div className="min-w-0">
                           <FormLabel className="text-sm font-normal">
                             {t("settings:accounts.form_archive_label")}
-                            <span className="text-muted-foreground ml-1 text-xs font-normal">
+                            <span className="text-muted-foreground ms-1 text-xs font-normal">
                               {t("settings:accounts.form_archive_hint")}
                             </span>
                           </FormLabel>
@@ -625,7 +625,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                         aria-expanded={costBasisOpen}
                         aria-controls="account-cost-basis"
                         onClick={() => setCostBasisOpen((open) => !open)}
-                        className="flex w-full items-center justify-between gap-3 text-left"
+                        className="flex w-full items-center justify-between gap-3 text-start"
                       >
                         <span className="text-sm font-medium">
                           {t("settings:accounts.form_cost_basis_method_label")}

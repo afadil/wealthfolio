@@ -167,7 +167,7 @@ export function QuickEventPopover({
                   onSelect={handleClear}
                   className="text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"
                 >
-                  <Icons.X className="mr-2 h-3.5 w-3.5" />
+                  <Icons.X className="me-2 h-3.5 w-3.5" />
                   {tr("spending:events.clearEvent")}
                 </CommandItem>
               )}

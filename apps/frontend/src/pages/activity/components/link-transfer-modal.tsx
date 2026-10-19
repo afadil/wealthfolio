@@ -115,11 +115,11 @@ export function LinkTransferModal({
           <AlertDialogCancel disabled={isProcessing}>{t("common:cancel")}</AlertDialogCancel>
           <Button onClick={onConfirm} disabled={isProcessing}>
             {isProcessing ? (
-              <Spinner className="mr-2 h-4 w-4" />
+              <Spinner className="me-2 h-4 w-4" />
             ) : isUnlinkMode ? (
-              <Icons.Unlink className="mr-2 h-4 w-4" />
+              <Icons.Unlink className="me-2 h-4 w-4" />
             ) : (
-              <Icons.Link className="mr-2 h-4 w-4" />
+              <Icons.Link className="me-2 h-4 w-4" />
             )}
             <span>
               {isUnlinkMode

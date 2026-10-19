@@ -150,7 +150,7 @@ export function MoneyFlowSection({
                 // `Button` is `shrink-0` by default: let a long group name truncate.
                 className="h-7 min-w-0 shrink gap-1 px-2.5 text-xs"
               >
-                <Icons.ArrowLeft className="size-3.5 shrink-0" aria-hidden />
+                <Icons.ArrowLeft className="size-3.5 shrink-0 rtl:rotate-180" aria-hidden />
                 <span className="truncate">{previousName ?? t("spending:moneyFlow.back")}</span>
               </Button>
               {previousName && (

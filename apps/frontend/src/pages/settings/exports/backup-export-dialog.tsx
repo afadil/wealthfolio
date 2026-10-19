@@ -88,7 +88,7 @@ export function BackupExportDialog({ filename, displayName, onClose }: BackupExp
       }}
     >
       <DialogContent className="sm:max-w-md" mobileClassName="h-auto max-h-[85dvh] overflow-y-auto">
-        <DialogHeader className="text-left">
+        <DialogHeader className="text-start">
           <DialogTitle>{t("settings:backup_export_dialog_title")}</DialogTitle>
           <DialogDescription>{t("settings:backup_export_description")}</DialogDescription>
         </DialogHeader>
@@ -177,7 +177,7 @@ export function BackupExportDialog({ filename, displayName, onClose }: BackupExp
                     setConfirmation(generated);
                   }}
                 >
-                  <Icons.Sparkles className="mr-1.5 size-3.5" aria-hidden />
+                  <Icons.Sparkles className="me-1.5 size-3.5" aria-hidden />
                   {t("settings:backup_export_generate")}
                 </Button>
                 <Button
@@ -197,7 +197,7 @@ export function BackupExportDialog({ filename, displayName, onClose }: BackupExp
                     }
                   }}
                 >
-                  <Icons.Copy className="size-4 md:mr-1.5 md:size-3.5" aria-hidden />
+                  <Icons.Copy className="size-4 md:me-1.5 md:size-3.5" aria-hidden />
                   <span className="hidden md:inline">{t("settings:backup_export_copy")}</span>
                 </Button>
               </div>

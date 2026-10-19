@@ -256,7 +256,7 @@ export function AllocationDetailSheet({
                         {hasChildren ? (
                           <Icons.ChevronRight
                             className={`text-muted-foreground h-3.5 w-3.5 transition-transform duration-200 ${
-                              isExpanded ? "rotate-90" : ""
+                              isExpanded ? "rotate-90" : "rtl:rotate-180"
                             }`}
                           />
                         ) : (
@@ -280,7 +280,7 @@ export function AllocationDetailSheet({
                         isHidden={isBalanceHidden}
                         className="shrink-0 text-sm"
                       />
-                      <span className="text-muted-foreground w-12 shrink-0 text-right text-xs tabular-nums">
+                      <span className="text-muted-foreground w-12 shrink-0 text-end text-xs tabular-nums">
                         {category.percentage.toFixed(1)}%
                       </span>
                     </div>
@@ -302,7 +302,7 @@ export function AllocationDetailSheet({
                               return (
                                 <div
                                   key={child.categoryId}
-                                  className={`flex cursor-pointer items-center gap-3 py-2.5 pl-11 pr-4 transition-colors ${
+                                  className={`flex cursor-pointer items-center gap-3 py-2.5 pe-4 ps-11 transition-colors ${
                                     isChildSelected ? "bg-muted" : "hover:bg-muted/50"
                                   } ${childIdx > 0 ? "border-t border-dashed" : ""}`}
                                   onClick={(e) => {
@@ -323,7 +323,7 @@ export function AllocationDetailSheet({
                                     isHidden={isBalanceHidden}
                                     className="text-muted-foreground shrink-0 text-xs"
                                   />
-                                  <span className="text-muted-foreground w-12 shrink-0 text-right text-xs tabular-nums">
+                                  <span className="text-muted-foreground w-12 shrink-0 text-end text-xs tabular-nums">
                                     {child.percentage.toFixed(1)}%
                                   </span>
                                 </div>
@@ -366,9 +366,9 @@ export function AllocationDetailSheet({
                         <Skeleton className="h-4 w-16" />
                         <Skeleton className="h-3 w-32" />
                       </div>
-                      <div className="space-y-1.5 text-right">
-                        <Skeleton className="ml-auto h-4 w-20" />
-                        <Skeleton className="ml-auto h-3 w-12" />
+                      <div className="space-y-1.5 text-end">
+                        <Skeleton className="ms-auto h-4 w-20" />
+                        <Skeleton className="ms-auto h-3 w-12" />
                       </div>
                     </div>
                   ))}
@@ -434,7 +434,7 @@ export function AllocationDetailSheet({
                           <p className="truncate text-sm font-semibold">{primaryLabel}</p>
                           <p className="text-muted-foreground truncate text-xs">{secondaryLabel}</p>
                         </div>
-                        <div className="text-right">
+                        <div className="text-end">
                           <AmountDisplay
                             value={holding.marketValue}
                             currency={baseCurrency}

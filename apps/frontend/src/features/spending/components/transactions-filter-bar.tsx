@@ -274,14 +274,14 @@ export function TransactionsFilterBar({
             <div className="relative">
               <Icons.ListFilter className="h-4 w-4" />
               {controlFiltersActive && (
-                <span className="bg-primary absolute -left-[1.5px] -top-1 h-2 w-2 rounded-full" />
+                <span className="bg-primary absolute -start-[1.5px] -top-1 h-2 w-2 rounded-full" />
               )}
             </div>
           </Button>
         </div>
         <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
           <SheetContent side="bottom" className="rounded-t-4xl mx-1 flex h-[80vh] flex-col p-0">
-            <SheetHeader className="border-border border-b px-6 py-4 text-left">
+            <SheetHeader className="border-border border-b px-6 py-4 text-start">
               <SheetTitle>{t("spending:filters.filterTransactions")}</SheetTitle>
             </SheetHeader>
             <ScrollArea className="flex-1">
@@ -296,7 +296,7 @@ export function TransactionsFilterBar({
               >
                 {t("spending:filters.clearAll")}
               </Button>
-              <Button className="ml-auto" onClick={() => setMobileFiltersOpen(false)}>
+              <Button className="ms-auto" onClick={() => setMobileFiltersOpen(false)}>
                 {t("spending:filters.done")}
               </Button>
             </SheetFooter>
@@ -337,7 +337,7 @@ export function TransactionsFilterBar({
           {t("spending:filters.clearAll")}
         </Button>
       )}
-      <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1">
+      <div className="ms-auto flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1">
         {selectedNet.byCurrency.length > 0 && (
           <NetReadout label={t("spending:filters.selectedNet")} net={selectedNet} />
         )}

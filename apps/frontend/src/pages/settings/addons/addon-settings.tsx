@@ -184,7 +184,7 @@ export default function AddonSettingsPage() {
             <Icons.Package className="h-4 w-4 flex-shrink-0" />
             <span className="truncate">{t("settings:addons_tab_installed")}</span>
             {installedAddons.length > 0 && (
-              <Badge variant="secondary" className="ml-0.5 flex-shrink-0 sm:ml-1">
+              <Badge variant="secondary" className="ms-0.5 flex-shrink-0 sm:ms-1">
                 {installedAddons.length}
               </Badge>
             )}
@@ -240,7 +240,7 @@ export default function AddonSettingsPage() {
                         <Icons.Refresh className="h-4 w-4" />
                       )}
                       {hasUpdates() && (
-                        <div className="bg-destructive absolute -right-1 -top-1 h-2 w-2 rounded-full" />
+                        <div className="bg-destructive absolute -end-1 -top-1 h-2 w-2 rounded-full" />
                       )}
                     </Button>
                   </PopoverTrigger>
@@ -316,7 +316,7 @@ export default function AddonSettingsPage() {
             {isLoadingAddons ? (
               <div className="flex items-center justify-center py-12">
                 <Spinner className="text-muted-foreground h-8 w-8" />
-                <span className="text-muted-foreground ml-2 text-sm sm:text-base">
+                <span className="text-muted-foreground ms-2 text-sm sm:text-base">
                   {t("settings:addons_loading")}
                 </span>
               </div>
@@ -332,7 +332,7 @@ export default function AddonSettingsPage() {
                 <EmptyContent>
                   <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:gap-3">
                     <Button onClick={() => setActiveTab("store")} className="w-full sm:w-auto">
-                      <Icons.Store className="mr-2 h-4 w-4" />
+                      <Icons.Store className="me-2 h-4 w-4" />
                       {t("settings:addons_browse_button")}
                     </Button>
                     <Button
@@ -341,7 +341,7 @@ export default function AddonSettingsPage() {
                       disabled={isLoading}
                       className="w-full sm:w-auto"
                     >
-                      <Icons.Plus className="mr-2 h-4 w-4" />
+                      <Icons.Plus className="me-2 h-4 w-4" />
                       {t("settings:addons_install_from_file")}
                     </Button>
                   </div>
@@ -386,7 +386,7 @@ export default function AddonSettingsPage() {
                             </Badge>
                             {!addon.metadata.enabled && (
                               <Badge variant="warning-subtle" className="shrink-0">
-                                <Icons.AlertCircle className="mr-1 h-3 w-3" />
+                                <Icons.AlertCircle className="me-1 h-3 w-3" />
                                 {t("settings:addons_disabled_badge")}
                               </Badge>
                             )}
@@ -423,7 +423,7 @@ export default function AddonSettingsPage() {
                         </div>
 
                         {/* Controls section */}
-                        <div className="flex items-center justify-between gap-2 sm:ml-6 sm:justify-normal">
+                        <div className="flex items-center justify-between gap-2 sm:ms-6 sm:justify-normal">
                           <div className="flex items-center gap-2">
                             {/* Permissions button */}
                             <Button

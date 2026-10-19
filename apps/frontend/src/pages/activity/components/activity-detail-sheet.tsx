@@ -67,7 +67,7 @@ function DetailRow({ label, value, icon }: DetailRowProps) {
         {icon}
         <span>{label}</span>
       </div>
-      <div className="text-right text-sm font-medium">{value}</div>
+      <div className="text-end text-sm font-medium">{value}</div>
     </div>
   );
 }
@@ -107,7 +107,7 @@ export function ActivityReviewReasons({
       title={t("activity:detail.needs_review")}
       icon={<Icons.AlertCircle className="text-warning h-4 w-4" />}
     >
-      <ul className="list-disc space-y-1 pl-5 text-sm">
+      <ul className="list-disc space-y-1 ps-5 text-sm">
         {reviewReasons.map((reason) => (
           <li key={reason}>{reason}</li>
         ))}
@@ -211,7 +211,7 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
                 {statusConfig && <Badge variant={statusConfig.variant}>{statusLabel}</Badge>}
                 {activity.needsReview && (
                   <Badge variant="outline" className="border-warning text-warning">
-                    <Icons.AlertCircle className="mr-1 h-3 w-3" />
+                    <Icons.AlertCircle className="me-1 h-3 w-3" />
                     {t("activity:detail.needs_review")}
                   </Badge>
                 )}
@@ -223,7 +223,7 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
                 <div className="text-muted-foreground text-xs">{t("activity:field_date")}</div>
                 <div className="font-medium">{formatShortDate(activity.date)}</div>
               </div>
-              <div className="text-right">
+              <div className="text-end">
                 <div className="text-muted-foreground text-xs">{t("activity:field_amount")}</div>
                 <div className="text-lg font-bold">
                   <StoredAmount activity={activity} isHidden={isBalanceHidden} />

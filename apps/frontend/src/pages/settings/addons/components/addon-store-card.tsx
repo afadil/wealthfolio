@@ -92,7 +92,7 @@ export function AddonStoreCard({
         <div className="flex gap-2 pt-2 sm:hidden">
           <Dialog>
             <DialogTrigger render={<Button variant="outline" size="sm" className="flex-1" />}>
-              <Icons.Eye className="mr-2 h-4 w-4" />
+              <Icons.Eye className="me-2 h-4 w-4" />
               {t("settings:addon_card_details")}
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
@@ -191,7 +191,7 @@ export function AddonStoreCard({
                           className={`capitalize ${onTagClick ? "hover:bg-primary hover:text-primary-foreground cursor-pointer" : ""}`}
                           onClick={() => onTagClick?.(tag)}
                         >
-                          <Icons.Tag className="mr-1 h-3 w-3" />
+                          <Icons.Tag className="me-1 h-3 w-3" />
                           {tag}
                         </Badge>
                       ))}
@@ -208,17 +208,17 @@ export function AddonStoreCard({
                   >
                     {isInstalling ? (
                       <>
-                        <Spinner className="mr-2 h-4 w-4" />
+                        <Spinner className="me-2 h-4 w-4" />
                         {t("settings:addon_card_installing")}
                       </>
                     ) : isInstalled ? (
                       <>
-                        <Icons.Check className="mr-2 h-4 w-4" />
+                        <Icons.Check className="me-2 h-4 w-4" />
                         {t("settings:addon_card_installed")}
                       </>
                     ) : (
                       <>
-                        <Icons.Download className="mr-2 h-4 w-4" />
+                        <Icons.Download className="me-2 h-4 w-4" />
                         {t("settings:addon_card_install")}
                       </>
                     )}
@@ -229,7 +229,7 @@ export function AddonStoreCard({
                       href={addonDetailUrl}
                       className={buttonVariants({ variant: "outline" })}
                     >
-                      <Icons.ExternalLink className="mr-2 h-4 w-4" />
+                      <Icons.ExternalLink className="me-2 h-4 w-4" />
                       {t("settings:addon_card_addon_page")}
                     </ExternalLink>
                   )}
@@ -247,18 +247,18 @@ export function AddonStoreCard({
             >
               {isInstalling ? (
                 <>
-                  <Spinner className="mr-2 h-4 w-4" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {t("settings:addon_card_installing")}
                 </>
               ) : listing.status !== "active" ? (
                 listing.status === "coming-soon" ? (
                   <>
-                    <Icons.Clock className="mr-2 h-4 w-4" />
+                    <Icons.Clock className="me-2 h-4 w-4" />
                     {t("settings:addon_card_coming_soon")}
                   </>
                 ) : (
                   <>
-                    <Icons.Close className="mr-2 h-4 w-4" />
+                    <Icons.Close className="me-2 h-4 w-4" />
                     {listing.status === "deprecated"
                       ? t("settings:addon_card_deprecated")
                       : t("settings:addon_card_unavailable")}
@@ -266,7 +266,7 @@ export function AddonStoreCard({
                 )
               ) : (
                 <>
-                  <Icons.Download className="mr-2 h-4 w-4" />
+                  <Icons.Download className="me-2 h-4 w-4" />
                   {t("settings:addon_card_install")}
                 </>
               )}
@@ -278,7 +278,7 @@ export function AddonStoreCard({
               className="flex-1"
               onClick={() => setRatingDialogOpen(true)}
             >
-              <Icons.Star className="mr-2 h-4 w-4" />
+              <Icons.Star className="me-2 h-4 w-4" />
               {t("settings:addon_card_rate")}
             </Button>
           )}
@@ -298,7 +298,7 @@ export function AddonStoreCard({
               />
             }
           >
-            <Icons.Eye className="mr-2 h-4 w-4" />
+            <Icons.Eye className="me-2 h-4 w-4" />
             {t("settings:addon_card_details")}
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
@@ -397,7 +397,7 @@ export function AddonStoreCard({
                         className={`capitalize ${onTagClick ? "hover:bg-primary hover:text-primary-foreground cursor-pointer" : ""}`}
                         onClick={() => onTagClick?.(tag)}
                       >
-                        <Icons.Tag className="mr-1 h-3 w-3" />
+                        <Icons.Tag className="me-1 h-3 w-3" />
                         {tag}
                       </Badge>
                     ))}
@@ -414,17 +414,17 @@ export function AddonStoreCard({
                 >
                   {isInstalling ? (
                     <>
-                      <Spinner className="mr-2 h-4 w-4" />
+                      <Spinner className="me-2 h-4 w-4" />
                       {t("settings:addon_card_installing")}
                     </>
                   ) : isInstalled ? (
                     <>
-                      <Icons.Check className="mr-2 h-4 w-4" />
+                      <Icons.Check className="me-2 h-4 w-4" />
                       {t("settings:addon_card_installed")}
                     </>
                   ) : (
                     <>
-                      <Icons.Download className="mr-2 h-4 w-4" />
+                      <Icons.Download className="me-2 h-4 w-4" />
                       {t("settings:addon_card_install")}
                     </>
                   )}
@@ -435,7 +435,7 @@ export function AddonStoreCard({
                     href={addonDetailUrl}
                     className={buttonVariants({ variant: "outline" })}
                   >
-                    <Icons.ExternalLink className="mr-2 h-4 w-4" />
+                    <Icons.ExternalLink className="me-2 h-4 w-4" />
                     {t("settings:addon_card_addon_page")}
                   </ExternalLink>
                 )}
@@ -452,7 +452,7 @@ export function AddonStoreCard({
             className="bg-white/90 text-black hover:bg-white"
             onClick={() => setRatingDialogOpen(true)}
           >
-            <Icons.Star className="mr-2 h-4 w-4" />
+            <Icons.Star className="me-2 h-4 w-4" />
             {t("settings:addon_card_rate")}
           </Button>
         )}
@@ -467,18 +467,18 @@ export function AddonStoreCard({
           >
             {isInstalling ? (
               <>
-                <Spinner className="mr-2 h-4 w-4" />
+                <Spinner className="me-2 h-4 w-4" />
                 {t("settings:addon_card_installing")}
               </>
             ) : listing.status !== "active" ? (
               listing.status === "coming-soon" ? (
                 <>
-                  <Icons.Clock className="mr-2 h-4 w-4" />
+                  <Icons.Clock className="me-2 h-4 w-4" />
                   {t("settings:addon_card_coming_soon")}
                 </>
               ) : (
                 <>
-                  <Icons.Close className="mr-2 h-4 w-4" />
+                  <Icons.Close className="me-2 h-4 w-4" />
                   {listing.status === "deprecated"
                     ? t("settings:addon_card_deprecated")
                     : t("settings:addon_card_unavailable")}
@@ -486,7 +486,7 @@ export function AddonStoreCard({
               )
             ) : (
               <>
-                <Icons.Download className="mr-2 h-4 w-4" />
+                <Icons.Download className="me-2 h-4 w-4" />
                 {t("settings:addon_card_install")}
               </>
             )}
@@ -495,10 +495,10 @@ export function AddonStoreCard({
       </div>
 
       {/* Status Indicators */}
-      <div className="absolute right-2 top-2 flex flex-col gap-1 opacity-90">
+      <div className="absolute end-2 top-2 flex flex-col gap-1 opacity-90">
         {isInstalled && (
           <Badge variant="secondary" className="bg-success-subtle text-success-subtle-foreground">
-            <Icons.Check className="mr-1 h-3 w-3" />
+            <Icons.Check className="me-1 h-3 w-3" />
             {t("settings:addon_card_installed")}
           </Badge>
         )}
@@ -509,7 +509,7 @@ export function AddonStoreCard({
               variant="default"
               className="bg-primary text-primary-foreground text-xs capitalize"
             >
-              <Icons.Clock className="mr-1 h-3 w-3" />
+              <Icons.Clock className="me-1 h-3 w-3" />
               {t("settings:addon_card_coming_soon")}
             </Badge>
           ) : (

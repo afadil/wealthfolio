@@ -120,12 +120,12 @@ export function SyncHistory({ pageSize = 10 }: SyncHistoryProps) {
           >
             {isFetchingNextPage ? (
               <>
-                <Spinner className="mr-2 h-4 w-4" />
+                <Spinner className="me-2 h-4 w-4" />
                 {t("common:loading")}
               </>
             ) : (
               <>
-                <Icons.ChevronDown className="mr-2 h-4 w-4" />
+                <Icons.ChevronDown className="me-2 h-4 w-4" />
                 {t("connect:syncHistory.loadMore")}
               </>
             )}
@@ -245,7 +245,7 @@ function SyncRunItem({ run }: { run: ImportRun }) {
               className="text-primary flex items-center gap-1 text-xs hover:underline"
             >
               {t("connect:syncHistory.review")}
-              <Icons.ArrowRight className="h-3 w-3" />
+              <Icons.ArrowRight className="h-3 w-3 rtl:rotate-180" />
             </Link>
           </div>
           <ul className="text-muted-foreground space-y-0.5 text-xs">

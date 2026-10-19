@@ -114,7 +114,7 @@ function CalculatingBanner() {
 
 function HeroMetricSkeleton() {
   return (
-    <div className="space-y-2 border-t p-4 first:border-t-0 md:border-l md:border-t-0 md:first:border-l-0">
+    <div className="space-y-2 border-t p-4 first:border-t-0 md:border-s md:border-t-0 md:first:border-s-0">
       <Skeleton className="h-2.5 w-20 rounded" />
       <Skeleton className="h-6 w-24 rounded" />
       <Skeleton className="h-2.5 w-16 rounded" />
@@ -124,7 +124,7 @@ function HeroMetricSkeleton() {
 
 function SimMetricSkeleton() {
   return (
-    <div className="space-y-2 border-t p-4 first:border-t-0 md:border-l md:border-t-0 md:first:border-l-0">
+    <div className="space-y-2 border-t p-4 first:border-t-0 md:border-s md:border-t-0 md:first:border-s-0">
       <Skeleton className="h-2.5 w-20 rounded" />
       <Skeleton className="h-6 w-20 rounded" />
       <Skeleton className="h-2.5 w-24 rounded" />
@@ -135,7 +135,7 @@ function SimMetricSkeleton() {
 export function StressCardSkeleton() {
   return (
     <div className="bg-card relative overflow-hidden rounded-xl border shadow-sm">
-      <div className="bg-muted/60 absolute inset-y-5 left-0 w-0.5 rounded-r-full" />
+      <div className="bg-muted/60 absolute inset-y-5 start-0 w-0.5 rounded-e-full" />
       <div className="space-y-5 p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 space-y-3">

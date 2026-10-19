@@ -273,7 +273,7 @@ const PaceCard: FC<PaceCardProps> = ({
         />
         <div
           className="bg-foreground/70 absolute inset-y-0 w-px"
-          style={{ left: `${Math.min(100, pace.percentPace * 100)}%` }}
+          style={{ insetInlineStart: `${Math.min(100, pace.percentPace * 100)}%` }}
           aria-hidden
           title={t("spending:whereIAm.paceTitle", {
             pct: formatPercentValue(pace.percentPace * 100, numberFormatting, { digits: 0 }),
@@ -812,12 +812,12 @@ const NetCashflowCard: FC<NetCashflowCardProps> = ({ months, currency, isLoading
               style={{ width: `${incomePct}%` }}
             />
           </div>
-          <span className="text-foreground/90 w-20 shrink-0 text-right font-semibold tabular-nums">
+          <span className="text-foreground/90 w-20 shrink-0 text-end font-semibold tabular-nums">
             <PrivacyAmount value={totals.income} currency={currency} />
           </span>
         </div>
         {totals.income === 0 && (
-          <p className="text-muted-foreground/70 text-2xs pl-14 leading-snug">
+          <p className="text-muted-foreground/70 text-2xs ps-14 leading-snug">
             {t("spending:whereIAm.noIncome")}
           </p>
         )}
@@ -831,7 +831,7 @@ const NetCashflowCard: FC<NetCashflowCardProps> = ({ months, currency, isLoading
               style={{ width: `${spentPct}%` }}
             />
           </div>
-          <span className="text-foreground/90 w-20 shrink-0 text-right font-semibold tabular-nums">
+          <span className="text-foreground/90 w-20 shrink-0 text-end font-semibold tabular-nums">
             <PrivacyAmount value={totals.spent} currency={currency} />
           </span>
         </div>
@@ -846,7 +846,7 @@ const NetCashflowCard: FC<NetCashflowCardProps> = ({ months, currency, isLoading
                 style={{ width: `${savedPct}%` }}
               />
             </div>
-            <span className="text-foreground/90 w-20 shrink-0 text-right font-semibold tabular-nums">
+            <span className="text-foreground/90 w-20 shrink-0 text-end font-semibold tabular-nums">
               <PrivacyAmount value={totals.saved} currency={currency} />
             </span>
           </div>
@@ -998,7 +998,7 @@ function BreakdownCanvas({
                   className={cn("text-xs", sort === opt && "font-semibold")}
                 >
                   {t(SORT_LABEL_KEYS[opt])}
-                  {sort === opt && <Icons.Check className="ml-auto size-3" />}
+                  {sort === opt && <Icons.Check className="ms-auto size-3" />}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>

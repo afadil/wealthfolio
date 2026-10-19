@@ -866,7 +866,7 @@ export function ProfileShell({ children }: { children: ReactNode }) {
         </div>
       )}
       <div
-        className={`w-full space-y-6 ${isRecoveryView ? "!max-w-md rounded-3xl border border-white/40 bg-white/40 p-6 text-left shadow-xl shadow-black/5 backdrop-blur-xl sm:p-8 dark:border-white/10 dark:bg-white/5" : isProfileEditor ? "max-w-2xl text-left" : "max-w-xl text-center"}`}
+        className={`w-full space-y-6 ${isRecoveryView ? "!max-w-md rounded-3xl border border-white/40 bg-white/40 p-6 text-start shadow-xl shadow-black/5 backdrop-blur-xl sm:p-8 dark:border-white/10 dark:bg-white/5" : isProfileEditor ? "max-w-2xl text-left" : "max-w-xl text-center"}`}
       >
         {isRecoveryView && selected && (
           <div className="flex items-center gap-3 !overflow-visible">
@@ -1115,7 +1115,7 @@ export function ProfileShell({ children }: { children: ReactNode }) {
         ) : (
           <form
             onSubmit={submit}
-            className={`mx-auto space-y-5 text-left ${isProfileEditor ? "max-w-2xl" : "max-w-sm"}`}
+            className={`mx-auto space-y-5 text-start ${isProfileEditor ? "max-w-2xl" : "max-w-sm"}`}
           >
             {(mode === "create" || mode === "manage") && (
               <>

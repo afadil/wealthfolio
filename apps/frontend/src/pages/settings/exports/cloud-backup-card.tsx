@@ -179,7 +179,7 @@ function CloudBackupPromotion() {
           className="text-connect-brand hover:text-foreground focus-visible:ring-ring @min-[40rem]:col-start-3 @min-[40rem]:row-start-1 col-start-2 inline-flex min-h-11 w-fit items-center gap-1.5 rounded-md text-xs font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
         >
           {t("settings:cloud_backup_promotion_action")}
-          <Icons.ArrowRight className="size-3.5 shrink-0" aria-hidden />
+          <Icons.ArrowRight className="size-3.5 shrink-0 rtl:rotate-180" aria-hidden />
         </Link>
       </CardContent>
     </Card>
@@ -285,7 +285,7 @@ export function CloudBackupSummary() {
             )}
           >
             <span className="hidden sm:inline">{t("settings:cloud_backup_manage")}</span>
-            <Icons.ChevronRight className="size-4" aria-hidden />
+            <Icons.ChevronRight className="size-4 rtl:rotate-180" aria-hidden />
           </Link>
         </div>
         {data && <RecoveryDeadline data={data} />}
@@ -321,7 +321,7 @@ export function CloudBackupCompactSummary() {
           )}
         </h2>
         {summary && (
-          <div className="mt-0.5 pl-7">
+          <div className="mt-0.5 ps-7">
             {/* "On" is implied by a scheduled next backup; other states name themselves. */}
             <BackupStatusLine
               dot={summary.dot}
@@ -381,7 +381,7 @@ export function CloudBackupCompactSummary() {
         className="text-muted-foreground hover:bg-muted/40 hover:text-foreground flex min-h-11 items-center justify-between border-t px-4 text-sm"
       >
         {t("settings:cloud_backup_manage")}
-        <Icons.ChevronRight className="size-4" aria-hidden />
+        <Icons.ChevronRight className="size-4 rtl:rotate-180" aria-hidden />
       </Link>
     </Card>
   );
@@ -884,11 +884,11 @@ function CloudBackupPanel({ backup }: { backup: ReturnType<typeof useCloudBackup
             <Button
               variant="link"
               size="sm"
-              className="text-muted-foreground h-auto whitespace-normal p-0 text-left text-xs font-normal"
+              className="text-muted-foreground h-auto whitespace-normal p-0 text-start text-xs font-normal"
               onClick={() => showFlow("help")}
             >
               {t("settings:cloud_backup_restore_help")}
-              <Icons.ArrowRight className="size-3.5" aria-hidden />
+              <Icons.ArrowRight className="size-3.5 rtl:rotate-180" aria-hidden />
             </Button>
           )}
           {isMobile && history.length > 0 && (
@@ -909,7 +909,7 @@ function CloudBackupPanel({ backup }: { backup: ReturnType<typeof useCloudBackup
           mobileClassName="h-auto max-h-[85dvh] overflow-y-auto"
           showCloseButton={!busy && !recoveryCode}
         >
-          <DialogHeader className="pr-6 text-left">
+          <DialogHeader className="pe-6 text-start">
             <DialogTitle>
               {t(
                 flow === "help"

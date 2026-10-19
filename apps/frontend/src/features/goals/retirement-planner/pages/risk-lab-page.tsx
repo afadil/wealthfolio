@@ -180,11 +180,11 @@ function InlineAmountTooltip({
         <div className="text-2xs font-semibold uppercase tracking-wider">{label}</div>
         <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 tabular-nums">
           <span className="text-background/70">{t("goals:risk_lab.results.base_plan")}</span>
-          <span className="text-right">{fmt(baseline, currency, formatting)}</span>
+          <span className="text-end">{fmt(baseline, currency, formatting)}</span>
           <span className="text-background/70">{t("goals:risk_lab.results.stress_test")}</span>
-          <span className="text-right">{fmt(stressed, currency, formatting)}</span>
+          <span className="text-end">{fmt(stressed, currency, formatting)}</span>
           <span className="text-background/70">{t("goals:risk_lab.results.change")}</span>
-          <span className="text-right">
+          <span className="text-end">
             {delta > 0 ? "+" : delta < 0 ? "-" : ""}
             {fmt(Math.abs(delta), currency, formatting)}
           </span>
@@ -298,7 +298,7 @@ function HeroMetric({
   tone?: "default" | "good" | "bad";
 }) {
   return (
-    <div className="border-border/70 px-3 py-3 first:rounded-l-lg last:rounded-r-lg md:border-l md:first:border-l-0">
+    <div className="border-border/70 px-3 py-3 first:rounded-s-lg last:rounded-e-lg md:border-s md:first:border-s-0">
       <p className="text-muted-foreground text-2xs font-semibold uppercase tracking-[0.18em]">
         {label}
       </p>
@@ -581,7 +581,7 @@ function SimulationMetric({
   tone?: "default" | "good" | "bad";
 }) {
   return (
-    <div className="border-border/70 px-4 py-4 first:border-l-0 md:border-l">
+    <div className="border-border/70 px-4 py-4 first:border-s-0 md:border-s">
       <p className="text-muted-foreground text-2xs font-semibold uppercase tracking-[0.18em]">
         {label}
       </p>
@@ -782,25 +782,15 @@ function MonteCarloTooltip({
       <p className="font-semibold">{t("goals:risk_lab.chart.age_label", { age: label })}</p>
       <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
         <span className="text-muted-foreground">P90</span>
-        <span className="text-right tabular-nums">
-          {fmt(point.p90, currency, amountFormatting)}
-        </span>
+        <span className="text-end tabular-nums">{fmt(point.p90, currency, amountFormatting)}</span>
         <span className="text-muted-foreground">P75</span>
-        <span className="text-right tabular-nums">
-          {fmt(point.p75, currency, amountFormatting)}
-        </span>
+        <span className="text-end tabular-nums">{fmt(point.p75, currency, amountFormatting)}</span>
         <span className="text-muted-foreground">P50</span>
-        <span className="text-right tabular-nums">
-          {fmt(point.p50, currency, amountFormatting)}
-        </span>
+        <span className="text-end tabular-nums">{fmt(point.p50, currency, amountFormatting)}</span>
         <span className="text-muted-foreground">P25</span>
-        <span className="text-right tabular-nums">
-          {fmt(point.p25, currency, amountFormatting)}
-        </span>
+        <span className="text-end tabular-nums">{fmt(point.p25, currency, amountFormatting)}</span>
         <span className="text-muted-foreground">P10</span>
-        <span className="text-right tabular-nums">
-          {fmt(point.p10, currency, amountFormatting)}
-        </span>
+        <span className="text-end tabular-nums">{fmt(point.p10, currency, amountFormatting)}</span>
       </div>
     </div>
   );
@@ -1028,7 +1018,7 @@ function MonteCarloDistributionSection({
         )}
         {!running && !result && (
           <div className="m-5 rounded-xl bg-[hsl(88,45%,84%)] px-4 py-4 text-[hsl(91,31%,24%)] md:m-6 md:px-5">
-            <div className="flex flex-col gap-4 text-center md:flex-row md:items-center md:justify-between md:text-left">
+            <div className="flex flex-col gap-4 text-center md:flex-row md:items-center md:justify-between md:text-start">
               <div>
                 <p className="text-sm font-semibold">{t("goals:risk_lab.montecarlo.no_run_yet")}</p>
                 <p className="mt-1 max-w-4xl text-sm leading-relaxed text-[hsl(91,22%,32%)]">
@@ -1042,7 +1032,7 @@ function MonteCarloDistributionSection({
                   disabled={running}
                   className="bg-[hsl(91,34%,29%)] text-white hover:bg-[hsl(91,34%,24%)]"
                 >
-                  <Icons.Sparkles className="mr-2 size-3.5" />
+                  <Icons.Sparkles className="me-2 size-3.5" />
                   {running && activeSims === 10_000
                     ? t("goals:risk_lab.montecarlo.running_short")
                     : t("goals:risk_lab.montecarlo.run_10k")}
@@ -1153,7 +1143,7 @@ function MonteCarloDistributionSection({
                     {t("goals:risk_lab.chart.median_fi_age")}
                   </span>
                 )}
-                <span className="ml-auto italic">
+                <span className="ms-auto italic">
                   {t("goals:risk_lab.chart.market_paths_count", {
                     count: numberFormatting.formatDecimal(result.nSimulations),
                   })}
@@ -1381,7 +1371,7 @@ function DecisionHeatmap({
             <tr key={`${rowValue}-${row}`}>
               <td
                 className={cn(
-                  "text-muted-foreground text-2xs pr-2 text-right font-semibold tabular-nums sm:pr-3 sm:text-sm",
+                  "text-muted-foreground text-2xs pe-2 text-end font-semibold tabular-nums sm:pe-3 sm:text-sm",
                   row === matrix.baselineRow && "text-foreground",
                 )}
               >
@@ -1416,25 +1406,25 @@ function DecisionHeatmap({
                           <span className="text-background/70">
                             {localizedBackendLabel(t, matrix.rowLabel)}
                           </span>
-                          <span className="text-right">
+                          <span className="text-end">
                             {formatRow(rowValue, matrix.rowLabels[row] ?? "")}
                           </span>
                           <span className="text-background/70">
                             {localizedBackendLabel(t, matrix.columnLabel)}
                           </span>
-                          <span className="text-right">
+                          <span className="text-end">
                             {formatColumn(columnValue, matrix.columnLabels[column] ?? "")}
                           </span>
                           <span className="text-background/70">
                             {t("goals:risk_lab.results.money_left_at_end")}
                           </span>
-                          <span className="text-right">
+                          <span className="text-end">
                             {fmt(cell.portfolioAtHorizon, currency, amountFormatting)}
                           </span>
                           <span className="text-background/70">
                             {t("goals:risk_lab.results.change_vs_base_plan")}
                           </span>
-                          <span className="text-right">
+                          <span className="text-end">
                             {cell.portfolioAtHorizon >= range.baselinePortfolio ? "+" : "-"}
                             {fmt(
                               Math.abs(cell.portfolioAtHorizon - range.baselinePortfolio),
@@ -1443,13 +1433,13 @@ function DecisionHeatmap({
                             )}
                           </span>
                           <span className="text-background/70">{ageMetricLabel}</span>
-                          <span className="text-right">
+                          <span className="text-end">
                             {cell.fiAge ?? t("goals:risk_lab.results.not_reached")}
                           </span>
                           <span className="text-background/70">
                             {t("goals:risk_lab.results.shortfall_at_retirement")}
                           </span>
-                          <span className="text-right">
+                          <span className="text-end">
                             {fmt(cell.shortfallAtGoalAge, currency, amountFormatting)}
                           </span>
                         </div>
@@ -1547,7 +1537,7 @@ function WhatMovesThePlanSection({
               </p>
             </div>
             <Button size="sm" onClick={onRun} disabled={loading}>
-              <Icons.Sparkles className="mr-2 size-3.5" />
+              <Icons.Sparkles className="me-2 size-3.5" />
               {loading ? t("goals:risk_lab.moves.building") : t("goals:risk_lab.moves.build_maps")}
             </Button>
           </div>
@@ -1923,7 +1913,7 @@ function AdvancedSection({
           </>
         ) : (
           <div className="bg-muted/10 rounded-xl border border-dashed px-5 py-6">
-            <div className="flex flex-col gap-4 text-center md:flex-row md:items-center md:justify-between md:text-left">
+            <div className="flex flex-col gap-4 text-center md:flex-row md:items-center md:justify-between md:text-start">
               <div>
                 <p className="text-sm font-semibold">
                   {canRunSorr
@@ -1939,9 +1929,9 @@ function AdvancedSection({
               {canRunSorr && (
                 <Button size="sm" onClick={onRunSorr} disabled={sorrRunning} className="shrink-0">
                   {sorrRunning ? (
-                    <Spinner className="mr-2 size-3.5" />
+                    <Spinner className="me-2 size-3.5" />
                   ) : (
-                    <Icons.RefreshCw className="mr-2 size-3.5" />
+                    <Icons.RefreshCw className="me-2 size-3.5" />
                   )}
                   {sorrRunning
                     ? t("goals:risk_lab.advanced.running_short")

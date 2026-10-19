@@ -330,7 +330,7 @@ export function HoldingsReviewStep() {
                 className="mt-2 h-7"
                 onClick={() => setCheckRetryRevision((revision) => revision + 1)}
               >
-                <Icons.RefreshCw className="mr-2 h-3.5 w-3.5" />
+                <Icons.RefreshCw className="me-2 h-3.5 w-3.5" />
                 {t("activity:import.validationAlert.retry")}
               </Button>
             </ImportAlert>

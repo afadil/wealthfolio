@@ -1051,7 +1051,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
             key={virtualItem.key}
             data-index={virtualItem.index}
             ref={virtualizer.measureElement}
-            className="absolute left-0 top-0 w-full"
+            className="absolute start-0 top-0 w-full"
             style={{ transform: `translateY(${virtualItem.start - scrollMargin}px)` }}
           >
             {item.kind === "header" ? (
@@ -1234,7 +1234,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
                 </Button>
               ) : (
                 <Button onClick={openAddForm}>
-                  <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                  <Icons.Plus className="me-2 h-4 w-4" aria-hidden="true" />
                   {t("spending:txTab.addTransaction")}
                 </Button>
               )}
@@ -1296,9 +1296,9 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
                   <TableHead className="hidden w-44 px-3 sm:table-cell">
                     {t("spending:filters.category")}
                   </TableHead>
-                  <TableHead className="w-28 px-3 text-right">{t("common:amount")}</TableHead>
+                  <TableHead className="w-28 px-3 text-end">{t("common:amount")}</TableHead>
                   {showBalance && (
-                    <TableHead className="hidden w-28 px-3 text-right sm:table-cell">
+                    <TableHead className="hidden w-28 px-3 text-end sm:table-cell">
                       {t("activity:table_balance")}
                     </TableHead>
                   )}

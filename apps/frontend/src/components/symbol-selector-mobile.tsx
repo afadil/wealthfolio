@@ -187,7 +187,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
             }
           >
             <span className="truncate">{displayText}</span>
-            <Icons.Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <Icons.Search className="ms-2 h-4 w-4 shrink-0 opacity-50" />
           </SheetTrigger>
           <SheetContent side="bottom" className="rounded-t-4xl mx-1 h-[85vh] p-0">
             {showCustomAssetForm ? (
@@ -200,7 +200,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                       className="text-muted-foreground hover:text-foreground rounded-md p-2 transition-colors"
                       type="button"
                     >
-                      <Icons.ArrowLeft className="h-5 w-5" />
+                      <Icons.ArrowLeft className="h-5 w-5 rtl:rotate-180" />
                     </button>
                     <div className="flex-1">
                       <SheetTitle>{t("common:component.create_custom_asset")}</SheetTitle>
@@ -318,13 +318,13 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                   {/* Search Input */}
                   <div className="border-border border-b px-6 py-4">
                     <div className="relative">
-                      <Icons.Search className="text-muted-foreground absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2" />
+                      <Icons.Search className="text-muted-foreground absolute start-4 top-1/2 h-5 w-5 -translate-y-1/2" />
                       <input
                         type="text"
                         placeholder={t("common:search_symbols")}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="bg-background border-input ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring h-14 w-full rounded-md border px-4 py-3 pl-12 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                        className="bg-background border-input ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring h-14 w-full rounded-md border px-4 py-3 ps-12 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                         autoFocus
                       />
                     </div>
@@ -361,7 +361,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                             <button
                               key={ticker.symbol}
                               onClick={() => handleSymbolSelect(ticker)}
-                              className="card-mobile hover:bg-accent active:bg-accent/80 focus:border-primary flex w-full items-center gap-3 border border-transparent text-left transition-colors focus:outline-none"
+                              className="card-mobile hover:bg-accent active:bg-accent/80 focus:border-primary flex w-full items-center gap-3 border border-transparent text-start transition-colors focus:outline-none"
                             >
                               <div className="bg-primary/10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full">
                                 <Icons.TrendingUp className="text-primary h-5 w-5" />
@@ -381,7 +381,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                                   </div>
                                 )}
                               </div>
-                              <Icons.ChevronRight className="text-muted-foreground h-5 w-5 shrink-0" />
+                              <Icons.ChevronRight className="text-muted-foreground h-5 w-5 shrink-0 rtl:rotate-180" />
                             </button>
                           ))}
                         </div>
@@ -422,7 +422,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                         {sortedSearchResults.length > 0 && <Separator className="my-4" />}
                         <button
                           onClick={handleShowCustomAssetForm}
-                          className="card-mobile hover:bg-accent active:bg-accent/80 focus:border-primary flex w-full items-center gap-3 border border-dashed text-left transition-colors focus:outline-none"
+                          className="card-mobile hover:bg-accent active:bg-accent/80 focus:border-primary flex w-full items-center gap-3 border border-dashed text-start transition-colors focus:outline-none"
                         >
                           <div className="bg-muted flex h-12 w-12 shrink-0 items-center justify-center rounded-full">
                             <Icons.Plus className="text-muted-foreground h-5 w-5" />
@@ -439,7 +439,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                                 : t("common:component.track_assets_not_found")}
                             </div>
                           </div>
-                          <Icons.ChevronRight className="text-muted-foreground h-5 w-5 shrink-0" />
+                          <Icons.ChevronRight className="text-muted-foreground h-5 w-5 shrink-0 rtl:rotate-180" />
                         </button>
                       </>
                     )}

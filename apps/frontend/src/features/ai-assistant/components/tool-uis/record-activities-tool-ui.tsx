@@ -315,20 +315,18 @@ function RecordActivitiesToolUIContentImpl({
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4 text-xs">{t("ai:recordActivities.date")}</TableHead>
+                <TableHead className="ps-4 text-xs">{t("ai:recordActivities.date")}</TableHead>
                 <TableHead className="text-xs">{t("ai:recordActivities.type")}</TableHead>
                 <TableHead className="text-xs">{t("ai:recordActivities.symbol")}</TableHead>
-                <TableHead className="text-right text-xs">{t("ai:recordActivities.qty")}</TableHead>
-                <TableHead className="text-right text-xs">
-                  {t("ai:recordActivities.price")}
-                </TableHead>
-                <TableHead className="text-right text-xs">
+                <TableHead className="text-end text-xs">{t("ai:recordActivities.qty")}</TableHead>
+                <TableHead className="text-end text-xs">{t("ai:recordActivities.price")}</TableHead>
+                <TableHead className="text-end text-xs">
                   {t("ai:recordActivities.amount")}
                 </TableHead>
-                <TableHead className="text-right text-xs">{t("ai:recordActivities.fee")}</TableHead>
-                <TableHead className="text-right text-xs">{t("ai:recordActivities.tax")}</TableHead>
+                <TableHead className="text-end text-xs">{t("ai:recordActivities.fee")}</TableHead>
+                <TableHead className="text-end text-xs">{t("ai:recordActivities.tax")}</TableHead>
                 <TableHead className="text-xs">{t("ai:recordActivities.account")}</TableHead>
-                <TableHead className="pr-4 text-xs">{t("ai:recordActivities.status")}</TableHead>
+                <TableHead className="pe-4 text-xs">{t("ai:recordActivities.status")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -338,7 +336,7 @@ function RecordActivitiesToolUIContentImpl({
                 const rowStatusBadge = getRowStatusBadge(statusEntry, row.validation.isValid, t);
                 return (
                   <TableRow key={row.rowIndex} className="text-xs">
-                    <TableCell className="py-2 pl-4 tabular-nums">
+                    <TableCell className="py-2 ps-4 tabular-nums">
                       {formatActivityDate(row.draft.activityDate, dateFormatting)}
                     </TableCell>
                     <TableCell className="py-2">
@@ -350,14 +348,14 @@ function RecordActivitiesToolUIContentImpl({
                       </Badge>
                     </TableCell>
                     <TableCell className="py-2">{row.draft.symbol ?? "-"}</TableCell>
-                    <TableCell className="py-2 text-right tabular-nums">
+                    <TableCell className="py-2 text-end tabular-nums">
                       {formatActivityQuantity(
                         row.draft.quantity,
                         quantityFormatter,
                         isBalanceHidden,
                       )}
                     </TableCell>
-                    <TableCell className="py-2 text-right tabular-nums">
+                    <TableCell className="py-2 text-end tabular-nums">
                       {formatActivityAmount(
                         row.draft.unitPrice,
                         amountFormatter,
@@ -365,7 +363,7 @@ function RecordActivitiesToolUIContentImpl({
                         row.draft.currency,
                       )}
                     </TableCell>
-                    <TableCell className="py-2 text-right tabular-nums">
+                    <TableCell className="py-2 text-end tabular-nums">
                       {formatActivityAmount(
                         // Stated amounts verbatim; trade totals preview the
                         // mirror calc (the backend derives them at commit).
@@ -375,7 +373,7 @@ function RecordActivitiesToolUIContentImpl({
                         row.draft.currency,
                       )}
                     </TableCell>
-                    <TableCell className="py-2 text-right tabular-nums">
+                    <TableCell className="py-2 text-end tabular-nums">
                       {formatActivityAmount(
                         row.draft.fee,
                         amountFormatter,
@@ -383,7 +381,7 @@ function RecordActivitiesToolUIContentImpl({
                         row.draft.currency,
                       )}
                     </TableCell>
-                    <TableCell className="py-2 text-right tabular-nums">
+                    <TableCell className="py-2 text-end tabular-nums">
                       {formatActivityAmount(
                         row.draft.tax,
                         amountFormatter,
@@ -394,7 +392,7 @@ function RecordActivitiesToolUIContentImpl({
                     <TableCell className="py-2">
                       {row.draft.accountName ?? row.draft.accountId ?? "-"}
                     </TableCell>
-                    <TableCell className="py-2 pr-4">
+                    <TableCell className="py-2 pe-4">
                       <div className="space-y-1">
                         <Badge
                           variant={rowStatusBadge.variant}
@@ -442,9 +440,9 @@ function RecordActivitiesToolUIContentImpl({
         <div className="flex items-center justify-end px-6 pt-1">
           <Button onClick={handleSubmit} disabled={!canSubmit}>
             {isSubmitting ? (
-              <Spinner className="mr-2 h-4 w-4" />
+              <Spinner className="me-2 h-4 w-4" />
             ) : (
-              <Icons.Check className="mr-2 h-4 w-4" />
+              <Icons.Check className="me-2 h-4 w-4" />
             )}
             {pendingValidRows.length > 0
               ? t("ai:recordActivities.confirmActivities", { count: pendingValidRows.length })

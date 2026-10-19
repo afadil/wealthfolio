@@ -264,7 +264,7 @@ function HoldingRow({
         className={cn(
           "flex items-center gap-4 px-3 py-3",
           isClickable && "hover:bg-muted/50 cursor-pointer transition-colors",
-          isIndented && "pl-10",
+          isIndented && "ps-10",
         )}
         onClick={isClickable ? handleNavigate : undefined}
       >
@@ -293,12 +293,12 @@ function HoldingRow({
         </div>
 
         {/* Quantity Column */}
-        <div className="hidden w-24 flex-shrink-0 text-right md:block">
+        <div className="hidden w-24 flex-shrink-0 text-end md:block">
           <QuantityDisplay value={holding.quantity} isHidden={isBalanceHidden} />
         </div>
 
         {/* Value Column */}
-        <div className="w-28 flex-shrink-0 text-right">
+        <div className="w-28 flex-shrink-0 text-end">
           <AmountDisplay
             value={displayValue}
             currency={currency}
@@ -309,7 +309,7 @@ function HoldingRow({
         </div>
 
         {/* Gain/Loss Column */}
-        <div className="hidden w-28 flex-shrink-0 text-right sm:block">
+        <div className="hidden w-28 flex-shrink-0 text-end sm:block">
           {!holding.isLiability && (
             <>
               <AmountDisplay
@@ -326,7 +326,9 @@ function HoldingRow({
 
         {/* Actions Column */}
         <div className="w-8 flex-shrink-0">
-          {isClickable && <Icons.ChevronRight className="text-muted-foreground h-4 w-4" />}
+          {isClickable && (
+            <Icons.ChevronRight className="text-muted-foreground h-4 w-4 rtl:rotate-180" />
+          )}
         </div>
       </div>
 

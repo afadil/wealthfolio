@@ -101,7 +101,7 @@ export function AccountOperations({
           <AlertDialogFooter>
             <AlertDialogCancel>{t("settings:accounts_cancel_button")}</AlertDialogCancel>
             <Button onClick={handleDelete} className="bg-destructive focus:ring-destructive">
-              <Icons.Trash className="mr-2 h-4 w-4" />
+              <Icons.Trash className="me-2 h-4 w-4" />
               <span>{t("settings:accounts_operations_delete")}</span>
             </Button>
           </AlertDialogFooter>

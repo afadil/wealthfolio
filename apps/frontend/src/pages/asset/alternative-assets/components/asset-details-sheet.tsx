@@ -236,7 +236,7 @@ export function AssetDetailsSheet({
                   {kindDisplayName}
                 </Badge>
               </SheetTitle>
-              <SheetDescription className="text-left">
+              <SheetDescription className="text-start">
                 {asset.kind === AlternativeAssetKind.LIABILITY
                   ? t("asset:detailsSheet.liability_description")
                   : t("asset:detailsSheet.asset_description")}
@@ -425,9 +425,9 @@ export function AssetDetailsSheet({
               </Button>
               <Button type="submit" disabled={isSaving}>
                 {isSaving ? (
-                  <Spinner className="mr-2 h-4 w-4" />
+                  <Spinner className="me-2 h-4 w-4" />
                 ) : (
-                  <Icons.Check className="mr-2 h-4 w-4" />
+                  <Icons.Check className="me-2 h-4 w-4" />
                 )}
                 {t("asset:detailsSheet.save_details")}
               </Button>
@@ -933,11 +933,11 @@ function LiabilityFields({
                       value={field.value}
                       onValueChange={(value) => field.onChange(value ?? null)}
                       maxDecimalPlaces={2}
-                      className="pr-8"
+                      className="pe-8"
                       {...describedBy("interestRate", "interestRate")}
                     />
                   </FormControl>
-                  <span className="text-muted-foreground pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm">
+                  <span className="text-muted-foreground pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-sm">
                     %
                   </span>
                 </div>
@@ -1313,7 +1313,7 @@ function PropertyMortgageSection({
                 onClick={() => setShowLinkSelect(true)}
                 className="w-full"
               >
-                <Icons.Link className="mr-2 h-4 w-4" />
+                <Icons.Link className="me-2 h-4 w-4" />
                 {t("asset:detailsSheet.link_existing_mortgage")}
               </Button>
             ) : (
@@ -1350,9 +1350,9 @@ function PropertyMortgageSection({
                     className="flex-1"
                   >
                     {isLinking ? (
-                      <Spinner className="mr-2 h-4 w-4" />
+                      <Spinner className="me-2 h-4 w-4" />
                     ) : (
-                      <Icons.Check className="mr-2 h-4 w-4" />
+                      <Icons.Check className="me-2 h-4 w-4" />
                     )}
                     {t("asset:detailsSheet.link")}
                   </Button>

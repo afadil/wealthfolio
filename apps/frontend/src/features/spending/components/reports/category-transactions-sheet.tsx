@@ -344,10 +344,10 @@ export function CategoryTransactionsSheet({
                           }}
                         />
                       </div>
-                      <span className="text-muted-foreground/80 text-2xs w-10 shrink-0 text-right tabular-nums">
+                      <span className="text-muted-foreground/80 text-2xs w-10 shrink-0 text-end tabular-nums">
                         {numberFormatting.formatPercent(row.share / 100, { digits: 0 })}
                       </span>
-                      <span className="text-foreground/90 w-16 shrink-0 text-right text-xs font-semibold tabular-nums">
+                      <span className="text-foreground/90 w-16 shrink-0 text-end text-xs font-semibold tabular-nums">
                         {isBalanceHidden
                           ? "••••"
                           : amountFormatting.formatCompactAmount(row.amount, currency)}
@@ -421,14 +421,14 @@ export function CategoryTransactionsSheet({
                       </div>
                       <div
                         className={cn(
-                          "shrink-0 text-right text-sm font-semibold tabular-nums leading-tight",
+                          "shrink-0 text-end text-sm font-semibold tabular-nums leading-tight",
                           isOutflow ? "text-foreground" : "text-success",
                         )}
                       >
                         {isOutflow ? "−" : "+"}
                         <PrivacyAmount value={displayAmount} currency={it.currency} />
                         {it.currency !== currency && (
-                          <span className="text-muted-foreground/70 text-2xs ml-1 uppercase tracking-wide">
+                          <span className="text-muted-foreground/70 text-2xs ms-1 uppercase tracking-wide">
                             {it.currency}
                           </span>
                         )}
@@ -449,7 +449,7 @@ export function CategoryTransactionsSheet({
                 >
                   {isFetchingNextPage ? (
                     <>
-                      <Spinner className="mr-2 h-3.5 w-3.5" aria-hidden />
+                      <Spinner className="me-2 h-3.5 w-3.5" aria-hidden />
                       {t("spending:categorySheet.loading")}
                     </>
                   ) : (
@@ -471,7 +471,7 @@ export function CategoryTransactionsSheet({
             className={cn(buttonVariants({ size: "sm" }), "w-full")}
           >
             {t("spending:categorySheet.openInTransactions")}
-            <Icons.ArrowRight className="ml-1.5 h-3.5 w-3.5" aria-hidden />
+            <Icons.ArrowRight className="ms-1.5 h-3.5 w-3.5 rtl:rotate-180" aria-hidden />
           </Link>
         </div>
       </SheetContent>

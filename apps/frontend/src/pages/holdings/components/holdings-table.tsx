@@ -271,7 +271,7 @@ export const HoldingsTable = ({
           ) : undefined
         }
         toolbarActions={
-          <div className="mr-2 flex items-center gap-2">
+          <div className="me-2 flex items-center gap-2">
             {hasMultipleCurrencies && (
               <Tooltip>
                 <TooltipTrigger
@@ -372,7 +372,7 @@ const getColumns = (
             exchangeMic={holding.instrument?.exchangeMic}
             instrumentType={holding.instrument?.instrumentType}
             assetId={holding.instrument?.id}
-            className="mr-2 h-8 w-8"
+            className="me-2 h-8 w-8"
           />
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
@@ -431,7 +431,7 @@ const getColumns = (
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader
-        className="justify-end text-right"
+        className="justify-end text-end"
         column={column}
         title={t("holdings:cost_basis")}
       />
@@ -443,7 +443,7 @@ const getColumns = (
       const holding = row.original;
       const costBasis = getDisposedCostBasis(holding);
       if (costBasis == null) {
-        return <div className="text-muted-foreground px-4 text-right">—</div>;
+        return <div className="text-muted-foreground px-4 text-end">—</div>;
       }
 
       const value = showConvertedValues ? costBasis.base : costBasis.local;
@@ -465,7 +465,7 @@ const getColumns = (
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader
-        className="justify-end text-right"
+        className="justify-end text-end"
         column={column}
         title={t("holdings:closing_cash_flow")}
       />
@@ -477,7 +477,7 @@ const getColumns = (
       const holding = row.original;
       const cashFlow = getClosingCashFlow(holding);
       if (cashFlow == null) {
-        return <div className="text-muted-foreground px-4 text-right">—</div>;
+        return <div className="text-muted-foreground px-4 text-end">—</div>;
       }
 
       const value = showConvertedValues ? cashFlow.base : cashFlow.local;
@@ -499,7 +499,7 @@ const getColumns = (
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader
-        className="justify-end text-right"
+        className="justify-end text-end"
         column={column}
         title={t("holdings:realized_pnl")}
       />
@@ -510,7 +510,7 @@ const getColumns = (
     cell: ({ row }) => {
       const holding = row.original;
       if (holding.realizedGain == null) {
-        return <div className="text-muted-foreground px-4 text-right">—</div>;
+        return <div className="text-muted-foreground px-4 text-end">—</div>;
       }
 
       const value = showConvertedValues ? holding.realizedGain.base : holding.realizedGain.local;
@@ -531,7 +531,7 @@ const getColumns = (
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader
-        className="justify-end text-right"
+        className="justify-end text-end"
         column={column}
         title={t("holdings:realized_return")}
       />
@@ -579,7 +579,7 @@ const getColumns = (
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader
-        className="justify-end text-right"
+        className="justify-end text-end"
         column={column}
         title={t("holdings:qty")}
       />
@@ -590,7 +590,7 @@ const getColumns = (
     cell: ({ row }) => {
       const holding = row.original;
       if (isCashHolding(holding)) {
-        return <div className="text-muted-foreground px-4 text-right">—</div>;
+        return <div className="text-muted-foreground px-4 text-end">—</div>;
       }
 
       const symbol = holding.instrument?.symbol ?? holding.id;
@@ -625,7 +625,7 @@ const getColumns = (
     enableSorting: true,
     header: ({ column }) => (
       <DataTableColumnHeader
-        className="justify-end text-right"
+        className="justify-end text-end"
         column={column}
         title={t("holdings:todays_price")}
       />
@@ -636,7 +636,7 @@ const getColumns = (
     cell: ({ row }) => {
       const holding = row.original;
       if (isCashHolding(holding) || isClosedPosition(holding)) {
-        return <div className="text-muted-foreground px-4 text-right">—</div>;
+        return <div className="text-muted-foreground px-4 text-end">—</div>;
       }
       const price = holding.price ?? 0;
       const currency = holding.localCurrency;
@@ -655,7 +655,7 @@ const getColumns = (
     enableSorting: true,
     header: ({ column }) => (
       <DataTableColumnHeader
-        className="justify-end text-right"
+        className="justify-end text-end"
         column={column}
         title={t("holdings:avg_price")}
       />
@@ -704,7 +704,7 @@ const getColumns = (
     cell: ({ row }) => {
       const holding = row.original;
       if (isCashHolding(holding) || isClosedPosition(holding)) {
-        return <div className="text-muted-foreground px-4 text-right">—</div>;
+        return <div className="text-muted-foreground px-4 text-end">—</div>;
       }
       const value = holding.costBasis?.local ?? 0;
       const currency = holding.localCurrency;
@@ -777,7 +777,7 @@ const getColumns = (
     enableSorting: true,
     header: ({ column }) => (
       <DataTableColumnHeader
-        className="justify-end text-right"
+        className="justify-end text-end"
         column={column}
         title={t("holdings:weight")}
       />
@@ -787,7 +787,7 @@ const getColumns = (
     },
     cell: ({ row }) =>
       isClosedPosition(row.original) ? (
-        <div className="text-muted-foreground px-4 text-right">—</div>
+        <div className="text-muted-foreground px-4 text-end">—</div>
       ) : (
         <div className="flex min-h-10 flex-col items-end justify-center px-4">
           <span className="font-medium tabular-nums">
@@ -815,7 +815,7 @@ const getColumns = (
     cell: ({ row }) => {
       const holding = row.original;
       if (isCashHolding(holding)) {
-        return <div className="text-muted-foreground px-4 text-right">—</div>;
+        return <div className="text-muted-foreground px-4 text-end">—</div>;
       }
       const value = showConvertedValues
         ? (holding.totalGain?.base ?? 0)
@@ -860,7 +860,7 @@ const getColumns = (
     cell: ({ row }) => {
       const holding = row.original;
       if (isCashHolding(holding)) {
-        return <div className="text-muted-foreground px-4 text-right">—</div>;
+        return <div className="text-muted-foreground px-4 text-end">—</div>;
       }
       const value = showConvertedValues
         ? (holding.totalReturn?.base ?? 0)
@@ -900,7 +900,7 @@ const getColumns = (
     cell: ({ row }) => {
       const holding = row.original;
       if (isCashHolding(holding) || isClosedPosition(holding)) {
-        return <div className="text-muted-foreground px-4 text-right">—</div>;
+        return <div className="text-muted-foreground px-4 text-end">—</div>;
       }
       const value = showConvertedValues
         ? (holding.dayChange?.base ?? 0)
@@ -937,7 +937,7 @@ const getColumns = (
     cell: ({ row }) => {
       const holding = row.original;
       if (isCashHolding(holding) || isClosedPosition(holding)) {
-        return <div className="text-muted-foreground px-4 text-right">—</div>;
+        return <div className="text-muted-foreground px-4 text-end">—</div>;
       }
       const value = showConvertedValues
         ? (holding.unrealizedGain?.base ?? 0)
@@ -977,7 +977,7 @@ const getColumns = (
     cell: ({ row }) => {
       const holding = row.original;
       if (isCashHolding(holding)) {
-        return <div className="text-muted-foreground px-4 text-right">—</div>;
+        return <div className="text-muted-foreground px-4 text-end">—</div>;
       }
       const value = showConvertedValues
         ? (holding.realizedGain?.base ?? 0)
@@ -1013,7 +1013,7 @@ const getColumns = (
     cell: ({ row }) => {
       const holding = row.original;
       if (isCashHolding(holding)) {
-        return <div className="text-muted-foreground px-4 text-right">—</div>;
+        return <div className="text-muted-foreground px-4 text-end">—</div>;
       }
       const value = showConvertedValues
         ? (holding.income?.base ?? 0)
@@ -1096,12 +1096,12 @@ const getColumns = (
             <DropdownMenuContent align="end">
               {onClassify && (
                 <DropdownMenuItem onClick={() => onClassify(holding)}>
-                  <Icons.Tag className="mr-2 h-4 w-4" />
+                  <Icons.Tag className="me-2 h-4 w-4" />
                   {t("holdings:classify")}
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onClick={handleNavigate}>
-                <Icons.ChevronRight className="mr-2 h-4 w-4" />
+                <Icons.ChevronRight className="me-2 h-4 w-4 rtl:rotate-180" />
                 {t("holdings:view_details")}
               </DropdownMenuItem>
             </DropdownMenuContent>

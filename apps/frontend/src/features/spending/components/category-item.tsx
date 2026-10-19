@@ -95,7 +95,7 @@ export function CategoryItem({
   ];
 
   return (
-    <div className={isSubcategory ? "ml-6 border-l pl-4" : ""}>
+    <div className={isSubcategory ? "ms-6 border-s ps-4" : ""}>
       <div className="flex items-center justify-between gap-2 py-2.5">
         <div
           className={`flex min-w-0 flex-1 items-center gap-2.5 ${isExcluded ? "opacity-60" : ""}`}
@@ -110,7 +110,7 @@ export function CategoryItem({
               {isExpanded ? (
                 <Icons.ChevronDown className="h-4 w-4" />
               ) : (
-                <Icons.ChevronRight className="h-4 w-4" />
+                <Icons.ChevronRight className="h-4 w-4 rtl:rotate-180" />
               )}
             </Button>
           )}

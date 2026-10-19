@@ -176,7 +176,7 @@ export default function SettingsLayout() {
                     <button
                       key={item.href}
                       onClick={() => navigate(item.href)}
-                      className="hover:bg-muted/40 flex w-full items-center justify-between gap-3 px-4 py-4 text-left transition-colors active:opacity-90"
+                      className="hover:bg-muted/40 flex w-full items-center justify-between gap-3 px-4 py-4 text-start transition-colors active:opacity-90"
                       aria-label={item.title}
                     >
                       <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -192,7 +192,7 @@ export default function SettingsLayout() {
                           )}
                         </div>
                       </div>
-                      <Icons.ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
+                      <Icons.ChevronRight className="text-muted-foreground h-4 w-4 shrink-0 rtl:rotate-180" />
                     </button>
                   ))}
                 </div>
@@ -219,7 +219,7 @@ export default function SettingsLayout() {
               <div className="space-y-6">
                 {sections.map((section) => (
                   <div key={section.title} className="space-y-2">
-                    <div className="text-muted-foreground pl-2 text-sm font-light uppercase tracking-widest">
+                    <div className="text-muted-foreground ps-2 text-sm font-light uppercase tracking-widest">
                       {section.title}
                     </div>
                     <SidebarNav items={section.items} />

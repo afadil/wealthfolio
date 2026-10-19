@@ -70,7 +70,7 @@ export function ProgressBar({ progress, fillClass }: { progress: number; fillCla
       <div className={cn("h-full", fillClass)} style={{ width: `${pct * 100}%` }} />
       <div className="pointer-events-none absolute inset-0 flex">
         {Array.from({ length: 20 }).map((_, i) => (
-          <div key={i} className="border-card flex-1 border-r last:border-r-0" />
+          <div key={i} className="border-card flex-1 border-e last:border-e-0" />
         ))}
       </div>
     </div>
@@ -181,7 +181,7 @@ export function GoalCard({ goal }: { goal: Goal }) {
           {pill && (
             <div
               className={cn(
-                "text-2xs absolute left-3 top-3 inline-flex h-5 items-center px-2 font-medium leading-none tracking-[0.14em] shadow-sm",
+                "text-2xs absolute start-3 top-3 inline-flex h-5 items-center px-2 font-medium leading-none tracking-[0.14em] shadow-sm",
                 pill.className,
               )}
             >
@@ -191,7 +191,7 @@ export function GoalCard({ goal }: { goal: Goal }) {
 
           {/* Bottom-left italic quote */}
           {quote && (
-            <div className="absolute bottom-2.5 left-3 right-3">
+            <div className="absolute bottom-2.5 end-3 start-3">
               <span className="text-2xs line-clamp-1 block font-serif italic text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
                 &ldquo;{quote}&rdquo;
               </span>
@@ -209,7 +209,7 @@ export function GoalCard({ goal }: { goal: Goal }) {
                 {targetDateStr ? `${targetDateStr} · ${timeLeftStr}` : timeLeftStr}
               </p>
             </div>
-            <div className="text-right">
+            <div className="text-end">
               <div className={cn("font-serif text-xl leading-none", accentClass)}>
                 {progressPct}
               </div>
@@ -227,7 +227,7 @@ export function GoalCard({ goal }: { goal: Goal }) {
                 {t("goals:card.saved_of")} <span className="tabular-nums">{targetDisplay}</span>
               </div>
             </div>
-            <div className="text-right">
+            <div className="text-end">
               <div className="font-serif text-sm font-semibold tabular-nums">
                 {remainingDisplay}
               </div>

@@ -211,7 +211,7 @@ export function CategoryHierarchyTable({
             </span>
           </div>
           {totals.budgeted > 0 && (
-            <div className="text-muted-foreground/60 text-2xs mt-0.5 text-right tabular-nums">
+            <div className="text-muted-foreground/60 text-2xs mt-0.5 text-end tabular-nums">
               {tr("spending:hierarchy.of")}{" "}
               <PrivacyAmount value={totals.budgeted} currency={currency} />{" "}
               {tr("spending:hierarchy.budgeted")}
@@ -227,7 +227,7 @@ export function CategoryHierarchyTable({
       <table className="text-foreground w-full text-sm">
         <thead>
           <tr className="border-border/60 text-muted-foreground/80 text-2xs border-b uppercase tracking-wide">
-            <th className="px-3 py-2 text-left font-medium">
+            <th className="px-3 py-2 text-start font-medium">
               <div className="flex items-center gap-3">
                 <span>{tr("spending:filters.category")}</span>
                 {hasExpandable && (
@@ -253,11 +253,13 @@ export function CategoryHierarchyTable({
                 )}
               </div>
             </th>
-            <th className="px-3 py-2 text-right font-medium">
+            <th className="px-3 py-2 text-end font-medium">
               {tr("spending:hierarchy.spentBudget")}
             </th>
-            <th className="px-3 py-2 text-left font-medium">{tr("spending:hierarchy.progress")}</th>
-            <th className="px-3 py-2 text-right font-medium">
+            <th className="px-3 py-2 text-start font-medium">
+              {tr("spending:hierarchy.progress")}
+            </th>
+            <th className="px-3 py-2 text-end font-medium">
               {tr("spending:hierarchy.deltaVsPrior")}
             </th>
           </tr>
@@ -291,12 +293,12 @@ export function CategoryHierarchyTable({
         <tfoot>
           <tr className="border-border/60 border-t text-sm font-medium">
             <td className="px-3 py-2.5">{tr("spending:hierarchy.total")}</td>
-            <td className="px-3 py-2.5 text-right text-xs tabular-nums">
+            <td className="px-3 py-2.5 text-end text-xs tabular-nums">
               <span className="text-foreground font-medium">
                 <PrivacyAmount value={totals.spent} currency={currency} />
               </span>
               {totals.budgeted > 0 && (
-                <span className="text-muted-foreground/70 ml-1">
+                <span className="text-muted-foreground/70 ms-1">
                   / <PrivacyAmount value={totals.budgeted} currency={currency} />
                 </span>
               )}
@@ -312,7 +314,7 @@ export function CategoryHierarchyTable({
             </td>
             <td
               className={cn(
-                "px-3 py-2.5 text-right text-xs tabular-nums",
+                "px-3 py-2.5 text-end text-xs tabular-nums",
                 totals.priorSpent === 0 || totals.spent - totals.priorSpent === 0
                   ? "text-muted-foreground/70"
                   : totals.spent - totals.priorSpent > 0
@@ -350,7 +352,7 @@ function ProgressBar({ spent, budget }: { spent: number; budget: number }) {
       </div>
       <span
         className={cn(
-          "text-2xs w-10 shrink-0 text-right tabular-nums",
+          "text-2xs w-10 shrink-0 text-end tabular-nums",
           isOver ? "text-destructive font-medium" : "text-muted-foreground/80",
         )}
       >
@@ -399,7 +401,7 @@ const GroupRow = memo(function GroupRow({
             <Icons.ChevronRight
               className={cn(
                 "text-muted-foreground/70 h-3.5 w-3.5 transition-transform",
-                expanded && "rotate-90",
+                expanded ? "rotate-90" : "rtl:rotate-180",
                 !hasChildren && "opacity-0",
               )}
             />
@@ -415,10 +417,10 @@ const GroupRow = memo(function GroupRow({
             </span>
           </div>
         </td>
-        <td className="text-foreground px-3 py-2.5 text-right text-xs font-semibold tabular-nums">
+        <td className="text-foreground px-3 py-2.5 text-end text-xs font-semibold tabular-nums">
           <PrivacyAmount value={group.spent} currency={currency} />
           {group.budgeted > 0 && (
-            <span className="text-muted-foreground/70 ml-1 font-normal">
+            <span className="text-muted-foreground/70 ms-1 font-normal">
               / <PrivacyAmount value={group.budgeted} currency={currency} />
             </span>
           )}
@@ -432,7 +434,7 @@ const GroupRow = memo(function GroupRow({
         </td>
         <td
           className={cn(
-            "px-3 py-2.5 text-right text-xs font-medium tabular-nums",
+            "px-3 py-2.5 text-end text-xs font-medium tabular-nums",
             delta === 0 || group.priorSpent === 0
               ? "text-muted-foreground/70"
               : delta > 0
@@ -508,7 +510,7 @@ const ParentRow = memo(function ParentRow({
               <Icons.ChevronRight
                 className={cn(
                   "h-3.5 w-3.5 transition-transform",
-                  expanded && "rotate-90",
+                  expanded ? "rotate-90" : "rtl:rotate-180",
                   !hasChildren && "opacity-0",
                 )}
               />
@@ -522,12 +524,12 @@ const ParentRow = memo(function ParentRow({
             <span className="text-foreground text-sm font-medium">{node.name}</span>
           </div>
         </td>
-        <td className="text-foreground/90 px-3 py-2.5 text-right text-xs tabular-nums">
+        <td className="text-foreground/90 px-3 py-2.5 text-end text-xs tabular-nums">
           <span className="text-foreground font-medium">
             <PrivacyAmount value={node.spent} currency={currency} />
           </span>
           {node.budgeted > 0 && (
-            <span className="text-muted-foreground/70 ml-1">
+            <span className="text-muted-foreground/70 ms-1">
               / <PrivacyAmount value={node.budgeted} currency={currency} />
             </span>
           )}
@@ -543,7 +545,7 @@ const ParentRow = memo(function ParentRow({
         </td>
         <td
           className={cn(
-            "px-3 py-2.5 text-right text-xs tabular-nums",
+            "px-3 py-2.5 text-end text-xs tabular-nums",
             delta === 0 || node.priorSpent === 0
               ? "text-muted-foreground/70"
               : delta > 0
@@ -592,7 +594,7 @@ const ChildRow = memo(function ChildRow({
       )}
       onClick={clickable ? () => onCategoryClick?.(node.id) : undefined}
     >
-      <td className={cn("text-muted-foreground/90 px-3 py-1.5 pl-9", indented && "pl-14")}>
+      <td className={cn("text-muted-foreground/90 px-3 py-1.5 ps-9", indented && "ps-14")}>
         <div className="flex items-center gap-2">
           <span
             className="h-1 w-1 shrink-0 rounded-full"
@@ -601,12 +603,12 @@ const ChildRow = memo(function ChildRow({
           <span>{node.name}</span>
         </div>
       </td>
-      <td className="text-muted-foreground/90 px-3 py-1.5 text-right text-xs tabular-nums">
+      <td className="text-muted-foreground/90 px-3 py-1.5 text-end text-xs tabular-nums">
         <PrivacyAmount value={node.spent} currency={currency} />
       </td>
       <td className="px-3 py-1.5"></td>
       {/* The insight has no prior-period amount per subcategory: the change is unknown, not new. */}
-      <td className="text-muted-foreground/60 px-3 py-1.5 text-right text-xs tabular-nums">—</td>
+      <td className="text-muted-foreground/60 px-3 py-1.5 text-end text-xs tabular-nums">—</td>
     </tr>
   );
 });
@@ -678,7 +680,7 @@ const MobileGroupRow = memo(function MobileGroupRow({
     <li className={MOBILE_CARD}>
       <button
         type="button"
-        className="hover:bg-muted/20 block w-full rounded-2xl px-4 pb-3 pt-3 text-left transition-colors"
+        className="hover:bg-muted/20 block w-full rounded-2xl px-4 pb-3 pt-3 text-start transition-colors"
         onClick={hasChildren ? onToggle : undefined}
         disabled={!hasChildren}
       >
@@ -695,12 +697,12 @@ const MobileGroupRow = memo(function MobileGroupRow({
             <Icons.ChevronRight
               className={cn(
                 "text-muted-foreground/40 h-3.5 w-3.5 shrink-0 transition-transform",
-                expanded && "rotate-90",
+                expanded ? "rotate-90" : "rtl:rotate-180",
               )}
             />
           )}
         </div>
-        <div className="mt-1.5 flex items-baseline justify-between gap-3 pl-4">
+        <div className="mt-1.5 flex items-baseline justify-between gap-3 ps-4">
           <span className="text-foreground text-base font-semibold tabular-nums tracking-tight">
             <PrivacyAmount value={group.spent} currency={currency} />
           </span>
@@ -712,7 +714,7 @@ const MobileGroupRow = memo(function MobileGroupRow({
           )}
         </div>
         {hasBudget && (
-          <div className="mt-1.5 pl-4">
+          <div className="mt-1.5 ps-4">
             <ProgressBar spent={group.spent} budget={group.budgeted} />
           </div>
         )}
@@ -823,7 +825,7 @@ const MobileCategoryRow = memo(function MobileCategoryRow({
         <ul
           className={cn(
             "border-border/30 divide-border/30 mt-1 divide-y border-t pt-1",
-            standalone ? "mx-4 mb-3" : "ml-13",
+            standalone ? "mx-4 mb-3" : "ms-13",
           )}
         >
           {node.children.map((child) => (

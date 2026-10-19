@@ -18,7 +18,7 @@ export function BackupError({ error }: { error: BackupFailure }) {
         <details className="group mt-1 text-xs">
           <summary className="inline-flex cursor-pointer list-none items-center gap-1 opacity-80 hover:opacity-100 [&::-webkit-details-marker]:hidden">
             <Icons.ChevronRight
-              className="size-3.5 transition-transform group-open:rotate-90"
+              className="size-3.5 transition-transform group-open:rotate-90 rtl:rotate-180"
               aria-hidden
             />
             {t("settings:recovery_details")}

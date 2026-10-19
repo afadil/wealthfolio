@@ -535,7 +535,7 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
                   isHidden={isBalanceHidden}
                 />
               </div>
-              <div className="text-muted-foreground text-right text-sm font-normal">
+              <div className="text-muted-foreground text-end text-sm font-normal">
                 {holding.currency}
               </div>
             </div>
@@ -592,7 +592,7 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
             {detailRows.map((row, idx) => (
               <div key={idx} className="flex justify-between">
                 <span className="text-muted-foreground">{row.label}</span>
-                <span className="text-right font-medium">{row.value}</span>
+                <span className="text-end font-medium">{row.value}</span>
               </div>
             ))}
           </div>
@@ -870,7 +870,7 @@ export function useAlternativeAssetActions({
             >
               {deleteMutation.isPending ? (
                 <>
-                  <Spinner className="mr-2 h-4 w-4" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {t("asset:altContent.deleting")}
                 </>
               ) : (

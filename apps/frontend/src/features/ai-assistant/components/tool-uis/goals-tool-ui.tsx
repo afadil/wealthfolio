@@ -293,7 +293,10 @@ function GoalCard({
         <Progress value={Math.min(goal.progressPercent, 100)} className="h-2" />
         {/* Colored overlay for the progress indicator */}
         <div
-          className={cn("absolute inset-y-0 left-0 h-2 rounded-full transition-all", progressColor)}
+          className={cn(
+            "absolute inset-y-0 start-0 h-2 rounded-full transition-all",
+            progressColor,
+          )}
           style={{ width: `${Math.min(goal.progressPercent, 100)}%` }}
         />
       </div>

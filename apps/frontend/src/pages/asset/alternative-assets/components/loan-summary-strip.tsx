@@ -48,7 +48,7 @@ export function LoanSummaryStrip({
   const next = calculation?.rows.find(
     (row) => row.date > today && row.scheduledPayment && row.payment > 0,
   );
-  const cell = "lg:border-l lg:pl-6";
+  const cell = "lg:border-s lg:ps-6";
 
   return (
     <Card data-testid="loan-summary-header">
@@ -255,20 +255,20 @@ function TermRuler({
         >
           <span className="bg-muted absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full" />
           <span
-            className="bg-muted-foreground/60 absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full"
+            className="bg-muted-foreground/60 absolute start-0 top-1/2 h-1 -translate-y-1/2 rounded-full"
             style={{ width: `${position * 100}%` }}
           />
           {yearTicks.map((tick) => (
             <span
               key={tick}
-              className="bg-card absolute top-1/2 h-1.5 w-0.5 -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${tick * 100}%` }}
+              className="bg-card absolute top-1/2 h-1.5 w-0.5 -translate-x-1/2 -translate-y-1/2 rtl:translate-x-1/2"
+              style={{ insetInlineStart: `${tick * 100}%` }}
             />
           ))}
           {!ended && (
             <span
-              className="bg-foreground absolute top-1/2 h-2.5 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full"
-              style={{ left: `${position * 100}%` }}
+              className="bg-foreground absolute top-1/2 h-2.5 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full rtl:translate-x-1/2"
+              style={{ insetInlineStart: `${position * 100}%` }}
             />
           )}
         </TooltipTrigger>

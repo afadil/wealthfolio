@@ -111,7 +111,7 @@ export function WizardLayout({ mode, progress, onHide, children }: WizardLayoutP
             <Button
               variant="ghost"
               size="icon"
-              className="text-muted-foreground -mr-2 -mt-2 size-8 shrink-0"
+              className="text-muted-foreground -me-2 -mt-2 size-8 shrink-0"
               aria-label={
                 mode === "recover" ? t("sync:restore.hide") : t("sync:restore.continueInBackground")
               }

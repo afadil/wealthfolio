@@ -182,7 +182,7 @@ export function ThreadSidebar({
     >
       <button
         onClick={() => onSelectThread(thread.id)}
-        className="flex min-w-0 flex-1 flex-col gap-0.5 text-left"
+        className="flex min-w-0 flex-1 flex-col gap-0.5 text-start"
       >
         <div className="flex items-center gap-1.5">
           {thread.isPinned && <Icons.Pin className="text-muted-foreground h-3 w-3 shrink-0" />}
@@ -224,22 +224,22 @@ export function ThreadSidebar({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => handleOpenRenameDialog(thread)}>
-            <Icons.Pencil className="mr-2 h-4 w-4" />
+            <Icons.Pencil className="me-2 h-4 w-4" />
             {t("ai:threadSidebar.rename")}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => handleOpenTagsDialog(thread)}>
-            <Icons.Tag className="mr-2 h-4 w-4" />
+            <Icons.Tag className="me-2 h-4 w-4" />
             {t("ai:threadSidebar.editTags")}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => onTogglePin(thread.id, !thread.isPinned)}>
             {thread.isPinned ? (
               <>
-                <Icons.PinOff className="mr-2 h-4 w-4" />
+                <Icons.PinOff className="me-2 h-4 w-4" />
                 {t("ai:threadSidebar.unpin")}
               </>
             ) : (
               <>
-                <Icons.Pin className="mr-2 h-4 w-4" />
+                <Icons.Pin className="me-2 h-4 w-4" />
                 {t("ai:threadSidebar.pin")}
               </>
             )}
@@ -249,7 +249,7 @@ export function ThreadSidebar({
             className="text-destructive focus:text-destructive"
             onClick={() => handleOpenDeleteDialog(thread)}
           >
-            <Icons.Trash className="mr-2 h-4 w-4" />
+            <Icons.Trash className="me-2 h-4 w-4" />
             {t("ai:threadSidebar.delete")}
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -258,7 +258,7 @@ export function ThreadSidebar({
   );
 
   return (
-    <div className={cn("flex h-full flex-col border-r", className)}>
+    <div className={cn("flex h-full flex-col border-e", className)}>
       {/* Header */}
       <div className="flex items-center justify-between border-b p-3">
         <h2 className="text-sm font-semibold">{t("ai:threadSidebar.conversations")}</h2>
@@ -271,13 +271,13 @@ export function ThreadSidebar({
       {/* Search */}
       <div className="border-b p-2">
         <div className="relative">
-          <Icons.Search className="text-muted-foreground absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
+          <Icons.Search className="text-muted-foreground absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
           <Input
             type="search"
             placeholder={t("ai:threadSidebar.searchConversations")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-8 pl-8 text-sm"
+            className="h-8 ps-8 text-sm"
           />
         </div>
       </div>
@@ -293,7 +293,7 @@ export function ThreadSidebar({
               onClick={() => handleTagFilterClick(tag)}
             >
               {tag}
-              {filterTag === tag && <Icons.X className="ml-1 h-3 w-3" />}
+              {filterTag === tag && <Icons.X className="ms-1 h-3 w-3" />}
             </Badge>
           ))}
         </div>
@@ -417,7 +417,7 @@ export function ThreadSidebar({
           <AlertDialogFooter>
             <AlertDialogCancel>{t("ai:threadSidebar.cancel")}</AlertDialogCancel>
             <Button variant="destructive" onClick={handleConfirmDelete}>
-              <Icons.Trash className="mr-2 h-4 w-4" />
+              <Icons.Trash className="me-2 h-4 w-4" />
               {t("ai:threadSidebar.deleteConfirm")}
             </Button>
           </AlertDialogFooter>

@@ -113,9 +113,7 @@ function RhythmRow({
   const formatting = useDateFormatting();
   return (
     <>
-      <div className="text-muted-foreground/70 text-2xs self-center pr-1 text-right">
-        {weekLabel}
-      </div>
+      <div className="text-muted-foreground/70 text-2xs self-center pe-1 text-end">{weekLabel}</div>
       {cells.map((cell, i) => {
         const intensity = max > 0 ? cell.amount / max : 0;
         const opacity = cell.amount === 0 ? 0.12 : 0.18 + intensity * 0.7;

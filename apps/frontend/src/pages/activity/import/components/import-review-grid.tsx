@@ -239,7 +239,7 @@ function useImportReviewColumns({
                   <Tooltip>
                     <TooltipTrigger render={dot} />
                     <TooltipContent
-                      side="right"
+                      side="inline-end"
                       className={
                         status === "error"
                           ? "max-w-xs whitespace-pre-wrap text-xs"
@@ -547,7 +547,10 @@ export function ImportReviewGrid({
     // Convert vertical scroll to horizontal when Shift is pressed
     if (e.shiftKey && e.deltaY !== 0) {
       e.preventDefault();
-      target.scrollLeft += e.deltaY;
+      // Scrolling down moves toward the end of the row, which is leftward
+      // (negative scrollLeft) in right-to-left.
+      const towardEnd = getComputedStyle(target).direction === "rtl" ? -1 : 1;
+      target.scrollLeft += towardEnd * e.deltaY;
     }
   }, []);
 

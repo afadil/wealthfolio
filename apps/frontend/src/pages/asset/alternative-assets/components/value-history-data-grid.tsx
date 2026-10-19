@@ -543,7 +543,7 @@ export function ValueHistoryDataGrid({
             onClick={handleMobileAdd}
             disabled={mobileDraft !== null || isPersisting}
           >
-            <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+            <Icons.Plus className="me-2 h-4 w-4" aria-hidden="true" />
             {isLiability ? t("asset:valueToolbar.add_balance") : t("asset:valueToolbar.add_value")}
           </Button>
         </div>
@@ -634,7 +634,7 @@ export function ValueHistoryDataGrid({
                         {t("common:cancel")}
                       </Button>
                       <Button className="h-11" disabled={isPersisting} onClick={handleMobileSave}>
-                        <Icons.Save className="mr-2 h-4 w-4" aria-hidden="true" />
+                        <Icons.Save className="me-2 h-4 w-4" aria-hidden="true" />
                         {t("common:save")}
                       </Button>
                     </div>
@@ -646,7 +646,7 @@ export function ValueHistoryDataGrid({
                 <div key={entry.id} className="flex items-center p-1.5">
                   <button
                     type="button"
-                    className="active:bg-muted/40 grid min-h-11 min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 rounded-md px-1.5 py-2 text-left disabled:opacity-50"
+                    className="active:bg-muted/40 grid min-h-11 min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 rounded-md px-1.5 py-2 text-start disabled:opacity-50"
                     aria-label={t("asset:valueHistory.edit_entry_aria", {
                       date: dateFormatting.formatCalendarDate(format(entry.date, "yyyy-MM-dd")),
                       value: amountFormatting.formatAmount(entry.value, entry.currency),

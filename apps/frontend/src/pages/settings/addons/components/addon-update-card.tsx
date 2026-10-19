@@ -215,14 +215,14 @@ export function AddonUpdateCard({
             )}
           </div>
 
-          <div className="ml-4 flex items-center gap-2">
+          <div className="ms-4 flex items-center gap-2">
             {(updateInfo.releaseNotes || updateInfo.changelogUrl) && (
               <ExternalLink
                 href={addonDetailUrl}
                 className={buttonVariants({ variant: "ghost", size: "sm" })}
               >
                 <span className="inline-flex items-center">
-                  <Icons.FileText className="mr-1 h-3 w-3" />
+                  <Icons.FileText className="me-1 h-3 w-3" />
                   {t("settings:addon_update_release_notes")}
                 </span>
               </ExternalLink>
@@ -231,12 +231,12 @@ export function AddonUpdateCard({
             <Button onClick={handleUpdate} disabled={isUpdating || disabled} size="sm">
               {isUpdating ? (
                 <>
-                  <Spinner className="mr-1 h-3 w-3" />
+                  <Spinner className="me-1 h-3 w-3" />
                   {t("settings:addon_update_updating")}
                 </>
               ) : (
                 <>
-                  <Icons.Download className="mr-1 h-3 w-3" />
+                  <Icons.Download className="me-1 h-3 w-3" />
                   {t("settings:addon_update_update_button")}
                 </>
               )}
@@ -247,7 +247,7 @@ export function AddonUpdateCard({
         {updateInfo.minWealthfolioVersion && (
           <div className="bg-warning-subtle mt-3 rounded-md p-2">
             <p className="text-warning-subtle-foreground text-xs">
-              <Icons.Info className="mr-1 inline h-3 w-3" />
+              <Icons.Info className="me-1 inline h-3 w-3" />
               {t("settings:addon_update_requires", {
                 version: updateInfo.minWealthfolioVersion,
               })}

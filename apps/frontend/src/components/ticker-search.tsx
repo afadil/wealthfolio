@@ -550,7 +550,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
             ) : (
               <>
                 <span className="text-muted-foreground">{resolvedPlaceholder}</span>
-                <Icons.Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                <Icons.Search className="ms-2 h-4 w-4 shrink-0 opacity-50" />
               </>
             )}
           </PopoverTrigger>

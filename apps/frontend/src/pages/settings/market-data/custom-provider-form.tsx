@@ -583,7 +583,7 @@ function CustomProviderFormContent({
         {/* ── Body: two-pane ── */}
         <div className="bg-muted/40 grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_35rem]">
           {/* LEFT pane */}
-          <div className="min-h-0 space-y-3 overflow-y-auto border-r p-4">
+          <div className="min-h-0 space-y-3 overflow-y-auto border-e p-4">
             {/* Provider Mode */}
             <div>
               <div className="text-muted-foreground text-2xs mb-2 font-medium uppercase tracking-wide">
@@ -666,7 +666,7 @@ function CustomProviderFormContent({
                       <FormLabel className="text-muted-foreground text-2xs font-medium uppercase tracking-wide">
                         {t("settings:market_data_page.provider_name")}
                         {!nameManuallyEdited && !isEditing && form.getValues("name") && (
-                          <span className="text-muted-foreground ml-1 font-normal normal-case tracking-normal">
+                          <span className="text-muted-foreground ms-1 font-normal normal-case tracking-normal">
                             {t("settings:market_data_page.provider_name_from_url")}
                           </span>
                         )}
@@ -872,12 +872,12 @@ function CustomProviderFormContent({
             <Button type="submit" disabled={isSaving}>
               {isSaving ? (
                 <>
-                  <Spinner className="mr-1.5 h-4 w-4" />
+                  <Spinner className="me-1.5 h-4 w-4" />
                   {t("settings:market_data_page.saving")}
                 </>
               ) : (
                 <>
-                  <Icons.Check className="mr-1.5 h-4 w-4" />
+                  <Icons.Check className="me-1.5 h-4 w-4" />
                   {isEditing
                     ? t("settings:market_data_page.save_changes")
                     : t("settings:market_data_page.create_provider")}
@@ -913,7 +913,7 @@ function ModeCard({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex items-center gap-2 rounded-lg border p-3 text-left transition-all",
+        "flex items-center gap-2 rounded-lg border p-3 text-start transition-all",
         selected
           ? "bg-background border-foreground/30 ring-foreground/5 shadow-sm ring-1"
           : "bg-background/50 border-border hover:bg-background",
@@ -966,7 +966,7 @@ function UsageOption({
           <span className="text-muted-foreground block text-xs">{description}</span>
         </span>
       </label>
-      {children && <div className="mt-2 space-y-2 pl-6">{children}</div>}
+      {children && <div className="mt-2 space-y-2 ps-6">{children}</div>}
     </div>
   );
 }

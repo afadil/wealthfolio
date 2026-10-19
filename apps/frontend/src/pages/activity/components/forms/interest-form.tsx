@@ -409,11 +409,11 @@ export function InterestForm({
             </Button>
           )}
           <Button type="submit" disabled={isLoading}>
-            {isLoading && <Spinner className="mr-2 h-4 w-4" />}
+            {isLoading && <Spinner className="me-2 h-4 w-4" />}
             {isEditing ? (
-              <Icons.Check className="mr-2 h-4 w-4" />
+              <Icons.Check className="me-2 h-4 w-4" />
             ) : (
-              <Icons.Plus className="mr-2 h-4 w-4" />
+              <Icons.Plus className="me-2 h-4 w-4" />
             )}
             {isEditing ? t("activity:form.button_update") : t("activity:form.button_add_interest")}
           </Button>

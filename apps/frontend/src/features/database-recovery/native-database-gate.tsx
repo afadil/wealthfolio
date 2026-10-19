@@ -245,7 +245,7 @@ function NativeStartup({ children }: { children: ReactNode }) {
               aria-hidden
             />
           </summary>
-          <div className="flex items-start gap-2 pb-3 pl-4 pr-2">
+          <div className="flex items-start gap-2 pb-3 pe-2 ps-4">
             <p className="max-h-40 min-w-0 flex-1 select-text overflow-y-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
               {startupError}
             </p>

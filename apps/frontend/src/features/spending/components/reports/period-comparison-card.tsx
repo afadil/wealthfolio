@@ -147,7 +147,7 @@ function ComparisonMetric({ row, currency }: { row: MetricRow; currency: string 
         <span className={cn("text-2xs mt-0.5 tabular-nums", toneClass)}>
           {trendingUp ? "↑" : delta < 0 ? "↓" : "→"}{" "}
           {numberFormatting.formatPercent(Math.abs(pct), { digits: 1 })}
-          <span className="text-muted-foreground/70 ml-1 font-normal">
+          <span className="text-muted-foreground/70 ms-1 font-normal">
             {t("spending:comparison.was", {
               value: formatMetric(priorValue, currency, isRate, amountFormatting, numberFormatting),
             })}

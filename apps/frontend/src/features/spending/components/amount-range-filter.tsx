@@ -78,7 +78,7 @@ function AmountRangeFilterInner({ value, onChange }: AmountRangeFilterProps) {
           />
         }
       >
-        <Icons.PlusCircle className="mr-2 h-4 w-4" />
+        <Icons.PlusCircle className="me-2 h-4 w-4" />
         {t("spending:common.amount")}
         {isActive && summary && (
           <>

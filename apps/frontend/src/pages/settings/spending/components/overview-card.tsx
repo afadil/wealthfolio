@@ -80,7 +80,7 @@ export function OverviewCard({
             className="text-foreground hover:text-foreground/80 group inline-flex shrink-0 items-center gap-1 text-xs font-medium"
           >
             {resolvedManageLabel}
-            <Icons.ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+            <Icons.ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
           </Link>
         )}
       </CardHeader>
@@ -102,7 +102,7 @@ export function OverviewCard({
               <p className="text-muted-foreground text-xs">{emptyDescription}</p>
             </div>
             <Link to={manageHref} className={buttonVariants({ size: "sm" })}>
-              <Icons.Plus className="mr-1.5 h-3.5 w-3.5" />
+              <Icons.Plus className="me-1.5 h-3.5 w-3.5" />
               {emptyCtaLabel}
             </Link>
           </div>

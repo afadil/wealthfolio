@@ -53,7 +53,7 @@ export default function SpendingBudgetPage() {
         to="/settings/spending/setup"
         className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-muted-foreground")}
       >
-        <Icons.Settings className="mr-1.5 h-3.5 w-3.5" />
+        <Icons.Settings className="me-1.5 h-3.5 w-3.5" />
         {t("spending:budgetPage.defaults")}
       </Link>
     </div>
@@ -103,7 +103,7 @@ function MonthSwitcher({
         aria-label={t("spending:calendar.previousMonth")}
         onClick={() => shift(-1)}
       >
-        <Icons.ChevronLeft className="h-4 w-4" />
+        <Icons.ChevronLeft className="h-4 w-4 rtl:rotate-180" />
       </Button>
       <label className="hover:bg-muted/40 flex cursor-pointer items-center gap-1 rounded-full px-2 transition-colors">
         <Icons.Calendar className="text-muted-foreground h-3.5 w-3.5" />
@@ -122,7 +122,7 @@ function MonthSwitcher({
         aria-label={t("spending:calendar.nextMonth")}
         onClick={() => shift(1)}
       >
-        <Icons.ChevronRight className="h-4 w-4" />
+        <Icons.ChevronRight className="h-4 w-4 rtl:rotate-180" />
       </Button>
       {monthKey !== current && (
         <Button

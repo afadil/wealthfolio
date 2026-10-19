@@ -272,12 +272,12 @@ export default function SpendingRulesPage() {
                 }
               >
                 {rerun.isPending ? (
-                  <Spinner className="mr-2 h-3.5 w-3.5" />
+                  <Spinner className="me-2 h-3.5 w-3.5" />
                 ) : (
-                  <Icons.Refresh className="mr-2 h-3.5 w-3.5" />
+                  <Icons.Refresh className="me-2 h-3.5 w-3.5" />
                 )}
                 {t("settings:spending.rules.rerun")}
-                <Icons.ChevronDown className="ml-2 h-3.5 w-3.5 opacity-60" />
+                <Icons.ChevronDown className="ms-2 h-3.5 w-3.5 opacity-60" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-72">
                 <DropdownMenuItem
@@ -317,7 +317,7 @@ export default function SpendingRulesPage() {
               <Icons.Plus className="h-3.5 w-3.5" />
             </Button>
             <Button size="sm" className="hidden sm:inline-flex" onClick={handleAddRule}>
-              <Icons.Plus className="mr-2 h-3.5 w-3.5" />
+              <Icons.Plus className="me-2 h-3.5 w-3.5" />
               {t("settings:spending.rules.add")}
             </Button>
           </div>
@@ -356,7 +356,7 @@ export default function SpendingRulesPage() {
               </EmptyHeader>
               <EmptyContent>
                 <Button variant="outline" onClick={handleAddRule}>
-                  <Icons.Plus className="mr-2 h-4 w-4" />
+                  <Icons.Plus className="me-2 h-4 w-4" />
                   {t("settings:spending.rules.add_manually")}
                 </Button>
               </EmptyContent>
@@ -371,13 +371,13 @@ export default function SpendingRulesPage() {
             {/* Search + preset filter chips */}
             <div className="space-y-2">
               <div className="relative">
-                <Icons.Search className="text-muted-foreground/60 absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" />
+                <Icons.Search className="text-muted-foreground/60 absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" />
                 <Input
                   type="search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t("settings:spending.rules.search_placeholder")}
-                  className="bg-muted/40 border-border/60 placeholder:text-muted-foreground/60 h-7 pl-8 text-xs"
+                  className="bg-muted/40 border-border/60 placeholder:text-muted-foreground/60 h-7 ps-8 text-xs"
                   aria-label={t("settings:spending.rules.search_aria")}
                 />
               </div>

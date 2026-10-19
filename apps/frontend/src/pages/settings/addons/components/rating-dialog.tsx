@@ -104,7 +104,7 @@ export function RatingDialog({
               disabled={isSubmittingRating}
               className="resize-none"
             />
-            <div className="text-muted-foreground text-right text-xs">
+            <div className="text-muted-foreground text-end text-xs">
               {t("settings:addon_rating_characters", { count: review.length })}
             </div>
           </div>
@@ -126,7 +126,7 @@ export function RatingDialog({
           >
             {isSubmittingRating ? (
               <>
-                <Spinner className="mr-2 h-4 w-4" />
+                <Spinner className="me-2 h-4 w-4" />
                 {t("settings:addon_rating_submitting")}
               </>
             ) : (

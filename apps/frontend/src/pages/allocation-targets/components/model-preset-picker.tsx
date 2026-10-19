@@ -146,7 +146,7 @@ export function ModelPresetPicker({
         type="button"
         onClick={() => onSelect(preset.id)}
         className={cn(
-          "bg-card/70 group relative flex flex-col overflow-hidden rounded-lg border text-left shadow-sm transition-colors",
+          "bg-card/70 group relative flex flex-col overflow-hidden rounded-lg border text-start shadow-sm transition-colors",
           compact ? "min-h-36 px-3.5 py-3.5" : "min-h-48 px-4 py-5",
           selected === preset.id
             ? "border-foreground bg-card"
@@ -212,7 +212,7 @@ export function ModelPresetPicker({
       {(secondaryPresets.length > 0 || compact) && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
           {secondaryPresets.length > 0 && (
-            <span className="text-muted-foreground text-2xs mr-1 font-medium uppercase tracking-wider">
+            <span className="text-muted-foreground text-2xs me-1 font-medium uppercase tracking-wider">
               {t("allocation:presets.moreTemplates")}
             </span>
           )}

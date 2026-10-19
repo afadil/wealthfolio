@@ -43,7 +43,7 @@ export default function MarketDataImportPage() {
             onClick={handleStartOver}
             disabled={quoteImport.isValidating || quoteImport.isImporting}
           >
-            <Icons.Refresh className="mr-2 h-4 w-4" />
+            <Icons.Refresh className="me-2 h-4 w-4" />
             {t("settings:market_data_page.start_over")}
           </Button>
         </div>

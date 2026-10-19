@@ -195,9 +195,9 @@ function CreateCategorizationRuleToolUIContentImpl({
         <div className="flex items-center justify-end">
           <Button size="sm" onClick={handleCreate} disabled={isSubmitted || create.isPending}>
             {create.isPending ? (
-              <Spinner className="mr-2 h-4 w-4" />
+              <Spinner className="me-2 h-4 w-4" />
             ) : isSubmitted ? (
-              <Icons.Check className="mr-2 h-4 w-4" />
+              <Icons.Check className="me-2 h-4 w-4" />
             ) : null}
             {isSubmitted
               ? t("ai:createRule.ruleCreatedButton")

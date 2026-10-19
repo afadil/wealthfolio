@@ -162,7 +162,7 @@ export function ContextResultStep() {
 
         <motion.div className="flex justify-center gap-3" variants={itemVariants}>
           <Button variant="outline" onClick={() => dispatch(setStep("confirm"))}>
-            <Icons.ArrowLeft className="mr-2 h-4 w-4" />
+            <Icons.ArrowLeft className="me-2 h-4 w-4 rtl:rotate-180" />
             {t("activity:import.result.tryAgain")}
           </Button>
         </motion.div>
@@ -245,7 +245,7 @@ export function ContextResultStep() {
       {/* Action buttons */}
       <motion.div className="flex gap-3" variants={itemVariants}>
         <Button variant="outline" size="lg" onClick={handleImportAnother}>
-          <Icons.Import className="mr-2 h-4 w-4" />
+          <Icons.Import className="me-2 h-4 w-4" />
           {t("activity:import.result.importAnother")}
         </Button>
 
@@ -253,7 +253,7 @@ export function ContextResultStep() {
           {isHoldingsMode
             ? t("activity:import.result.viewHoldings")
             : t("activity:import.result.viewActivities")}
-          <Icons.ArrowRight className="ml-2 h-4 w-4" />
+          <Icons.ArrowRight className="ms-2 h-4 w-4 rtl:rotate-180" />
         </Button>
       </motion.div>
 

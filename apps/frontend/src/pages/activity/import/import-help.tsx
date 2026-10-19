@@ -202,7 +202,7 @@ function HoldingsHelpContent() {
             <li>{t("activity:import.help.holdingsStep2")}</li>
             <li>
               {t("activity:import.help.holdingsStep3")}
-              <span className="text-muted-foreground ml-2 text-xs">
+              <span className="text-muted-foreground ms-2 text-xs">
                 {t("activity:import.help.holdingsStep3Fields")}
               </span>
             </li>
@@ -374,7 +374,7 @@ export function ImportHelpPopover({
           <SheetHeader>
             <SheetTitle>{t("activity:import.help.mobileTitle")}</SheetTitle>
           </SheetHeader>
-          <ScrollArea className="h-[calc(85vh-4rem)] pr-4">{helpContent}</ScrollArea>
+          <ScrollArea className="h-[calc(85vh-4rem)] pe-4">{helpContent}</ScrollArea>
         </SheetContent>
       </Sheet>
     );
@@ -385,7 +385,7 @@ export function ImportHelpPopover({
       <PopoverTrigger
         render={<Button type="button" variant="link" className="flex items-center" />}
       >
-        <Icons.HelpCircle className="mr-1 h-5 w-5" />
+        <Icons.HelpCircle className="me-1 h-5 w-5" />
         {t("activity:import.help.button")}
       </PopoverTrigger>
       <PopoverContent className="w-225 m-4 max-h-[80vh] max-w-[calc(100vw-2rem)] overflow-y-auto p-6 text-sm">

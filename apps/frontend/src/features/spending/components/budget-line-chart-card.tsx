@@ -321,7 +321,7 @@ export function BudgetLineChartCard({
       <div className="flex items-center gap-2">
         <Icon className="h-4 w-4 shrink-0" style={{ color: a.accent }} />
         <span className="text-foreground text-sm font-semibold">{statusLabel}</span>
-        <span className="text-muted-foreground/70 ml-auto text-xs tabular-nums">
+        <span className="text-muted-foreground/70 ms-auto text-xs tabular-nums">
           {isCurrentMonth
             ? t("spending:budgetChart.dayOf", { day: dayOfMonth, total: daysInMonth })
             : t("spending:budgetChart.closed")}
@@ -479,7 +479,7 @@ export function BudgetLineChartCard({
             <PrivacyAmount value={spent} currency={currency} />
           </div>
         </div>
-        <div className="text-right">
+        <div className="text-end">
           <div className="text-muted-foreground/70 text-2xs uppercase tracking-wide">
             {isCurrentMonth
               ? t("spending:budgetChart.forecastUpper")
@@ -672,7 +672,7 @@ function BudgetCardHeaderActions({
           className="hover:bg-background flex h-6 w-6 items-center justify-center rounded-full transition-colors"
           aria-label={t("spending:budgetChart.previousBudgetMonth")}
         >
-          <Icons.ChevronLeft className="h-3.5 w-3.5" />
+          <Icons.ChevronLeft className="h-3.5 w-3.5 rtl:rotate-180" />
         </button>
         <span className="text-foreground text-2xs min-w-18.5 px-1 text-center font-medium tabular-nums">
           {monthLabel}
@@ -684,7 +684,7 @@ function BudgetCardHeaderActions({
           className="hover:bg-background disabled:text-muted-foreground/40 flex h-6 w-6 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed"
           aria-label={t("spending:budgetChart.nextBudgetMonth")}
         >
-          <Icons.ChevronRight className="h-3.5 w-3.5" />
+          <Icons.ChevronRight className="h-3.5 w-3.5 rtl:rotate-180" />
         </button>
       </div>
       <BudgetManageLink monthKey={monthKey} />

@@ -296,14 +296,14 @@ export const ActivityTable = ({
               omitSeconds: true,
             });
             return (
-              <span className="text-muted-foreground ml-2 whitespace-nowrap text-xs tabular-nums">
+              <span className="text-muted-foreground ms-2 whitespace-nowrap text-xs tabular-nums">
                 {time}
               </span>
             );
           }
           const formattedDate = formatDateTime(date, dateFormatting, appTimezone);
           return (
-            <div className="ml-2 flex flex-col">
+            <div className="ms-2 flex flex-col">
               <span>{formattedDate.date}</span>
               <span className="text-muted-foreground text-xs font-light">{formattedDate.time}</span>
             </div>
@@ -359,7 +359,7 @@ export const ActivityTable = ({
         },
         header: ({ column }) => (
           <DataTableColumnHeader
-            className="justify-end text-right"
+            className="justify-end text-end"
             column={column}
             title={t("activity:table_quantity")}
           />
@@ -385,7 +385,7 @@ export const ActivityTable = ({
             isSplitActivity(activityType) ||
             isFeeActivity(activityType)
           ) {
-            return <div className="pr-4 text-right">-</div>;
+            return <div className="pe-4 text-end">-</div>;
           }
 
           if (
@@ -393,11 +393,11 @@ export const ActivityTable = ({
             (typeof quantity !== "number" && typeof quantity !== "string") ||
             String(quantity).trim() === ""
           ) {
-            return <div className="pr-4 text-right">-</div>;
+            return <div className="pe-4 text-end">-</div>;
           }
 
           return (
-            <div className="whitespace-nowrap pr-4 text-right tabular-nums">
+            <div className="whitespace-nowrap pe-4 text-end tabular-nums">
               {isBalanceHidden
                 ? "••••"
                 : typeof quantity === "number"
@@ -417,7 +417,7 @@ export const ActivityTable = ({
         },
         header: ({ column }) => (
           <DataTableColumnHeader
-            className="justify-end text-right"
+            className="justify-end text-end"
             column={column}
             title={t("activity:table_price_amount")}
           />
@@ -439,11 +439,11 @@ export const ActivityTable = ({
           );
 
           if (activityType === "FEE") {
-            return <div className="pr-4 text-right">-</div>;
+            return <div className="pe-4 text-end">-</div>;
           }
           if (activityType === "SPLIT") {
             return (
-              <div className="whitespace-nowrap text-right tabular-nums">
+              <div className="whitespace-nowrap text-end tabular-nums">
                 {formatSplitRatio(Number(amount))}
               </div>
             );
@@ -456,7 +456,7 @@ export const ActivityTable = ({
             (isIncomeActivity(activityType) && !isAssetBackedIncome)
           ) {
             return (
-              <div className="whitespace-nowrap text-right tabular-nums">
+              <div className="whitespace-nowrap text-end tabular-nums">
                 <AmountDisplay
                   value={Number(amount)}
                   currency={currency}
@@ -467,7 +467,7 @@ export const ActivityTable = ({
           }
 
           return (
-            <div className="whitespace-nowrap text-right tabular-nums">
+            <div className="whitespace-nowrap text-end tabular-nums">
               <PriceDisplay value={unitPrice} currency={currency} isHidden={isBalanceHidden} />
             </div>
           );
@@ -483,7 +483,7 @@ export const ActivityTable = ({
         },
         header: ({ column }) => (
           <DataTableColumnHeader
-            className="justify-end text-right"
+            className="justify-end text-end"
             column={column}
             title={t("activity:table_fee")}
           />
@@ -498,7 +498,7 @@ export const ActivityTable = ({
               : row.original.accountCurrency || "USD";
 
           return (
-            <div className="whitespace-nowrap text-right tabular-nums">
+            <div className="whitespace-nowrap text-end tabular-nums">
               {activityType === "SPLIT" ? (
                 "-"
               ) : (
@@ -518,7 +518,7 @@ export const ActivityTable = ({
         },
         header: ({ column }) => (
           <DataTableColumnHeader
-            className="justify-end text-right"
+            className="justify-end text-end"
             column={column}
             title={t("activity:table.tax")}
           />
@@ -533,7 +533,7 @@ export const ActivityTable = ({
               : row.original.accountCurrency || "USD";
 
           return (
-            <div className="whitespace-nowrap text-right tabular-nums">
+            <div className="whitespace-nowrap text-end tabular-nums">
               {activityType === "SPLIT" ? (
                 "-"
               ) : (
@@ -553,7 +553,7 @@ export const ActivityTable = ({
         },
         header: ({ column }) => (
           <DataTableColumnHeader
-            className="justify-end text-right"
+            className="justify-end text-end"
             column={column}
             title={t("activity:table_total")}
           />
@@ -564,12 +564,12 @@ export const ActivityTable = ({
           const currency = activity.currency || activity.accountCurrency || "USD";
 
           if (activityType === "SPLIT") {
-            return <div className="pr-4 text-right">-</div>;
+            return <div className="pe-4 text-end">-</div>;
           }
 
           const displayValue = calculateActivityValue(activity);
           return (
-            <div className="whitespace-nowrap pr-4 text-right font-medium tabular-nums">
+            <div className="whitespace-nowrap pe-4 text-end font-medium tabular-nums">
               <AmountDisplay value={displayValue} currency={currency} isHidden={isBalanceHidden} />
             </div>
           );
@@ -587,7 +587,7 @@ export const ActivityTable = ({
               },
               header: ({ column }) => (
                 <DataTableColumnHeader
-                  className="justify-end text-right"
+                  className="justify-end text-end"
                   column={column}
                   title={t("activity:table_balance")}
                 />
@@ -595,10 +595,10 @@ export const ActivityTable = ({
               cell: ({ row }) => {
                 const { cashBalance, cashBalanceCurrency, cashBalanceScope } = row.original;
                 if (cashBalance == null || !cashBalanceCurrency || cashBalanceScope === "DAY") {
-                  return <div className="pr-4 text-right">-</div>;
+                  return <div className="pe-4 text-end">-</div>;
                 }
                 return (
-                  <div className="whitespace-nowrap pr-4 text-right tabular-nums">
+                  <div className="whitespace-nowrap pe-4 text-end tabular-nums">
                     <AmountDisplay
                       value={Number(cashBalance)}
                       currency={cashBalanceCurrency}
@@ -625,7 +625,7 @@ export const ActivityTable = ({
           const accountName = row.getValue("account");
           const accountCurrency = row.getValue("accountCurrency");
           return (
-            <div className="min-w-37.5 ml-2 flex flex-col">
+            <div className="min-w-37.5 ms-2 flex flex-col">
               <span>{String(accountName)}</span>
               <span className="text-muted-foreground text-xs font-light">
                 {String(accountCurrency)}
@@ -869,7 +869,7 @@ export const ActivityTable = ({
             ) : onAdd ? (
               <div className="flex flex-col items-center gap-3 sm:flex-row">
                 <Button onClick={onAdd}>
-                  <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                  <Icons.Plus className="me-2 h-4 w-4" aria-hidden="true" />
                   {t("activity:add_activity")}
                 </Button>
                 {showConnectAccountLink && (
@@ -877,7 +877,7 @@ export const ActivityTable = ({
                     to={connectPagePath("activities_empty")}
                     className={buttonVariants({ variant: "outline" })}
                   >
-                    <Icons.CloudSync2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                    <Icons.CloudSync2 className="me-2 h-4 w-4" aria-hidden="true" />
                     {t("activity:page.connect_account")}
                   </Link>
                 )}

@@ -557,7 +557,7 @@ export function ConfirmStep() {
       {/* Action buttons */}
       <div className="flex justify-between gap-3 border-t pt-6">
         <Button variant="outline" onClick={handleBack} disabled={isProcessing}>
-          <Icons.ArrowLeft className="mr-2 h-4 w-4" />
+          <Icons.ArrowLeft className="me-2 h-4 w-4 rtl:rotate-180" />
           {t("activity:import.toolbar.back")}
         </Button>
 
@@ -569,14 +569,14 @@ export function ConfirmStep() {
           >
             {isProcessing ? (
               <>
-                <Spinner className="mr-2 h-4 w-4" />
+                <Spinner className="me-2 h-4 w-4" />
                 {isPreparingAssets
                   ? t("activity:import.confirm.preparingAssets")
                   : t("activity:import.confirm.importing")}
               </>
             ) : (
               <>
-                <Icons.Import className="mr-2 h-4 w-4" />
+                <Icons.Import className="me-2 h-4 w-4" />
                 {t("activity:import.confirm.importActivities", { count: summary.toImport })}
               </>
             )}

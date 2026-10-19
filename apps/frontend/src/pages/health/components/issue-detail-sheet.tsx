@@ -458,7 +458,7 @@ export function IssueDetailSheet({
         </SheetHeader>
 
         <ScrollArea className="min-h-0 flex-1">
-          <div className="space-y-6 pr-4">
+          <div className="space-y-6 pe-4">
             {!hasDiagnostics && issue.affectedItems && issue.affectedItems.length > 0 && (
               <div className="space-y-3">
                 <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
@@ -480,7 +480,7 @@ export function IssueDetailSheet({
                             )}
                             <span className="truncate text-sm">{item.name}</span>
                           </div>
-                          <Icons.ChevronRight className="text-muted-foreground h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+                          <Icons.ChevronRight className="text-muted-foreground h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 rtl:rotate-180" />
                         </Link>
                       ) : (
                         <div className="flex items-center gap-2 px-2 py-2">
@@ -584,7 +584,7 @@ export function IssueDetailSheet({
                                     </p>
                                   </div>
                                   {assetGroup.route && (
-                                    <Icons.ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
+                                    <Icons.ChevronRight className="text-muted-foreground h-4 w-4 shrink-0 rtl:rotate-180" />
                                   )}
                                 </div>
                               );
@@ -623,7 +623,7 @@ export function IssueDetailSheet({
                                       </div>
                                     </div>
                                     {rowRoute && (
-                                      <Icons.ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
+                                      <Icons.ChevronRight className="text-muted-foreground h-4 w-4 shrink-0 rtl:rotate-180" />
                                     )}
                                   </div>
                                 );
@@ -652,7 +652,7 @@ export function IssueDetailSheet({
                                 key={key}
                                 className={buttonVariants({ variant: "outline", size: "sm" })}
                               >
-                                <Icons.ArrowRight className="mr-2 h-4 w-4" />
+                                <Icons.ArrowRight className="me-2 h-4 w-4 rtl:rotate-180" />
                                 {action.label}
                               </Link>
                             ) : (
@@ -671,9 +671,9 @@ export function IssueDetailSheet({
                                 }
                               >
                                 {isFixing ? (
-                                  <Spinner className="mr-2 h-4 w-4" />
+                                  <Spinner className="me-2 h-4 w-4" />
                                 ) : (
-                                  <Icons.Wand2 className="mr-2 h-4 w-4" />
+                                  <Icons.Wand2 className="me-2 h-4 w-4" />
                                 )}
                                 {action.label}
                               </Button>
@@ -732,7 +732,7 @@ export function IssueDetailSheet({
                             })}
                           </div>
                           {detailRoute && (
-                            <Icons.ChevronRight className="text-muted-foreground mt-1 h-4 w-4 shrink-0" />
+                            <Icons.ChevronRight className="text-muted-foreground mt-1 h-4 w-4 shrink-0 rtl:rotate-180" />
                           )}
                         </div>
                       </div>
@@ -766,9 +766,9 @@ export function IssueDetailSheet({
           {issue.fixAction && !hasDiagnosticActions && (
             <Button onClick={onFix} disabled={isFixing} className="w-full">
               {isFixing ? (
-                <Spinner className="mr-2 h-4 w-4" />
+                <Spinner className="me-2 h-4 w-4" />
               ) : (
-                <Icons.Wand2 className="mr-2 h-4 w-4" />
+                <Icons.Wand2 className="me-2 h-4 w-4" />
               )}
               {issue.fixAction.label}
             </Button>
@@ -779,7 +779,7 @@ export function IssueDetailSheet({
               to={navigateActionRoute ?? issue.navigateAction.route}
               className={cn(buttonVariants({ variant: "outline" }), "w-full")}
             >
-              <Icons.ArrowRight className="mr-2 h-4 w-4" />
+              <Icons.ArrowRight className="me-2 h-4 w-4 rtl:rotate-180" />
               {issue.navigateAction.label}
             </Link>
           )}
@@ -794,7 +794,7 @@ export function IssueDetailSheet({
             pendingText={t("health:detail.dismissConfirm.pendingText")}
             button={
               <Button variant="ghost" className="text-muted-foreground w-full">
-                <Icons.EyeOff className="mr-2 h-4 w-4" />
+                <Icons.EyeOff className="me-2 h-4 w-4" />
                 {t("health:detail.dismiss")}
               </Button>
             }

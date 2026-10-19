@@ -16,7 +16,7 @@ export function HelpTooltip({ content }: HelpTooltipProps) {
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger delay={300} className="ml-2 cursor-help" aria-label={t("common:help")}>
+        <TooltipTrigger delay={300} className="ms-2 cursor-help" aria-label={t("common:help")}>
           <Icons.Info className="text-muted-foreground h-4 w-4" />
         </TooltipTrigger>
         <TooltipContent>

@@ -181,12 +181,12 @@ export default function TaxonomiesPage() {
             <div className="flex items-center gap-2">
               {isEditableTaxonomy && (
                 <Button variant="default" size="sm" onClick={handleAddCategory}>
-                  <Icons.Plus className="mr-2 h-4 w-4" />
+                  <Icons.Plus className="me-2 h-4 w-4" />
                   {t("settings:tax_add_category")}
                 </Button>
               )}
               <Button variant="outline" size="sm" onClick={handleExport}>
-                <Icons.Download className="mr-2 h-4 w-4" />
+                <Icons.Download className="me-2 h-4 w-4" />
                 {t("settings:tax_export")}
               </Button>
             </div>
@@ -195,7 +195,7 @@ export default function TaxonomiesPage() {
           {/* Categories and details */}
           <div className="min-h-125 flex flex-col lg:flex-row">
             {/* Category tree */}
-            <div className="w-full border-b lg:w-80 lg:border-b-0 lg:border-r">
+            <div className="w-full border-b lg:w-80 lg:border-b-0 lg:border-e">
               <ScrollArea className="h-75 lg:h-125">
                 {isLoadingCategories ? (
                   <div className="text-muted-foreground p-4 text-center text-sm">

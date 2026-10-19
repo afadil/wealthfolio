@@ -183,7 +183,7 @@ export function RuleItem({
           <button
             type="button"
             onClick={() => setPatternExpanded((v) => !v)}
-            className="text-muted-foreground/80 hover:text-muted-foreground block w-full text-left transition-colors"
+            className="text-muted-foreground/80 hover:text-muted-foreground block w-full text-start transition-colors"
             aria-label={
               patternExpanded
                 ? t("spending:rules.collapsePattern")
@@ -250,14 +250,14 @@ export function RuleItem({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => onEdit(rule)}>
-                <Icons.Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
+                <Icons.Pencil className="me-2 h-4 w-4" aria-hidden="true" />
                 {t("common:edit")}
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-destructive"
                 onClick={() => setShowDeleteDialog(true)}
               >
-                <Icons.Trash className="mr-2 h-4 w-4" aria-hidden="true" />
+                <Icons.Trash className="me-2 h-4 w-4" aria-hidden="true" />
                 {t("common:delete")}
               </DropdownMenuItem>
             </DropdownMenuContent>

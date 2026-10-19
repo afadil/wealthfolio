@@ -159,7 +159,7 @@ function StackedAvatars({ holdings, totalRemaining, onClick }: StackedAvatarsPro
           return (
             <div
               key={holding.id}
-              className={cn("relative", index > 0 && "-ml-2")}
+              className={cn("relative", index > 0 && "-ms-2")}
               style={{ zIndex: displayedHoldings.length - index }}
             >
               <TickerAvatar
@@ -178,7 +178,7 @@ function StackedAvatars({ holdings, totalRemaining, onClick }: StackedAvatarsPro
           ? t("dashboard:holdings.more_holdings", { count: totalRemaining })
           : t("dashboard:holdings.more", { count: totalRemaining })}
       </span>
-      <Icons.ChevronRight className="text-muted-foreground ml-auto h-3 w-3" />
+      <Icons.ChevronRight className="text-muted-foreground ms-auto h-3 w-3 rtl:rotate-180" />
     </div>
   );
 }
@@ -222,7 +222,7 @@ function TopHoldingsEmptyState() {
           className="text-muted-foreground hover:text-foreground mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
         >
           {t("dashboard:holdings.add_first_transaction")}
-          <Icons.ChevronRight className="h-3 w-3" />
+          <Icons.ChevronRight className="h-3 w-3 rtl:rotate-180" />
         </Link>
       </div>
     </DashboardCard>
@@ -409,7 +409,7 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
             onClick={() => navigate("/holdings")}
           >
             {t("dashboard:view_all")}
-            <Icons.ChevronRight className="ml-1 h-3 w-3" />
+            <Icons.ChevronRight className="ms-1 h-3 w-3 rtl:rotate-180" />
           </Button>
         </div>
       }

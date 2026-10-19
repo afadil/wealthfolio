@@ -201,9 +201,9 @@ export function TargetWeightEditor({
         <div className="text-muted-foreground text-2xs grid grid-cols-[minmax(8rem,1fr)_minmax(12rem,2fr)_4.25rem_5rem_6rem_1.75rem] gap-4 border-b px-1 pb-2 font-medium uppercase tracking-wider">
           <span>{resolvedCategoryLabel}</span>
           <span>{t("allocation:editor.todayVsTarget")}</span>
-          <span className="text-right">{t("allocation:editor.current")}</span>
-          <span className="text-right">{t("allocation:editor.target")}</span>
-          <span className="text-right">{t("allocation:editor.drift")}</span>
+          <span className="text-end">{t("allocation:editor.current")}</span>
+          <span className="text-end">{t("allocation:editor.target")}</span>
+          <span className="text-end">{t("allocation:editor.drift")}</span>
           <span />
         </div>
 
@@ -239,12 +239,14 @@ export function TargetWeightEditor({
                   />
                   <span
                     className="bg-foreground absolute top-1/2 h-5 w-px -translate-y-1/2 rounded-full"
-                    style={{ left: `calc(${Math.min(100, Math.max(0, row.targetPct))}% - 1px)` }}
+                    style={{
+                      insetInlineStart: `calc(${Math.min(100, Math.max(0, row.targetPct))}% - 1px)`,
+                    }}
                   />
                 </div>
 
                 {/* Current % */}
-                <span className="text-muted-foreground text-right text-xs tabular-nums">
+                <span className="text-muted-foreground text-end text-xs tabular-nums">
                   {row.currentPct > 0 ? `${row.currentPct.toFixed(1)}%` : "—"}
                 </span>
 
@@ -280,7 +282,7 @@ export function TargetWeightEditor({
                           setLiveBps(null);
                         }
                       }}
-                      className="border-primary bg-background focus:ring-primary w-12 rounded border px-1.5 py-1 text-right text-sm tabular-nums [appearance:textfield] focus:outline-none focus:ring-1 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      className="border-primary bg-background focus:ring-primary w-12 rounded border px-1.5 py-1 text-end text-sm tabular-nums [appearance:textfield] focus:outline-none focus:ring-1 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     />
                   ) : (
                     <button
@@ -293,7 +295,7 @@ export function TargetWeightEditor({
                           : t("allocation:editor.editTarget")
                       }
                       className={cn(
-                        "bg-background/45 inline-flex h-7 w-14 items-center justify-end rounded-md border px-2 text-right text-sm tabular-nums transition-colors",
+                        "bg-background/45 inline-flex h-7 w-14 items-center justify-end rounded-md border px-2 text-end text-sm tabular-nums transition-colors",
                         row.isLocked
                           ? "border-border/40 text-muted-foreground cursor-not-allowed opacity-60"
                           : "border-border/70 text-foreground hover:border-foreground/45 hover:bg-muted/40 cursor-text",
@@ -347,7 +349,7 @@ export function TargetWeightEditor({
             <span />
             <span
               className={cn(
-                "text-right text-sm font-semibold tabular-nums",
+                "text-end text-sm font-semibold tabular-nums",
                 isValid ? "text-success-subtle-foreground" : "text-destructive",
               )}
             >

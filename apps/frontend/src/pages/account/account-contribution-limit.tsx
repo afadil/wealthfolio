@@ -108,7 +108,7 @@ function AccountContributionLimitItem({
               />
             </p>
           </div>
-          <div className={`shrink-0 text-right text-xs font-semibold ${statusClassName}`}>
+          <div className={`shrink-0 text-end text-xs font-semibold ${statusClassName}`}>
             {isOverLimit ? (
               <Trans
                 i18nKey="account:contribution.over_by"

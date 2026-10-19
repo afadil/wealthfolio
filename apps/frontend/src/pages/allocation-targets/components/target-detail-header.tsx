@@ -44,7 +44,7 @@ export function TargetToolbarActions({
             }
           >
             <Icons.Target className="h-4 w-4 shrink-0 opacity-70" />
-            <span className="min-w-0 flex-1 truncate text-left">
+            <span className="min-w-0 flex-1 truncate text-start">
               {target?.name ?? t("allocation:header.selectTarget")}
             </span>
             <Icons.ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
@@ -99,8 +99,8 @@ export function TargetDetailHeader({
   const { t } = useTranslation();
   return (
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-      <Button variant="ghost" size="sm" className="-ml-2" onClick={onBack}>
-        <Icons.ArrowLeft className="mr-1.5 h-4 w-4" />
+      <Button variant="ghost" size="sm" className="-ms-2" onClick={onBack}>
+        <Icons.ArrowLeft className="me-1.5 h-4 w-4 rtl:rotate-180" />
         {t("allocation:header.backToAllocation")}
       </Button>
 

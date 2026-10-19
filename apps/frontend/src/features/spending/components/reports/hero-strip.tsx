@@ -314,7 +314,7 @@ export const BudgetStatusHero: FC<BudgetStatusHeroProps> = ({
         {/* Pace target tick — vertical line on the bar */}
         <div
           className="bg-foreground/60 absolute top-0 h-full w-px"
-          style={{ left: `${pacePct * 100}%` }}
+          style={{ insetInlineStart: `${pacePct * 100}%` }}
           title={t("spending:hero.paceTarget", { pct: Math.round(paceTarget * 100) })}
         />
       </div>
@@ -337,7 +337,7 @@ export const BudgetStatusHero: FC<BudgetStatusHeroProps> = ({
             {isBalanceHidden ? "••••" : formatting.formatCompactAmount(forecast, currency)}
           </span>
           {forecast > 0 && (
-            <span className="ml-1">
+            <span className="ms-1">
               (
               {isBalanceHidden
                 ? "••••"

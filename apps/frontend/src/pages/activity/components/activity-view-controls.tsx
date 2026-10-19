@@ -223,7 +223,7 @@ export function ActivityViewControls({
             }}
           >
             {t("activity:reset_filters")}
-            <Icons.Close className="ml-2 h-4 w-4" />
+            <Icons.Close className="ms-2 h-4 w-4" />
           </Button>
         ) : null}
       </div>

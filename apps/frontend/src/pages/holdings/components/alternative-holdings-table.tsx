@@ -141,7 +141,7 @@ export function AlternativeHoldingsTable({
           const value = parseFloat(holding.marketValue);
 
           return (
-            <div className="text-right">
+            <div className="text-end">
               <AmountDisplay
                 value={value}
                 currency={holding.currency}
@@ -175,7 +175,7 @@ export function AlternativeHoldingsTable({
           const isLiability = holding.kind.toLowerCase() === "liability";
 
           if (gain === null || gainPct === null) {
-            return <div className="text-muted-foreground text-right text-sm">—</div>;
+            return <div className="text-muted-foreground text-end text-sm">—</div>;
           }
 
           return (
@@ -222,7 +222,7 @@ export function AlternativeHoldingsTable({
             day: "numeric",
           });
 
-          return <div className="text-muted-foreground text-right text-sm">{formatted}</div>;
+          return <div className="text-muted-foreground text-end text-sm">{formatted}</div>;
         },
         enableSorting: true,
       },
@@ -249,19 +249,19 @@ export function AlternativeHoldingsTable({
                 <DropdownMenuContent align="end">
                   {onUpdateValue && (
                     <DropdownMenuItem onClick={() => onUpdateValue(holding)}>
-                      <Icons.DollarSign className="mr-2 h-4 w-4" />
+                      <Icons.DollarSign className="me-2 h-4 w-4" />
                       {t("holdings:update_value")}
                     </DropdownMenuItem>
                   )}
                   {onViewHistory && (
                     <DropdownMenuItem onClick={() => onViewHistory(holding)}>
-                      <Icons.History className="mr-2 h-4 w-4" />
+                      <Icons.History className="me-2 h-4 w-4" />
                       {t("holdings:value_history")}
                     </DropdownMenuItem>
                   )}
                   {onEdit && (
                     <DropdownMenuItem onClick={() => onEdit(holding)}>
-                      <Icons.Pencil className="mr-2 h-4 w-4" />
+                      <Icons.Pencil className="me-2 h-4 w-4" />
                       {t("holdings:edit_details")}
                     </DropdownMenuItem>
                   )}
@@ -272,7 +272,7 @@ export function AlternativeHoldingsTable({
                         className="text-destructive focus:text-destructive"
                         onClick={() => setAssetToDelete(holding)}
                       >
-                        <Icons.Trash className="mr-2 h-4 w-4" />
+                        <Icons.Trash className="me-2 h-4 w-4" />
                         {t("common:delete")}
                       </DropdownMenuItem>
                     </>
@@ -347,7 +347,7 @@ export function AlternativeHoldingsTable({
             >
               {isDeleting ? (
                 <>
-                  <Spinner className="mr-2 h-4 w-4" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {t("holdings:deleting")}
                 </>
               ) : (

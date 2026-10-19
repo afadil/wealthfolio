@@ -98,7 +98,7 @@ export const EventsCalendarCard: FC<Props> = ({
               className="h-7 w-7"
               onClick={() => setCursor(addMonths(cursor, -1))}
             >
-              <Icons.ChevronLeft className="h-4 w-4" />
+              <Icons.ChevronLeft className="h-4 w-4 rtl:rotate-180" />
             </Button>
             <Button
               variant="outline"
@@ -108,13 +108,13 @@ export const EventsCalendarCard: FC<Props> = ({
               className="h-7 w-7"
               onClick={() => setCursor(addMonths(cursor, 1))}
             >
-              <Icons.ChevronRight className="h-4 w-4" />
+              <Icons.ChevronRight className="h-4 w-4 rtl:rotate-180" />
             </Button>
             <Button
               variant="outline"
               size="icon"
               aria-label={t("spending:events.createEvent")}
-              className="ml-1 h-7 w-7 rounded-full"
+              className="ms-1 h-7 w-7 rounded-full"
               onClick={() =>
                 openEventDialog({
                   prefill: { startDate: monthStart, endDate: monthEnd },
@@ -192,7 +192,7 @@ export const EventsCalendarCard: FC<Props> = ({
                       : formatting.formatAmount(bar.event.totalSpending, currency)
                   }`}
                   className={cn(
-                    "text-2xs min-h-4 truncate rounded-sm px-1 text-left leading-[1rem]",
+                    "text-2xs min-h-4 truncate rounded-sm px-1 text-start leading-[1rem]",
                     isSel ? "font-semibold" : "hover:brightness-95",
                   )}
                   style={{

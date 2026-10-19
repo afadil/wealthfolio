@@ -31,7 +31,7 @@ export function RecoveryDialog({ open, onOpenChange }: RecoveryDialogProps) {
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-sm:bg-background/90 gap-8 text-center max-sm:bottom-6 max-sm:left-4 max-sm:right-4 max-sm:top-auto max-sm:w-auto max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-3xl max-sm:shadow-2xl max-sm:backdrop-blur-2xl sm:max-w-lg">
+      <AlertDialogContent className="max-sm:bg-background/90 gap-8 text-center max-sm:bottom-6 max-sm:end-4 max-sm:start-4 max-sm:top-auto max-sm:w-auto max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-3xl max-sm:shadow-2xl max-sm:backdrop-blur-2xl sm:max-w-lg">
         <AlertDialogHeader className="items-center gap-4 px-8 text-center">
           <div className="text-warning-subtle-foreground bg-current/15 flex h-14 w-14 items-center justify-center rounded-full">
             <Icons.AlertTriangle className="h-6 w-6" />
@@ -50,7 +50,7 @@ export function RecoveryDialog({ open, onOpenChange }: RecoveryDialogProps) {
           <AlertDialogAction onClick={onRecovery} disabled={handleRecovery.isPending}>
             {handleRecovery.isPending ? (
               <>
-                <Spinner className="mr-2 h-4 w-4" />
+                <Spinner className="me-2 h-4 w-4" />
                 {t("sync:recovery.settingUp")}
               </>
             ) : (

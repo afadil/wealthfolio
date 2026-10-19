@@ -325,7 +325,7 @@ function LoanLedger({ holding, calculation, quotes, actions, onEditDetails }: Lo
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button size="sm" variant="outline" />}>
               {t("asset:loanEvents.add_event")}
-              <Icons.ChevronDown className="ml-2 size-3.5" />
+              <Icons.ChevronDown className="ms-2 size-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={actions.confirmBalance}>
@@ -380,8 +380,8 @@ function LoanLedger({ holding, calculation, quotes, actions, onEditDetails }: Lo
         <div className={cn(ROW_GRID, "text-muted-foreground border-t py-2 text-xs")}>
           <span />
           <span />
-          <span className="text-right">{t("asset:loanEvents.amount")}</span>
-          <span className="hidden text-right sm:block">{t("asset:valueHistory.balance")}</span>
+          <span className="text-end">{t("asset:loanEvents.amount")}</span>
+          <span className="hidden text-end sm:block">{t("asset:valueHistory.balance")}</span>
           <span />
         </div>
         {years.length === 0 && (
@@ -400,14 +400,14 @@ function LoanLedger({ holding, calculation, quotes, actions, onEditDetails }: Lo
                 onClick={() => setOpenYears((current) => ({ ...current, [key]: !open }))}
                 className={cn(
                   ROW_GRID,
-                  "bg-muted/40 hover:bg-muted/60 w-full border-t py-2.5 text-left",
+                  "bg-muted/40 hover:bg-muted/60 w-full border-t py-2.5 text-start",
                 )}
               >
                 <span className="flex items-center gap-1.5 font-semibold tabular-nums">
                   {open ? (
                     <Icons.ChevronDown className="text-muted-foreground size-4" />
                   ) : (
-                    <Icons.ChevronRight className="text-muted-foreground size-4" />
+                    <Icons.ChevronRight className="text-muted-foreground size-4 rtl:rotate-180" />
                   )}
                   {group.year}
                 </span>
@@ -431,7 +431,7 @@ function LoanLedger({ holding, calculation, quotes, actions, onEditDetails }: Lo
                     </span>
                   )}
                 </span>
-                <span className="text-muted-foreground hidden text-right text-xs tabular-nums sm:block">
+                <span className="text-muted-foreground hidden text-end text-xs tabular-nums sm:block">
                   {group.endBalance != null && money(group.endBalance)}
                 </span>
                 <span />
@@ -446,7 +446,7 @@ function LoanLedger({ holding, calculation, quotes, actions, onEditDetails }: Lo
                         onClick={() => setOpenRuns((current) => new Set(current).add(item.more))}
                         className={cn(
                           ROW_GRID,
-                          "text-muted-foreground hover:text-foreground w-full border-t py-2 text-left text-xs",
+                          "text-muted-foreground hover:text-foreground w-full border-t py-2 text-start text-xs",
                         )}
                       >
                         <span />
@@ -492,13 +492,13 @@ function LoanLedger({ holding, calculation, quotes, actions, onEditDetails }: Lo
                           {badge}
                         </span>
                         {detail && (
-                          <span className="text-muted-foreground block truncate pl-6 text-xs">
+                          <span className="text-muted-foreground block truncate ps-6 text-xs">
                             {detail}
                           </span>
                         )}
                       </span>
-                      <span className="text-right tabular-nums">{amount}</span>
-                      <span className="hidden text-right tabular-nums sm:block">
+                      <span className="text-end tabular-nums">{amount}</span>
+                      <span className="hidden text-end tabular-nums sm:block">
                         {item.balance != null && money(item.balance)}
                       </span>
                       <span className="flex justify-end">

@@ -41,7 +41,7 @@ export function MigrationBanner() {
         <Button onClick={handleMigrate} disabled={migrateMutation.isPending} size="sm">
           {migrateMutation.isPending ? (
             <>
-              <Spinner className="mr-2 h-4 w-4" />
+              <Spinner className="me-2 h-4 w-4" />
               {t("settings:tax_migrating")}
             </>
           ) : (

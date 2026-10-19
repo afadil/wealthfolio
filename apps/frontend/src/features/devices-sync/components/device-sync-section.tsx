@@ -443,7 +443,7 @@ export function DeviceSyncSection() {
                 {userFacingSyncErrorMessage(status.error)}
               </p>
               <Button variant="outline" className="mt-4" onClick={handleRefresh}>
-                <Icons.RefreshCw className="mr-2 h-4 w-4" />
+                <Icons.RefreshCw className="me-2 h-4 w-4" />
                 {t("common:retry")}
               </Button>
             </div>
@@ -529,7 +529,7 @@ export function DeviceSyncSection() {
                 {t("sync:stale.keysNeedUpdatingDescription")}
               </p>
               <Button className="mt-3 sm:mt-4" onClick={openPairingDialog}>
-                <Icons.Link className="mr-2 h-4 w-4" />
+                <Icons.Link className="me-2 h-4 w-4" />
                 {t("sync:stale.updateThisDevice")}
               </Button>
             </div>
@@ -652,12 +652,12 @@ export function DeviceSyncSection() {
                         >
                           {restore.start.isPending ? (
                             <>
-                              <Spinner className="mr-2 h-3.5 w-3.5" />
+                              <Spinner className="me-2 h-3.5 w-3.5" />
                               {t("sync:waitingSnapshot.checking")}
                             </>
                           ) : (
                             <>
-                              <Icons.RefreshCw className="mr-2 h-3.5 w-3.5" />
+                              <Icons.RefreshCw className="me-2 h-3.5 w-3.5" />
                               {t("sync:waitingSnapshot.checkAgain")}
                             </>
                           )}
@@ -671,12 +671,12 @@ export function DeviceSyncSection() {
                           >
                             {isUploadingSnapshot ? (
                               <>
-                                <Spinner className="mr-2 h-3.5 w-3.5" />
+                                <Spinner className="me-2 h-3.5 w-3.5" />
                                 {t("sync:waitingSnapshot.preparing")}
                               </>
                             ) : (
                               <>
-                                <Icons.Upload className="mr-2 h-3.5 w-3.5" />
+                                <Icons.Upload className="me-2 h-3.5 w-3.5" />
                                 {t("sync:waitingSnapshot.speedUpSetup")}
                               </>
                             )}
@@ -706,7 +706,7 @@ export function DeviceSyncSection() {
           </CardContent>
 
           <AlertDialog open={showReinitConfirmDialog} onOpenChange={setShowReinitConfirmDialog}>
-            <AlertDialogContent className="max-sm:bg-background/90 gap-8 text-center max-sm:bottom-6 max-sm:left-4 max-sm:right-4 max-sm:top-auto max-sm:w-auto max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-3xl max-sm:shadow-2xl max-sm:backdrop-blur-2xl sm:max-w-lg">
+            <AlertDialogContent className="max-sm:bg-background/90 gap-8 text-center max-sm:bottom-6 max-sm:end-4 max-sm:start-4 max-sm:top-auto max-sm:w-auto max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-3xl max-sm:shadow-2xl max-sm:backdrop-blur-2xl sm:max-w-lg">
               <AlertDialogHeader className="items-center gap-4 px-8 text-center">
                 <div className="text-warning-subtle-foreground bg-current/15 flex h-14 w-14 items-center justify-center rounded-full">
                   <Icons.AlertTriangle className="h-6 w-6" />
@@ -821,7 +821,7 @@ function UntrustedDevicePrompt({
           : t("sync:untrusted.enterCodeGeneric")}
       </p>
       <Button className="mt-3 sm:mt-4" onClick={onStartPairing}>
-        <Icons.Link className="mr-2 h-4 w-4" />
+        <Icons.Link className="me-2 h-4 w-4" />
         {t("sync:untrusted.connectThisDevice")}
       </Button>
     </div>
@@ -863,7 +863,7 @@ function OrphanedKeysPrompt({ onReinitialize }: { onReinitialize: () => Promise<
           onClick={() => setShowConfirmDialog(true)}
           disabled={isReinitializing}
         >
-          <Icons.RefreshCw className="mr-2 h-4 w-4" />
+          <Icons.RefreshCw className="me-2 h-4 w-4" />
           {t("sync:orphaned.restoreTitle")}
         </Button>
       </div>
@@ -879,7 +879,7 @@ function OrphanedKeysPrompt({ onReinitialize }: { onReinitialize: () => Promise<
             <Button onClick={handleReinitialize} disabled={isReinitializing}>
               {isReinitializing ? (
                 <>
-                  <Spinner className="mr-2 h-4 w-4" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {t("sync:orphaned.restarting")}
                 </>
               ) : (
@@ -993,7 +993,7 @@ function ConnectedDevicesList({
       {mode === "trusted" && (
         <div className="mt-4">
           <Button onClick={onLinkDevice} size="sm">
-            <Icons.Link className="mr-2 h-4 w-4" />
+            <Icons.Link className="me-2 h-4 w-4" />
             {t("sync:connect.connectAnotherDevice")}
           </Button>
         </div>
@@ -1047,7 +1047,7 @@ function PairThisDeviceItem({ onPair }: { onPair: () => void }) {
         </div>
         <div className="flex items-center gap-2">
           <Button size="default" className="w-full shrink-0 sm:w-auto" onClick={onPair}>
-            <Icons.Link className="mr-2 h-4 w-4" />
+            <Icons.Link className="me-2 h-4 w-4" />
             {t("sync:connect.connectThisDevice")}
           </Button>
           <DropdownMenu>
@@ -1068,7 +1068,7 @@ function PairThisDeviceItem({ onPair }: { onPair: () => void }) {
                 onClick={() => setShowResetAlert(true)}
                 className="text-destructive focus:text-destructive"
               >
-                <Icons.LogOut className="mr-2 h-4 w-4" />
+                <Icons.LogOut className="me-2 h-4 w-4" />
                 {t("sync:connect.disconnect")}
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -1089,7 +1089,7 @@ function PairThisDeviceItem({ onPair }: { onPair: () => void }) {
             <Button variant="destructive" onClick={handleDisconnect} disabled={isResetting}>
               {isResetting ? (
                 <>
-                  <Spinner className="mr-2 h-4 w-4" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {t("sync:disconnectDialog.disconnecting")}
                 </>
               ) : (
@@ -1136,7 +1136,7 @@ function SyncStatusDot({
         <TooltipTrigger
           render={<span className={`inline-block h-2 w-2 shrink-0 rounded-full ${color}`} />}
         />
-        <TooltipContent side="right" className="text-xs">
+        <TooltipContent side="inline-end" className="text-xs">
           {label}
         </TooltipContent>
       </Tooltip>
@@ -1223,7 +1223,7 @@ function DeviceCard({
             <Icon weight="duotone" className="text-muted-foreground size-5" />
           </div>
           {isOnline && (
-            <span className="border-background bg-success absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2" />
+            <span className="border-background bg-success absolute -bottom-0.5 -end-0.5 h-3 w-3 rounded-full border-2" />
           )}
         </div>
 
@@ -1332,7 +1332,7 @@ function DeviceCard({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={handleStartRename}>
-                  <Icons.Pencil className="mr-2 h-4 w-4" />
+                  <Icons.Pencil className="me-2 h-4 w-4" />
                   {t("sync:connect.rename")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -1340,7 +1340,7 @@ function DeviceCard({
                   onClick={() => setShowUnpairAlert(true)}
                   className="text-destructive focus:text-destructive"
                 >
-                  <Icons.LogOut className="mr-2 h-4 w-4" />
+                  <Icons.LogOut className="me-2 h-4 w-4" />
                   {device.isCurrent ? t("sync:connect.unpair") : t("sync:connect.revoke")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -1369,7 +1369,7 @@ function DeviceCard({
             <Button variant="destructive" onClick={handleUnpair} disabled={isUnpairing}>
               {isUnpairing ? (
                 <>
-                  <Spinner className="mr-2 h-4 w-4" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {t("sync:unpairDialog.unpairing")}
                 </>
               ) : (

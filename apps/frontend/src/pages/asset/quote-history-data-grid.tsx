@@ -582,7 +582,7 @@ export function QuoteHistoryDataGrid({
                         {t("common:cancel")}
                       </Button>
                       <Button className="h-11" disabled={isPersisting} onClick={handleMobileSave}>
-                        <Icons.Save className="mr-2 h-4 w-4" aria-hidden="true" />
+                        <Icons.Save className="me-2 h-4 w-4" aria-hidden="true" />
                         {t("common:save")}
                       </Button>
                     </div>
@@ -642,7 +642,7 @@ export function QuoteHistoryDataGrid({
                 <div key={entry.id} className="flex items-center gap-1 p-1.5">
                   <button
                     type="button"
-                    className="active:bg-muted/40 min-w-0 flex-1 space-y-1.5 rounded-md p-1.5 text-left disabled:opacity-50"
+                    className="active:bg-muted/40 min-w-0 flex-1 space-y-1.5 rounded-md p-1.5 text-start disabled:opacity-50"
                     aria-label={t("asset:valueHistory.edit_entry_aria", {
                       date: dateLabel,
                       value: closeLabel,

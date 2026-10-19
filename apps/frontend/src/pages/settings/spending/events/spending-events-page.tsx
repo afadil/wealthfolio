@@ -111,7 +111,7 @@ export default function SpendingEventsPage() {
           <Icons.Plus className="h-3.5 w-3.5" />
         </Button>
         <Button size="sm" className="hidden sm:inline-flex" onClick={handleAddEventType}>
-          <Icons.Plus className="mr-2 h-3.5 w-3.5" />
+          <Icons.Plus className="me-2 h-3.5 w-3.5" />
           {t("settings:spending.events.add_type")}
         </Button>
       </SettingsHeader>
@@ -178,7 +178,7 @@ export default function SpendingEventsPage() {
           </EmptyHeader>
           <EmptyContent>
             <Button onClick={handleAddEventType}>
-              <Icons.Plus className="mr-2 h-4 w-4" />
+              <Icons.Plus className="me-2 h-4 w-4" />
               {t("settings:spending.events.add_type")}
             </Button>
           </EmptyContent>
@@ -243,7 +243,7 @@ function EventTypeRow({
             {isExpanded ? (
               <Icons.ChevronDown className="h-4 w-4" />
             ) : (
-              <Icons.ChevronRight className="h-4 w-4" />
+              <Icons.ChevronRight className="h-4 w-4 rtl:rotate-180" />
             )}
           </Button>
         ) : (
@@ -365,7 +365,7 @@ function EventRow({
   ];
 
   return (
-    <div className="ml-6 border-l pl-4">
+    <div className="ms-6 border-s ps-4">
       <div className="flex items-center justify-between gap-2 py-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <div className="w-6 shrink-0" />

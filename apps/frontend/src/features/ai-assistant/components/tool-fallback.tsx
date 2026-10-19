@@ -82,7 +82,7 @@ export const ToolFallback: ToolCallMessagePartComponent = ({
 
       {/* Expandable debug details */}
       {expanded && (
-        <div className="text-muted-foreground ml-5.5 mt-1.5 space-y-1.5 text-xs">
+        <div className="text-muted-foreground ms-5.5 mt-1.5 space-y-1.5 text-xs">
           <pre className="bg-muted/50 max-h-40 overflow-auto whitespace-pre-wrap rounded p-2">
             {argsText}
           </pre>

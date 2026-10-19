@@ -163,7 +163,7 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
                 type="button"
                 disabled={!canNavigate}
                 className={cn(
-                  "focus-visible:ring-ring block w-full px-4 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset",
+                  "focus-visible:ring-ring block w-full px-4 py-2.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-inset",
                   canNavigate ? "hover:bg-muted/30" : "cursor-default",
                 )}
                 onClick={() => navigateToHolding(row)}
@@ -186,7 +186,7 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
                     </span>
                     <span className="text-muted-foreground truncate text-xs">{row.name}</span>
                   </div>
-                  <span className="text-foreground text-right text-xs font-medium tabular-nums">
+                  <span className="text-foreground text-end text-xs font-medium tabular-nums">
                     {formatting.formatAmount(row.value, baseCurrency)}
                   </span>
 
@@ -201,7 +201,7 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
                   </div>
                   <span
                     className={cn(
-                      "text-2xs text-right font-medium tabular-nums",
+                      "text-2xs text-end font-medium tabular-nums",
                       row.driftBps != null ? driftColor(row.driftBps) : "text-muted-foreground",
                     )}
                   >
@@ -217,26 +217,26 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-muted-foreground text-2xs border-b uppercase tracking-wider">
-                <th className="py-2.5 pl-6 pr-3 text-left font-medium">
+                <th className="py-2.5 pe-3 ps-6 text-start font-medium">
                   {t("allocation:holdings.colHolding")}
                 </th>
-                <th className="py-2.5 pr-3 text-left font-medium">
+                <th className="py-2.5 pe-3 text-start font-medium">
                   {t("allocation:holdings.colCategory")}
                 </th>
-                <th className="py-2.5 pr-3 text-right font-medium">
+                <th className="py-2.5 pe-3 text-end font-medium">
                   {t("allocation:holdings.colValue")}
                 </th>
-                <th className="py-2.5 pr-3 text-right font-medium">
+                <th className="py-2.5 pe-3 text-end font-medium">
                   {t("allocation:holdings.colCurrent")}
                 </th>
-                <th className="py-2.5 pr-3 text-right font-medium">
+                <th className="py-2.5 pe-3 text-end font-medium">
                   {t("allocation:holdings.colTarget")}
                 </th>
-                <th className="py-2.5 pr-3 text-right font-medium">
+                <th className="py-2.5 pe-3 text-end font-medium">
                   {t("allocation:holdings.colDrift")}
                 </th>
                 {showAccountCol && (
-                  <th className="py-2.5 pl-2 pr-6 text-right font-medium">
+                  <th className="py-2.5 pe-6 ps-2 text-end font-medium">
                     {t("allocation:holdings.colAccount")}
                   </th>
                 )}
@@ -264,7 +264,7 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
                       }
                     }}
                   >
-                    <td className="pl-6 pr-3">
+                    <td className="pe-3 ps-6">
                       <div className="min-w-70 flex items-center gap-2">
                         <HoldingAvatar
                           isCash={row.isCash}
@@ -283,7 +283,7 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
                         </div>
                       </div>
                     </td>
-                    <td className="pr-3">
+                    <td className="pe-3">
                       <div className="flex items-center gap-1.5">
                         {row.categoryColor && (
                           <span
@@ -303,27 +303,27 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
                         </span>
                       </div>
                     </td>
-                    <td className="text-foreground pr-3 text-right tabular-nums">
+                    <td className="text-foreground pe-3 text-end tabular-nums">
                       {formatting.formatAmount(row.value, baseCurrency)}
                     </td>
-                    <td className="text-foreground pr-3 text-right font-medium tabular-nums">
+                    <td className="text-foreground pe-3 text-end font-medium tabular-nums">
                       {numberFormatting.formatPercent(row.currentPct / 100, { digits: 2 })}
                     </td>
-                    <td className="text-muted-foreground pr-3 text-right tabular-nums">
+                    <td className="text-muted-foreground pe-3 text-end tabular-nums">
                       {row.targetPct != null
                         ? numberFormatting.formatPercent(row.targetPct / 100, { digits: 2 })
                         : "—"}
                     </td>
                     <td
                       className={cn(
-                        "pr-3 text-right font-medium tabular-nums",
+                        "pe-3 text-end font-medium tabular-nums",
                         row.driftBps != null ? driftColor(row.driftBps) : "text-muted-foreground",
                       )}
                     >
                       {row.driftBps != null ? formatPp(row.driftBps) : "—"}
                     </td>
                     {showAccountCol && (
-                      <td className="text-muted-foreground pl-2 pr-6 text-right">
+                      <td className="text-muted-foreground pe-6 ps-2 text-end">
                         {accountLabelForRow(row, accountMap, t)}
                       </td>
                     )}

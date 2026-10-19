@@ -119,7 +119,7 @@ export function TargetRailsCard({
             onClick={onViewDetails}
           >
             {t("insights:insights.rails.details")}
-            <Icons.ArrowRight className="h-3 w-3" />
+            <Icons.ArrowRight className="h-3 w-3 rtl:rotate-180" />
           </Button>
         )}
       </div>
@@ -172,12 +172,10 @@ export function TargetRailsCard({
                     />
                     <span
                       className="bg-foreground absolute -top-1 h-4 w-[2.5px] rounded-sm"
-                      style={{ left: `calc(${(tgt / maxScale) * 100}% - 1px)` }}
+                      style={{ insetInlineStart: `calc(${(tgt / maxScale) * 100}% - 1px)` }}
                     />
                   </span>
-                  <span
-                    className={cn("text-2xs text-right font-bold tabular-nums", driftClass(row))}
-                  >
+                  <span className={cn("text-2xs text-end font-bold tabular-nums", driftClass(row))}>
                     {formatDriftBps(row.driftBps)}
                   </span>
                 </div>
@@ -280,12 +278,12 @@ export function TargetRailsCard({
                   <span className={cn("h-2.5 w-2.5 rounded-sm", row.color)} />
                   <span className="bg-background relative h-2.5 overflow-visible rounded-full border">
                     <span
-                      className={cn("absolute inset-y-0 left-0 rounded-full", row.color)}
+                      className={cn("absolute inset-y-0 start-0 rounded-full", row.color)}
                       style={{ width: row.width }}
                     />
                     <span
                       className="bg-foreground absolute -top-1 h-4 w-[2.5px] rounded-sm"
-                      style={{ left: row.target }}
+                      style={{ insetInlineStart: row.target }}
                     />
                   </span>
                 </div>
@@ -308,7 +306,7 @@ export function TargetRailsCard({
             {onCreateTarget && (
               <Button size="sm" className="gap-2 rounded-full px-4" onClick={onCreateTarget}>
                 {t("insights:insights.rails.set_target_allocation")}
-                <Icons.ArrowRight className="h-3.5 w-3.5" />
+                <Icons.ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" />
               </Button>
             )}
           </div>

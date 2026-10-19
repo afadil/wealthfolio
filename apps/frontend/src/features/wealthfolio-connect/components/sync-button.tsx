@@ -92,7 +92,7 @@ export function SyncButton({ className, showLabel = false, size = "icon" }: Sync
           <Icons.RefreshCw className={`h-4 w-4 ${colorClass}`} />
         )}
         {showLabel && (
-          <span className="ml-2">
+          <span className="ms-2">
             {isRunning ? t("connect:sync.syncingShort") : t("connect:sync.sync")}
           </span>
         )}

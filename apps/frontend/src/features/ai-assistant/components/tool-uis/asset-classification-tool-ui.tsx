@@ -388,8 +388,8 @@ function ClassificationComparisonTable({
       <div className="bg-background/70 overflow-hidden rounded-md border">
         <div className="text-muted-foreground text-2xs grid grid-cols-[minmax(0,1fr)_4.25rem_4.25rem] gap-2 border-b px-2.5 py-1.5 font-medium sm:grid-cols-[minmax(0,1fr)_5.25rem_5.25rem]">
           <div>{t("ai:assetClassification.section")}</div>
-          <div className="text-right">{t("ai:assetClassification.current")}</div>
-          <div className="text-right">{t("ai:assetClassification.new")}</div>
+          <div className="text-end">{t("ai:assetClassification.current")}</div>
+          <div className="text-end">{t("ai:assetClassification.new")}</div>
         </div>
         {rows.length === 0 ? (
           <div className="text-muted-foreground px-3 py-3 text-xs">{emptyLabel}</div>
@@ -408,7 +408,7 @@ function ClassificationComparisonTable({
                   <div className="truncate text-xs font-medium sm:text-sm">{row.categoryName}</div>
                 </div>
               </div>
-              <div className="text-right">
+              <div className="text-end">
                 <span
                   aria-label={t("ai:assetClassification.currentPercentLabel", {
                     categoryName: row.categoryName,
@@ -421,7 +421,7 @@ function ClassificationComparisonTable({
                   {formatBasisPoints(row.currentWeightBasisPoints, formatting)}
                 </span>
               </div>
-              <div className="text-right">
+              <div className="text-end">
                 <div
                   className={cn(
                     "bg-background relative inline-flex min-w-[3.75rem] items-center rounded-md border sm:min-w-[4.5rem]",
@@ -436,7 +436,7 @@ function ClassificationComparisonTable({
                     aria-label={t("ai:assetClassification.newPercentLabel", {
                       categoryName: row.categoryName,
                     })}
-                    className="h-6 w-full bg-transparent pl-1.5 pr-4 text-right text-xs font-medium outline-none disabled:cursor-not-allowed"
+                    className="h-6 w-full bg-transparent pe-4 ps-1.5 text-end text-xs font-medium outline-none disabled:cursor-not-allowed"
                     disabled={disabled}
                     inputMode="decimal"
                     type="text"
@@ -462,7 +462,7 @@ function ClassificationComparisonTable({
                       onNewWeightChange(row, basisPoints);
                     }}
                   />
-                  <span className="text-2xs pointer-events-none absolute right-1.5">%</span>
+                  <span className="text-2xs pointer-events-none absolute end-1.5">%</span>
                 </div>
               </div>
             </div>
@@ -470,13 +470,13 @@ function ClassificationComparisonTable({
         )}
         {rows.length > 0 ? (
           <div className="bg-muted/50 grid grid-cols-[minmax(0,1fr)_4.25rem_4.25rem] items-center gap-2 px-2.5 py-1.5 sm:grid-cols-[minmax(0,1fr)_5.25rem_5.25rem]">
-            <div className="text-muted-foreground text-right text-xs font-medium">
+            <div className="text-muted-foreground text-end text-xs font-medium">
               {t("ai:assetClassification.total")}
             </div>
-            <div className="text-right text-sm font-semibold">
+            <div className="text-end text-sm font-semibold">
               {formatBasisPoints(currentTotalBasisPoints, formatting)}
             </div>
-            <div className="text-primary text-right text-sm font-semibold">
+            <div className="text-primary text-end text-sm font-semibold">
               {formatBasisPoints(proposedTotalBasisPoints, formatting)}
             </div>
           </div>
@@ -749,7 +749,7 @@ export function AssetClassificationToolUIContentImpl({
                     onClick={() => handleSelectAsset(candidate)}
                     disabled={isApplied}
                     className={cn(
-                      "bg-background/70 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                      "bg-background/70 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border px-3 py-2 text-start transition-colors disabled:cursor-not-allowed disabled:opacity-60",
                       isSelected && "border-primary/50 bg-primary/5",
                     )}
                   >
@@ -872,9 +872,9 @@ export function AssetClassificationToolUIContentImpl({
           </div>
           <Button size="sm" onClick={handleConfirm} disabled={!canConfirm}>
             {isSubmitting ? (
-              <Spinner className="mr-2 h-4 w-4" />
+              <Spinner className="me-2 h-4 w-4" />
             ) : isApplied ? (
-              <Icons.Check className="mr-2 h-4 w-4" />
+              <Icons.Check className="me-2 h-4 w-4" />
             ) : null}
             {isApplied ? t("ai:assetClassification.applied") : t("ai:assetClassification.confirm")}
           </Button>

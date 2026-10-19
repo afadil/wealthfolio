@@ -160,7 +160,7 @@ function AssetLogoDialogBody({
             </Badge>
           </div>
 
-          <Icons.ArrowRight className="text-muted-foreground mt-8 size-4 shrink-0" />
+          <Icons.ArrowRight className="text-muted-foreground mt-8 size-4 shrink-0 rtl:rotate-180" />
 
           <div className="flex w-24 flex-col items-center gap-2">
             <AssetLogoDropzone
@@ -256,7 +256,7 @@ function AssetLogoDialogBody({
           <Button
             type="button"
             variant="ghost"
-            className={cn(isMobile ? "w-full" : "sm:mr-auto")}
+            className={cn(isMobile ? "w-full" : "sm:me-auto")}
             disabled={isBusy}
             aria-busy={resetLogo.isPending}
             onClick={handleReset}

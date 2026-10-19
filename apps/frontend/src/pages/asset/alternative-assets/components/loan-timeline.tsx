@@ -209,7 +209,7 @@ export function LoanTimeline({
                 )}
               </span>
               <span>{markerName(event)}</span>
-              <span className="ml-auto pl-2 font-medium">{markerDetail(event)}</span>
+              <span className="ms-auto ps-2 font-medium">{markerDetail(event)}</span>
             </div>
           ))}
       </div>
@@ -285,9 +285,9 @@ export function LoanTimeline({
               <div className="flex flex-col space-y-4">
                 <div className="space-y-2">
                   <h4 className="flex items-center text-sm font-light">
-                    <Icons.Calendar className="mr-2 h-4 w-4" />
+                    <Icons.Calendar className="me-2 h-4 w-4" />
                     {t("asset:loanOverview.last_confirmed")}
-                    <Badge className="ml-1 font-medium" variant="secondary">
+                    <Badge className="ms-1 font-medium" variant="secondary">
                       {lastConfirmed ? dateLabel(lastConfirmed) : "-"}
                     </Badge>
                   </h4>
@@ -303,7 +303,7 @@ export function LoanTimeline({
                   size="sm"
                   className="rounded-full"
                 >
-                  <Icons.Check className="mr-2 h-4 w-4" />
+                  <Icons.Check className="me-2 h-4 w-4" />
                   {t("asset:loanActions.confirm_balance")}
                 </Button>
               </div>
@@ -313,7 +313,7 @@ export function LoanTimeline({
       </CardHeader>
       <CardContent className="relative flex-1 p-0">
         {focusedEvent && !isBalanceHidden && (
-          <div className="pointer-events-none absolute right-3 top-2 z-10">
+          <div className="pointer-events-none absolute end-3 top-2 z-10">
             {renderTooltip(focusedEvent)}
           </div>
         )}
@@ -436,7 +436,7 @@ export function LoanTimeline({
             </div>
           )}
         </div>
-        <div className="pointer-events-none absolute bottom-2 left-0 right-0 flex justify-center">
+        <div className="pointer-events-none absolute bottom-2 end-0 start-0 flex justify-center">
           <AnimatedToggleGroup
             items={LOAN_RANGES.map((code) => ({
               value: code,

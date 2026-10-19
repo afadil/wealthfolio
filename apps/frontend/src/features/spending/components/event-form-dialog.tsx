@@ -398,7 +398,7 @@ export function EventFormDialog({
                               </span>
                             )}
                             <Icons.ChevronDown
-                              className="ml-2 h-4 w-4 shrink-0 opacity-50"
+                              className="ms-2 h-4 w-4 shrink-0 opacity-50"
                               aria-hidden="true"
                             />
                           </PopoverTrigger>

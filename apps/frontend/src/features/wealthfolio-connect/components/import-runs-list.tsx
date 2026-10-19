@@ -95,7 +95,7 @@ function ImportRunItem({ run }: { run: ImportRun }) {
           }
         >
           <div className="flex items-center gap-3">
-            <div className="text-left">
+            <div className="text-start">
               <p className="text-sm font-medium">
                 {formatting.formatDateTime(new Date(run.startedAt))}
               </p>
@@ -167,7 +167,7 @@ function ImportRunItem({ run }: { run: ImportRun }) {
                   className="text-primary mt-2 inline-flex items-center gap-1 text-sm hover:underline"
                 >
                   {t("connect:syncRuns.reviewActivities")}
-                  <Icons.ArrowRight className="h-3 w-3" />
+                  <Icons.ArrowRight className="h-3 w-3 rtl:rotate-180" />
                 </Link>
               </div>
             )}

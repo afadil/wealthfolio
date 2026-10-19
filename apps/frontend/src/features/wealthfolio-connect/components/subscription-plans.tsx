@@ -246,18 +246,18 @@ export function SubscriptionPlans({
             </p>
             <div className="flex items-center gap-2">
               <Button size="sm" variant="outline" onClick={handleRefresh}>
-                <Icons.Refresh className="mr-2 h-4 w-4" />
+                <Icons.Refresh className="me-2 h-4 w-4" />
                 {t("common:refresh")}
               </Button>
               <Button size="sm" onClick={handleReconnect} disabled={isSigningOut}>
                 {isSigningOut ? (
                   <>
-                    <Spinner className="mr-2 h-4 w-4" />
+                    <Spinner className="me-2 h-4 w-4" />
                     {t("connect:subscription.reconnecting")}
                   </>
                 ) : (
                   <>
-                    <Icons.LogOut className="mr-2 h-4 w-4" />
+                    <Icons.LogOut className="me-2 h-4 w-4" />
                     {t("connect:subscription.reconnect")}
                   </>
                 )}
@@ -311,7 +311,7 @@ export function SubscriptionPlans({
               </Popover>
             </p>
             <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
-              <Icons.Refresh className="mr-2 h-4 w-4" />
+              <Icons.Refresh className="me-2 h-4 w-4" />
               {t("connect:subscription.refreshPage")}
             </Button>
           </div>
@@ -388,9 +388,9 @@ export function SubscriptionPlans({
               className="h-7 px-2 text-xs"
             >
               {isRefreshing ? (
-                <Spinner className="mr-1.5 h-3 w-3" />
+                <Spinner className="me-1.5 h-3 w-3" />
               ) : (
-                <Icons.Refresh className="mr-1.5 h-3 w-3" />
+                <Icons.Refresh className="me-1.5 h-3 w-3" />
               )}
               {t("common:refresh")}
             </Button>

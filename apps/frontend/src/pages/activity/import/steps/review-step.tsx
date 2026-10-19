@@ -508,7 +508,7 @@ export function ReviewStep() {
       {/* Filter bar */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground mr-1 text-sm">
+          <span className="text-muted-foreground me-1 text-sm">
             {t("activity:import.review.activitiesCount", { count: filterStats.all })}
           </span>
           <FacetedFilter

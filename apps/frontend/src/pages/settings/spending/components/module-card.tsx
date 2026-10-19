@@ -232,7 +232,7 @@ export function ModuleCard() {
             </div>
             <span className="text-background/70 group-hover:text-background flex shrink-0 items-center gap-1 text-xs font-medium uppercase tracking-widest">
               <span className="hidden sm:inline">{t("settings:spending.module.setup_rules")}</span>
-              <Icons.ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+              <Icons.ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
             </span>
           </Link>
         )}
@@ -252,7 +252,7 @@ interface HeroStatProps {
 
 function HeroStat({ label, value, unit, sub, valueClassName, sublineClassName }: HeroStatProps) {
   return (
-    <div className="pr-4">
+    <div className="pe-4">
       <div className="text-background/55 text-2xs font-medium uppercase tracking-widest">
         {label}
       </div>
@@ -260,7 +260,7 @@ function HeroStat({ label, value, unit, sub, valueClassName, sublineClassName }:
         <span className={cn("text-2xl font-semibold leading-none tracking-tight", valueClassName)}>
           {value}
         </span>
-        {unit && <span className="text-background/55 ml-1 text-xs font-normal">{unit}</span>}
+        {unit && <span className="text-background/55 ms-1 text-xs font-normal">{unit}</span>}
       </div>
       {sub && <div className={cn("text-background/45 mt-1 text-xs", sublineClassName)}>{sub}</div>}
     </div>

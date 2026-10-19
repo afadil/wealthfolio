@@ -206,7 +206,7 @@ export function ActivityLoanPaymentSheet({
                 })
               }
             >
-              {busy && <Spinner className="mr-2 h-4 w-4" />}
+              {busy && <Spinner className="me-2 h-4 w-4" />}
               {t("asset:loanPayments.link")}
             </Button>
           )}

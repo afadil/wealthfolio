@@ -108,7 +108,7 @@ const SelectorTrigger = forwardRef<HTMLButtonElement, SelectorTriggerProps>(
           <span className="relative" aria-hidden="true">
             <Icons.ListFilter className="h-4 w-4" />
             {value.type !== "all" && (
-              <span className="bg-primary absolute -left-[1.5px] -top-1 h-2 w-2 rounded-full" />
+              <span className="bg-primary absolute -start-[1.5px] -top-1 h-2 w-2 rounded-full" />
             )}
           </span>
         ) : (
@@ -118,7 +118,7 @@ const SelectorTrigger = forwardRef<HTMLButtonElement, SelectorTriggerProps>(
           <span className="sr-only">{label}</span>
         ) : (
           <>
-            <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+            <span className="min-w-0 flex-1 truncate text-start">{label}</span>
             <Icons.ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
           </>
         )}
@@ -171,11 +171,11 @@ function AccountScopeCommand({
         <CommandGroup className={groupClassName}>
           <CommandItem className={itemClassName} onSelect={() => onSelect({ type: "all" })}>
             <Icons.Wallet
-              className={cn("mr-1 h-4 w-4", portfoliosOnly && "text-muted-foreground mr-0")}
+              className={cn("me-1 h-4 w-4", portfoliosOnly && "text-muted-foreground me-0")}
             />
             <span className="min-w-0 flex-1 truncate">{t("common:component.all_accounts")}</span>
             <Icons.Check
-              className={cn("ml-auto h-4 w-4", value.type === "all" ? "opacity-100" : "opacity-0")}
+              className={cn("ms-auto h-4 w-4", value.type === "all" ? "opacity-100" : "opacity-0")}
             />
           </CommandItem>
         </CommandGroup>
@@ -191,12 +191,12 @@ function AccountScopeCommand({
                 onSelect={() => onSelect({ type: "portfolio", portfolioId: p.id })}
               >
                 <Icons.Folder
-                  className={cn("mr-1 h-4 w-4", portfoliosOnly && "text-muted-foreground mr-0")}
+                  className={cn("me-1 h-4 w-4", portfoliosOnly && "text-muted-foreground me-0")}
                 />
                 <span className="min-w-0 flex-1 truncate">{p.name}</span>
                 <Icons.Check
                   className={cn(
-                    "ml-auto h-4 w-4",
+                    "ms-auto h-4 w-4",
                     value.type === "portfolio" && value.portfolioId === p.id
                       ? "opacity-100"
                       : "opacity-0",
@@ -219,11 +219,11 @@ function AccountScopeCommand({
                   className={itemClassName}
                   onSelect={() => onToggleAccount(a.id)}
                 >
-                  <Icons.CreditCard className="mr-1 h-4 w-4" />
+                  <Icons.CreditCard className="me-1 h-4 w-4" />
                   <span className="min-w-0 flex-1 truncate">{a.name}</span>
                   <span className="text-muted-foreground shrink-0 text-xs">({a.currency})</span>
                   <Icons.Check
-                    className={cn("ml-auto h-4 w-4", checked ? "opacity-100" : "opacity-0")}
+                    className={cn("ms-auto h-4 w-4", checked ? "opacity-100" : "opacity-0")}
                   />
                 </CommandItem>
               );
@@ -244,11 +244,11 @@ function AccountScopeCommand({
           >
             {showAddPortfolio ? (
               <Icons.Plus
-                className={cn("text-muted-foreground", portfoliosOnly ? "size-5" : "mr-1 h-4 w-4")}
+                className={cn("text-muted-foreground", portfoliosOnly ? "size-5" : "me-1 h-4 w-4")}
               />
             ) : (
               <Icons.Settings
-                className={cn("text-muted-foreground", portfoliosOnly ? "size-5" : "mr-1 h-4 w-4")}
+                className={cn("text-muted-foreground", portfoliosOnly ? "size-5" : "me-1 h-4 w-4")}
               />
             )}
             {t(
