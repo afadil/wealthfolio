@@ -110,7 +110,7 @@
       "title_many": "{{count}} حسابًا بحاجة إلى إعداد",
       "title_one": "{{count}} حساب يحتاج إلى إعداد",
       "title_other": "{{count}} حساب بحاجة إلى إعداد",
-      "title_two": "{{count}} حسابات تحتاج إلى إعداد",
+      "title_two": "حسابان يحتاجان إلى إعداد",
       "title_zero": "{{count}} حسابات تحتاج إلى إعداد"
     },
     "classification_legacy_migration": {
@@ -119,7 +119,7 @@
       "title_many": "{{count}} أصلًا ببيانات تصنيف قديمة",
       "title_one": "{{count}} أصل يحتوي على بيانات تصنيف قديمة",
       "title_other": "{{count}} أصل ببيانات تصنيف قديمة",
-      "title_two": "{{count}} أصول تحتوي على بيانات تصنيف قديمة",
+      "title_two": "أصلان يحتويان على بيانات تصنيف قديمة",
       "title_zero": "{{count}} أصول تحتوي على بيانات تصنيف قديمة"
     },
     "classification_missing_category": {
@@ -128,7 +128,7 @@
       "title_many": "{{count}} حيازةً بحاجة إلى فئات",
       "title_one": "{{count}} حيازة تحتاج إلى فئة",
       "title_other": "{{count}} حيازة بحاجة إلى فئات",
-      "title_two": "{{count}} حيازات تحتاج إلى فئات",
+      "title_two": "حيازتان تحتاجان إلى فئات",
       "title_zero": "{{count}} حيازات تحتاج إلى فئات"
     },
     "data_incomplete_valuation_basis": {
@@ -137,7 +137,7 @@
       "title_many": "{{count}} مركزًا بأساس تكلفة غير مكتمل",
       "title_one": "تغطية أساس التكلفة غير مكتملة",
       "title_other": "{{count}} مركز بأساس تكلفة غير مكتمل",
-      "title_two": "{{count}} مراكز ذات أساس تكلفة غير مكتمل",
+      "title_two": "مركزان بأساس تكلفة غير مكتمل",
       "title_zero": "{{count}} مراكز ذات أساس تكلفة غير مكتمل"
     },
     "data_incomplete_valuation_value": {
@@ -146,7 +146,7 @@
       "title_many": "{{count}} صفًا تقييميًا بقيمة سوقية غير مكتملة",
       "title_one": "تغطية التقييم غير مكتملة",
       "title_other": "{{count}} صف تقييم بقيمة سوقية غير مكتملة",
-      "title_two": "{{count}} صفوف تقييم ذات قيمة سوقية غير مكتملة",
+      "title_two": "صفا تقييم بقيمة سوقية غير مكتملة",
       "title_zero": "{{count}} صفوف تقييم ذات قيمة سوقية غير مكتملة"
     },
     "data_legacy_classification": {
@@ -155,7 +155,7 @@
       "title_many": "{{count}} أصلًا ببيانات تصنيف قديمة",
       "title_one": "{{count}} أصل يحتوي على بيانات تصنيف قديمة",
       "title_other": "{{count}} أصل ببيانات تصنيف قديمة",
-      "title_two": "{{count}} أصول تحتوي على بيانات تصنيف قديمة",
+      "title_two": "أصلان يحتويان على بيانات تصنيف قديمة",
       "title_zero": "{{count}} أصول تحتوي على بيانات تصنيف قديمة"
     },
     "data_missing_activity_amount": {
@@ -164,7 +164,7 @@
       "title_many": "{{count}} معاملةً بلا مبلغ",
       "title_one": "معاملة بلا مبلغ",
       "title_other": "{{count}} معاملة بلا مبلغ",
-      "title_two": "{{count}} معاملات بلا مبلغ",
+      "title_two": "معاملتان بلا مبلغ",
       "title_zero": "{{count}} معاملات بلا مبلغ"
     },
     "data_missing_generated_valuation": {
@@ -173,7 +173,7 @@
       "title_many": "فقدان {{count}} صفًا تقييميًا مولّدًا",
       "title_one": "سجل التقييم المولّد غير مكتمل",
       "title_other": "فقدان {{count}} صف تقييم مولّد",
-      "title_two": "{{count}} صفوف تقييم مُنشأة مفقودة",
+      "title_two": "صفا تقييم مولّدان مفقودان",
       "title_zero": "{{count}} صفوف تقييم مُنشأة مفقودة"
     },
     "data_missing_lot_disposal_for_sell": {
@@ -182,7 +182,7 @@
       "title_many": "{{count}} عمليةَ بيع بلا مطابقة لأساس التكلفة",
       "title_one": "عملية بيع بلا مطابقة لأساس التكلفة",
       "title_other": "{{count}} عملية بيع بلا مطابقة لأساس التكلفة",
-      "title_two": "{{count}} عمليات بيع تفتقد مطابقات أساس التكلفة",
+      "title_two": "عمليتا بيع تفتقدان مطابقات أساس التكلفة",
       "title_zero": "{{count}} عمليات بيع تفتقد مطابقات أساس التكلفة"
     },
     "data_negative_account_balance": {
@@ -191,7 +191,7 @@
       "title_many": "{{count}} حسابًا كان رصيده سالبًا",
       "title_one": "حساب كان رصيده سالبًا",
       "title_other": "{{count}} حساب كان رصيده سالبًا",
-      "title_two": "{{count}} حسابات كان رصيدها سالبًا",
+      "title_two": "حسابان كان رصيدهما سالبًا",
       "title_zero": "{{count}} حسابات كان رصيدها سالبًا"
     },
     "data_negative_cash_balance": {
@@ -200,7 +200,7 @@
       "title_many": "{{count}} حسابًا نقديًا كان رصيده سالبًا",
       "title_one": "حساب نقدي كان رصيده سالبًا",
       "title_other": "{{count}} حساب نقدي كان رصيده سالبًا",
-      "title_two": "{{count}} حسابات نقدية كان رصيدها سالبًا",
+      "title_two": "حسابان نقديان كان رصيدهما سالبًا",
       "title_zero": "{{count}} حسابات نقدية كان رصيدها سالبًا"
     },
     "data_negative_position": {
@@ -209,7 +209,7 @@
       "title_many": "{{count}} حيازةً بكمية سالبة",
       "title_one": "حيازة بكمية سالبة",
       "title_other": "{{count}} حيازة بكمية سالبة",
-      "title_two": "{{count}} حيازات ذات كميات سالبة",
+      "title_two": "حيازتان بكميتين سالبتين",
       "title_zero": "{{count}} حيازات ذات كميات سالبة"
     },
     "data_orphan_activity_account": {
@@ -218,7 +218,7 @@
       "title_many": "{{count}} معاملةً تشير إلى حسابات مفقودة",
       "title_one": "معاملة تشير إلى حساب مفقود",
       "title_other": "{{count}} معاملة تشير إلى حسابات مفقودة",
-      "title_two": "{{count}} معاملات تشير إلى حسابات مفقودة",
+      "title_two": "معاملتان تشيران إلى حسابات مفقودة",
       "title_zero": "{{count}} معاملات تشير إلى حسابات مفقودة"
     },
     "data_orphan_activity_asset": {
@@ -227,7 +227,7 @@
       "title_many": "{{count}} معاملةً تشير إلى أصول مفقودة",
       "title_one": "معاملة تشير إلى أصل مفقود",
       "title_other": "{{count}} معاملة تشير إلى أصول مفقودة",
-      "title_two": "{{count}} معاملات تشير إلى أصول مفقودة",
+      "title_two": "معاملتان تشيران إلى أصول مفقودة",
       "title_zero": "{{count}} معاملات تشير إلى أصول مفقودة"
     },
     "data_oversold_activity": {
@@ -236,7 +236,7 @@
       "title_many": "{{count}} معاملةً تبيع أكثر مما كان محتفظًا به",
       "title_one": "معاملة تبيع أكثر مما كان محتفظًا به",
       "title_other": "{{count}} معاملة تبيع أكثر مما كان محتفظًا به",
-      "title_two": "{{count}} معاملات تبيع أكثر مما كان محتفظًا به",
+      "title_two": "معاملتان تبيعان أكثر مما كان محتفظًا به",
       "title_zero": "{{count}} معاملات تبيع أكثر مما كان محتفظًا به"
     },
     "data_rejected_activity": {
@@ -245,7 +245,7 @@
       "title_many": "تعذّر تطبيق {{count}} معاملةً",
       "title_one": "تعذّر تطبيق معاملة",
       "title_other": "تعذّر تطبيق {{count}} معاملة",
-      "title_two": "{{count}} معاملات تعذّر تطبيقها",
+      "title_two": "معاملتان تعذّر تطبيقهما",
       "title_zero": "{{count}} معاملات تعذّر تطبيقها"
     },
     "data_stale_projection": {
@@ -254,7 +254,7 @@
       "title_many": "{{count}} سجلًّا للحسابات غير محدّث",
       "title_one": "سجل الحساب غير محدّث",
       "title_other": "{{count}} سجل حساب غير محدّث",
-      "title_two": "{{count}} سجلات حسابات غير محدّثة",
+      "title_two": "سجلّا حسابين غير محدّثين",
       "title_zero": "{{count}} سجلات حسابات غير محدّثة"
     },
     "data_unknown_performance_flow_source": {
@@ -263,7 +263,7 @@
       "title_many": "{{count}} صفًّا للتقييم بتصنيف تحويل غير معروف",
       "title_one": "حدود تدفق الأداء غير معروفة",
       "title_other": "{{count}} صف تقييم بتصنيف تحويل غير معروف",
-      "title_two": "{{count}} صفوف تقييم ذات تصنيف تحويل غير معروف",
+      "title_two": "صفا تقييم بتصنيف تحويل غير معروف",
       "title_zero": "{{count}} صفوف تقييم ذات تصنيف تحويل غير معروف"
     },
     "fx_conflicting_rates": {
@@ -272,7 +272,7 @@
       "title_many": "أسعار الصرف متعارضة لـ {{count}} زوجًا من العملات",
       "title_one": "أسعار الصرف بين {{from}} و{{to}} متعارضة",
       "title_other": "أسعار الصرف متعارضة لـ {{count}} زوج عملات",
-      "title_two": "أسعار الصرف متعارضة لـ {{count}} أزواج عملات",
+      "title_two": "أسعار صرف متعارضة لزوجي عملات",
       "title_zero": "أسعار الصرف متعارضة لـ {{count}} أزواج عملات"
     },
     "fx_missing": {
@@ -281,7 +281,7 @@
       "title_many": "أسعار صرف مفقودة لـ {{count}} عملة",
       "title_one": "سعر صرف مفقود لـ {{currency}}",
       "title_other": "أسعار صرف مفقودة لـ {{count}} عملة",
-      "title_two": "أسعار صرف مفقودة لـ {{count}} عملات",
+      "title_two": "أسعار صرف مفقودة لعملتين",
       "title_zero": "أسعار صرف مفقودة لـ {{count}} عملات"
     },
     "fx_stale_error": {
@@ -290,7 +290,7 @@
       "title_many": "أسعار صرف قديمة لـ {{count}} عملة",
       "title_one": "سعر صرف قديم",
       "title_other": "أسعار صرف قديمة لـ {{count}} عملة",
-      "title_two": "أسعار صرف قديمة لـ {{count}} عملات",
+      "title_two": "أسعار صرف قديمة لعملتين",
       "title_zero": "أسعار صرف قديمة لـ {{count}} عملات"
     },
     "fx_stale_warning": {
@@ -299,7 +299,7 @@
       "title_many": "يلزم تحديث أسعار الصرف لـ {{count}} عملة",
       "title_one": "يلزم تحديث سعر الصرف",
       "title_other": "يلزم تحديث أسعار الصرف لـ {{count}} عملة",
-      "title_two": "يلزم تحديث أسعار الصرف لـ {{count}} عملات",
+      "title_two": "يلزم تحديث أسعار الصرف لعملتين",
       "title_zero": "يلزم تحديث أسعار الصرف لـ {{count}} عملات"
     },
     "price_manual_valuation_missing": {
@@ -308,7 +308,7 @@
       "title_many": "تقييمات يدوية مفقودة لـ {{count}} حيازة",
       "title_one": "تقييم يدوي مفقود لـ {{symbol}}",
       "title_other": "تقييمات يدوية مفقودة لـ {{count}} حيازة",
-      "title_two": "تقييمات يدوية مفقودة لـ {{count}} حيازات",
+      "title_two": "تقييمات يدوية مفقودة لحيازتين",
       "title_zero": "تقييمات يدوية مفقودة لـ {{count}} حيازات"
     },
     "price_no_market_data": {
@@ -317,7 +317,7 @@
       "title_many": "لا توجد بيانات سوق لـ {{count}} حيازة",
       "title_one": "لا توجد بيانات سوق لـ {{symbol}}",
       "title_other": "لا توجد بيانات سوق لـ {{count}} حيازة",
-      "title_two": "لا توجد بيانات سوق لـ {{count}} حيازات",
+      "title_two": "لا توجد بيانات سوق لحيازتين",
       "title_zero": "لا توجد بيانات سوق لـ {{count}} حيازات"
     },
     "price_stale_outdated": {
@@ -326,7 +326,7 @@
       "title_many": "أسعار قديمة لـ {{count}} حيازة",
       "title_one": "سعر قديم لـ {{count}} حيازة",
       "title_other": "أسعار قديمة لـ {{count}} حيازة",
-      "title_two": "أسعار قديمة لـ {{count}} حيازات",
+      "title_two": "أسعار قديمة لحيازتين",
       "title_zero": "أسعار قديمة لـ {{count}} حيازات"
     },
     "price_update_needed": {
@@ -335,7 +335,7 @@
       "title_many": "يلزم تحديث أسعار {{count}} حيازة",
       "title_one": "يلزم تحديث السعر لـ {{count}} حيازة",
       "title_other": "يلزم تحديث أسعار {{count}} حيازة",
-      "title_two": "يلزم تحديث الأسعار لـ {{count}} حيازات",
+      "title_two": "يلزم تحديث الأسعار لحيازتين",
       "title_zero": "يلزم تحديث الأسعار لـ {{count}} حيازات"
     },
     "quote_sync_error": {
@@ -344,7 +344,7 @@
       "title_many": "فشل مزامنة الأسعار لـ {{count}} أصلًا",
       "title_one": "فشل مزامنة الأسعار لـ {{symbol}}",
       "title_other": "فشل مزامنة الأسعار لـ {{count}} أصل",
-      "title_two": "فشل مزامنة عروض الأسعار لـ {{count}} أصول",
+      "title_two": "فشلت مزامنة أسعار أصلين",
       "title_zero": "فشل مزامنة عروض الأسعار لـ {{count}} أصول"
     },
     "quote_sync_warning": {
@@ -353,7 +353,7 @@
       "title_many": "مشكلات في المزامنة لـ {{count}} أصلًا",
       "title_one": "مشكلات في المزامنة لـ {{symbol}}",
       "title_other": "مشكلات في المزامنة لـ {{count}} أصل",
-      "title_two": "مشكلات مزامنة لـ {{count}} أصول",
+      "title_two": "مشكلات مزامنة لأصلين",
       "title_zero": "مشكلات مزامنة لـ {{count}} أصول"
     },
     "transfer_incomplete": {
@@ -362,7 +362,7 @@
       "title_many": "تم اكتشاف {{count}} تحويلًا غير مكتمل",
       "title_one": "تم اكتشاف تحويل غير مكتمل",
       "title_other": "تم اكتشاف {{count}} تحويل غير مكتمل",
-      "title_two": "تم اكتشاف {{count}} تحويلات غير مكتملة",
+      "title_two": "تم اكتشاف تحويلين غير مكتملين",
       "title_zero": "تم اكتشاف {{count}} تحويلات غير مكتملة"
     }
   },
@@ -393,7 +393,7 @@
     "missingTradingDay_many": "{{count}} يومًا تداوليًا مفقودًا: {{dates}}",
     "missingTradingDay_one": "يوم تداول واحد مفقود: {{dates}}",
     "missingTradingDay_other": "{{count}} يوم تداول مفقود: {{dates}}",
-    "missingTradingDay_two": "{{count}} أيام تداول مفقودة: {{dates}}",
+    "missingTradingDay_two": "يوما تداول مفقودان: {{dates}}",
     "missingTradingDay_zero": "{{count}} أيام تداول مفقودة: {{dates}}",
     "priceDate_few": "تواريخ",
     "priceDate_many": "تاريخًا",
