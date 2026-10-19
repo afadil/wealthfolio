@@ -765,6 +765,7 @@
   "tools": {
     "calling": "جارٍ استدعاء {{toolName}}...",
     "cancelled": "تم إلغاء {{toolName}}",
+    "notUsed": "لم تُستخدم الأداة: {{toolName}}",
     "used": "الأداة المستخدمة: {{toolName}}"
   },
   "valuation": {

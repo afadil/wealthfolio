@@ -51,6 +51,7 @@ describe("Arabic plural output", () => {
     ["sync:status.daysAgo", "منذ يومين"],
     ["goals:card.years_left", "سنتان متبقيتان"],
     ["goals:card.months_left", "شهران متبقيان"],
+    ["activity:table.day_count", "نشاطان"],
   ])("uses the dual and the case required by %s", (key, expected) => {
     expect(i18n.t(key, { count: 2 })).toBe(expected);
   });

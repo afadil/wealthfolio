@@ -1376,6 +1376,13 @@
   "table": {
     "cash": "النقد",
     "clear_filters": "مسح عوامل التصفية",
+    "day_count_few": "{{count}} أنشطة",
+    "day_count_many": "{{count}} نشاطًا",
+    "day_count_one": "نشاط واحد",
+    "day_count_other": "{{count}} نشاط",
+    "day_count_two": "نشاطان",
+    "day_count_zero": "{{count}} نشاط",
+    "day_end_cash": "النقد",
     "loading": "جارٍ التحميل...",
     "no_activities": "لا توجد أنشطة",
     "no_activities_desc": "أضف أول نشاط لك للبدء.",
