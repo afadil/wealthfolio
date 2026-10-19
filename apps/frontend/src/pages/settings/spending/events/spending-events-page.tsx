@@ -239,6 +239,8 @@ function EventTypeRow({
             size="sm"
             className="h-6 w-6 shrink-0 p-0"
             onClick={onToggleExpanded}
+            aria-label={type.name}
+            aria-expanded={isExpanded}
           >
             {isExpanded ? (
               <Icons.ChevronDown className="h-4 w-4" />

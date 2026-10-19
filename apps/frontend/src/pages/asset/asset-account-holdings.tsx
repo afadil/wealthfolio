@@ -444,6 +444,9 @@ export function AssetSnapshotHistory({
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7"
+                  aria-label={t("account:snapshot.edit_aria", {
+                    date: formatDate(snap.snapshotDate, dateFormatting),
+                  })}
                   onClick={() => handleEditSnapshot(snap.accountId, snap.snapshotDate)}
                 >
                   <Icons.Pencil className="h-3.5 w-3.5" />
@@ -452,6 +455,9 @@ export function AssetSnapshotHistory({
                   variant="ghost"
                   size="icon"
                   className="text-destructive h-7 w-7"
+                  aria-label={t("account:snapshot.delete_aria", {
+                    date: formatDate(snap.snapshotDate, dateFormatting),
+                  })}
                   onClick={() =>
                     setDeletingSnapshot({
                       accountId: snap.accountId,
@@ -520,6 +526,9 @@ export function AssetSnapshotHistory({
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7"
+                        aria-label={t("account:snapshot.edit_aria", {
+                          date: formatDate(snap.snapshotDate, dateFormatting),
+                        })}
                         onClick={() => handleEditSnapshot(snap.accountId, snap.snapshotDate)}
                       >
                         <Icons.Pencil className="h-3.5 w-3.5" />
@@ -528,6 +537,9 @@ export function AssetSnapshotHistory({
                         variant="ghost"
                         size="icon"
                         className="text-destructive h-7 w-7"
+                        aria-label={t("account:snapshot.delete_aria", {
+                          date: formatDate(snap.snapshotDate, dateFormatting),
+                        })}
                         onClick={() =>
                           setDeletingSnapshot({
                             accountId: snap.accountId,

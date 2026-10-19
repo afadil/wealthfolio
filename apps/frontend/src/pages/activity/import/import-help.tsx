@@ -366,7 +366,15 @@ export function ImportHelpPopover({
     return (
       <Sheet>
         <SheetTrigger
-          render={<Button type="button" variant="ghost" size="icon" className="h-9 w-9" />}
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              aria-label={t("activity:import.help.mobileTitle")}
+            />
+          }
         >
           <Icons.HelpCircle className="h-6 w-6" />
         </SheetTrigger>

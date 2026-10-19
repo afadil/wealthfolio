@@ -1074,7 +1074,9 @@
     "imported_count_many": "{{count}} importadas",
     "failed_count_one": "{{count}} fallida",
     "failed_count_other": "{{count}} fallidas",
-    "failed_count_many": "{{count}} fallidas"
+    "failed_count_many": "{{count}} fallidas",
+    "priority_decrease": "Reducir el número de prioridad",
+    "priority_increase": "Aumentar el número de prioridad"
   },
   "addon_permission_none_detected": "No se detectaron permisos de acceso a datos. Este complemento parece tener un acceso mínimo al sistema.",
   "addon_permission_list_title": "Permisos",

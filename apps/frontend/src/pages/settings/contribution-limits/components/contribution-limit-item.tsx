@@ -85,7 +85,14 @@ export function ContributionLimitItem({
               <CardTitle className="text-base">{limit.groupName}</CardTitle>
             </div>
             <div className="flex items-center">
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleExpanded}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={toggleExpanded}
+                aria-label={limit.groupName}
+                aria-expanded={isExpanded}
+              >
                 <Icons.ChevronDown
                   className={`h-4 w-4 transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`}
                 />
@@ -223,7 +230,14 @@ export function ContributionLimitItem({
             )}
 
             <div className="flex items-center space-x-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleExpanded}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={toggleExpanded}
+                aria-label={limit.groupName}
+                aria-expanded={isExpanded}
+              >
                 <Icons.ChevronDown
                   className={`h-4 w-4 transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`}
                 />

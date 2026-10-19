@@ -756,7 +756,12 @@ export function AssetReviewStep() {
               <span className="text-2xs bg-warning-subtle text-warning-subtle-foreground rounded-full px-2 py-0.5 font-bold">
                 {needsFixing.length}
               </span>
-              <button type="button" onClick={() => toggleSection("needsFixing")}>
+              <button
+                type="button"
+                onClick={() => toggleSection("needsFixing")}
+                aria-label={t("activity:import.assets.needsFixing")}
+                aria-expanded={!collapsed.has("needsFixing")}
+              >
                 <Icons.ChevronDown
                   className={`text-warning h-3.5 w-3.5 transition-transform ${collapsed.has("needsFixing") ? "" : "rotate-180"}`}
                 />

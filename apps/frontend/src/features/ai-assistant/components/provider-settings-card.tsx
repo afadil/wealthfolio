@@ -399,6 +399,7 @@ export function ProviderSettingsCard({
                   variant="ghost"
                   size="icon"
                   className="text-muted-foreground hover:text-foreground h-8 w-8"
+                  aria-label={t("common:settings_for", { name: provider.name })}
                 />
               }
             >
@@ -406,6 +407,7 @@ export function ProviderSettingsCard({
             </CollapsibleTrigger>
             <Switch
               id={`${provider.id}-enabled`}
+              aria-label={provider.name}
               checked={provider.enabled}
               onCheckedChange={onToggleEnabled}
               className="data-checked:bg-success"
@@ -505,6 +507,7 @@ export function ProviderSettingsCard({
                             size="sm"
                             className="text-muted-foreground hover:text-foreground h-7 px-2 text-xs"
                             onClick={onRefreshModels}
+                            aria-label={t("common:refresh")}
                             disabled={
                               isFetchingModels || (!provider.hasApiKey && provider.type === "api")
                             }
@@ -702,6 +705,9 @@ export function ProviderSettingsCard({
                                     variant="ghost"
                                     size="icon"
                                     className="text-muted-foreground hover:text-destructive h-6 w-6"
+                                    aria-label={t("common:remove_item", {
+                                      name: model.name ?? model.id,
+                                    })}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleToggleFavorite(model.id);

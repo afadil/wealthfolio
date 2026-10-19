@@ -60,7 +60,12 @@ export function ActionPalette({
       <PopoverTrigger
         render={
           trigger ?? (
-            <Button variant="outline" size="icon" className="h-9 w-9">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9"
+              aria-label={t("common:layout.more_options")}
+            >
               <Icons.DotsThreeVertical className="h-5 w-5" weight="fill" />
             </Button>
           )

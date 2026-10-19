@@ -56,6 +56,7 @@ function TreeItem({ node, level, selectedId, onSelect, expandedIds, onToggle }: 
             <CollapsibleTrigger
               render={
                 <button
+                  aria-label={node.name}
                   className="hover:bg-muted flex h-5 w-5 shrink-0 items-center justify-center rounded-sm"
                   onClick={(e) => {
                     e.stopPropagation();

@@ -1658,6 +1658,7 @@ function CopyFromMonthRow({
             type="month"
             value={sourceMonth}
             max={currentPeriodKey}
+            aria-label={t("spending:budgetEditor.sourceMonth")}
             onChange={(event) => setSourceMonth(event.target.value || previousMonth)}
             className="text-foreground w-30 h-7 bg-transparent px-2 text-xs outline-none"
           />

@@ -1035,7 +1035,9 @@
     "review_first_rows_other": "查看 CSV 数据的前 {{count}} 行",
     "import_quotes_count_other": "导入 {{count}} 条报价",
     "imported_count_other": "已导入 {{count}} 条",
-    "failed_count_other": "失败 {{count}} 条"
+    "failed_count_other": "失败 {{count}} 条",
+    "priority_decrease": "减小优先级数值",
+    "priority_increase": "增大优先级数值"
   },
   "addon_permission_none_detected": "未检测到数据访问权限。此插件似乎对系统的访问权限极少。",
   "addon_permission_list_title": "权限",

@@ -381,6 +381,7 @@ const ThreadListItemCustom: FC<ThreadListItemCustomProps> = ({
                 variant="ghost"
                 size="sm"
                 className="text-destructive hover:text-destructive/80 size-6 p-0"
+                aria-label={t("ai:threadList.deleteButton")}
                 onClick={(e) => e.stopPropagation()}
               >
                 <Icons.Trash2 className="size-3.5" />

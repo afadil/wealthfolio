@@ -937,7 +937,9 @@
     "imported_count_one": "{{count}} importiert",
     "imported_count_other": "{{count}} importiert",
     "failed_count_one": "{{count}} fehlgeschlagen",
-    "failed_count_other": "{{count}} fehlgeschlagen"
+    "failed_count_other": "{{count}} fehlgeschlagen",
+    "priority_decrease": "Prioritätszahl verringern",
+    "priority_increase": "Prioritätszahl erhöhen"
   },
   "addon_permission_none_detected": "Keine Datenzugriffsberechtigungen erkannt. Dieses Add-on scheint minimalen Systemzugriff zu haben.",
   "addon_permission_list_title": "Berechtigungen",

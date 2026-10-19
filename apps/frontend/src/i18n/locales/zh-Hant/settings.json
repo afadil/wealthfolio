@@ -1047,7 +1047,9 @@
     "review_first_rows_one": "檢查 CSV 資料的第一列",
     "import_quotes_count_one": "匯入 {{count}} 筆報價",
     "imported_count_one": "已匯入 {{count}} 筆",
-    "failed_count_one": "{{count}} 筆失敗"
+    "failed_count_one": "{{count}} 筆失敗",
+    "priority_decrease": "減少優先順序數值",
+    "priority_increase": "增加優先順序數值"
   },
   "addon_permission_none_detected": "未偵測到資料存取權限。此擴充功能對系統的存取權限似乎很少。",
   "addon_permission_list_title": "權限",

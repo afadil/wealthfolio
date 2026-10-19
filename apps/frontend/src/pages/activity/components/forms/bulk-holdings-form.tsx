@@ -266,6 +266,7 @@ const HoldingRow = memo(
                 variant="ghost"
                 size="sm"
                 onClick={handleRemoveClick}
+                aria-label={t("common:remove")}
                 className="hover:bg-destructive-subtle hover:text-destructive-subtle-foreground h-6 w-6 shrink-0 p-0 sm:hidden"
               >
                 <Icons.Trash className="h-3 w-3" />
@@ -328,6 +329,7 @@ const HoldingRow = memo(
               variant="ghost"
               size="sm"
               onClick={handleRemoveClick}
+              aria-label={t("common:remove")}
               className="hover:bg-destructive-subtle hover:text-destructive-subtle-foreground h-6 w-6 p-0"
             >
               <Icons.Trash className="h-3 w-3" />

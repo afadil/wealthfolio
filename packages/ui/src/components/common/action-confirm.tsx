@@ -52,6 +52,7 @@ export const ActionConfirm = ({
               variant="ghost"
               size="sm"
               className="h-7 w-7 p-0"
+              aria-label={confirmTitle}
               onClick={(e) => {
                 e.stopPropagation();
               }}

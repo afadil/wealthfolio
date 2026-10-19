@@ -1,6 +1,7 @@
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 
 interface ApplicationHeaderProps {
@@ -22,6 +23,7 @@ export function ApplicationHeader({
   displayBack,
   backUrl,
 }: ApplicationHeaderProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   return (
     <div
@@ -34,12 +36,17 @@ export function ApplicationHeader({
         {displayBack ? (
           backUrl ? (
             <Link to={backUrl}>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" aria-label={t("common:back")}>
                 <Icons.ArrowLeft className="rtl:rotate-180" />
               </Button>
             </Link>
           ) : (
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate(-1)}
+              aria-label={t("common:back")}
+            >
               <Icons.ArrowLeft className="rtl:rotate-180" />
             </Button>
           )

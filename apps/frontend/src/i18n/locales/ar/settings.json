@@ -1327,7 +1327,9 @@
     "validation_symbol_text": "يجب أن يكون رمز تداول صالحًا",
     "validation_url_format": "يجب أن يبدأ عنوان URL بـ http:// أو https://",
     "validation_url_required": "عنوان URL مطلوب",
-    "website": "الموقع الإلكتروني"
+    "website": "الموقع الإلكتروني",
+    "priority_decrease": "إنقاص رقم الأولوية",
+    "priority_increase": "زيادة رقم الأولوية"
   },
   "market_data_provider_api_key": "مفتاح API",
   "market_data_provider_api_key_placeholder": "أدخل مفتاح API",

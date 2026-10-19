@@ -193,5 +193,9 @@
   },
   "sheet": {
     "close": "닫기"
-  }
+  },
+  "page": {
+    "back": "뒤로"
+  },
+  "remove": "{{label}} 제거"
 }

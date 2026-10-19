@@ -505,5 +505,9 @@
       "teamChanged": "Your household has changed. Reconnect Wealthfolio Connect to continue.",
       "rebind": "Reconnect Wealthfolio Connect to confirm this profile’s account and household."
     }
-  }
+  },
+  "remove": "Remove",
+  "remove_item": "Remove {{name}}",
+  "actions_for": "Actions for {{name}}",
+  "settings_for": "{{name}} settings"
 }
