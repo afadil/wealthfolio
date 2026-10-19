@@ -49,6 +49,10 @@ and this project adheres to
 - `Badge` variants `success-subtle`, `warning-subtle`, `destructive-subtle` and
   `info-subtle`: pale pills on the status surfaces, for confidences, changes and
   states.
+- `DirectionProvider` and `useDirection` from `@wealthfolio/ui`. The addon
+  sandbox now sets `<html dir>` and provides the host's reading direction, so
+  `@wealthfolio/ui` menus, selects, tabs and sliders follow it. Read it with
+  `useDirection()` to mirror an addon's own layout.
 
 ### Changed
 

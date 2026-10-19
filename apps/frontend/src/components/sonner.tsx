@@ -1,4 +1,5 @@
 import { useIsMobileViewport } from "@/hooks";
+import { useDocumentDirection } from "@/i18n/direction";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { Icons, Spinner } from "@wealthfolio/ui";
 import { createPortal } from "react-dom";
@@ -14,6 +15,7 @@ import "sonner/dist/styles.css";
 const Toaster = ({ ...props }: ToasterProps) => {
   const { settings } = useSettingsContext();
   const isMobile = useIsMobileViewport();
+  const direction = useDocumentDirection();
   const settingsTheme = settings?.theme;
 
   let theme: "light" | "dark" | "system" = "system";
@@ -28,7 +30,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
   const content = (
     <Sonner
       theme={theme}
-      position={isMobile ? "top-center" : undefined}
+      dir={direction}
+      // Sonner's corners are physical; its default bottom-right mirrors to the
+      // reading direction's trailing corner.
+      position={isMobile ? "top-center" : direction === "rtl" ? "bottom-left" : "bottom-right"}
       className="toaster group"
       expand={true}
       icons={{
@@ -44,14 +49,14 @@ const Toaster = ({ ...props }: ToasterProps) => {
           toast:
             (isMobile
               ? "!backdrop-blur-[1.25rem] !backdrop-saturate-[1.8] !rounded-2xl !shadow-[0_2px_16px_rgba(0,0,0,0.08)] dark:!shadow-[0_2px_20px_rgba(0,0,0,0.3)] !py-3 !px-4"
-              : "") + " !pr-8 !text-sm",
+              : "") + " !pe-8 !text-sm",
           title: isMobile ? "!text-sm !font-semibold" : undefined,
           description: isMobile ? "!text-sm !leading-tight" : undefined,
           actionButton: isMobile
             ? "!bg-transparent !text-inherit !border-none !p-0 !font-semibold !text-sm !underline !underline-offset-2"
             : undefined,
           closeButton:
-            "!absolute !top-2 !right-2 !left-auto !transform-none !border-none" +
+            "!absolute !top-2 !end-2 !start-auto !transform-none !border-none" +
             (isMobile ? " !bg-transparent" : ""),
         },
       }}

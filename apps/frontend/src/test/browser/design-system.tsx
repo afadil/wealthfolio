@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { AppDirectionProvider } from "@/i18n/direction";
 import i18next from "@/i18n/i18n";
 import {
   Accordion,
@@ -97,7 +98,7 @@ import "@/globals.css";
 
 // Synthetic fixture for the UI-primitive guardrails: every primitive in
 // @wealthfolio/ui in its key states, each overlay opened from a named trigger.
-// No financial data and no backend.
+// No financial data and no backend. `?dir=rtl` mirrors it (see i18n/direction).
 
 const params = new URLSearchParams(location.search);
 const mode = params.get("mode") === "dark" ? "dark" : "light";
@@ -537,5 +538,9 @@ function Fixture() {
 }
 
 void i18next.changeLanguage("en").then(() => {
-  createRoot(document.getElementById("root")!).render(<Fixture />);
+  createRoot(document.getElementById("root")!).render(
+    <AppDirectionProvider>
+      <Fixture />
+    </AppDirectionProvider>,
+  );
 });

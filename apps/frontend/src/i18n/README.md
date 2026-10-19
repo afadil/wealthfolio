@@ -70,6 +70,23 @@ so pick it deliberately before shipping. Five places have to agree:
    plus any alias normalization (`fr-CA` -> `fr`).
 5. `addon-sandbox-i18n.ts`, if the locale should reach addon iframes.
 
+### Right-to-left languages
+
+Direction follows the UI language and nothing else: `i18n/direction.tsx` sets
+`<html dir>` from `i18n.dir(language)`, and `AppDirectionProvider` (around
+`App`) hands the same value to Base UI, so keyboard navigation, popup sides,
+sliders and the data grid mirror with it. The formatting region never changes
+direction. Add-on iframes receive it with the localization snapshot.
+
+Styles use logical classes (`ms-*`, `pe-*`, `start-*`, `text-end`, `border-s`,
+`rounded-e-*`) and `rtl:rotate-180` on icons that point forward or back. Keep a
+physical class only where the side is meant literally: safe-area insets, chart
+plot coordinates, centring with `left-1/2 -translate-x-1/2`.
+
+To try right-to-left without shipping a language, development builds read
+`?dir=rtl` on load and expose `__wealthfolioSetDirection("rtl" | "ltr" | null)`
+in the console; neither exists in production builds and nothing is stored.
+
 ### Naming
 
 Bare language codes (`fr`, `ja`) unless the language is written in more than one

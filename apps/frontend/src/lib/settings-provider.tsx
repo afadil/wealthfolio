@@ -9,6 +9,7 @@ import { createContext, ReactNode, useContext, useEffect, useState } from "react
 import { getPlatform } from "@/hooks/use-platform";
 import { useSettings } from "@/hooks/use-settings";
 import { useSettingsMutation } from "@/hooks/use-settings-mutation";
+import { setLanguageDirection, useDocumentDirection } from "@/i18n/direction";
 import i18n, { LANGUAGE_STORAGE_KEY } from "@/i18n/i18n";
 import { DEFAULT_LOCALE } from "@/i18n/locales";
 import { Settings, SettingsContextType } from "@/lib/types";
@@ -134,15 +135,23 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const resolvedFormattingLocale = resolveFormattingLocale(formattingRegion);
   const formattingTimezone = settings?.timezone || undefined;
   const currencyFormattingRegions = settings?.currencyFormattingRegions;
+  const direction = useDocumentDirection();
 
   useEffect(() => {
     setAddonLocalizationSnapshot({
       locale: resolvedFormattingLocale,
       uiLocale,
+      direction,
       timezone: formattingTimezone,
       currencyFormattingRegions,
     });
-  }, [resolvedFormattingLocale, uiLocale, formattingTimezone, currencyFormattingRegions]);
+  }, [
+    resolvedFormattingLocale,
+    uiLocale,
+    direction,
+    formattingTimezone,
+    currencyFormattingRegions,
+  ]);
 
   if (settings && !formattingRegion) {
     throw new Error("Loaded settings are missing the required formatting region");
@@ -251,7 +260,7 @@ const applySettingsToDocument = async (newSettings: Settings) => {
   }
   if (application !== appearanceGeneration) return;
   document.documentElement.setAttribute("lang", language);
-  document.documentElement.setAttribute("dir", i18n.dir(language));
+  setLanguageDirection(language);
 
   // Font classes
   document.body.classList.remove("font-mono", "font-sans", "font-serif");
