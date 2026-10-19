@@ -507,6 +507,7 @@ export const HoldingsEditMode = ({
                         {/* Avg Cost */}
                         <div className="col-span-2">
                           <MoneyInput
+                            aria-label={t("holdings:avg_cost")}
                             value={holding.averageCost}
                             onValueChange={(value) =>
                               handleAverageCostChange(holding.assetId, value)
@@ -633,6 +634,7 @@ export const HoldingsEditMode = ({
                       {/* Amount */}
                       <div className="col-span-5">
                         <MoneyInput
+                          aria-label={t("holdings:amount")}
                           ref={(el) => {
                             cashAmountInputRefs.current[cash.currency] = el;
                           }}

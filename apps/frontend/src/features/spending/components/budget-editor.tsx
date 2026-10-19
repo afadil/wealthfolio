@@ -1018,6 +1018,7 @@ function GroupEditDialogBody({
           <div className="bg-muted/60 border-border/60 focus-within:ring-ring/50 flex h-9 items-center rounded-md border px-3 transition-shadow focus-within:ring-2">
             <input
               type="text"
+              aria-label={t("common:name")}
               value={draftName}
               onChange={(event) => setDraftName(event.target.value)}
               onKeyDown={(event) => {

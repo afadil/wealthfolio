@@ -542,6 +542,7 @@ export function HoldingsMappingStep() {
                     }}
                   >
                     <SelectTrigger
+                      aria-label={column.csvColumn}
                       className={cn(
                         "w-32.5 !h-7 shrink-0 !py-0 text-xs",
                         !isMapped && "text-muted-foreground border-dashed",

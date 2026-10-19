@@ -800,6 +800,7 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
               <TestField label={t("settings:market_data_page.from")} className="w-36">
                 <Input
                   type="date"
+                  aria-label={t("settings:market_data_page.from")}
                   value={inputs.from}
                   onChange={(e) => setInputs({ from: e.target.value })}
                 />
@@ -807,6 +808,7 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
               <TestField label={t("settings:market_data_page.to")} className="w-36">
                 <Input
                   type="date"
+                  aria-label={t("settings:market_data_page.to")}
                   value={inputs.to}
                   onChange={(e) => setInputs({ to: e.target.value })}
                 />

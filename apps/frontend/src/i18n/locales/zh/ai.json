@@ -31,7 +31,8 @@
     "addModels": "添加模型..."
   },
   "provider": {
-    "noProvidersConfigured": "未配置提供商"
+    "noProvidersConfigured": "未配置提供商",
+    "label": "AI 提供商"
   },
   "reasoning": {
     "thinking": "思考中...",

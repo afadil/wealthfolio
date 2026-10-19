@@ -31,7 +31,8 @@
     "addModels": "モデルを追加..."
   },
   "provider": {
-    "noProvidersConfigured": "設定済みのプロバイダーがありません"
+    "noProvidersConfigured": "設定済みのプロバイダーがありません",
+    "label": "AIプロバイダー"
   },
   "reasoning": {
     "thinking": "思考中...",

@@ -55,6 +55,7 @@ export function RateCell({ rate, onUpdate }: RateCellProps) {
       <div className="w-24">
         {isManual && isEditing ? (
           <Input
+            aria-label={t("settings:exchange_rates_rate")}
             value={editedRate}
             onChange={(e) => setEditedRate(e.target.value)}
             className="w-full"
