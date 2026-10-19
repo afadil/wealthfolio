@@ -1287,6 +1287,7 @@ function PropertyMortgageSection({
                       size="sm"
                       onClick={() => handleUnlink(liability.id)}
                       disabled={unlinkingId === liability.id}
+                      aria-label={t("asset:loanPayments.unlink")}
                       className="h-7 px-2"
                     >
                       {unlinkingId === liability.id ? (

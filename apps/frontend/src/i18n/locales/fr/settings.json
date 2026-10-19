@@ -1076,7 +1076,9 @@
     "imported_count_many": "{{count}} importées",
     "failed_count_one": "{{count}} échouée",
     "failed_count_other": "{{count}} échouées",
-    "failed_count_many": "{{count}} échouées"
+    "failed_count_many": "{{count}} échouées",
+    "priority_decrease": "Diminuer le numéro de priorité",
+    "priority_increase": "Augmenter le numéro de priorité"
   },
   "addon_permission_none_detected": "Aucune permission d’accès aux données détectée. Cette extension semble avoir un accès système minimal.",
   "addon_permission_list_title": "Permissions",

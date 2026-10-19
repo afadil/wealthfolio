@@ -110,6 +110,7 @@ function MonthSwitcher({
         <input
           type="month"
           value={monthKey}
+          aria-label={t("spending:period.selectMonth")}
           onChange={(event) => onChange(event.target.value || current)}
           className="text-foreground w-27.5 h-7 cursor-pointer bg-transparent text-xs outline-none"
         />

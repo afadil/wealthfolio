@@ -440,7 +440,14 @@ function SymbolMappingRow({
         />
       </td>
       <td className="px-2 py-2">
-        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onRemove}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={onRemove}
+          aria-label={t("common:remove")}
+        >
           <Icons.Close className="h-4 w-4" />
         </Button>
       </td>

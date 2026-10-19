@@ -85,6 +85,7 @@ export function RetirementSnapshotTable({
               className="h-7 w-7"
               onClick={() => setTablePage((p) => Math.max(0, p - 1))}
               disabled={tablePage === 0}
+              aria-label={t("common:previous")}
             >
               <Icons.ChevronLeft className="h-3.5 w-3.5 rtl:rotate-180" />
             </Button>
@@ -94,6 +95,7 @@ export function RetirementSnapshotTable({
               className="h-7 w-7"
               onClick={() => setTablePage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={tablePage >= totalPages - 1}
+              aria-label={t("common:next")}
             >
               <Icons.ChevronRight className="h-3.5 w-3.5 rtl:rotate-180" />
             </Button>

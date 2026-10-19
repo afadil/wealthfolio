@@ -534,6 +534,7 @@ export const HoldingsEditMode = ({
                             variant="ghost"
                             size="sm"
                             onClick={() => handleRemoveHolding(holding.assetId)}
+                            aria-label={t("common:remove")}
                             className="hover:bg-destructive-subtle hover:text-destructive-subtle-foreground h-7 w-7 p-0"
                           >
                             <Icons.Trash className="h-3.5 w-3.5" />
@@ -648,6 +649,7 @@ export const HoldingsEditMode = ({
                           variant="ghost"
                           size="sm"
                           onClick={() => handleRemoveCashBalance(cash.currency)}
+                          aria-label={t("common:remove")}
                           className="hover:bg-destructive-subtle hover:text-destructive-subtle-foreground h-7 w-7 p-0"
                         >
                           <Icons.Trash className="h-3.5 w-3.5" />

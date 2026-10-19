@@ -178,7 +178,13 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
               </Badge>
             )}
             <Tooltip>
-              <TooltipTrigger>
+              <TooltipTrigger
+                aria-label={
+                  account.sync_enabled
+                    ? t("connect:accounts.syncEnabled")
+                    : t("connect:accounts.excludedFromSync")
+                }
+              >
                 {account.sync_enabled ? (
                   <Icons.Eye className="text-info h-3.5 w-3.5 shrink-0" />
                 ) : (

@@ -1035,7 +1035,9 @@
     "review_first_rows_other": "CSVデータの先頭{{count}}行を確認してください",
     "import_quotes_count_other": "{{count}}件の価格をインポート",
     "imported_count_other": "{{count}}件インポート",
-    "failed_count_other": "{{count}}件失敗"
+    "failed_count_other": "{{count}}件失敗",
+    "priority_decrease": "優先度の数値を下げる",
+    "priority_increase": "優先度の数値を上げる"
   },
   "addon_permission_none_detected": "データへのアクセス権限は検出されませんでした。このアドオンのシステムアクセスは最小限のようです。",
   "addon_permission_list_title": "権限",

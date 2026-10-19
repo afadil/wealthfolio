@@ -351,7 +351,11 @@ export function LanguageRegionSettings() {
               if (value !== null) updateSettings({ formattingRegion: value });
             }}
           >
-            <SelectTrigger className="max-w-90 w-full" data-testid="formatting-locale-select">
+            <SelectTrigger
+              className="max-w-90 w-full"
+              aria-label={t("settings:formattingRegion.title", "Region & formats")}
+              data-testid="formatting-locale-select"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

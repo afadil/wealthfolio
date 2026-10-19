@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 
 import { cn } from "../../lib/utils";
 import { Button } from "./button";
@@ -121,6 +122,7 @@ export function PageHeader({
   dragRegion = true,
   ...props
 }: PageHeaderProps) {
+  const { t } = useTranslation();
   const { isScrolled } = usePage();
   const headerRef = React.useRef<HTMLElement>(null);
 
@@ -182,7 +184,7 @@ export function PageHeader({
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               {onBack && (
-                <Button variant="ghost" size="icon" onClick={onBack}>
+                <Button variant="ghost" size="icon" onClick={onBack} aria-label={t("ui:page.back", "Back")}>
                   <Icons.ArrowLeft className="size-5 rtl:rotate-180" />
                 </Button>
               )}

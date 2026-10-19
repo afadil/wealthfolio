@@ -353,6 +353,7 @@ function SellProtectionSection({
               <button
                 type="button"
                 onClick={() => onToggle("asset", a.assetId)}
+                aria-label={t("common:remove_item", { name: a.symbol })}
                 className="text-muted-foreground hover:text-foreground hover:bg-muted ms-0.5 flex h-[1.0625rem] w-[1.0625rem] items-center justify-center rounded-full"
               >
                 <Icons.X className="h-3 w-3" />
@@ -448,6 +449,7 @@ function SellProtectionSection({
               <button
                 type="button"
                 onClick={() => onToggle("account", a.id)}
+                aria-label={t("common:remove_item", { name: a.name })}
                 className="text-muted-foreground hover:text-foreground hover:bg-muted ms-0.5 flex h-[1.0625rem] w-[1.0625rem] items-center justify-center rounded-full"
               >
                 <Icons.X className="h-3 w-3" />

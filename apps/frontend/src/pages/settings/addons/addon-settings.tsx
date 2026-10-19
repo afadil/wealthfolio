@@ -144,7 +144,11 @@ export default function AddonSettingsPage() {
 
         <div className="flex items-center gap-3">
           <Popover>
-            <PopoverTrigger render={<Button variant="ghost" size="icon" />}>
+            <PopoverTrigger
+              render={
+                <Button variant="ghost" size="icon" aria-label={t("settings:addons_info_title")} />
+              }
+            >
               <Icons.Info className="h-4 w-4" />
             </PopoverTrigger>
             <PopoverContent className="w-80">

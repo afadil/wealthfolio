@@ -309,6 +309,7 @@ export function MultiSelectTaxonomy({
                       className="h-8"
                       onClick={handleConfirmCategory}
                       disabled={isPending}
+                      aria-label={t("common:confirm")}
                     >
                       {isPending ? (
                         <Spinner className="h-3 w-3" />
@@ -321,6 +322,7 @@ export function MultiSelectTaxonomy({
                       variant="ghost"
                       className="h-8 w-8 p-0"
                       onClick={handleCancelPending}
+                      aria-label={t("common:cancel")}
                     >
                       <Icons.Close className="h-3 w-3" />
                     </Button>
@@ -440,6 +442,7 @@ export function MultiSelectTaxonomy({
                   className="h-7 w-7 shrink-0"
                   onClick={() => handleRemoveCategory(assignment.id)}
                   disabled={isPending}
+                  aria-label={t("common:remove")}
                 >
                   <Icons.Close className="h-3.5 w-3.5 opacity-60" />
                 </Button>

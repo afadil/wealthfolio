@@ -311,6 +311,7 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
                   variant="ghost"
                   size="sm"
                   className="text-muted-foreground hover:bg-success-subtle h-8 w-8 p-0"
+                  aria-label={t("common:filter")}
                 />
               }
             >

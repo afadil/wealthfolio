@@ -1004,7 +1004,9 @@
     "imported_count_one": "{{count}} imported",
     "imported_count_other": "{{count}} imported",
     "failed_count_one": "{{count}} failed",
-    "failed_count_other": "{{count}} failed"
+    "failed_count_other": "{{count}} failed",
+    "priority_decrease": "Decrease priority number",
+    "priority_increase": "Increase priority number"
   },
   "addon_permission_none_detected": "No data access permissions detected. This addon appears to have minimal system access.",
   "addon_permission_list_title": "Permissions",

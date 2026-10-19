@@ -536,6 +536,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                       setLanguageSearch("");
                     }}
                     className="hover:bg-accent rounded-lg p-2 transition-colors"
+                    aria-label={t("common:close")}
                   >
                     <Icons.Close className="h-5 w-5" />
                   </button>
@@ -596,6 +597,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                       setCurrencySearch("");
                     }}
                     className="hover:bg-accent rounded-lg p-2 transition-colors"
+                    aria-label={t("common:close")}
                   >
                     <Icons.Close className="h-5 w-5" />
                   </button>
@@ -659,6 +661,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                       setFormattingRegionSearch("");
                     }}
                     className="hover:bg-accent rounded-lg p-2 transition-colors"
+                    aria-label={t("common:close")}
                   >
                     <Icons.Close className="h-5 w-5" />
                   </button>
@@ -720,6 +723,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                       setTimezoneSearch("");
                     }}
                     className="hover:bg-accent rounded-lg p-2 transition-colors"
+                    aria-label={t("common:close")}
                   >
                     <Icons.Close className="h-5 w-5" />
                   </button>

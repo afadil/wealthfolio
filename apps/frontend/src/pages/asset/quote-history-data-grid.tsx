@@ -219,6 +219,7 @@ export function QuoteHistoryDataGrid({
                     size="icon"
                     className="text-muted-foreground hover:text-destructive h-7 w-7"
                     onClick={() => handleDeleteRow(row.original)}
+                    aria-label={t("common:delete")}
                   >
                     <Icons.X className="h-4 w-4" />
                   </Button>

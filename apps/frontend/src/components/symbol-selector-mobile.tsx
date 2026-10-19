@@ -199,6 +199,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                       onClick={handleCustomAssetCancel}
                       className="text-muted-foreground hover:text-foreground rounded-md p-2 transition-colors"
                       type="button"
+                      aria-label={t("common:back")}
                     >
                       <Icons.ArrowLeft className="h-5 w-5 rtl:rotate-180" />
                     </button>

@@ -106,6 +106,8 @@ export function CategoryItem({
               size="sm"
               className="h-6 w-6 shrink-0 p-0"
               onClick={() => setIsExpanded(!isExpanded)}
+              aria-label={category.name}
+              aria-expanded={isExpanded}
             >
               {isExpanded ? (
                 <Icons.ChevronDown className="h-4 w-4" />

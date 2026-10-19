@@ -139,7 +139,8 @@
     "moveCategory": "نقل الفئة",
     "moveExistingCategory": "نقل فئة موجودة",
     "moveToGroup": "نقل إلى مجموعة",
-    "newGroup": "مجموعة جديدة"
+    "newGroup": "مجموعة جديدة",
+    "sourceMonth": "الشهر المصدر"
   },
   "budgetPage": {
     "defaults": "الإعدادات الافتراضية",
