@@ -44,7 +44,7 @@ export function ActivityDateSheet({
   const formatting = useDateFormatting();
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex h-full w-full flex-col p-0 sm:max-w-xl">
+      <SheetContent side="inline-end" className="flex h-full w-full flex-col p-0 sm:max-w-xl">
         <SheetHeader className="border-b px-6 py-4">
           <SheetTitle>
             {t("activity:date_sheet.title", {

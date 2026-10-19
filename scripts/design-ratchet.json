@@ -89,6 +89,7 @@
   "pxSizes": {},
   "physicalDirections": {
     "apps/frontend/src/features/profiles/persona-avatars.tsx": 1,
-    "apps/frontend/src/features/profiles/profile-avatar.tsx": 3
+    "apps/frontend/src/features/profiles/profile-avatar.tsx": 3,
+    "packages/ui/src/components/ui/sheet.tsx": 4
   }
 }

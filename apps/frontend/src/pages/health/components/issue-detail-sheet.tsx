@@ -436,7 +436,7 @@ export function IssueDetailSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col sm:max-w-xl lg:max-w-2xl">
+      <SheetContent side="inline-end" className="flex w-full flex-col sm:max-w-xl lg:max-w-2xl">
         <SheetHeader className="shrink-0 space-y-3 pb-6">
           <div className="flex items-center gap-2 text-xs">
             <span className={cn("font-medium", severityConfig.color)}>

@@ -53,6 +53,9 @@ and this project adheres to
   sandbox now sets `<html dir>` and provides the host's reading direction, so
   `@wealthfolio/ui` menus, selects, tabs and sliders follow it. Read it with
   `useDirection()` to mirror an addon's own layout.
+- `SheetContent` takes `side="inline-start"` and `side="inline-end"`, which
+  follow the reading direction; `inline-end` is the new default. `left` and
+  `right` stay physical, as in shadcn.
 
 ### Changed
 

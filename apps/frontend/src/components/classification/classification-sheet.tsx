@@ -71,7 +71,7 @@ export function ClassificationSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex h-full w-full flex-col sm:max-w-lg">
+      <SheetContent side="inline-end" className="flex h-full w-full flex-col sm:max-w-lg">
         <SheetHeader className="shrink-0 pb-4">
           <div className="flex items-center gap-3">
             {assetSymbol && (
