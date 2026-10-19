@@ -47,7 +47,17 @@
   "search_accounts": "Rechercher des comptes...",
   "no_accounts_found": "Aucun compte trouvé.",
   "holdings": "Positions",
-  "click_to_update_cash_balance": "Cliquez pour mettre à jour le solde de trésorerie",
+  "balance_edit": {
+    "title": "Ajuster le solde de trésorerie",
+    "description": "Ajustez une devise à la fois. La différence est enregistrée comme un dépôt ou un retrait dans cette devise.",
+    "current_balance": "Solde actuel",
+    "new_balance": "Nouveau solde",
+    "no_change": "Aucune modification du solde",
+    "unavailable": "Les soldes de trésorerie sont indisponibles. Attendez leur chargement ou actualisez la page.",
+    "invalid_amount": "Saisissez un solde valide supérieur ou égal à zéro.",
+    "success": "Solde mis à jour",
+    "error": "Erreur lors de la mise à jour du solde. Veuillez réessayer."
+  },
   "investments": "Investissements",
   "net_contribution": "Contribution nette",
   "cost_basis": "Coût de base",

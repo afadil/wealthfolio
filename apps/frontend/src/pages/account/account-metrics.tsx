@@ -12,7 +12,6 @@ import {
   GainAmount,
   GainPercent,
   Icons,
-  MoneyInput,
   PrivacyAmount,
   Separator,
   Skeleton,
@@ -26,60 +25,7 @@ import {
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useBalanceUpdate } from "./use-balance-update";
-
-interface EditableBalanceProps {
-  account: AccountValuation;
-  initialBalance: number;
-  currency: string;
-}
-
-const EditableBalance: React.FC<EditableBalanceProps> = ({ account, initialBalance, currency }) => {
-  const { t } = useTranslation();
-  const [isEditing, setIsEditing] = useState(false);
-  const [balance, setBalance] = useState(initialBalance);
-  const { updateBalance, isPending } = useBalanceUpdate(account);
-
-  const handleSave = () => {
-    updateBalance(balance);
-    setIsEditing(false);
-  };
-
-  if (isEditing) {
-    return (
-      <div className="flex items-center gap-2">
-        <MoneyInput value={balance} onValueChange={(value) => setBalance(value ?? 0)} />
-        <Button size="sm" onClick={handleSave} disabled={isPending}>
-          {isPending ? <Spinner className="h-4 w-4" /> : <Icons.Check className="h-4 w-4" />}
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => setIsEditing(false)}>
-          <Icons.Close className="h-4 w-4" />
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <div
-              className="flex cursor-pointer items-center gap-2 text-lg font-extrabold"
-              onClick={() => setIsEditing(true)}
-            />
-          }
-        >
-          <PrivacyAmount value={initialBalance} currency={currency} />
-          <Icons.Pencil className="text-muted-foreground h-4 w-4 cursor-pointer" />
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{t("account:click_to_update_cash_balance")}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-};
+import { CashBalanceDialog } from "./cash-balance-dialog";
 
 interface AccountMetricsProps {
   valuation?: AccountValuation | null;
@@ -90,8 +36,9 @@ interface AccountMetricsProps {
   isLoading?: boolean;
   isPerformanceLoading?: boolean;
   performanceError?: string;
-  /** If true, hides the inline balance edit (HOLDINGS mode accounts should use the Update Holdings sheet) */
+  /** HOLDINGS mode accounts should use the Update Holdings sheet. */
   hideBalanceEdit?: boolean;
+  balanceEditDisabled?: boolean;
   balanceLabel?: string;
   /** If true, shows holdings-mode return cards instead of transaction return cards. */
   isHoldingsMode?: boolean;
@@ -149,11 +96,13 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
   isPerformanceLoading,
   performanceError,
   hideBalanceEdit = false,
+  balanceEditDisabled = false,
   balanceLabel,
   isHoldingsMode = false,
   balanceWarning,
 }) => {
   const dateFormatting = useDateFormatting();
+  const [isEditingBalance, setIsEditingBalance] = useState(false);
 
   const { t } = useTranslation();
   const resolvedBalanceLabel = balanceLabel ?? t("account:cash_balance");
@@ -185,6 +134,18 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
     );
 
   const displayCurrency = valuation?.accountCurrency || valuation?.baseCurrency;
+  // Never substitute FX-converted totals for missing native balances.
+  const cashBalances = cashCurrencySplit?.flatMap(({ currency, valueLocal }) =>
+    currency.trim() && typeof valueLocal === "number" && Number.isFinite(valueLocal)
+      ? [{ currency, balance: valueLocal }]
+      : [],
+  );
+  const canEditBalance =
+    !balanceEditDisabled &&
+    Boolean(valuation.accountId.trim()) &&
+    Boolean(valuation.accountCurrency.trim()) &&
+    cashBalances !== undefined &&
+    cashBalances.length === cashCurrencySplit?.length;
   const performanceCurrency = performance?.scope.currency || displayCurrency;
   const performancePnl = performancePeriodPnl(performance);
   const performanceReturn = performanceSummaryReturn(performance);
@@ -316,19 +277,39 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
               </Tooltip>
             </TooltipProvider>
           ) : null}
-          <div data-testid="account-cash-balance-value">
-            {valuation && !hideBalanceEdit ? (
-              <EditableBalance
-                account={valuation}
-                initialBalance={valuation?.cashBalance || 0}
-                currency={displayCurrency}
-              />
-            ) : (
-              <span className="text-lg font-extrabold">
-                <PrivacyAmount value={valuation?.cashBalance || 0} currency={displayCurrency} />
-              </span>
-            )}
+          <div data-testid="account-cash-balance-value" className="text-lg font-extrabold">
+            <PrivacyAmount value={valuation.cashBalance || 0} currency={displayCurrency} />
           </div>
+          {!hideBalanceEdit && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="size-8"
+                      aria-label={t("account:balance_edit.title")}
+                      disabled={!canEditBalance}
+                      onClick={() => setIsEditingBalance(true)}
+                    />
+                  }
+                >
+                  <Icons.Pencil className="text-muted-foreground size-4" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    {t(
+                      canEditBalance
+                        ? "account:balance_edit.title"
+                        : "account:balance_edit.unavailable",
+                    )}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
       </CardHeader>
       <CardContent className={cn(compact ? "space-y-4 pb-2" : "space-y-6 pb-4")}>
@@ -381,6 +362,16 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
           </p>
         )}
       </CardFooter>
+      {isEditingBalance && !hideBalanceEdit && (
+        <CashBalanceDialog
+          key={valuation.accountId}
+          accountId={valuation.accountId}
+          accountCurrency={valuation.accountCurrency}
+          cashBalances={cashBalances ?? []}
+          disabled={!canEditBalance}
+          onClose={() => setIsEditingBalance(false)}
+        />
+      )}
     </Card>
   );
 };

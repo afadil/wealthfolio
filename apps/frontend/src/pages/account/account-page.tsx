@@ -1162,6 +1162,7 @@ const AccountPage = () => {
                   isPerformanceLoading={isPerformanceHistoryLoading}
                   performanceError={hasPerformanceError ? performanceErrorMessages[0] : undefined}
                   hideBalanceEdit={isHoldingsMode || isLiabilityAccount}
+                  balanceEditDisabled={isCurrentValuationLoading || Boolean(currentValuationError)}
                   isHoldingsMode={isHoldingsMode}
                   balanceLabel={
                     isLiabilityAccount ? t("account:balance_label") : t("account:cash_balance")
