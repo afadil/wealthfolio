@@ -239,6 +239,10 @@ Right-to-left runs through the development-only `?dir=rtl` override, since no
 shipped language is right-to-left yet: `visual.spec.ts` shoots every gallery and
 overlay state again with an `-rtl` suffix, and `rtl.spec.ts` checks the mirrored
 arrows, popup and sheet sides, and a live switch between directions.
+`pnpm ui:design-ratchet` also counts physical left/right classes (`ml-2`,
+`text-left`, `left-0`, `border-r`, `rounded-l-md`), so a new one fails in favour
+of its logical form; classes under `ltr:`/`rtl:` or a physical side variant, and
+centring with `left-1/2 -translate-x-1/2`, are not counted.
 
 `colors.spec.ts` is the colour contract: every role a theme defines, text pairs
 at 4.5:1 and the focus ring at 3:1, in light and dark. Callouts, banners and
