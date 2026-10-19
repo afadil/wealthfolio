@@ -5,6 +5,7 @@ import {
   GainPercent,
   parseLocalizedDate,
   parseLocalizedDecimalString,
+  stripBidiControls,
   useAmountFormatting,
   useDateFormatting,
   useNumberFormatting,
@@ -76,5 +77,11 @@ describe("formatted values in a right-to-left page", () => {
     renderIn("rtl", <GainPercent value={0.686} />);
 
     expect(screen.getByText(`${FSI}+68.60%${PDI}`)).toBeInTheDocument();
+  });
+
+  it("can be measured or cut through stripBidiControls", () => {
+    renderIn("rtl");
+
+    expect(stripBidiControls(text("amount") ?? "")).toBe("-$1,234.56");
   });
 });

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { FormattingProvider } from "@wealthfolio/ui";
+import { DirectionProvider, FormattingProvider, type TextDirection } from "@wealthfolio/ui";
 import { cloneElement, isValidElement, type ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -52,24 +52,26 @@ const range = spendingRangeToReportsRange(
   timezone,
 );
 
-function setup(custom: boolean) {
+function setup(custom: boolean, direction: TextDirection = "ltr") {
   render(
     <MemoryRouter>
-      <FormattingProvider locale="en-US" timezone={timezone}>
-        <WhereIAmStage
-          range={range}
-          priorRange={custom ? comparisonRange(range, "prior", timezone)! : undefined}
-          currentReport={report(300)}
-          priorReport={report(150)}
-          months={[]}
-          taxonomyCategories={[]}
-          incomeCategories={[]}
-          savingsCategories={[]}
-          budget={undefined}
-          currency="USD"
-          isLoading={false}
-        />
-      </FormattingProvider>
+      <DirectionProvider direction={direction}>
+        <FormattingProvider locale="en-US" timezone={timezone}>
+          <WhereIAmStage
+            range={range}
+            priorRange={custom ? comparisonRange(range, "prior", timezone)! : undefined}
+            currentReport={report(300)}
+            priorReport={report(150)}
+            months={[]}
+            taxonomyCategories={[]}
+            incomeCategories={[]}
+            savingsCategories={[]}
+            budget={undefined}
+            currency="USD"
+            isLoading={false}
+          />
+        </FormattingProvider>
+      </DirectionProvider>
     </MemoryRouter>,
   );
 }
@@ -261,5 +263,10 @@ describe("Where I am comparison labels", () => {
     setup(false);
     expect(screen.getByText("SPENT THIS MONTH")).toBeInTheDocument();
     expect(screen.getByText(/vs Feb/)).toBeInTheDocument();
+  });
+  it("keeps the whole short month in a right-to-left page", () => {
+    // Formatted values carry bidi isolates there; cutting the string kept "Fe".
+    setup(false, "rtl");
+    expect(screen.getByText(/vs \u2068Feb\u2069/)).toBeInTheDocument();
   });
 });

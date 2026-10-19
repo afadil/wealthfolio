@@ -30,7 +30,12 @@ import type { BudgetCategoryRow, BudgetSnapshot } from "../../../types/budget";
 import type { PaceState } from "../../../types/insight";
 import type { CategoryBreakdownRow, MonthBucket, MonthlyReport } from "../../../types/report";
 import { CategoryHierarchyTable, type CategorySort } from "../category-hierarchy-table";
-import { formatMonthDay, formatMonthName, formatPercentValue } from "./format";
+import {
+  formatMonthDay,
+  formatMonthName,
+  formatPercentValue,
+  formatShortMonthName,
+} from "./format";
 import { MoneyFlowSection } from "./money-flow-section";
 import { badgeVariants } from "@wealthfolio/ui";
 
@@ -568,7 +573,7 @@ const SpentThisPeriodCard: FC<SpentThisPeriodCardProps> = ({
       const prev = new Date(range.start);
       prev.setMonth(prev.getMonth() - 1);
       return t("spending:whereIAm.vsMonth", {
-        month: formatMonthName(prev, dateFormatting).slice(0, 3),
+        month: formatShortMonthName(prev, dateFormatting),
       });
     }
     return t("spending:whereIAm.vsPrior");
