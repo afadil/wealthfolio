@@ -39,7 +39,7 @@
     "fileSizeExceeds": "حجم الملف يتجاوز {{size}}",
     "fileTypeNotAccepted": "نوع الملف غير مقبول",
     "fileUpload": "رفع الملفات",
-    "filesRejected": "تم رفض \"{{name}}\" و{{count}} ملفات أخرى",
+    "filesRejected": "تم رفض \"{{name}}\" وملفات أخرى (العدد: {{count}})",
     "hideColumn": "إخفاء العمود",
     "invalidUrl": "عنوان URL غير صالح",
     "invalidUrlDescription": "يحتوي عنوان URL على بروتوكول خطير (javascript:، أو data:، أو vbscript:، أو file:)",
@@ -146,7 +146,7 @@
   "errorBoundary": {
     "description": "واجهنا خطأً غير متوقع. بياناتك في أمان — حاول تحديث الصفحة للمتابعة.",
     "errorDetails": "تفاصيل الخطأ",
-    "goHome": "الانتقال إلى لوحة التحكم",
+    "goHome": "الانتقال إلى لوحة المعلومات",
     "hideDetails": "إخفاء تفاصيل الخطأ",
     "refresh": "تحديث الصفحة",
     "showDetails": "عرض تفاصيل الخطأ",
