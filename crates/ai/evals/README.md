@@ -43,6 +43,7 @@ cargo run -p wealthfolio-ai --bin eval --features eval -- \
 | `WF_EVAL_PROVIDER_URL` | `http://localhost:11434` for Ollama | Provider base URL, used by the chat and the judge. |
 | `WF_EVAL_THINKING` | the app's choice | `on` / `off`: force the model's thinking. |
 | `WF_EVAL_TRIALS` | `1` | Runs per case, each from a fresh thread and mock environment. |
+| `WF_EVAL_TITLES` | `on` | `off`: give each thread a title first, so the turn makes no title call. |
 | `WF_EVAL_JUDGE_PROVIDER` | `WF_EVAL_PROVIDER` | Provider that grades `expected_response` rubrics. Another provider needs `WF_EVAL_JUDGE_MODEL`. |
 | `WF_EVAL_JUDGE_MODEL` | the case's `judge_model`, else `WF_EVAL_MODEL` | Judge model; overrides `judge_model` in every case. |
 | `WF_EVAL_JUDGE_PROVIDER_URL` | the provider's default | Judge base URL. |
@@ -93,7 +94,9 @@ attempt's, since a failed attempt ends without a usage report. A counter the pro
 `—`. Times depend on the machine and on what else Ollama has loaded; the
 app also generates a thread title with the provider's title model
 (`gemma4:e4b` for Ollama) on the first turn, so a run of another model loads
-that one too.
+that one too. If both don't fit in memory, Ollama swaps them on every case and
+the times mostly measure model loading; `WF_EVAL_TITLES=off` skips the title
+call. Times from runs with and without titles are not comparable.
 
 ## Prerequisites
 
