@@ -167,9 +167,7 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
           to="/health"
           title={emptyReason}
           aria-label={t("common:component.open_health_center_for", { label })}
-          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring text-2xs line-clamp-2 max-w-[11rem] rounded-sm text-center leading-tight underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-          onClick={(event) => event.stopPropagation()}
-          onPointerDown={(event) => event.stopPropagation()}
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring text-2xs relative z-10 line-clamp-2 max-w-[11rem] rounded-sm text-center leading-tight underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
         >
           {emptyReason}
         </Link>
@@ -177,26 +175,32 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
     </>
   );
 
+  // On mobile the whole tile opens the explanation. The trigger is a sibling
+  // overlay rather than a wrapper, so the info button and Health link inside
+  // the tile are not nested in another control.
   return (
-    <Popover open={mobilePopoverOpen} onOpenChange={setMobilePopoverOpen}>
-      <PopoverTrigger
-        nativeButton={false}
-        render={
-          <div
-            className={cn(
-              "flex min-h-16 flex-col items-center justify-center space-y-1 p-4 md:cursor-default md:p-4",
-              "relative cursor-pointer md:cursor-auto",
-              className,
-            )}
-          />
-        }
-      >
-        {content}
-      </PopoverTrigger>
-      <PopoverContent className="w-60 text-xs md:hidden" side="top" align="center">
-        {infoText}
-      </PopoverContent>
-    </Popover>
+    <div
+      className={cn(
+        "relative flex min-h-16 flex-col items-center justify-center space-y-1 p-4 md:p-4",
+        className,
+      )}
+    >
+      <Popover open={mobilePopoverOpen} onOpenChange={setMobilePopoverOpen}>
+        <PopoverTrigger
+          render={
+            <button
+              type="button"
+              aria-label={t("common:component.more_info_about", { label })}
+              className="focus-visible:outline-ring absolute inset-0 cursor-pointer rounded-[inherit] focus-visible:outline-2 md:hidden"
+            />
+          }
+        />
+        <PopoverContent className="w-60 text-xs md:hidden" side="top" align="center">
+          {infoText}
+        </PopoverContent>
+      </Popover>
+      {content}
+    </div>
   );
 };
 

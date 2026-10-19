@@ -1000,25 +1000,23 @@ const SelectedItemBadge = ({
       className={cn(
         "text-foreground group relative cursor-pointer rounded-md border px-2.5 py-1.5 shadow-sm transition-all sm:px-3",
         "hover:bg-accent/80 hover:shadow-md",
-        "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+        "has-[[data-badge-select]:focus-visible]:ring-ring has-[[data-badge-select]:focus-visible]:ring-2 has-[[data-badge-select]:focus-visible]:ring-offset-2",
         !isPlotted &&
           "text-muted-foreground bg-muted/30 hover:bg-muted/50 border-dashed shadow-none hover:shadow-sm",
         isSelected && "bg-warning-subtle hover:bg-warning-subtle/70",
       )}
-      onClick={onSelect}
-      role="button"
       variant="secondary"
-      tabIndex={0}
       title={plotReason}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
-      aria-pressed={isSelected}
     >
-      <div className="flex items-center space-x-2 sm:space-x-3">
+      {/* The select button stretches over the whole badge with ::after; the
+          remove button sits beside it rather than inside another control. */}
+      <button
+        type="button"
+        data-badge-select=""
+        onClick={onSelect}
+        aria-pressed={isSelected}
+        className="flex cursor-pointer items-center space-x-2 outline-none after:absolute after:inset-0 after:content-[''] sm:space-x-3"
+      >
         <div
           className={cn(
             "h-3 w-1 rounded-full sm:h-4",
@@ -1045,12 +1043,12 @@ const SelectedItemBadge = ({
             {contextLabel}
           </span>
         )}
-      </div>
+      </button>
       <Button
         variant="ghost"
         size="icon-xs"
         className={cn(
-          "ms-2 size-5 transition-all duration-150",
+          "relative ms-2 size-5 transition-all duration-150",
           "hover:bg-destructive-subtle hover:text-destructive-subtle-foreground hover:scale-110",
           "focus-visible:ring-destructive/50 focus-visible:ring-2",
         )}
