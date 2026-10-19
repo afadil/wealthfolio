@@ -12,6 +12,7 @@ import {
   Button,
   Icons,
   Skeleton,
+  stripBidiControls,
 } from "@wealthfolio/ui";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
@@ -646,7 +647,8 @@ function TargetEditor({
     : defaultScopeFromAccountScope(accountScope);
   const cannotTargetScope = !target && accountScope.type === "accounts";
   const selectedTaxonomy = taxonomies.find((taxonomy) => taxonomy.id === taxonomyId);
-  const suggestedTargetName =
+  // Seeds an editable name that is saved, so it carries no bidi isolation marks.
+  const suggestedTargetName = stripBidiControls(
     startId === "scratch" || startId === "current"
       ? t("allocation:editor.suggestedTargetName", {
           name: selectedTaxonomy?.name ?? t("allocation:editor.customFallback"),
@@ -654,7 +656,8 @@ function TargetEditor({
       : t("allocation:editor.suggestedTargetName", {
           name:
             selectedPreset?.name ?? selectedTaxonomy?.name ?? t("allocation:editor.customFallback"),
-        });
+        }),
+  );
   const savedWeightDrafts = React.useMemo(
     () => (existingWeightsData ? savedWeightsToDraft(existingWeightsData) : null),
     [existingWeightsData],
