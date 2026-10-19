@@ -983,6 +983,11 @@ function currencyFormattingKey(currency: string): string {
 const FIRST_STRONG_ISOLATE = "\u2068";
 const POP_DIRECTIONAL_ISOLATE = "\u2069";
 
+/** Wraps text in a first-strong isolate (U+2068 … U+2069), for right-to-left pages only. */
+export function isolateBidi(text: string): string {
+  return FIRST_STRONG_ISOLATE + text + POP_DIRECTIONAL_ISOLATE;
+}
+
 /**
  * Wraps every `format*` result in first-strong isolates (U+2068 … U+2069), the
  * mechanism UAX #9 gives for text inserted into a paragraph. The formatting
@@ -997,9 +1002,7 @@ export function isolateFormatting<T extends object>(formatting: T): T {
   for (const [key, value] of Object.entries(formatting)) {
     if (key.startsWith("format") && typeof value === "function") {
       isolated[key] = (...args: unknown[]) =>
-        FIRST_STRONG_ISOLATE +
-        String((value as (...a: unknown[]) => unknown)(...args)) +
-        POP_DIRECTIONAL_ISOLATE;
+        isolateBidi(String((value as (...a: unknown[]) => unknown)(...args)));
     }
   }
   return isolated as T;
