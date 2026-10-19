@@ -1380,8 +1380,18 @@ function useDataGrid<TData>({
       let newColumnId = columnId;
 
       const isRtl = dir === "rtl";
+      const resolved =
+        direction === "next"
+          ? isRtl
+            ? "left"
+            : "right"
+          : direction === "previous"
+            ? isRtl
+              ? "right"
+              : "left"
+            : direction;
 
-      switch (direction) {
+      switch (resolved) {
         case "up":
           newRowIndex = Math.max(0, rowIndex - 1);
           break;
@@ -1515,7 +1525,7 @@ function useDataGrid<TData>({
                 const targetCellRetry = cellMapRef.current.get(cellKeyRetry);
 
                 if (targetCellRetry) {
-                  const scrollDirection = getScrollDirection(direction);
+                  const scrollDirection = getScrollDirection(resolved);
 
                   scrollCellIntoView({
                     container,
@@ -1581,7 +1591,7 @@ function useDataGrid<TData>({
         // Horizontal scrolling for rendered cells
         if (newColumnId !== columnId && targetCell) {
           requestAnimationFrame(() => {
-            const scrollDirection = getScrollDirection(direction);
+            const scrollDirection = getScrollDirection(resolved);
 
             scrollCellIntoView({
               container,
@@ -1633,7 +1643,7 @@ function useDataGrid<TData>({
         const { rowIndex, columnId } = currentEditing;
         focusCell(rowIndex, columnId);
         requestAnimationFrame(() => {
-          navigateCell(opts.direction ?? "right");
+          navigateCell(opts.direction ?? "next");
         });
       } else if (currentEditing) {
         const { rowIndex, columnId } = currentEditing;
@@ -2523,8 +2533,7 @@ function useDataGrid<TData>({
         }
         if (key === "Tab") {
           event.preventDefault();
-          const direction = shiftKey ? "left" : "right";
-          onCellEditingStop({ direction });
+          onCellEditingStop({ direction: shiftKey ? "previous" : "next" });
           return;
         }
         return;
@@ -2804,11 +2813,7 @@ function useDataGrid<TData>({
           return;
         case "Tab":
           event.preventDefault();
-          if (dir === "rtl") {
-            direction = event.shiftKey ? "right" : "left";
-          } else {
-            direction = event.shiftKey ? "left" : "right";
-          }
+          direction = event.shiftKey ? "previous" : "next";
           break;
       }
 

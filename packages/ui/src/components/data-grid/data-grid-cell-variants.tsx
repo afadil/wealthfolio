@@ -102,7 +102,7 @@ export function ShortTextCell<TData>({
             });
           }
           tableMeta?.onCellEditingStop?.({
-            direction: event.shiftKey ? "left" : "right",
+            direction: event.shiftKey ? "previous" : "next",
           });
         } else if (event.key === "Escape") {
           event.preventDefault();
@@ -296,7 +296,7 @@ export function LongTextCell<TData>({
           tableMeta?.onDataUpdate?.({ rowIndex, columnId, value });
         }
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
         return;
       }
@@ -450,7 +450,7 @@ export function NumberCell<TData>({
             tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: parsed.value });
           }
           tableMeta?.onCellEditingStop?.({
-            direction: event.shiftKey ? "left" : "right",
+            direction: event.shiftKey ? "previous" : "next",
           });
         } else if (event.key === "Escape") {
           event.preventDefault();
@@ -654,7 +654,7 @@ export function UrlCell<TData>({
             });
           }
           tableMeta?.onCellEditingStop?.({
-            direction: event.shiftKey ? "left" : "right",
+            direction: event.shiftKey ? "previous" : "next",
           });
         } else if (event.key === "Escape") {
           event.preventDefault();
@@ -829,7 +829,7 @@ export function CheckboxCell<TData>({
       } else if (isFocused && event.key === "Tab") {
         event.preventDefault();
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -966,7 +966,7 @@ export function SelectCell<TData>({
       } else if (!isEditing && isFocused && event.key === "Tab") {
         event.preventDefault();
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -1162,7 +1162,7 @@ export function MultiSelectCell<TData>({
         event.preventDefault();
         setSearchValue("");
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -1374,7 +1374,7 @@ export function DateCell<TData>({
       } else if (!isEditing && isFocused && event.key === "Tab") {
         event.preventDefault();
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -1564,7 +1564,7 @@ export function DateInputCell<TData>({
             tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: date });
           }
           tableMeta?.onCellEditingStop?.({
-            direction: event.shiftKey ? "left" : "right",
+            direction: event.shiftKey ? "previous" : "next",
           });
         } else if (event.key === "Escape") {
           event.preventDefault();
@@ -1574,7 +1574,7 @@ export function DateInputCell<TData>({
       } else if (isFocused && event.key === "Tab") {
         event.preventDefault();
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -1749,7 +1749,7 @@ export function DateTimeCell<TData>({
             tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: date });
           }
           tableMeta?.onCellEditingStop?.({
-            direction: event.shiftKey ? "left" : "right",
+            direction: event.shiftKey ? "previous" : "next",
           });
         } else if (event.key === "Escape") {
           event.preventDefault();
@@ -1759,7 +1759,7 @@ export function DateTimeCell<TData>({
       } else if (isFocused && event.key === "Tab") {
         event.preventDefault();
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -2267,7 +2267,7 @@ export function FileCell<TData>({
       } else if (!isEditing && isFocused && event.key === "Tab") {
         event.preventDefault();
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -2651,7 +2651,7 @@ export function SymbolCell<TData>({
       } else if (!isEditing && isFocused && event.key === "Tab") {
         event.preventDefault();
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -2676,7 +2676,7 @@ export function SymbolCell<TData>({
         setSearchQuery("");
         setOptions([]);
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       } else if (event.key === "Enter" && searchQuery.trim() && options.length === 0) {
         event.preventDefault();
@@ -2892,7 +2892,7 @@ export function CurrencyCell<TData>({
       } else if (!isEditing && isFocused && event.key === "Tab") {
         event.preventDefault();
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -2915,7 +2915,7 @@ export function CurrencyCell<TData>({
         event.preventDefault();
         setSearchQuery("");
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },

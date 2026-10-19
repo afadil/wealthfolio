@@ -225,6 +225,9 @@ export type NavigationDirection =
   | "down"
   | "left"
   | "right"
+  // Tab: the next or previous column in reading order, whichever side that is.
+  | "next"
+  | "previous"
   | "home"
   | "end"
   | "ctrl+up"
