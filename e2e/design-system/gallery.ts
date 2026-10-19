@@ -2,6 +2,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 
 export const modes = ["light", "dark"] as const;
 export const widths = [390, 1440] as const;
+export const directions = ["ltr", "rtl"] as const;
 
 /** Opens the synthetic primitives gallery and returns the page errors it collects. */
 export async function openGallery(
@@ -10,12 +11,14 @@ export async function openGallery(
     mode = "light",
     width = 1440,
     height = 900,
-  }: { mode?: string; width?: number; height?: number } = {},
+    dir = "ltr",
+  }: { mode?: string; width?: number; height?: number; dir?: string } = {},
 ) {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.setViewportSize({ width, height });
-  await page.goto(`/e2e/design-system/?mode=${mode}`);
+  // `dir=rtl` is the development-only direction override (i18n/direction.tsx).
+  await page.goto(`/e2e/design-system/?mode=${mode}${dir === "rtl" ? "&dir=rtl" : ""}`);
   await expect(page.getByRole("heading", { name: "UI primitives" })).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
   return errors;

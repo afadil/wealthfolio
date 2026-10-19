@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { navigate, openGallery } from "./gallery";
 
-// Keyboard behaviour of the inline primitives. RTL is not covered: no shipped
-// locale is right-to-left and the app provides no reading direction to primitives.
+// Keyboard behaviour of the inline primitives, left-to-right. rtl.spec.ts covers
+// the mirrored arrows.
 
 test("tabs move and activate with arrow keys, Home and End", async ({ page }) => {
   await openGallery(page);
