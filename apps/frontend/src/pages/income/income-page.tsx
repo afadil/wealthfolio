@@ -527,7 +527,9 @@ export default function IncomePage() {
                         <Badge className="bg-primary me-2 flex min-w-[3.4375rem] items-center justify-center rounded-sm text-xs">
                           {asset.symbol}
                         </Badge>
-                        <span className="text-muted-foreground me-16 text-xs">{asset.name}</span>
+                        <span className="text-muted-foreground me-16 text-xs">
+                          <bdi>{asset.name}</bdi>
+                        </span>
                       </div>
                       <div className="text-success text-sm">
                         <PrivacyAmount value={asset.income} currency={currency} />

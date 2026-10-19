@@ -642,6 +642,14 @@
   padding-left: var(--inset-left);
 }
 
+/* Chart plots keep left-to-right geometry in a right-to-left page: time runs
+   left to right and axis labels anchor as Recharts placed them. SVG text
+   otherwise inherits direction: rtl, which swaps text-anchor start and end.
+   Tooltips and legends are HTML outside the SVG and follow the page. */
+.recharts-surface {
+  direction: ltr;
+}
+
 [data-sonner-toaster] {
   z-index: 2147483647 !important;
 }

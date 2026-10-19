@@ -376,7 +376,7 @@ const getColumns = (
           />
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
-              <span className="font-medium">{displaySymbol}</span>
+              <bdi className="font-medium">{displaySymbol}</bdi>
               {isManual && !isCash && (
                 <Badge variant="secondary" className="text-2xs h-4 px-1 py-0">
                   {t("holdings:manual")}
@@ -388,7 +388,9 @@ const getColumns = (
                 </Badge>
               )}
             </div>
-            <span className="text-muted-foreground line-clamp-1 text-xs">
+            {/* Provider names read in their own direction: "Apple Inc." keeps its period
+                at the end and a clipped name its start; RTL pages keep it on the right. */}
+            <span dir="auto" className="text-muted-foreground line-clamp-1 text-xs rtl:text-right">
               {optionSubtitle ??
                 (isCash ? t("holdings:cash_balance") : holding.instrument?.name) ??
                 null}
