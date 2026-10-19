@@ -72,6 +72,16 @@ describe("Arabic plural output", () => {
     );
   });
 
+  it("keeps the affected-row count apart from the symbol count it follows", () => {
+    // SymbolResolutionPanel joins the two messages; a verb in the second would
+    // have to agree with the symbols, whose count it does not see.
+    const header = (symbols: number, rows: number) =>
+      i18n.t("activity:import.symbolPanel.unrecognized", { count: symbols }) +
+      i18n.t("activity:import.symbolPanel.affectingRows", { count: rows });
+    expect(header(1, 2)).toBe("1 رمز غير معروف · الصفوف المتأثرة: 2");
+    expect(header(2, 2)).toBe("رمزان غير معروفين · الصفوف المتأثرة: 2");
+  });
+
   it.each([1, 2, 3])("does not inflect an independent secondary count of %s", (total) => {
     expect(
       i18n.t("connect:connections.partialSyncing", {
