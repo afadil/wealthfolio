@@ -6,6 +6,26 @@
   /* Base radius - desktop default */
   --radius: 0.625rem;
 
+  /* Geometry the shared components read (packages/ui). Each is the value the
+     component had before themes, so Classic looks the same. */
+  --button-radius: 9999px;
+  /* Fields, select triggers and toggles (rounded-md). */
+  --control-radius: calc(var(--radius) - 0.125rem);
+  /* Field and default button height. Touch screens never go below 2.75rem
+     (globals.css, --control-size). */
+  --control-height: 2.75rem;
+  --card-radius: var(--radius);
+  --card-border: var(--border);
+  --card-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  /* Select lists, menus, popovers, hover cards, the command palette; their rows
+     are 0.125rem less round (rounded-xl). */
+  --popup-radius: 1rem;
+  /* Dialogs and alert dialogs on wider screens. */
+  --dialog-radius: var(--radius);
+  --badge-radius: 9999px;
+  /* Segmented controls (AnimatedToggleGroup) and their thumb. */
+  --segmented-radius: 9999px;
+
   /* Flexoki Light Theme (HSL numeric components). Classic darkens tx-2, gr
      and ye from Flexoki so text in them reaches 4.5:1 on every surface
      (e2e/design-system/colors.spec.ts). */

@@ -8,6 +8,15 @@ and this project adheres to
 
 ### Added
 
+- Theme geometry: `Button`, `Input`, `Textarea`, `Select`, `Toggle`, `Card`,
+  `Badge`, `Dialog`, `AlertDialog`, the popups (select, menu, popover, hover
+  card, command, combobox) and `AnimatedToggleGroup` take their corners, field
+  height and card shadow from CSS variables (`--button-radius`,
+  `--control-radius`, `--control-height`, `--card-radius`, `--card-border`,
+  `--card-shadow`, `--popup-radius`, `--dialog-radius`, `--badge-radius`,
+  `--segmented-radius`), so they follow the host's theme. Classic keeps the
+  previous values. `Button` also sets `data-variant` and `data-size`, as
+  shadcn's does.
 - `NetworkRequest.timeoutSecs` for longer-running addon HTTP requests. Defaults
   to 10 seconds; positive integer values are capped server-side at 120 seconds.
 

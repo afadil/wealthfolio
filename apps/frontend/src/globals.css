@@ -437,8 +437,11 @@
   /* Connect login brand: sage, with its existing dark-mode counterpart. */
   --connect-brand: #6b7256;
 
+  /* Control height: the theme's on a mouse, at least 44px (h-11) on touch. */
+  --control-size: var(--control-height);
+
   /* Field height; a container can set it for compact fields */
-  --input-height: 2.75rem; /* h-11 */
+  --input-height: var(--control-size);
 
   --inset-top: env(safe-area-inset-top, 0px);
   --inset-right: env(safe-area-inset-right, 0px);
@@ -455,6 +458,12 @@
 
 .dark {
   --connect-brand: #9ca88a;
+}
+
+@media (pointer: coarse) {
+  :root {
+    --control-size: max(var(--control-height), 2.75rem);
+  }
 }
 
 @layer base {

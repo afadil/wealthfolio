@@ -18,7 +18,7 @@ const animatedToggleVariants = cva("relative inline-flex items-center scrollbar-
       lg: "gap-1.5 p-1",
     },
     rounded: {
-      full: "rounded-full",
+      full: "rounded-(--segmented-radius)",
       lg: "rounded-lg",
       md: "rounded-md",
       sm: "rounded-sm",
@@ -45,7 +45,7 @@ const animatedToggleItemVariants = cva(
         lg: "h-10 px-5 text-base",
       },
       rounded: {
-        full: "rounded-full",
+        full: "rounded-(--segmented-radius)",
         lg: "rounded-lg",
         md: "rounded-md",
         sm: "rounded-sm",
@@ -109,7 +109,7 @@ export function AnimatedToggleGroup<T extends string = string>(props: AnimatedTo
           ? "rounded-sm"
           : rounded === "none"
             ? "rounded-none"
-            : "rounded-full";
+            : "rounded-(--segmented-radius)";
 
   return (
     <div
@@ -132,6 +132,7 @@ export function AnimatedToggleGroup<T extends string = string>(props: AnimatedTo
         >
           {selected === item.value && (
             <motion.div
+              data-slot="segmented-thumb"
               layoutId={`toggle-indicator-${uniqueId}`}
               className={cn("bg-background absolute inset-0 -z-10 shadow-sm", roundedClass)}
               initial={false}

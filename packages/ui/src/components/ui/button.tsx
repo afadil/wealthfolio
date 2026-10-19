@@ -13,7 +13,15 @@ export interface ButtonProps extends Omit<ButtonPrimitive.Props, "className">, V
 // like a button is the link itself with `buttonVariants`, not a Button: Button gives
 // whatever it renders button semantics.
 function Button({ className, variant, size, ...props }: ButtonProps) {
-  return <ButtonPrimitive data-slot="button" className={cn(buttonVariants({ variant, size }), className)} {...props} />;
+  return (
+    <ButtonPrimitive
+      data-slot="button"
+      data-variant={variant ?? "default"}
+      data-size={size ?? "default"}
+      className={cn(buttonVariants({ variant, size }), className)}
+      {...props}
+    />
+  );
 }
 
 export { Button };
