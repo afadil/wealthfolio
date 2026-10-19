@@ -67,7 +67,7 @@ export function DataTableToolbar<TData>({
             className="h-8 px-2 lg:px-3"
           >
             {t("ui:dataTable.reset", "Reset")}
-            <Icons.Close className="ml-2 h-4 w-4" />
+            <Icons.Close className="ms-2 h-4 w-4" />
           </Button>
         )}
       </div>
@@ -80,11 +80,11 @@ export function DataTableToolbar<TData>({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="bg-secondary/30 hover:bg-muted/80 ml-auto gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium"
+                  className="bg-secondary/30 hover:bg-muted/80 ms-auto gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium"
                 />
               }
             >
-              {t("ui:dataTable.columns", "Columns")} <Icons.ChevronDown className="ml-2 h-4 w-4" />
+              {t("ui:dataTable.columns", "Columns")} <Icons.ChevronDown className="ms-2 h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {hideableColumns.map((column) => {
@@ -145,7 +145,7 @@ function SearchInput({
 
   return (
     <div className={cn("relative", className)}>
-      <Icons.Search className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
+      <Icons.Search className="text-muted-foreground pointer-events-none absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
       <input
         type="text"
         value={value}
@@ -154,7 +154,7 @@ function SearchInput({
         onBlur={handleBlur}
         placeholder={placeholder}
         className={cn(
-          "shadow-inner-xs bg-muted/90 hover:bg-muted/80 h-8 w-full rounded-md pl-8 pr-8 text-sm outline-none transition-colors",
+          "shadow-inner-xs bg-muted/90 hover:bg-muted/80 h-8 w-full rounded-md pe-8 ps-8 text-sm outline-none transition-colors",
           "placeholder:text-muted-foreground",
           "focus-visible:outline-solid focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-2",
         )}
@@ -163,7 +163,7 @@ function SearchInput({
         <button
           type="button"
           onClick={handleClear}
-          className="text-muted-foreground hover:text-foreground absolute right-2 top-1/2 -translate-y-1/2"
+          className="text-muted-foreground hover:text-foreground absolute end-2 top-1/2 -translate-y-1/2"
         >
           <Icons.Close className="h-4 w-4" />
           <span className="sr-only">{t("ui:search.clear", "Clear search")}</span>

@@ -34,7 +34,7 @@ function ScrollBar({ className, orientation = "vertical", ...props }: ScrollBarP
       orientation={orientation}
       className={cn(
         "data-hovering:pointer-events-auto data-hovering:opacity-100 data-scrolling:pointer-events-auto data-scrolling:opacity-100 pointer-events-none flex touch-none select-none opacity-0 transition-[opacity,color]",
-        "data-horizontal:h-2.5 data-vertical:h-full data-vertical:w-2.5 data-horizontal:flex-col data-horizontal:border-t data-vertical:border-l data-horizontal:border-t-transparent data-vertical:border-l-transparent p-px",
+        "data-horizontal:h-2.5 data-vertical:h-full data-vertical:w-2.5 data-horizontal:flex-col data-horizontal:border-t data-vertical:border-s data-horizontal:border-t-transparent data-vertical:border-s-transparent p-px",
         className,
       )}
       {...props}

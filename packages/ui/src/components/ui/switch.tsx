@@ -20,7 +20,7 @@ function Switch({ className, size = "default", ...props }: SwitchProps) {
     >
       <SwitchPrimitive.Thumb
         data-slot="switch-thumb"
-        className="bg-background group-data-[size=default]/switch:data-checked:translate-x-5 group-data-[size=sm]/switch:data-checked:translate-x-3.5 data-unchecked:translate-x-0 pointer-events-none block rounded-full shadow-lg ring-0 transition-transform group-data-[size=default]/switch:size-5 group-data-[size=sm]/switch:size-3.5"
+        className="bg-background group-data-[size=default]/switch:data-checked:translate-x-5 group-data-[size=sm]/switch:data-checked:translate-x-3.5 rtl:group-data-[size=default]/switch:data-checked:-translate-x-5 rtl:group-data-[size=sm]/switch:data-checked:-translate-x-3.5 data-unchecked:translate-x-0 pointer-events-none block rounded-full shadow-lg ring-0 transition-transform group-data-[size=default]/switch:size-5 group-data-[size=sm]/switch:size-3.5"
       />
     </SwitchPrimitive.Root>
   );

@@ -183,7 +183,7 @@ export function PageHeader({
             <div className="flex min-w-0 flex-1 items-center gap-2">
               {onBack && (
                 <Button variant="ghost" size="icon" onClick={onBack}>
-                  <Icons.ArrowLeft className="size-5" />
+                  <Icons.ArrowLeft className="size-5 rtl:rotate-180" />
                 </Button>
               )}
               {titleContent ?? children}

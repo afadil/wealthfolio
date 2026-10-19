@@ -49,9 +49,9 @@ const sheetVariants = cva(
       side: {
         top: "inset-x-0 top-0 border-b data-starting-style:-translate-y-full data-ending-style:-translate-y-full",
         bottom: "inset-x-0 bottom-0 border-t data-starting-style:translate-y-full data-ending-style:translate-y-full",
-        left: "inset-y-0 left-0 h-full w-3/4 border-r data-starting-style:-translate-x-full data-ending-style:-translate-x-full sm:max-w-sm",
+        left: "inset-y-0 start-0 h-full w-3/4 border-e data-starting-style:-translate-x-full data-ending-style:-translate-x-full rtl:data-starting-style:translate-x-full rtl:data-ending-style:translate-x-full sm:max-w-sm",
         right:
-          "inset-y-0 right-0 h-full w-3/4  border-l data-starting-style:translate-x-full data-ending-style:translate-x-full sm:max-w-sm",
+          "inset-y-0 end-0 h-full w-3/4  border-s data-starting-style:translate-x-full data-ending-style:translate-x-full rtl:data-starting-style:-translate-x-full rtl:data-ending-style:-translate-x-full sm:max-w-sm",
       },
     },
     defaultVariants: {
@@ -94,7 +94,7 @@ function SheetContent({
         {showCloseButton && (
           <SheetPrimitive.Close
             data-slot="sheet-close"
-            className="focus-visible:outline-solid focus-visible:outline-ring bg-muted absolute right-4 cursor-pointer rounded-full p-2 opacity-70 transition-opacity hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none"
+            className="focus-visible:outline-solid focus-visible:outline-ring bg-muted absolute end-4 cursor-pointer rounded-full p-2 opacity-70 transition-opacity hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none"
             style={{ top: needsSafeAreaTop ? "calc(env(safe-area-inset-top, 0px) + 1rem)" : "1rem" }}
           >
             <Icons.X className="h-5 w-5 sm:h-4 sm:w-4" />
@@ -107,7 +107,7 @@ function SheetContent({
 }
 
 function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="sheet-header" className={cn("flex flex-col space-y-2 text-left", className)} {...props} />;
+  return <div data-slot="sheet-header" className={cn("flex flex-col space-y-2 text-start", className)} {...props} />;
 }
 
 function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {

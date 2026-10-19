@@ -96,7 +96,7 @@ function SelectContent({
           data-slot="select-content"
           data-align-trigger={alignItemWithTrigger}
           className={cn(
-            "bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 max-h-(--available-height) origin-(--transform-origin) ring-foreground/5 dark:ring-foreground/10 relative z-50 min-w-[max(8rem,var(--anchor-width))] overflow-y-auto overflow-x-hidden rounded-2xl shadow-2xl ring-1 duration-100 data-[align-trigger=true]:animate-none",
+            "bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-start-2 data-[side=inline-start]:slide-in-from-end-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 max-h-(--available-height) origin-(--transform-origin) ring-foreground/5 dark:ring-foreground/10 relative z-50 min-w-[max(8rem,var(--anchor-width))] overflow-y-auto overflow-x-hidden rounded-2xl shadow-2xl ring-1 duration-100 data-[align-trigger=true]:animate-none",
             className,
           )}
           {...props}
@@ -119,7 +119,7 @@ function SelectLabel({ className, ...props }: SelectLabelProps) {
   return (
     <SelectPrimitive.GroupLabel
       data-slot="select-label"
-      className={cn("py-2 pl-2 pr-8 text-sm font-semibold", className)}
+      className={cn("py-2 pe-8 ps-2 text-sm font-semibold", className)}
       {...props}
     />
   );
@@ -134,13 +134,13 @@ function SelectItem({ className, children, ...props }: SelectItemProps) {
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 relative flex w-full cursor-default select-none items-center rounded-xl py-2 pl-2 pr-8 text-sm outline-none",
+        "focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 relative flex w-full cursor-default select-none items-center rounded-xl py-2 pe-8 ps-2 text-sm outline-none",
         className,
       )}
       {...props}
     >
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
-      <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
+      <span className="absolute end-2 flex h-3.5 w-3.5 items-center justify-center">
         <SelectPrimitive.ItemIndicator>
           <Icons.Check className="h-3.5 w-3.5" />
         </SelectPrimitive.ItemIndicator>

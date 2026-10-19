@@ -128,7 +128,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
             {...props}
           >
             <span className="truncate">{mobileDisplayText}</span>
-            <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <Icons.ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetContent
@@ -165,21 +165,21 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
                       }}
                       className="card-mobile hover:bg-accent active:bg-accent/80 flex items-center justify-center border py-3 font-semibold transition-colors"
                     >
-                      <Icons.Search className="mr-1 h-4 w-4" />
+                      <Icons.Search className="me-1 h-4 w-4" />
                       {t("ui:currency.more", "More")}
                     </button>
                   </div>
                 </div>
                 <div className="border-border border-b px-6 py-4">
                   <div className="relative">
-                    <Icons.Search className="text-muted-foreground absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2" />
+                    <Icons.Search className="text-muted-foreground absolute start-4 top-1/2 h-5 w-5 -translate-y-1/2" />
                     <Input
                       ref={searchInputRef}
                       type="text"
                       placeholder={t("ui:currency.searchAll", "Search all currencies...")}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-12"
+                      className="ps-12"
                     />
                   </div>
                 </div>
@@ -198,7 +198,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
                           key={curr.value}
                           onClick={() => handleSelect(curr.value)}
                           className={cn(
-                            "card-mobile flex w-full items-center gap-3 border border-transparent text-left transition-colors",
+                            "card-mobile flex w-full items-center gap-3 border border-transparent text-start transition-colors",
                             value === curr.value
                               ? "border-primary bg-primary/10"
                               : "hover:bg-accent active:bg-accent/80 focus:border-primary focus:outline-none",
@@ -275,7 +275,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
           }
         >
           <span className="truncate">{buttonLabel}</span>
-          <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <Icons.ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
         </PopoverTrigger>
         <PopoverContent className="w-full p-0" initialFocus={autoFocusSearch ? desktopCommandInputRef : undefined}>
           <Command>
@@ -323,7 +323,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
                     >
                       {currency.label}
                       <Icons.Check
-                        className={cn("ml-auto h-4 w-4", currency.value === value ? "opacity-100" : "opacity-0")}
+                        className={cn("ms-auto h-4 w-4", currency.value === value ? "opacity-100" : "opacity-0")}
                       />
                     </CommandItem>
                   ))}

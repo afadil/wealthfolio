@@ -2717,7 +2717,7 @@ export function SymbolCell<TData>({
         <span ref={anchorRef} data-slot="grid-cell-content" className={cn(!value && "text-muted-foreground")}>
           {disabled ? value || "—" : value}
           {value && displayContext ? (
-            <span className="text-muted-foreground ml-1 text-xs">({displayContext})</span>
+            <span className="text-muted-foreground ms-1 text-xs">({displayContext})</span>
           ) : null}
         </span>
         {isEditing && !disabled && (

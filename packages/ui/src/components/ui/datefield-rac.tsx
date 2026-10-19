@@ -10,6 +10,7 @@ import {
   TimeFieldProps,
   TimeField as TimeFieldRac,
   TimeValue as TimeValueRac,
+  useLocale,
 } from "react-aria-components";
 
 import { cn } from "../../lib/utils";
@@ -53,8 +54,13 @@ interface DateInputProps extends DateInputPropsRac {
 }
 
 function DateInput({ className, unstyled = false, ...props }: Omit<DateInputProps, "children">) {
+  // react-aria moves between segments in its locale's direction, so the field
+  // lays out in that direction too; in a right-to-left page a Latin-script
+  // date keeps its left-to-right order instead of reversing under the arrows.
+  const { direction } = useLocale();
   return (
     <DateInputRac
+      dir={direction}
       className={composeRenderProps(className, (className) => cn(!unstyled && dateInputStyle, className))}
       {...props}
     >

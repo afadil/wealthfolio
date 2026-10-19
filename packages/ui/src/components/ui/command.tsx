@@ -55,7 +55,7 @@ function CommandDialog({
 function CommandInput({ className, ...props }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
     <div data-slot="command-input-wrapper" className="flex h-14 items-center border-b px-3" data-cmdk-input-wrapper="">
-      <Icons.Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+      <Icons.Search className="me-2 h-4 w-4 shrink-0 opacity-50" />
       <CommandPrimitive.Input
         data-slot="command-input"
         className={cn(
@@ -130,7 +130,7 @@ function CommandShortcut({ className, ...props }: React.ComponentProps<"span">) 
     <span
       data-slot="command-shortcut"
       className={cn(
-        "text-muted-foreground group-data-[selected=true]/command-item:text-accent-foreground ml-auto text-xs tracking-widest",
+        "text-muted-foreground group-data-[selected=true]/command-item:text-accent-foreground ms-auto text-xs tracking-widest",
         className,
       )}
       {...props}

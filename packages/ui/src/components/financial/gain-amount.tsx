@@ -61,7 +61,7 @@ export function GainAmount({
   const suffix = displayCurrency && quoteUnit ? quoteUnit.symbol : "";
 
   return (
-    <div className={cn("flex flex-col items-end text-right text-sm", className)} {...props}>
+    <div className={cn("flex flex-col items-end text-end text-sm", className)} {...props}>
       <div
         className={cn(
           "flex items-center",

@@ -128,7 +128,7 @@ function MonthYearPicker({ value, onChange, minDate, maxDate, className }: Month
           onClick={handlePrevYear}
           disabled={!canGoPrevYear}
         >
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
         </Button>
         <span className="text-sm font-medium">{yearLabel}</span>
         <Button
@@ -139,7 +139,7 @@ function MonthYearPicker({ value, onChange, minDate, maxDate, className }: Month
           onClick={handleNextYear}
           disabled={!canGoNextYear}
         >
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="h-4 w-4 rtl:rotate-180" />
         </Button>
       </div>
       <div className="grid grid-cols-3 gap-2">

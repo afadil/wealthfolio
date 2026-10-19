@@ -46,7 +46,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
   return (
     <div className="flex flex-col gap-3 px-2 py-4 sm:flex-row sm:items-center sm:justify-between">
       {/* Results count - centered on mobile */}
-      <div className="text-muted-foreground text-center text-sm sm:text-left">
+      <div className="text-muted-foreground text-center text-sm sm:text-start">
         <p className="flex items-center justify-center gap-1 sm:justify-start">
           {totalRows === 0 ? (
             <span>{t("ui:dataTable.noResults", "No results")}</span>
@@ -125,7 +125,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
             title={t("ui:dataTable.firstPage", "Go to first page")}
           >
             <span className="sr-only">{t("ui:dataTable.firstPage", "Go to first page")}</span>
-            <Icons.ChevronsLeft className="h-4 w-4" />
+            <Icons.ChevronsLeft className="h-4 w-4 rtl:rotate-180" />
           </Button>
           {/* Previous page */}
           <Button
@@ -137,7 +137,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
             title={t("ui:dataTable.previousPage", "Previous page")}
           >
             <span className="sr-only">{t("ui:dataTable.previousPageFull", "Go to previous page")}</span>
-            <Icons.ChevronLeft className="h-4 w-4" />
+            <Icons.ChevronLeft className="h-4 w-4 rtl:rotate-180" />
           </Button>
           {/* Next page */}
           <Button
@@ -149,7 +149,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
             title={t("ui:dataTable.nextPage", "Next page")}
           >
             <span className="sr-only">{t("ui:dataTable.nextPageFull", "Go to next page")}</span>
-            <Icons.ChevronRight className="h-4 w-4" />
+            <Icons.ChevronRight className="h-4 w-4 rtl:rotate-180" />
           </Button>
           {/* Last page - hidden on mobile */}
           <Button
@@ -161,7 +161,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
             title={t("ui:dataTable.lastPage", "Go to last page")}
           >
             <span className="sr-only">{t("ui:dataTable.lastPage", "Go to last page")}</span>
-            <Icons.ChevronsRight className="h-4 w-4" />
+            <Icons.ChevronsRight className="h-4 w-4 rtl:rotate-180" />
           </Button>
         </div>
       </div>

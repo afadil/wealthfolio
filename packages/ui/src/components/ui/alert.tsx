@@ -26,7 +26,7 @@ const warningGlass = cn(
 // colour and the description the page's text colour; without one, the sentence keeps
 // the status colour. For a compact alert, set the font size on Alert (text-xs).
 const alertVariants = cva(
-  "group/alert relative grid w-full gap-0.5 rounded-lg border px-4 py-3 text-left text-sm has-[>svg]:grid-cols-[auto_1fr] has-data-[slot=alert-action]:grid-cols-[1fr_auto] has-[>svg]:has-data-[slot=alert-action]:grid-cols-[auto_1fr_auto] gap-x-3 *:[svg]:row-span-2 *:[svg]:self-center [&:not(:has([data-slot=alert-title]))>[data-slot=alert-description]]:row-span-2 [&:not(:has([data-slot=alert-title]))>[data-slot=alert-description]]:self-center [&:not(:has([data-slot=alert-description]))>[data-slot=alert-title]]:row-span-2 [&:not(:has([data-slot=alert-description]))>[data-slot=alert-title]]:self-center *:[svg]:box-content *:[svg]:rounded-full *:[svg]:bg-current/15 *:[svg]:p-1.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4",
+  "group/alert relative grid w-full gap-0.5 rounded-lg border px-4 py-3 text-start text-sm has-[>svg]:grid-cols-[auto_1fr] has-data-[slot=alert-action]:grid-cols-[1fr_auto] has-[>svg]:has-data-[slot=alert-action]:grid-cols-[auto_1fr_auto] gap-x-3 *:[svg]:row-span-2 *:[svg]:self-center [&:not(:has([data-slot=alert-title]))>[data-slot=alert-description]]:row-span-2 [&:not(:has([data-slot=alert-title]))>[data-slot=alert-description]]:self-center [&:not(:has([data-slot=alert-description]))>[data-slot=alert-title]]:row-span-2 [&:not(:has([data-slot=alert-description]))>[data-slot=alert-title]]:self-center *:[svg]:box-content *:[svg]:rounded-full *:[svg]:bg-current/15 *:[svg]:p-1.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
