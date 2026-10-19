@@ -56,6 +56,9 @@ and this project adheres to
 - `SheetContent` takes `side="inline-start"` and `side="inline-end"`, which
   follow the reading direction; `inline-end` is the new default. `left` and
   `right` stay physical, as in shadcn.
+- `stripBidiControls(text)` from `@wealthfolio/ui` removes the invisible bidi
+  marks formatted values carry in right-to-left pages, for code that measures or
+  cuts them.
 
 ### Changed
 

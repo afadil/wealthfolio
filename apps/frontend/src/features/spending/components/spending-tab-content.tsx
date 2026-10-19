@@ -25,6 +25,7 @@ import {
   Icons,
   PrivacyAmount,
   Skeleton,
+  stripBidiControls,
   useAmountFormatting,
   type FormattingApi,
   useDateFormatting,
@@ -1543,8 +1544,9 @@ const CategoryTreemapNodeMono: FC<CategoryTreemapNodeMonoProps> = ({
 
   const amountText = isBalanceHidden ? "••••" : formatting.formatAmount(amount, currency);
   const pctText = numberFormatting.formatPercent(pct / 100, { digits: 1 });
-  const amountTextW = amountText.length * amountFontSize * 0.58;
-  const pctTextW = pctText.length * pctFontSize * 0.6;
+  // Estimate from the visible characters; right-to-left pages add bidi marks.
+  const amountTextW = stripBidiControls(amountText).length * amountFontSize * 0.58;
+  const pctTextW = stripBidiControls(pctText).length * pctFontSize * 0.6;
   const innerW = Math.max(0, width - padX * 2);
   const showAmount = width > 60 && height > 48;
   const showPct = showAmount && height > 70 && amountTextW + pctTextW + 8 <= innerW;

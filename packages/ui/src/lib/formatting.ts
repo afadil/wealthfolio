@@ -19,6 +19,11 @@ import { getQuoteUnitCurrency, quoteCurrencies } from "./currencies";
 /** Unicode bidi controls Intl or `isolateFormatting` put around formatted text. */
 const BIDI_CONTROLS = /[\u061c\u200e\u200f\u2066-\u2069]/gu;
 
+/** Formatted text without its invisible bidi marks, for code that measures or cuts it. */
+export function stripBidiControls(value: string): string {
+  return value.replace(BIDI_CONTROLS, "");
+}
+
 /** Max fraction digits for a standard per-unit price (prices >= 0.01). */
 const STANDARD_PRICE_DECIMAL_PRECISION = 4;
 
