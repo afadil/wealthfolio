@@ -84,7 +84,8 @@ run and 13 the next. To tell a change from noise:
 - `eval compare <before.json> <after.json>` pairs the runs by case id and
   lists cases that were **fixed** (now pass every trial), **regressed** (no
   longer do), and whose pass rate moved, plus the mean paired change in pass
-  rate with its standard error. Compare runs with the same k.
+  rate with its standard error. It refuses runs with different k, since
+  passing every trial gets harder as k grows.
 
 Per case the report also shows input, cached input and output tokens, model
 calls, tool calls and chat wall time (per trial when k > 1, judge excluded),
