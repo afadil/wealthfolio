@@ -167,7 +167,7 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
           to="/health"
           title={emptyReason}
           aria-label={t("common:component.open_health_center_for", { label })}
-          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring text-2xs relative z-10 line-clamp-2 max-w-[11rem] rounded-sm text-center leading-tight underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring text-2xs relative z-20 line-clamp-2 max-w-[11rem] rounded-sm text-center leading-tight underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
         >
           {emptyReason}
         </Link>
@@ -177,7 +177,8 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
 
   // On mobile the whole tile opens the explanation. The trigger is a sibling
   // overlay rather than a wrapper, so the info button and Health link inside
-  // the tile are not nested in another control.
+  // the tile are not nested in another control. It sits above the animated
+  // value, which isolates its own stacking context, and below the Health link.
   return (
     <div
       className={cn(
@@ -191,7 +192,7 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
             <button
               type="button"
               aria-label={t("common:component.more_info_about", { label })}
-              className="focus-visible:outline-ring absolute inset-0 cursor-pointer rounded-[inherit] focus-visible:outline-2 md:hidden"
+              className="focus-visible:outline-ring absolute inset-0 z-10 cursor-pointer rounded-[inherit] focus-visible:outline-2 md:hidden"
             />
           }
         />
