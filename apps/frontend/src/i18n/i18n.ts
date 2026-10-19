@@ -1,8 +1,8 @@
-import { isolateBidi } from "@wealthfolio/ui";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import resourcesToBackend from "i18next-resources-to-backend";
 
+import { reactInterpolation } from "./interpolation";
 import { DEFAULT_LOCALE, DEFAULT_NAMESPACE, NAMESPACES, SUPPORTED_LOCALE_CODES } from "./locales";
 
 export const LANGUAGE_STORAGE_KEY = "wealthfolio-language";
@@ -41,19 +41,7 @@ i18n
     load: "currentOnly",
     ns: [...NAMESPACES],
     defaultNS: DEFAULT_NAMESPACE,
-    interpolation: {
-      // React already escapes HTML, so `escape` only isolates: in a right-to-left
-      // language a `{{value}}` with letters keeps its own direction, and
-      // "Emergency Fund!" does not show as "!Emergency Fund". Bare numbers stay
-      // as they are, so "{{visible}}/{{total}}" keeps showing "20/50", not
-      // "50/20". Left-to-right text is unchanged. Follows the active language,
-      // read at call time, which is also what `<html dir>` derives from.
-      escapeValue: true,
-      escape: (value: string) =>
-        i18n.language && i18n.dir(i18n.language) === "rtl" && /\p{L}/u.test(value)
-          ? isolateBidi(value)
-          : value,
-    },
+    interpolation: reactInterpolation(i18n),
     react: {
       useSuspense: true,
     },

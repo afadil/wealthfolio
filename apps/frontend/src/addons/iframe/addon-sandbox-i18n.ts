@@ -4,6 +4,7 @@ import { initReactI18next, useTranslation } from "react-i18next";
 import type { AddonTranslationApi, AddonTranslationResources } from "@wealthfolio/addon-sdk";
 import type { TextDirection } from "@wealthfolio/ui";
 
+import { reactInterpolation } from "@/i18n/interpolation";
 import {
   DEFAULT_LOCALE,
   SUPPORTED_LOCALE_CODES,
@@ -98,10 +99,8 @@ export function initSandboxI18n(language?: string) {
     ns: ["ui"],
     defaultNS: "ui",
     resources,
-    interpolation: {
-      // React already escapes values.
-      escapeValue: false,
-    },
+    // Same as the host, so `ui` strings read the same inside an add-on.
+    interpolation: reactInterpolation(sandboxI18n),
     react: {
       // Resources are bundled synchronously, so there is nothing to suspend on
       // — and suspending here would land outside the route Suspense boundary.
