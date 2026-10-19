@@ -12,7 +12,8 @@ function InputOTP({
   return (
     <OTPInput
       data-slot="input-otp"
-      containerClassName={cn("flex items-center gap-2 has-[:disabled]:opacity-50", containerClassName)}
+      // Codes are read and typed left to right in right-to-left pages too.
+      containerClassName={cn("flex items-center gap-2 [direction:ltr] has-[:disabled]:opacity-50", containerClassName)}
       spellCheck={false}
       className={cn("disabled:cursor-not-allowed", className)}
       {...props}

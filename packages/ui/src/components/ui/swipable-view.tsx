@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "../../lib/utils";
+import { useDirection } from "./direction";
 import useEmblaCarousel, { type UseEmblaCarouselType } from "embla-carousel-react";
 import * as React from "react";
 
@@ -54,7 +55,9 @@ export function SwipableView({
   initialIndex = 0,
   selectedIndex: controlledIndex,
 }: SwipableViewProps) {
+  const direction = useDirection();
   const [emblaRef, emblaApi] = useEmblaCarousel({
+    direction,
     loop: false,
     align: "start",
     skipSnaps: false,

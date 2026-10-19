@@ -16,6 +16,9 @@ import { NumberParser } from "@internationalized/number";
 import { DECIMAL_PRECISION, DISPLAY_DECIMAL_PRECISION } from "./constants";
 import { getQuoteUnitCurrency, quoteCurrencies } from "./currencies";
 
+/** Unicode bidi controls Intl or `isolateFormatting` put around formatted text. */
+const BIDI_CONTROLS = /[\u061c\u200e\u200f\u2066-\u2069]/gu;
+
 /** Max fraction digits for a standard per-unit price (prices >= 0.01). */
 const STANDARD_PRICE_DECIMAL_PRECISION = 4;
 
@@ -334,10 +337,7 @@ function separators(locale: string) {
 const currencyAffixMatchers = new Map<string, { prefix: RegExp; suffix: RegExp }>();
 
 function normalizeCurrencyAffix(value: string): string {
-  return value
-    .normalize("NFKC")
-    .replace(/[\u061c\u200e\u200f]/gu, "")
-    .trim();
+  return value.normalize("NFKC").replace(BIDI_CONTROLS, "").trim();
 }
 
 function getCurrencyAffixMatchers(locale: string): { prefix: RegExp; suffix: RegExp } {
@@ -504,10 +504,7 @@ export function parseLocalizedNumber(value: string, locale: string): number | un
 export function parseLocalizedDecimalString(value: string, locale: string): string | undefined {
   const resolvedLocale = locale && locale !== "system" ? locale : resolveFormattingLocale(locale);
   const input = stripFinancialAffixes(
-    value
-      .normalize("NFKC")
-      .trim()
-      .replace(/[\u061c\u200e\u200f]/gu, ""),
+    value.normalize("NFKC").trim().replace(BIDI_CONTROLS, ""),
     resolvedLocale,
   );
   if (!input) return undefined;
@@ -621,10 +618,7 @@ function parseNamedMonthDate(value: string, locale: string): Date | undefined {
 export function parseLocalizedDate(value: string, locale: string): Date | undefined {
   const resolvedLocale = locale && locale !== "system" ? locale : resolveFormattingLocale(locale);
   const text = normalizeLocalizedDigits(
-    value
-      .normalize("NFKC")
-      .trim()
-      .replace(/[\u061c\u200e\u200f]/gu, ""),
+    value.normalize("NFKC").trim().replace(BIDI_CONTROLS, ""),
     resolvedLocale,
   );
   if (
@@ -983,8 +977,6 @@ function currencyFormattingKey(currency: string): string {
 
 const FIRST_STRONG_ISOLATE = "\u2068";
 const POP_DIRECTIONAL_ISOLATE = "\u2069";
-/** Unicode bidi controls Intl or `isolateFormatting` put around formatted text. */
-const BIDI_CONTROLS = /[\u061c\u200e\u200f\u2066-\u2069]/gu;
 
 /**
  * Wraps every `format*` result in first-strong isolates (U+2068 … U+2069), the
