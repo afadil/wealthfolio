@@ -86,5 +86,9 @@
     "apps/frontend/src/pages/settings/market-data/live-preview-pane.tsx": 1,
     "apps/frontend/src/pages/settings/spending/components/module-card.tsx": 2
   },
-  "pxSizes": {}
+  "pxSizes": {},
+  "physicalDirections": {
+    "apps/frontend/src/features/profiles/persona-avatars.tsx": 1,
+    "apps/frontend/src/features/profiles/profile-avatar.tsx": 3
+  }
 }
