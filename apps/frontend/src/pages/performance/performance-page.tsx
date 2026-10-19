@@ -830,7 +830,7 @@ function AttributionDetailMetric({
       </Button>
 
       <SheetContent
-        side={isMobile ? "bottom" : "right"}
+        side={isMobile ? "bottom" : "inline-end"}
         className={cn(
           "flex w-full flex-col p-0",
           isMobile ? "h-[85vh] rounded-t-3xl" : "h-full sm:max-w-md",

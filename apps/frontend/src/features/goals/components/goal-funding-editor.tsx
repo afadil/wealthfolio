@@ -675,7 +675,7 @@ function AllocationDetailsSheet({
   const { t } = useTranslation();
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex h-full w-full flex-col p-0 sm:max-w-3xl">
+      <SheetContent side="inline-end" className="flex h-full w-full flex-col p-0 sm:max-w-3xl">
         <SheetHeader className="border-border border-b px-6 py-5">
           <SheetTitle>{t("goals:funding.allocation_details")}</SheetTitle>
           <SheetDescription>{t("goals:funding.allocation_details_description")}</SheetDescription>

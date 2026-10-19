@@ -9,7 +9,7 @@ export function LoanSheetContent({ className, ...props }: ComponentProps<typeof 
   return (
     <SheetContent
       {...props}
-      side={isMobile ? "bottom" : "right"}
+      side={isMobile ? "bottom" : "inline-end"}
       className={cn(
         "flex w-full flex-col gap-0 overflow-hidden",
         isMobile

@@ -108,7 +108,7 @@ function MobileSidebar() {
         <span className="sr-only">{t("ai:shell.toggleMenu")}</span>
       </SheetTrigger>
       <SheetContent
-        side="left"
+        side="inline-start"
         className="w-70 flex flex-col gap-0 px-0 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-[max(env(safe-area-inset-top),0.75rem)]"
       >
         <SheetHeader className="sr-only">

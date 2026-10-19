@@ -49,13 +49,19 @@ const sheetVariants = cva(
       side: {
         top: "inset-x-0 top-0 border-b data-starting-style:-translate-y-full data-ending-style:-translate-y-full",
         bottom: "inset-x-0 bottom-0 border-t data-starting-style:translate-y-full data-ending-style:translate-y-full",
-        left: "inset-y-0 start-0 h-full w-3/4 border-e data-starting-style:-translate-x-full data-ending-style:-translate-x-full rtl:data-starting-style:translate-x-full rtl:data-ending-style:translate-x-full sm:max-w-sm",
+        // left and right are physical, as in shadcn; inline-start and inline-end
+        // follow the reading direction and are what the app uses.
+        left: "inset-y-0 left-0 h-full w-3/4 border-r data-starting-style:-translate-x-full data-ending-style:-translate-x-full sm:max-w-sm",
         right:
-          "inset-y-0 end-0 h-full w-3/4  border-s data-starting-style:translate-x-full data-ending-style:translate-x-full rtl:data-starting-style:-translate-x-full rtl:data-ending-style:-translate-x-full sm:max-w-sm",
+          "inset-y-0 right-0 h-full w-3/4 border-l data-starting-style:translate-x-full data-ending-style:translate-x-full sm:max-w-sm",
+        "inline-start":
+          "inset-y-0 start-0 h-full w-3/4 border-e data-starting-style:-translate-x-full data-ending-style:-translate-x-full rtl:data-starting-style:translate-x-full rtl:data-ending-style:translate-x-full sm:max-w-sm",
+        "inline-end":
+          "inset-y-0 end-0 h-full w-3/4 border-s data-starting-style:translate-x-full data-ending-style:translate-x-full rtl:data-starting-style:-translate-x-full rtl:data-ending-style:-translate-x-full sm:max-w-sm",
       },
     },
     defaultVariants: {
-      side: "right",
+      side: "inline-end",
     },
   },
 );
@@ -68,7 +74,7 @@ interface SheetContentProps
 }
 
 function SheetContent({
-  side = "right",
+  side = "inline-end",
   className,
   children,
   showCloseButton = true,

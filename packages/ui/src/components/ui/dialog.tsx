@@ -119,7 +119,7 @@ interface DialogContentProps extends Omit<DialogPrimitive.Popup.Props, "classNam
   /**
    * Side to show the sheet from on mobile (default: "bottom")
    */
-  side?: "top" | "bottom" | "left" | "right";
+  side?: React.ComponentProps<typeof SheetContent>["side"];
   /**
    * Whether to show the close button (default: true)
    */

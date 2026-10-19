@@ -550,7 +550,7 @@ export function AssetSnapshotHistory({
 
       {editingSnapshot && (
         <Sheet open={!!editingSnapshot} onOpenChange={() => handleEditClose()}>
-          <SheetContent side="right" className="flex h-full w-full flex-col p-0 sm:max-w-2xl">
+          <SheetContent side="inline-end" className="flex h-full w-full flex-col p-0 sm:max-w-2xl">
             <SheetHeader className="border-b px-6 py-4">
               <SheetTitle>{t("asset:accountHoldings.update_holdings")}</SheetTitle>
             </SheetHeader>

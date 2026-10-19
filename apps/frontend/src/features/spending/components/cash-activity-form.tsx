@@ -448,7 +448,7 @@ export function CashActivityForm({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
-        side={isMobile ? "bottom" : "right"}
+        side={isMobile ? "bottom" : "inline-end"}
         className={cn(
           isMobile
             ? "rounded-t-4xl mx-1 flex h-[90vh] flex-col p-0"

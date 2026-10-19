@@ -900,7 +900,9 @@ body.qr-scan-active > .qr-overlay {
     [data-slot="dialog-content"],
     [role="alertdialog"],
     [data-slot="sheet-content"][data-side="left"],
-    [data-slot="sheet-content"][data-side="right"] {
+    [data-slot="sheet-content"][data-side="right"],
+    [data-slot="sheet-content"][data-side="inline-start"],
+    [data-slot="sheet-content"][data-side="inline-end"] {
       max-width: revert-layer;
     }
   }

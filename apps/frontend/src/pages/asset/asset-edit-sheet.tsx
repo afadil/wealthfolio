@@ -706,7 +706,7 @@ export function AssetEditSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="pb-safe flex h-full w-full flex-col sm:max-w-2xl">
+      <SheetContent side="inline-end" className="pb-safe flex h-full w-full flex-col sm:max-w-2xl">
         <SheetHeader className="shrink-0 pb-4">
           <div className="flex items-center gap-3">
             <EditableTickerAvatar
