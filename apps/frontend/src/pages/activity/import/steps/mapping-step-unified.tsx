@@ -12,6 +12,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
+import { stripBidiControls } from "@wealthfolio/ui/lib/formatting";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -734,8 +735,11 @@ export function MappingStepUnified() {
       return;
     }
     if (
+      // A native dialog draws its own text: no bidi isolation marks.
       !window.confirm(
-        t("activity:import.template.deleteConfirm", { name: templateName || localMapping.name }),
+        stripBidiControls(
+          t("activity:import.template.deleteConfirm", { name: templateName || localMapping.name }),
+        ),
       )
     ) {
       return;

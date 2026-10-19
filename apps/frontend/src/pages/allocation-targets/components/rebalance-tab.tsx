@@ -16,6 +16,7 @@ import {
   Icons,
   Skeleton,
   calendarDateFromLocalDate,
+  stripBidiControls,
   useAmountFormatting,
   useDateFormatting,
   type FormattingApi,
@@ -264,8 +265,10 @@ function planCashTotals(plan: RebalancePlan) {
   };
 }
 
+// Exported text leaves the screen: drop the bidi isolation marks translated
+// and formatted values carry in a right-to-left language.
 function csvCell(value: string): string {
-  const escaped = value.replace(/"/g, '""');
+  const escaped = stripBidiControls(value).replace(/"/g, '""');
   return `"${escaped}"`;
 }
 
@@ -392,7 +395,7 @@ function copyToText(
     lines.push("", t("allocation:copyText.warnings", { count: plan.warnings.length }));
     plan.warnings.forEach((w) => lines.push(`  · ${w.message}`));
   }
-  void navigator.clipboard.writeText(lines.join("\n"));
+  void navigator.clipboard.writeText(stripBidiControls(lines.join("\n")));
 }
 
 // ── Eyebrow label ─────────────────────────────────────────────────────────────
