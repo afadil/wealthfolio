@@ -96,7 +96,7 @@ function ComboboxContent({
           data-slot="combobox-content"
           data-chips={!!anchor}
           className={cn(
-            "group/combobox-content max-h-(--available-height) w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) bg-popover text-popover-foreground ring-foreground/5 data-[chips=true]:min-w-(--anchor-width) data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-start-2 data-[side=inline-start]:slide-in-from-end-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 relative min-w-[calc(var(--anchor-width)+--spacing(7))] overflow-hidden rounded-2xl shadow-2xl ring-1 duration-100 *:data-[slot=input-group]:h-11 *:data-[slot=input-group]:rounded-none *:data-[slot=input-group]:border-0 *:data-[slot=input-group]:bg-transparent *:data-[slot=input-group]:shadow-none *:data-[slot=input-group]:outline-none",
+            "group/combobox-content max-h-(--available-height) w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) bg-popover text-popover-foreground ring-foreground/5 data-[chips=true]:min-w-(--anchor-width) data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-start-2 data-[side=inline-start]:slide-in-from-end-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 rounded-(--popup-radius) relative min-w-[calc(var(--anchor-width)+--spacing(7))] overflow-hidden shadow-2xl ring-1 duration-100 *:data-[slot=input-group]:h-11 *:data-[slot=input-group]:rounded-none *:data-[slot=input-group]:border-0 *:data-[slot=input-group]:bg-transparent *:data-[slot=input-group]:shadow-none *:data-[slot=input-group]:outline-none",
             className,
           )}
           {...props}
@@ -124,7 +124,7 @@ function ComboboxItem({ className, children, ...props }: ComboboxPrimitive.Item.
     <ComboboxPrimitive.Item
       data-slot="combobox-item"
       className={cn(
-        "outline-hidden data-highlighted:bg-accent data-highlighted:text-accent-foreground not-data-[variant=destructive]:data-highlighted:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 relative flex w-full cursor-default select-none items-center gap-2.5 rounded-xl py-2 pe-8 ps-3 text-sm [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "outline-hidden data-highlighted:bg-accent data-highlighted:text-accent-foreground not-data-[variant=destructive]:data-highlighted:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 relative flex w-full cursor-default select-none items-center gap-2.5 rounded-[calc(var(--popup-radius)-0.125rem)] py-2 pe-8 ps-3 text-sm [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         className,
       )}
       {...props}
@@ -188,7 +188,7 @@ function ComboboxChips({
     <ComboboxPrimitive.Chips
       data-slot="combobox-chips"
       className={cn(
-        "border-input bg-input-bg dark:bg-input/30 min-h-input-height focus-within:outline-solid focus-within:outline-ring has-aria-invalid:border-destructive has-data-[slot=combobox-chip]:px-1.5 flex flex-wrap items-center gap-1.5 rounded-md border bg-clip-padding px-2.5 py-1.5 text-sm transition-colors focus-within:outline-2 focus-within:outline-offset-2",
+        "border-input bg-input-bg dark:bg-input/30 min-h-input-height focus-within:outline-solid focus-within:outline-ring has-aria-invalid:border-destructive has-data-[slot=combobox-chip]:px-1.5 rounded-(--control-radius) flex flex-wrap items-center gap-1.5 border bg-clip-padding px-2.5 py-1.5 text-sm transition-colors focus-within:outline-2 focus-within:outline-offset-2",
         className,
       )}
       {...props}
