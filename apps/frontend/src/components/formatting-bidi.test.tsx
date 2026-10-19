@@ -1,3 +1,4 @@
+import { formatDateISO } from "@/lib/utils";
 import { render, screen } from "@testing-library/react";
 import {
   DirectionProvider,
@@ -23,6 +24,7 @@ function Probe() {
   const amount = formatAmount(-1234.56, "USD");
   const decimal = useNumberFormatting().formatDecimal(1234.56);
   const date = formatDate(new Date("2026-10-18T12:00:00Z"));
+  const parsedDate = parseLocalizedDate(date, "en-US");
   return (
     <>
       <output aria-label="amount">{amount}</output>
@@ -33,8 +35,9 @@ function Probe() {
       <output aria-label="parsed decimal">
         {String(parseLocalizedDecimalString(decimal, "en-US"))}
       </output>
+      {/* A parsed date is local midnight; the grid stores its local calendar day. */}
       <output aria-label="parsed date">
-        {parseLocalizedDate(date, "en-US")?.toISOString().slice(0, 10) ?? "undefined"}
+        {parsedDate ? formatDateISO(parsedDate) : "undefined"}
       </output>
     </>
   );
