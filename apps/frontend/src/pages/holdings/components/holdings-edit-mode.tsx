@@ -507,6 +507,7 @@ export const HoldingsEditMode = ({
                         {/* Avg Cost */}
                         <div className="col-span-2">
                           <MoneyInput
+                            aria-label={t("holdings:avg_cost")}
                             value={holding.averageCost}
                             onValueChange={(value) =>
                               handleAverageCostChange(holding.assetId, value)
@@ -534,6 +535,7 @@ export const HoldingsEditMode = ({
                             variant="ghost"
                             size="sm"
                             onClick={() => handleRemoveHolding(holding.assetId)}
+                            aria-label={t("common:remove")}
                             className="hover:bg-destructive-subtle hover:text-destructive-subtle-foreground h-7 w-7 p-0"
                           >
                             <Icons.Trash className="h-3.5 w-3.5" />
@@ -632,6 +634,7 @@ export const HoldingsEditMode = ({
                       {/* Amount */}
                       <div className="col-span-5">
                         <MoneyInput
+                          aria-label={t("holdings:amount")}
                           ref={(el) => {
                             cashAmountInputRefs.current[cash.currency] = el;
                           }}
@@ -648,6 +651,7 @@ export const HoldingsEditMode = ({
                           variant="ghost"
                           size="sm"
                           onClick={() => handleRemoveCashBalance(cash.currency)}
+                          aria-label={t("common:remove")}
                           className="hover:bg-destructive-subtle hover:text-destructive-subtle-foreground h-7 w-7 p-0"
                         >
                           <Icons.Trash className="h-3.5 w-3.5" />

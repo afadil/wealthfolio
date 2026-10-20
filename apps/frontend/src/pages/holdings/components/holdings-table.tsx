@@ -1092,7 +1092,15 @@ const getColumns = (
       return (
         <div className="flex items-center justify-end">
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="ghost" size="sm" />}>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={t("common:actions_for", { name: holding.instrument?.symbol ?? "" })}
+                />
+              }
+            >
               <Icons.MoreVertical className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">

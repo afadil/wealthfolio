@@ -31,7 +31,8 @@
     "addModels": "Modelle hinzufügen..."
   },
   "provider": {
-    "noProvidersConfigured": "Keine Anbieter konfiguriert"
+    "noProvidersConfigured": "Keine Anbieter konfiguriert",
+    "label": "KI-Anbieter"
   },
   "reasoning": {
     "thinking": "Denkt nach...",

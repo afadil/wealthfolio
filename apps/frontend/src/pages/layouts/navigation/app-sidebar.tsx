@@ -54,7 +54,11 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                   data-tauri-drag-region="true"
                   className="draggable flex items-center justify-center pb-6"
                 >
-                  <Link to="/" className="group/logo block shrink-0 [perspective:400px]">
+                  <Link
+                    to="/"
+                    aria-label={t("common:app_name")}
+                    className="group/logo block shrink-0 [perspective:400px]"
+                  >
                     <img
                       className={cn(
                         "h-10 w-10 rounded-full bg-transparent shadow-lg transition-transform duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",

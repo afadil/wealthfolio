@@ -496,5 +496,9 @@
       "teamChanged": "가구가 변경되었습니다. 계속하려면 Wealthfolio Connect를 다시 연결하세요.",
       "rebind": "Wealthfolio Connect를 다시 연결하여 이 프로필의 계정과 가구를 확인하세요."
     }
-  }
+  },
+  "remove": "제거",
+  "remove_item": "{{name}} 제거",
+  "actions_for": "{{name}} 작업",
+  "settings_for": "{{name}} 설정"
 }

@@ -496,5 +496,9 @@
       "teamChanged": "世帯が変更されました。続行するにはWealthfolio Connectに再接続してください。",
       "rebind": "Wealthfolio Connectに再接続して、このプロフィールのアカウントと世帯を確認してください。"
     }
-  }
+  },
+  "remove": "削除",
+  "remove_item": "{{name}} を削除",
+  "actions_for": "{{name}} の操作",
+  "settings_for": "{{name}} の設定"
 }

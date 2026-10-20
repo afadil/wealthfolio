@@ -188,7 +188,7 @@ export function BenchmarkSymbolSelector({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            aria-label={iconOnly ? t("common:component.add_benchmark") : undefined}
+            aria-label={t("common:component.add_benchmark")}
             className={cn(
               "bg-secondary/30 hover:bg-muted/80 flex items-center gap-1.5 rounded-md border-dashed text-sm font-medium",
               iconOnly ? "h-9 w-9 p-0" : "h-8 px-3 py-1",

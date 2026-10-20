@@ -565,5 +565,9 @@
   "value": "القيمة",
   "view": "عرض",
   "welcome": "مرحبًا",
-  "yes": "نعم"
+  "yes": "نعم",
+  "remove": "إزالة",
+  "remove_item": "إزالة {{name}}",
+  "actions_for": "إجراءات {{name}}",
+  "settings_for": "إعدادات {{name}}"
 }

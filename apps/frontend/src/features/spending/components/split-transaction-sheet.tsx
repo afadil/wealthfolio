@@ -407,6 +407,7 @@ export function SplitTransactionSheet({
                         {currencySymbol}
                       </span>
                       <MoneyInput
+                        aria-label={t("common:amount")}
                         value={line.amount ?? 0}
                         maxDecimalPlaces={splitDecimals}
                         onValueChange={(value: number | undefined) =>

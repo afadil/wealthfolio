@@ -1088,6 +1088,7 @@
     "addSource_many": "Ajouter une source ({{count}} disponibles)",
     "overridesTitle_one": "Ajustement · {{count}}",
     "overridesTitle_other": "Ajustements · {{count}}",
-    "overridesTitle_many": "Ajustements · {{count}}"
+    "overridesTitle_many": "Ajustements · {{count}}",
+    "sourceMonth": "Mois source"
   }
 }

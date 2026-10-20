@@ -89,6 +89,7 @@ export function ActivityMobileControls({
           size="icon"
           className="size-9 flex-shrink-0"
           onClick={() => setIsFilterSheetOpen(true)}
+          aria-label={t("common:filter")}
         >
           <div className="relative">
             <Icons.ListFilter className="h-4 w-4" />

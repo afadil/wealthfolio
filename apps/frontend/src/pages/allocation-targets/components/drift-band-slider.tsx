@@ -78,6 +78,7 @@ export function DriftBandSlider({
           </div>
           <input
             type="range"
+            aria-label={t("allocation:band.relativeFactor")}
             min={MIN_RELATIVE_FACTOR}
             max={MAX_RELATIVE_FACTOR}
             step={5}
@@ -105,6 +106,9 @@ export function DriftBandSlider({
         </div>
         <input
           type="range"
+          aria-label={
+            isHybrid ? t("allocation:band.absoluteFloor") : t("allocation:band.bandWidth")
+          }
           min={MIN_DRIFT_BAND}
           max={MAX_DRIFT_BAND}
           step={0.5}

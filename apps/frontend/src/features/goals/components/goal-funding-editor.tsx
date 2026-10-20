@@ -74,9 +74,11 @@ interface Props {
 }
 
 function SharePercentInput({
+  label,
   value,
   onChange,
 }: {
+  label: string;
   value: number;
   onChange: (value: number) => void;
 }) {
@@ -111,6 +113,7 @@ function SharePercentInput({
       <input
         type="text"
         inputMode="decimal"
+        aria-label={label}
         value={draftValue}
         onFocus={() => {
           setInputFocused(true);
@@ -491,6 +494,7 @@ export function GoalFundingEditor({
                           {/* Share % input */}
                           {!isDcLinked && (
                             <SharePercentInput
+                              label={a.name}
                               value={percent}
                               onChange={(value) => updateSharePercent(a.id, value)}
                             />

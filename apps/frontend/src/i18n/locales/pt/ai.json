@@ -31,7 +31,8 @@
     "addModels": "Adicionar modelos..."
   },
   "provider": {
-    "noProvidersConfigured": "Nenhum provedor configurado"
+    "noProvidersConfigured": "Nenhum provedor configurado",
+    "label": "Provedor de IA"
   },
   "reasoning": {
     "thinking": "Pensando...",

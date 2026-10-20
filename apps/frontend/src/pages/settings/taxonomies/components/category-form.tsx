@@ -173,7 +173,7 @@ export function CategoryForm({
             {isCreateMode ? t("settings:tax_new_category") : category?.name}
           </h3>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose}>
+        <Button variant="ghost" size="icon" onClick={onClose} aria-label={t("common:close")}>
           <Icons.Close className="h-4 w-4" />
         </Button>
       </div>

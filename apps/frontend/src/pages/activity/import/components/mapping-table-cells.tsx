@@ -84,7 +84,10 @@ export function MappingHeaderCell({
           items={isRequired ? undefined : { [SKIP_FIELD_VALUE]: skipLabel }}
           onOpenChange={(open) => !open && setEditingHeader(null)}
         >
-          <SelectTrigger className={cn(MAPPING_TRIGGER_CLASS, "text-muted-foreground !h-8 w-full")}>
+          <SelectTrigger
+            aria-label={field}
+            className={cn(MAPPING_TRIGGER_CLASS, "text-muted-foreground !h-8 w-full")}
+          >
             <SelectValue
               placeholder={
                 isRequired

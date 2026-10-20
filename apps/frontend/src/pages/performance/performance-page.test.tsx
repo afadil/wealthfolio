@@ -337,6 +337,29 @@ describe("PerformancePage shared scope", () => {
     },
   );
 
+  it("keeps a comparison badge's select and remove buttons apart", async () => {
+    setScope({ type: "account", accountId: "a" });
+    renderPage();
+    await waitFor(() => expect(savedItems().some((item) => item.id === "a")).toBe(true));
+
+    for (const badge of document.querySelectorAll("[data-slot='badge']")) {
+      expect(badge).not.toHaveAttribute("role", "button");
+      for (const control of badge.querySelectorAll("button")) {
+        expect(control.querySelector("button")).toBeNull();
+      }
+    }
+
+    const [select] = screen.getAllByRole("button", {
+      name: new RegExp(`^${ALL_PORTFOLIO_ITEM.name}`),
+    });
+    expect(select).toHaveAttribute("aria-pressed", "false");
+    select.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(
+      screen.getAllByRole("button", { name: new RegExp(`^${ALL_PORTFOLIO_ITEM.name}`) })[0],
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("keeps a newly bridged selection when StrictMode replays mount-time pruning", async () => {
     localStorage.setItem(
       "performance:selectedItems",

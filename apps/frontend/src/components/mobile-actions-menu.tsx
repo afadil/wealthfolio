@@ -35,7 +35,16 @@ export function MobileActionsMenu({
   const { t } = useTranslation();
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetTrigger render={<Button variant="outline" size="icon" className="h-9 w-9" />}>
+      <SheetTrigger
+        render={
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-9 w-9"
+            aria-label={title ?? t("common:actions")}
+          />
+        }
+      >
         <Icons.MoreVertical className="h-4 w-4" />
       </SheetTrigger>
       <SheetContent side="bottom" className="rounded-t-4xl mx-1 p-0">

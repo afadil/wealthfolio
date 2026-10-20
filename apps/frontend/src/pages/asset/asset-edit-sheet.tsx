@@ -56,7 +56,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/compon
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import type { TFunction } from "i18next";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { type Path, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import * as z from "zod";
@@ -197,21 +197,33 @@ function PricingModeToggle({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const isAutomatic = !isManualMode;
+  // The switch inside the trigger is hidden from assistive tech, so the
+  // on/off description names the current state instead.
+  const descriptionId = useId();
 
   return (
     <div className="rounded-lg border p-4">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0 flex-1 space-y-1">
           <Label className="text-sm font-medium">{t("asset:editSheet.automatic_updates")}</Label>
-          <p className="text-muted-foreground text-xs">
+          <p id={descriptionId} className="text-muted-foreground text-xs">
             {isAutomatic
               ? t("asset:editSheet.automatic_on_description")
               : t("asset:editSheet.automatic_off_description")}
           </p>
         </div>
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger render={<button type="button" className="shrink-0" />}>
-            <Switch checked={isAutomatic} />
+          <PopoverTrigger
+            render={
+              <button
+                type="button"
+                className="shrink-0"
+                aria-label={t("asset:editSheet.automatic_updates")}
+                aria-describedby={descriptionId}
+              />
+            }
+          >
+            <Switch checked={isAutomatic} tabIndex={-1} aria-hidden="true" />
           </PopoverTrigger>
           <PopoverContent className="w-90 p-4" align="end">
             <div className="space-y-4">
@@ -440,7 +452,14 @@ function SymbolMappingRow({
         />
       </td>
       <td className="px-2 py-2">
-        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onRemove}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={onRemove}
+          aria-label={t("common:remove")}
+        >
           <Icons.Close className="h-4 w-4" />
         </Button>
       </td>
@@ -775,6 +794,7 @@ export function AssetEditSheet({
                             {t("asset:editSheet.base_currency")}
                           </label>
                           <Input
+                            aria-label={t("asset:editSheet.base_currency")}
                             value={asset.instrumentSymbol ?? ""}
                             disabled
                             className="bg-muted/50"
@@ -784,7 +804,12 @@ export function AssetEditSheet({
                           <label className="text-sm font-medium">
                             {t("asset:editSheet.quote_currency")}
                           </label>
-                          <Input value={asset.quoteCcy ?? ""} disabled className="bg-muted/50" />
+                          <Input
+                            aria-label={t("asset:editSheet.quote_currency")}
+                            value={asset.quoteCcy ?? ""}
+                            disabled
+                            className="bg-muted/50"
+                          />
                         </div>
                       </div>
 
@@ -861,7 +886,12 @@ export function AssetEditSheet({
                           <label className="text-sm font-medium">
                             {t("asset:editSheet.symbol")}
                           </label>
-                          <Input value={asset.displayCode ?? ""} disabled className="bg-muted/50" />
+                          <Input
+                            aria-label={t("asset:editSheet.symbol")}
+                            value={asset.displayCode ?? ""}
+                            disabled
+                            className="bg-muted/50"
+                          />
                         </div>
                         <FormField
                           control={form.control}

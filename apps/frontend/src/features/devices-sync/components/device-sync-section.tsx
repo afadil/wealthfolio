@@ -1234,6 +1234,7 @@ function DeviceCard({
               <Input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
+                aria-label={t("common:name")}
                 className="h-7 w-full max-w-40 text-sm"
                 maxLength={64}
                 autoFocus

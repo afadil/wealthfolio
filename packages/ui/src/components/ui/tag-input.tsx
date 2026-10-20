@@ -3,6 +3,7 @@ import { Button } from "./button";
 import { cn, isKeyboardEventComposing } from "../../lib/utils";
 import { Icons } from "./icons";
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 
 type InputProps = React.ComponentProps<"input">;
 
@@ -13,6 +14,7 @@ type InputTagsProps = Omit<InputProps, "value" | "onChange"> & {
 
 const InputTags = React.forwardRef<HTMLInputElement, InputTagsProps>(
   ({ className, value, onChange, ...props }, ref) => {
+    const { t } = useTranslation();
     const [pendingDataPoint, setPendingDataPoint] = React.useState("");
 
     React.useEffect(() => {
@@ -47,6 +49,7 @@ const InputTags = React.forwardRef<HTMLInputElement, InputTagsProps>(
               variant="ghost"
               size="icon"
               className="ms-2 h-3 w-3"
+              aria-label={t("ui:remove", "Remove {{label}}", { label: item })}
               onClick={() => {
                 onChange(value.filter((i: string) => i !== item));
               }}

@@ -199,6 +199,7 @@ export function AssetsTableMobile({
           size="icon"
           className="relative size-10 flex-shrink-0"
           onClick={() => setIsFilterSheetOpen(true)}
+          aria-label={t("common:filter")}
         >
           <Icons.ListFilter className="h-4 w-4" />
           {hasActiveFilters && (

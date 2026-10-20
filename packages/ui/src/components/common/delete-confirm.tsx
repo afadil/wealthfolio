@@ -33,6 +33,7 @@ export const DeleteConfirm = ({
               variant="ghost"
               size="sm"
               className="text-destructive hover:text-destructive h-7 w-7 p-0"
+              aria-label={deleteConfirmTitle}
               onClick={(e) => {
                 e.stopPropagation(); // Prevent accordion from toggling
               }}

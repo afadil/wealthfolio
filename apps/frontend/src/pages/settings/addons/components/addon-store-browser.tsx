@@ -240,7 +240,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
             if (value !== null) setSortBy(value as "popular" | "rating" | "recent" | "name");
           }}
         >
-          <SelectTrigger className="sm:w-45 w-full">
+          <SelectTrigger className="sm:w-45 w-full" aria-label={t("holdings:sort_by")}>
             <SelectValue placeholder={t("settings:addon_store_sort_placeholder")} />
           </SelectTrigger>
           <SelectContent>
@@ -264,7 +264,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
             if (value !== null) setFilterBy(value as "all" | "uninstalled");
           }}
         >
-          <SelectTrigger className="sm:w-45 w-full">
+          <SelectTrigger className="sm:w-45 w-full" aria-label={t("common:filter")}>
             <SelectValue placeholder={t("settings:addon_store_filter_placeholder")} />
           </SelectTrigger>
           <SelectContent>

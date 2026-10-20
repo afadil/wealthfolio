@@ -415,6 +415,7 @@ export default function GoalNewPage() {
                         <Label htmlFor="goal-target-amount">{t("goals:new.target_amount")}</Label>
                         <MoneyInput
                           name="goal-target-amount"
+                          aria-label={t("goals:new.target_amount")}
                           value={targetAmount}
                           onValueChange={(value) => setTargetAmount(value ?? 0)}
                           thousandSeparator

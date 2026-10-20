@@ -1074,7 +1074,9 @@
     "imported_count_other": "{{count}} importate",
     "failed_count_one": "{{count}} non riuscita",
     "failed_count_many": "{{count}} non riuscite",
-    "failed_count_other": "{{count}} non riuscite"
+    "failed_count_other": "{{count}} non riuscite",
+    "priority_decrease": "Riduci il numero di priorità",
+    "priority_increase": "Aumenta il numero di priorità"
   },
   "addon_permission_none_detected": "Nessun permesso di accesso ai dati rilevato. Questo add-on sembra avere un accesso minimo al sistema.",
   "addon_permission_list_title": "Permessi",

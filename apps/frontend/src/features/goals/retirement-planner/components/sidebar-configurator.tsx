@@ -664,6 +664,7 @@ export function SidebarConfigurator({
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
                   <input
                     type="month"
+                    aria-label={t("goals:sidebar.plan.birth_month")}
                     value={birthYearMonth}
                     max={maxBirthYearMonth}
                     onChange={(e) => updateBirthYearMonth(e.target.value)}

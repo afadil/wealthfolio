@@ -141,6 +141,7 @@ export function ModuleCard() {
                 : t("settings:spending.module.disabled")}
             </span>
             <Switch
+              aria-label={t("settings:spending.title")}
               checked={enabled}
               onCheckedChange={handleToggle}
               disabled={isLoading || mutation.isPending}

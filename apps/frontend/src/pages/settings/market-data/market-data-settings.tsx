@@ -291,6 +291,7 @@ function ProviderSettings({
                   variant="ghost"
                   size="icon"
                   className="text-muted-foreground hover:text-foreground h-8 w-8"
+                  aria-label={t("common:settings_for", { name: provider.name })}
                 />
               }
             >
@@ -298,6 +299,7 @@ function ProviderSettings({
             </CollapsibleTrigger>
             <Switch
               id={`${provider.id}-enabled`}
+              aria-label={provider.name}
               checked={provider.enabled}
               onCheckedChange={(checked) => onUpdate({ enabled: checked })}
               className="data-checked:bg-success"
@@ -455,6 +457,7 @@ function ProviderSettings({
                         variant="outline"
                         size="icon"
                         className="h-7 w-7 rounded-e-none"
+                        aria-label={t("settings:market_data_page.priority_decrease")}
                         onClick={() => {
                           const newVal = Math.max(1, (priorityValue ?? 1) - 1);
                           onPriorityChange(String(newVal));
@@ -470,6 +473,7 @@ function ProviderSettings({
                         variant="outline"
                         size="icon"
                         className="h-7 w-7 rounded-s-none"
+                        aria-label={t("settings:market_data_page.priority_increase")}
                         onClick={() => {
                           const newVal = (priorityValue ?? 1) + 1;
                           onPriorityChange(String(newVal));
@@ -618,6 +622,7 @@ function CustomProviderCard({
         <div className="flex shrink-0 items-center gap-2">
           <Switch
             id={`${provider.id}-enabled`}
+            aria-label={provider.name}
             checked={provider.enabled}
             onCheckedChange={onToggleEnabled}
             disabled={isToggling}
@@ -628,6 +633,7 @@ function CustomProviderCard({
             size="icon"
             className="text-muted-foreground hover:text-foreground h-8 w-8"
             onClick={onEdit}
+            aria-label={t("settings:market_data_page.edit_custom_provider")}
           >
             <Icons.Pencil className="h-4 w-4" />
           </Button>

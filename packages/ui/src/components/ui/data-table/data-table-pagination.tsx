@@ -80,7 +80,10 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
               table.setPageSize(Number(value));
             }}
           >
-            <SelectTrigger className="sm:w-sidebar-collapsed w-17.5 h-9 transition-colors sm:h-8">
+            <SelectTrigger
+              className="sm:w-sidebar-collapsed w-17.5 h-9 transition-colors sm:h-8"
+              aria-label={t("ui:dataTable.rowsPerPage", "Rows per page")}
+            >
               <SelectValue placeholder={pageSize} />
             </SelectTrigger>
             <SelectContent side="top">

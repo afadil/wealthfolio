@@ -566,6 +566,7 @@ export function PlannerInput({
           {currencySymbol(currency, amountFormatting)}
         </span>
         <input
+          aria-label={t("allocation:planner.cashToDeploy")}
           value={cashValue}
           onChange={(e) => onCashChange(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && canCalculate && onCalculate()}
@@ -578,6 +579,7 @@ export function PlannerInput({
 
       <input
         type="range"
+        aria-label={t("allocation:planner.cashToDeploy")}
         min={0}
         max={limit || 1}
         step={limit > 0 ? Math.max(limit / 1000, 10 ** -fraction) : 1}

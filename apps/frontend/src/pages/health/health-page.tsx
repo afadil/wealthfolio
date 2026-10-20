@@ -181,6 +181,7 @@ function HealthIssueRow({
             onDismiss();
           }}
           disabled={isDismissing}
+          aria-label={t("health:detail.dismiss")}
         >
           {isDismissing ? <Spinner className="h-3.5 w-3.5" /> : <Icons.X className="h-3.5 w-3.5" />}
         </Button>
@@ -290,6 +291,7 @@ export default function HealthPage() {
         onClick={handleRefresh}
         disabled={runChecksMutation.isPending}
         className="h-8"
+        aria-label={t("common:refresh")}
       >
         {runChecksMutation.isPending ? (
           <Spinner className="h-4 w-4" />

@@ -832,6 +832,7 @@ function DateRow({
         </div>
       </div>
       <DatePickerInput
+        aria-label={label}
         value={value || undefined}
         onChange={(date) => onChange(date ? formatDateISO(date) : "")}
       />

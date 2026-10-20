@@ -45,6 +45,7 @@ export function TemplatePicker({
             variant="outline"
             role="combobox"
             aria-expanded={open}
+            aria-label={t("activity:import.template.label")}
             className="w-full justify-between rounded-lg font-normal"
           />
         }
