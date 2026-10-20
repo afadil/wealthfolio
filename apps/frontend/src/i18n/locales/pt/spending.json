@@ -998,7 +998,7 @@
     "interval3M": "últimos 3 meses",
     "interval6M": "últimos 6 meses",
     "intervalYtd": "no ano",
-    "interval1Y": "último ano",
+    "intervalLastYear": "último ano",
     "plusMore_one": "+ {{count}} mais",
     "plusMore_other": "+ {{count}} mais",
     "plusMore_many": "+ {{count}} mais"

@@ -938,7 +938,7 @@
     "interval3M": "直近3ヶ月",
     "interval6M": "直近6ヶ月",
     "intervalYtd": "年初来",
-    "interval1Y": "直近1年",
+    "intervalLastYear": "直近1年",
     "plusMore_other": "+ 他{{count}}件"
   },
   "budgetEditor": {

@@ -18,9 +18,9 @@ import {
   type ZonedCalendarDate,
 } from "./timezone";
 
-export type ReportsPeriod = "MTD" | "LAST_MONTH" | "3M" | "6M" | "YTD" | "1Y";
+export type ReportsPeriod = "MTD" | "LAST_MONTH" | "3M" | "6M" | "YTD" | "LAST_YEAR";
 
-export const REPORTS_PERIODS: ReportsPeriod[] = ["MTD", "LAST_MONTH", "3M", "6M", "YTD", "1Y"];
+export const REPORTS_PERIODS: ReportsPeriod[] = ["MTD", "LAST_MONTH", "3M", "6M", "YTD", "LAST_YEAR"];
 
 export const DEFAULT_REPORTS_PERIOD: ReportsPeriod = "MTD";
 
@@ -84,10 +84,10 @@ export function periodToReportsRange(
         };
       case "YTD":
         return { start: { year: today.year, month: 1, day: 1 }, end: today };
-      case "1Y":
+      case "LAST_YEAR":
         return {
-          start: addCalendarMonths({ year: today.year, month: today.month, day: 1 }, -11),
-          end: today,
+          start: { year: today.year - 1, month: 1, day: 1 },
+          end: { year: today.year - 1, month: 12, day: 31 },
         };
     }
   })();
@@ -147,7 +147,7 @@ export function periodLabel(period: ReportsPeriod): string {
       return "Past 6 months";
     case "YTD":
       return "Year to date";
-    case "1Y":
+    case "LAST_YEAR":
       return "Past year";
   }
 }
