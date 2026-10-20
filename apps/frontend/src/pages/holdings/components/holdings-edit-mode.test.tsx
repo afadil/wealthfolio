@@ -236,9 +236,7 @@ describe("HoldingsEditMode cost fields", () => {
     });
 
     // Displayed with the user's locale (comma), not the canonical "."…
-    const displayedAverageCost = screen.getByTestId(
-      "holding-average-cost-AAPL",
-    ) as HTMLInputElement;
+    const displayedAverageCost = screen.getByTestId<HTMLInputElement>("holding-average-cost-AAPL");
     expect(displayedAverageCost.value).toContain(",");
     expect(displayedAverageCost.value).not.toContain(".");
 
@@ -252,5 +250,52 @@ describe("HoldingsEditMode cost fields", () => {
         expect.any(String),
       ),
     );
+  });
+
+  it.each([
+    ["1000000000", "25", "0.000000025"],
+    ["1000000000000", "25", "0.000000000025"],
+    ["1000000000", "0.01", "0.00000000001"],
+    ["999999999", "25", "0.000000025000000025"],
+    ["1000000000", "1", "0.000000001"],
+  ])(
+    "persists an extreme average cost for %s shares over a %s total",
+    async (shares, total, expectedAverageCost) => {
+      const saveMock = vi.mocked(saveManualHoldings);
+      saveMock.mockClear();
+      renderEditMode();
+
+      fireEvent.change(screen.getByTestId("holding-shares-AAPL"), {
+        target: { value: shares },
+      });
+      fireEvent.change(screen.getByTestId("holding-total-cost-AAPL"), {
+        target: { value: total },
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+      await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+      expect(saveMock.mock.calls[0]?.[1]?.[0]?.averageCost).toBe(expectedAverageCost);
+    },
+  );
+
+  it("shows and persists the precise average cost", async () => {
+    const saveMock = vi.mocked(saveManualHoldings);
+    saveMock.mockClear();
+    renderEditMode();
+
+    fireEvent.change(screen.getByTestId("holding-shares-AAPL"), {
+      target: { value: "1000000000" },
+    });
+    fireEvent.change(screen.getByTestId("holding-total-cost-AAPL"), {
+      target: { value: "25" },
+    });
+
+    // The field shows the derived value instead of rounding it to 8 decimals,
+    // and the payload matches so the saved cost basis is 1e9 × 0.000000025 = 25.
+    expect(screen.getByTestId("holding-average-cost-AAPL")).toHaveValue("0.000000025");
+
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    expect(saveMock.mock.calls[0]?.[1]?.[0]?.averageCost).toBe("0.000000025");
   });
 });

@@ -88,6 +88,9 @@ const CANONICAL_DECIMAL = new Intl.NumberFormat("en-US", {
 });
 const formatCost = (value: number): string => CANONICAL_DECIMAL.format(value);
 
+/** Total ÷ shares can be far below the money default of 8 decimals; show more. */
+const AVERAGE_COST_DISPLAY_DECIMALS = 15;
+
 /** Blank clears the linked field; without a share count it returns null (leave it). */
 const deriveCostText = (sharesText: string, text: string, derive: CostMath): string | null => {
   if (text === "") return "";
@@ -576,6 +579,7 @@ export const HoldingsEditMode = ({
                             onValueChange={(value, isUserEdit) =>
                               handleAverageCostChange(holding.assetId, value, isUserEdit)
                             }
+                            maxDecimalPlaces={AVERAGE_COST_DISPLAY_DECIMALS}
                             data-testid={`holding-average-cost-${holding.assetId}`}
                             className="h-8 text-sm"
                           />
