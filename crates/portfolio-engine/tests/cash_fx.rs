@@ -657,6 +657,7 @@ fn an_unexplained_cash_value_difference_is_not_assigned_to_fx() {
         &lots,
         &p.bundle.disposals,
         &p.bundle.rejected_activities(),
+        MeasureProfile::Full,
     );
     let result = measure_scope(
         &inputs,
@@ -714,7 +715,7 @@ fn unmarked_same_account_pairs_keep_their_execution_difference_as_capital() {
 }
 
 #[test]
-fn a_window_cutting_a_conversion_counts_only_its_in_period_legs() {
+fn a_window_cutting_a_conversion_does_not_attribute_principal_as_fx() {
     let p = pipeline(
         r#"
 id: CASH-FX-CONVERSION-WINDOW
@@ -734,10 +735,11 @@ fx_rates:
     );
     let lots = p.lots();
     let inputs = p.measure_inputs(&lots);
-    for (start, end, expected) in [
-        ("2026-01-01", "2026-01-02", dec!(-100)),
-        ("2026-01-02", "2026-01-04", dec!(117)),
-        ("2026-01-03", "2026-01-04", dec!(9)),
+    for (start, end, expected, unexplained) in [
+        ("2026-01-01", "2026-01-02", dec!(0), dec!(-100)),
+        ("2026-01-02", "2026-01-04", dec!(9), dec!(108)),
+        ("2026-01-03", "2026-01-04", dec!(9), dec!(0)),
+        ("2026-01-01", "2026-01-04", dec!(17), dec!(0)),
     ] {
         let window = Window {
             start: Some(start.parse().unwrap()),
@@ -758,8 +760,218 @@ fx_rates:
                 measure_account(&inputs, &account, window, MeasureProfile::Summary, false)
             }
             .unwrap();
-            assert_complete(&result, expected);
+            assert_eq!(result.summary.amount, Some(expected));
+            assert_eq!(result.attribution.fx_effect, expected);
+            assert_transfer_residual(&result, unexplained);
         }
+    }
+}
+
+fn assert_transfer_residual(result: &PerformanceResult, expected: Decimal) {
+    let residual = result.data_quality.warnings.iter().find_map(|note| {
+        if let QualityNote::AttributionIncomplete { difference, .. } = note {
+            Some(*difference)
+        } else {
+            None
+        }
+    });
+    assert_eq!(residual, (!expected.is_zero()).then_some(expected));
+    if !expected.is_zero() {
+        assert_eq!(result.data_quality.status, QualityStatus::Partial);
+    }
+}
+
+fn split_cash_transfer(currency: &str, moving_fx: bool) -> Pipeline {
+    let (incoming, middle_rate, end_rate) = if moving_fx {
+        (dec!(90), dec!(1.2), dec!(1.3))
+    } else {
+        (dec!(100), dec!(1), dec!(1))
+    };
+    pipeline(&format!(
+        r#"
+id: SPLIT-TRANSFER-TWO-ACCOUNTS
+policy: {{ base_currency: USD, timezone: UTC, as_of: 2026-01-04 }}
+accounts:
+  - {{ id: sender, currency: USD }}
+  - {{ id: receiver, currency: {currency} }}
+activities:
+  - {{ id: dep, account: sender, type: DEPOSIT, date: 2026-01-01T10:00:00Z, amount: 1000 }}
+  - {{ id: receiver-dep, account: receiver, type: DEPOSIT, date: 2026-01-01T10:00:00Z, amount: 1 }}
+  - {{ id: out, account: sender, type: TRANSFER_OUT, date: 2026-01-02T10:00:00Z, amount: 100, source_group_id: pair }}
+  - {{ id: in, account: receiver, type: TRANSFER_IN, date: 2026-01-03T10:00:00Z, amount: {incoming}, source_group_id: pair }}
+fx_rates:
+  - {{ from: EUR, to: USD, day: 2026-01-01, rate: 1 }}
+  - {{ from: EUR, to: USD, day: 2026-01-02, rate: {middle_rate} }}
+  - {{ from: EUR, to: USD, day: 2026-01-03, rate: {middle_rate} }}
+  - {{ from: EUR, to: USD, day: 2026-01-04, rate: {end_rate} }}
+"#
+    ))
+}
+
+#[test]
+fn split_transfers_between_two_accounts_do_not_turn_principal_into_fx() {
+    for currency in ["USD", "EUR"] {
+        let p = split_cash_transfer(currency, false);
+        let lots = p.lots();
+        let inputs = p.measure_inputs(&lots);
+        for (start, end, unexplained) in [
+            ("2026-01-01", "2026-01-02", dec!(-100)),
+            ("2026-01-02", "2026-01-04", dec!(100)),
+            ("2026-01-01", "2026-01-04", dec!(0)),
+            ("2026-01-03", "2026-01-04", dec!(0)),
+        ] {
+            let window = Window {
+                start: Some(start.parse().unwrap()),
+                end: Some(end.parse().unwrap()),
+            };
+            for profile in [MeasureProfile::Full, MeasureProfile::Summary] {
+                let result = measure_scope(
+                    &inputs,
+                    "both",
+                    &p.portfolio_scope(),
+                    window,
+                    profile,
+                    false,
+                )
+                .unwrap();
+                assert_eq!(result.summary.amount, Some(Decimal::ZERO));
+                assert_eq!(result.attribution.fx_effect, Decimal::ZERO);
+                assert_transfer_residual(&result, unexplained);
+                let dashboard = measure_scope(
+                    &inputs,
+                    "both",
+                    &p.portfolio_scope(),
+                    window,
+                    MeasureProfile::Dashboard,
+                    false,
+                )
+                .unwrap();
+                assert_eq!(dashboard.summary.amount, Some(unexplained));
+                assert_eq!(result.returns.twr, dashboard.returns.twr);
+            }
+            for account in p.portfolio_scope() {
+                let result =
+                    measure_account(&inputs, &account, window, MeasureProfile::Summary, false)
+                        .unwrap();
+                assert_complete(&result, Decimal::ZERO);
+            }
+        }
+    }
+}
+
+#[test]
+fn split_transfers_keep_actual_cash_fx_and_complete_pair_execution_gains() {
+    let p = split_cash_transfer("EUR", true);
+    let lots = p.lots();
+    let inputs = p.measure_inputs(&lots);
+    for (start, end, expected, unexplained) in [
+        ("2026-01-01", "2026-01-02", dec!(0.2), dec!(-100)),
+        ("2026-01-02", "2026-01-04", dec!(9.1), dec!(108)),
+        ("2026-01-03", "2026-01-04", dec!(9.1), dec!(0)),
+        ("2026-01-01", "2026-01-04", dec!(17.3), dec!(0)),
+    ] {
+        let result = measure_scope(
+            &inputs,
+            "both",
+            &p.portfolio_scope(),
+            Window {
+                start: Some(start.parse().unwrap()),
+                end: Some(end.parse().unwrap()),
+            },
+            MeasureProfile::Summary,
+            false,
+        )
+        .unwrap();
+        assert_eq!(result.attribution.fx_effect, expected);
+        assert_eq!(result.summary.amount, Some(expected));
+        assert_transfer_residual(&result, unexplained);
+    }
+}
+
+#[test]
+fn dashboard_preparation_skips_cash_fx_without_changing_its_outputs() {
+    let p = Pipeline::from_scenario(&scenario("SECURITIES", dec!(1000), dec!(1)));
+    let lots = p.lots();
+    let full_inputs = p.measure_inputs(&lots);
+    let scope = p.portfolio_scope();
+    for profile in [
+        MeasureProfile::Full,
+        MeasureProfile::Summary,
+        MeasureProfile::Dashboard,
+    ] {
+        let inputs = p.engine.measure_inputs(
+            &p.series,
+            &lots,
+            &p.bundle.disposals,
+            &p.bundle.rejected_activities(),
+            profile,
+        );
+        assert_eq!(
+            inputs.effects.cash_fx.is_empty(),
+            profile == MeasureProfile::Dashboard
+        );
+        for scoped in [false, true] {
+            let measure = |inputs: &wealthfolio_portfolio_engine::MeasureInputs<'_>| {
+                if scoped {
+                    measure_scope(inputs, "scope", &scope, Window::default(), profile, true)
+                } else {
+                    measure_account(inputs, &scope[0], Window::default(), profile, true)
+                }
+                .unwrap()
+            };
+            let result = measure(&inputs);
+            assert_eq!(
+                serde_json::to_value(&result).unwrap(),
+                serde_json::to_value(measure(&full_inputs)).unwrap()
+            );
+            assert_complete(&result, dec!(-100.1));
+        }
+    }
+}
+
+#[test]
+fn missing_cash_fx_keeps_known_days_and_marks_the_subtotal_partial() {
+    let mut scenario = scenario("CASH", dec!(1000), dec!(0));
+    scenario.policy.as_of = "2026-01-03".parse().unwrap();
+    let mut next = scenario.fx_rates.last().unwrap().clone();
+    next.day = scenario.policy.as_of;
+    next.rate = support::Dec(dec!(6.8));
+    scenario.fx_rates.push(next);
+    let p = Pipeline::from_scenario(&scenario);
+    let lots = p.lots();
+    let mut inputs = p.measure_inputs(&lots);
+    let scope = p.portfolio_scope();
+    let days = inputs.effects.cash_fx.get_mut(&scope[0]).unwrap();
+    assert_eq!(days.len(), 2);
+    days[0].amount = None;
+    for scoped in [false, true] {
+        let result = if scoped {
+            measure_scope(
+                &inputs,
+                "scope",
+                &scope,
+                Window::default(),
+                MeasureProfile::Summary,
+                false,
+            )
+        } else {
+            measure_account(
+                &inputs,
+                &scope[0],
+                Window::default(),
+                MeasureProfile::Summary,
+                false,
+            )
+        }
+        .unwrap();
+        assert_eq!(result.attribution.fx_effect, dec!(-100));
+        assert_eq!(result.summary.amount, Some(dec!(-100)));
+        assert_eq!(result.summary.quality, QualityStatus::Partial);
+        assert!(result
+            .summary
+            .reasons
+            .iter()
+            .any(|note| matches!(note, QualityNote::CashFxUnavailable { .. })));
     }
 }
 

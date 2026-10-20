@@ -1552,6 +1552,9 @@ fn cash_fx_attribution(
     };
     let mut set = EffectSet::default();
     let mut total = Decimal::ZERO;
+    // Keep known daily FX when another day is unavailable. The warning marks
+    // the result Partial; completeness is not used to substitute a fallback
+    // here, unlike the scoped investment seed.
     for account in scope {
         let mut warned = false;
         for day in inputs
@@ -1569,7 +1572,6 @@ fn cash_fx_attribution(
                         account: account.as_str().to_string(),
                         date: day.date,
                     });
-                    set.complete = false;
                     warned = true;
                 }
                 None => {}
@@ -2253,13 +2255,13 @@ fn transfer_pair_effects(
         {
             continue;
         }
-        let priced = |leg: &EventEffect| {
-            if period.contains(leg.date) {
-                leg.flow.map_or(Decimal::ZERO, |flow| flow.amount)
-            } else {
-                Decimal::ZERO
-            }
-        };
+        // A cut pair leaves principal in transit under the valuation rules.
+        // It is an unreconciled delta, not an execution FX gain or loss.
+        // Only a window containing both legs can attribute their difference.
+        if !period.contains(transfer_in.date) || !period.contains(transfer_out.date) {
+            continue;
+        }
+        let priced = |leg: &EventEffect| leg.flow.map_or(Decimal::ZERO, |flow| flow.amount);
         let (in_base, out_base) = (priced(transfer_in), priced(transfer_out));
         if in_base.is_zero() && out_base.is_zero() {
             continue;
