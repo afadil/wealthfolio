@@ -400,6 +400,7 @@ function SymbolMappingRow({
             <FormItem>
               <FormControl>
                 <ResponsiveSelect
+                  aria-label={t("asset:editSheet.data_provider")}
                   value={providerField.value as string | undefined}
                   onValueChange={providerField.onChange}
                   options={mappingProviderOptions}

@@ -1320,6 +1320,7 @@ function PropertyMortgageSection({
             ) : (
               <div className="space-y-2">
                 <ResponsiveSelect
+                  aria-label={t("asset:detailsSheet.link_mortgage")}
                   value={selectedMortgageId}
                   onValueChange={setSelectedMortgageId}
                   options={availableMortgages.map((m) => ({
