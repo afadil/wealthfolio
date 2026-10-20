@@ -505,5 +505,9 @@
       "teamChanged": "Hộ gia đình của bạn đã thay đổi. Kết nối lại Wealthfolio Connect để tiếp tục.",
       "rebind": "Kết nối lại Wealthfolio Connect để xác nhận tài khoản và hộ gia đình của hồ sơ này."
     }
-  }
+  },
+  "remove": "Xóa",
+  "remove_item": "Xóa {{name}}",
+  "actions_for": "Thao tác cho {{name}}",
+  "settings_for": "Cài đặt {{name}}"
 }

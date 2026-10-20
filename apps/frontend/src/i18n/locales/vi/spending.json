@@ -1031,6 +1031,7 @@
     "addSource_one": "Thêm nguồn ({{count}} khả dụng)",
     "addSource_other": "Thêm nguồn ({{count}} khả dụng)",
     "overridesTitle_one": "Ghi đè · {{count}}",
-    "overridesTitle_other": "Ghi đè · {{count}}"
+    "overridesTitle_other": "Ghi đè · {{count}}",
+    "sourceMonth": "Tháng nguồn"
   }
 }

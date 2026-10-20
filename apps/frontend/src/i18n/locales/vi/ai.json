@@ -31,7 +31,8 @@
     "addModels": "Thêm mô hình..."
   },
   "provider": {
-    "noProvidersConfigured": "Chưa cấu hình nhà cung cấp nào"
+    "noProvidersConfigured": "Chưa cấu hình nhà cung cấp nào",
+    "label": "Nhà cung cấp AI"
   },
   "reasoning": {
     "thinking": "Đang suy nghĩ...",
