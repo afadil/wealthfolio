@@ -1,78 +1,83 @@
 import { saveManualHoldings } from "@/adapters";
-import { HoldingType, QuoteMode } from "@/lib/constants";
+import { AccountType, HoldingType } from "@/lib/constants";
 import type { Account, Holding } from "@/lib/types";
-import { fireEvent, render, screen, waitFor } from "@/test/render";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { FormattingProvider } from "@wealthfolio/ui";
 import { describe, expect, it, vi } from "vitest";
-
 import { HoldingsEditMode } from "./holdings-edit-mode";
 
 vi.mock("@/adapters", () => ({
+  deleteSnapshot: vi.fn(),
   getSnapshotByDate: vi.fn(),
   saveManualHoldings: vi.fn(),
-  deleteSnapshot: vi.fn(),
 }));
-
-vi.mock("@/components/ticker-search", () => ({
-  default: () => null,
-}));
+vi.mock("@/components/ticker-avatar", () => ({ TickerAvatar: () => null }));
+vi.mock("@/components/ticker-search", () => ({ default: () => null }));
 
 const account: Account = {
   id: "account-1",
   name: "Brokerage",
-  accountType: "SECURITIES" as Account["accountType"],
+  accountType: AccountType.SECURITIES,
   balance: 0,
   currency: "USD",
-  isDefault: true,
+  isDefault: false,
   isActive: true,
   isArchived: false,
-  trackingMode: "HOLDINGS" as Account["trackingMode"],
-  createdAt: new Date(),
-  updatedAt: new Date(),
+  trackingMode: "HOLDINGS",
+  createdAt: new Date("2026-01-01"),
+  updatedAt: new Date("2026-01-01"),
 };
+
+const holdings: Holding[] = ["INR", "USD", "JPY", "KWD"].map((currency) => ({
+  id: `asset-${currency}`,
+  accountId: account.id,
+  holdingType: HoldingType.SECURITY,
+  quantity: 1000,
+  localCurrency: currency,
+  baseCurrency: "USD",
+  costBasis: { local: 1234560, base: 1234560 },
+  marketValue: { local: 1234560, base: 1234560 },
+  weight: 1 / 3,
+  asOfDate: "2026-09-01",
+}));
 
 const makeHolding = (overrides: Partial<Holding> = {}): Holding => ({
   id: "AAPL",
-  accountId: "account-1",
+  accountId: account.id,
   holdingType: HoldingType.SECURITY,
   quantity: 10,
   localCurrency: "USD",
   baseCurrency: "USD",
-  marketValue: { local: 250, base: 250 },
   costBasis: { local: 250, base: 250 },
-  weight: 100,
+  marketValue: { local: 250, base: 250 },
+  weight: 1,
   asOfDate: "2026-01-01",
-  instrument: {
-    id: "AAPL",
-    symbol: "AAPL",
-    currency: "USD",
-    quoteMode: QuoteMode.MARKET,
-  },
   ...overrides,
 });
 
-const holdingFor = (symbol: string): Holding =>
-  makeHolding({
-    id: symbol,
-    instrument: { id: symbol, symbol, currency: "USD", quoteMode: QuoteMode.MARKET },
-  });
+const holdingFor = (symbol: string): Holding => makeHolding({ id: symbol });
 
-const renderHoldings = (holdings: Holding[], locale = "en-US") =>
+const renderHoldings = (list: Holding[], locale = "US") =>
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <HoldingsEditMode holdings={holdings} account={account} isLoading={false} onClose={vi.fn()} />
+      <FormattingProvider locale={locale}>
+        <HoldingsEditMode holdings={list} account={account} isLoading={false} onClose={vi.fn()} />
+      </FormattingProvider>
     </QueryClientProvider>,
-    {
-      wrapper: ({ children }) => (
-        <FormattingProvider locale={locale}>{children}</FormattingProvider>
-      ),
-    },
   );
 
-const renderEditMode = (holding: Holding = makeHolding()) => renderHoldings([holding]);
+const renderEditMode = (holding: Holding = makeHolding(), locale = "US") =>
+  renderHoldings([holding], locale);
 
 describe("HoldingsEditMode cost fields", () => {
+  it("shows each row's cost basis in the editable Total", () => {
+    renderHoldings(holdings);
+
+    expect(screen.getByTestId("holding-total-cost-asset-INR")).toHaveValue("1234560");
+    expect(screen.getByTestId("holding-average-cost-asset-INR")).toHaveValue("1234.56");
+  });
+
   it("recomputes cost per share when total cost is edited", () => {
     renderEditMode();
     const averageCost = screen.getByTestId("holding-average-cost-AAPL");
