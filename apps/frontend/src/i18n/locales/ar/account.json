@@ -29,12 +29,22 @@
   "add_account": "إضافة حساب",
   "all_time_return": "العائد منذ البداية",
   "balance": "الرصيد",
+  "balance_edit": {
+    "current_balance": "الرصيد الحالي",
+    "description": "عدّل رصيد عملة واحدة في كل مرة. يُسجّل الفرق كإيداع أو سحب بتلك العملة.",
+    "error": "حدث خطأ أثناء تحديث الرصيد. يرجى المحاولة مرة أخرى.",
+    "invalid_amount": "أدخل رصيدًا صالحًا لا يقل عن الصفر.",
+    "new_balance": "الرصيد الجديد",
+    "no_change": "لا يوجد تغيير في الرصيد",
+    "success": "تم تحديث الرصيد",
+    "title": "تعديل الرصيد النقدي",
+    "unavailable": "الأرصدة النقدية غير متاحة. انتظر حتى يتم تحميلها أو حدّث الصفحة."
+  },
   "balance_label": "الرصيد",
   "book_value": "القيمة الدفترية",
   "cancel": "إلغاء",
   "cash_balance": "الرصيد النقدي",
   "choose_account_to_view": "اختر حسابًا لعرضه",
-  "click_to_update_cash_balance": "انقر لتحديث الرصيد النقدي",
   "contributed_amount": "لقد ساهمت بمبلغ",
   "contribution": {
     "left": "المتبقي <amount></amount>",
