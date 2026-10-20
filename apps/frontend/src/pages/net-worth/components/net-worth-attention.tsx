@@ -100,6 +100,7 @@ export function NetWorthAttentionCard({
         <div key={liability.id} className="ms-9 mt-3 min-w-0">
           {properties.length > 0 ? (
             <ResponsiveSelect
+              aria-label={t("insights:networth.attention.link_property", { name: liability.name })}
               value=""
               disabled={isLinking}
               options={[
