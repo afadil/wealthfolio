@@ -56,7 +56,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/compon
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import type { TFunction } from "i18next";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { type Path, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import * as z from "zod";
@@ -197,13 +197,16 @@ function PricingModeToggle({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const isAutomatic = !isManualMode;
+  // The switch inside the trigger is hidden from assistive tech, so the
+  // on/off description names the current state instead.
+  const descriptionId = useId();
 
   return (
     <div className="rounded-lg border p-4">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0 flex-1 space-y-1">
           <Label className="text-sm font-medium">{t("asset:editSheet.automatic_updates")}</Label>
-          <p className="text-muted-foreground text-xs">
+          <p id={descriptionId} className="text-muted-foreground text-xs">
             {isAutomatic
               ? t("asset:editSheet.automatic_on_description")
               : t("asset:editSheet.automatic_off_description")}
@@ -216,6 +219,7 @@ function PricingModeToggle({
                 type="button"
                 className="shrink-0"
                 aria-label={t("asset:editSheet.automatic_updates")}
+                aria-describedby={descriptionId}
               />
             }
           >
