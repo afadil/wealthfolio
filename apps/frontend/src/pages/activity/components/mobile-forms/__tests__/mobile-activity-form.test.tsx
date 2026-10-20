@@ -1,4 +1,4 @@
-import { ActivityType } from "@/lib/constants";
+import { ActivityType, InstrumentType } from "@/lib/constants";
 import type { ActivityDetails } from "@/lib/types";
 import { render, screen, waitFor } from "@/test/render";
 import userEvent from "@testing-library/user-event";
@@ -220,4 +220,40 @@ describe("MobileActivityForm option defaults", () => {
 
     expect(screen.getByTestId("details-step")).toHaveAttribute("data-quote-ccy", "CAD");
   });
+});
+
+describe("mobile trade asset identity", () => {
+  it.each([ActivityType.BUY, ActivityType.SELL])(
+    "submits the stored %s instrument type and quote currency without reselection",
+    async (type) => {
+      noopMutation.mutateAsync.mockReset().mockResolvedValue({});
+      const user = userEvent.setup();
+      renderForm({
+        ...activity(type),
+        assetId: "asset-usdt",
+        assetSymbol: "USDT",
+        instrumentType: InstrumentType.CRYPTO,
+        assetQuoteCcy: "USD",
+        currency: "CAD",
+        quantity: "2",
+        unitPrice: "25",
+        amount: "50",
+      });
+
+      await user.click(screen.getByRole("button", { name: "Update Activity" }));
+
+      await waitFor(() =>
+        expect(noopMutation.mutateAsync).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({
+            id: "act_1",
+            assetId: "USDT",
+            currentAssetId: "asset-usdt",
+            symbolInstrumentType: InstrumentType.CRYPTO,
+            symbolQuoteCcy: "USD",
+            currency: "CAD",
+          }),
+        ),
+      );
+    },
+  );
 });
