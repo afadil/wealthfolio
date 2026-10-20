@@ -84,6 +84,27 @@ const DAY_HEADER_HEIGHT = 30;
 /** Rows kept mounted past the viewport edge, so a fast scroll stays painted. */
 const OVERSCAN = 8;
 const ACTIVITY_TABLE_COLUMN_VISIBILITY_KEY = "activity-table-column-visibility";
+/**
+ * Column widths, in rem, for the table's fixed layout. Rows are recycled as
+ * the list scrolls, so widths fitted to the mounted rows would change with
+ * every scroll; these fit the widest values instead. The symbol column has
+ * none: it takes the rest of the table and truncates.
+ */
+const COLUMN_WIDTHS: Partial<Record<string, number>> = {
+  date: 7.5,
+  activityType: 8,
+  quantity: 9,
+  unitPrice: 8,
+  fee: 5.5,
+  tax: 5.5,
+  value: 9,
+  cashBalance: 9,
+  account: 11.5,
+  currency: 5.5,
+  actions: 3.5,
+};
+/** Below this the symbol column stops shrinking and the table scrolls sideways. */
+const SYMBOL_MIN_WIDTH = 10;
 
 interface ActivityTableProps {
   activities: ActivityDetails[];
@@ -835,6 +856,10 @@ export const ActivityTable = ({
     : totalSize;
   const visibleColumns = table.getVisibleFlatColumns();
   const columnCount = visibleColumns.length;
+  const tableMinWidth = visibleColumns.reduce(
+    (width, column) => width + (COLUMN_WIDTHS[column.id] ?? 0),
+    SYMBOL_MIN_WIDTH,
+  );
   // A day's closing cash sits under the row totals, or at the row's end when
   // the Total column is hidden.
   const cashColumnIndex = visibleColumns.findIndex((column) => column.id === "value");
@@ -912,7 +937,12 @@ export const ActivityTable = ({
         )}
         style={{ overflowAnchor: "none" }}
       >
-        <Table ref={setTableElement} containerClassName="overflow-visible">
+        <Table
+          ref={setTableElement}
+          containerClassName="overflow-visible"
+          className="table-fixed"
+          style={{ minWidth: `${tableMinWidth}rem` }}
+        >
           {/* Opaque, so rows don't show through the pinned header. A collapsed
               row border stays with the table grid instead of moving with
               sticky cells, so the cells draw the header's bottom line.
@@ -930,8 +960,13 @@ export const ActivityTable = ({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="bg-muted-foreground/5">
                 {headerGroup.headers.map((header) => {
+                  const width = COLUMN_WIDTHS[header.column.id];
                   return (
-                    <TableHead key={header.id} className="px-3">
+                    <TableHead
+                      key={header.id}
+                      className="px-3"
+                      style={width ? { width: `${width}rem` } : undefined}
+                    >
                       {header.isPlaceholder
                         ? null
                         : flexRender(header.column.columnDef.header, header.getContext())}
