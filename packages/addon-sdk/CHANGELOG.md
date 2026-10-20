@@ -19,6 +19,8 @@ and this project adheres to
   mode too: an outline `Button`'s own background or border is no longer replaced
   by the variant's dark colours. `Button` also sets `data-variant` and
   `data-size`, as shadcn's does.
+- `AnimatedToggleGroup` items take an optional `aria-label`, for options whose
+  visible label needs more context.
 - `NetworkRequest.timeoutSecs` for longer-running addon HTTP requests. Defaults
   to 10 seconds; positive integer values are capped server-side at 120 seconds.
 
