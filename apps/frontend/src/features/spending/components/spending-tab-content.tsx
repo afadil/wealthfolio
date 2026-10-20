@@ -686,7 +686,7 @@ export default function SpendingTabContent() {
     setBudgetMonthTouched(false);
   };
 
-  const granularity: "day" | "week" | "month" | "year" = useMemo(() => {
+  const granularity: "day" | "week" | "month" = useMemo(() => {
     if (selection.kind === "month") return "day";
     if (selection.kind === "range") {
       const days = calendarDaysBetweenInclusive(

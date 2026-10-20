@@ -226,6 +226,7 @@
     "mtdShort": "이번 달",
     "lastMonth": "지난달",
     "prevShort": "이전",
+    "lastYear": "작년",
     "viewingMonth": "{{label}} 보는 중, 클릭하여 변경",
     "pickMonth": "특정 월 선택",
     "selectMonth": "월 선택",

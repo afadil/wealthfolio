@@ -226,6 +226,7 @@
     "mtdShort": "月初来",
     "lastMonth": "先月",
     "prevShort": "前期",
+    "lastYear": "昨年",
     "viewingMonth": "{{label}}を表示中。クリックで変更",
     "pickMonth": "特定の月を選択",
     "selectMonth": "月を選択",

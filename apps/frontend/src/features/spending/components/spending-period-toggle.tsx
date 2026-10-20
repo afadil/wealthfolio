@@ -1,6 +1,6 @@
 /**
  * Canonical period toggle for spending surfaces that need named comparison
- * periods (This month / Last month / 3M / 6M / YTD / Last Year / All). Used by the Insights page
+ * periods (This month / Last month / 3M / 6M / YTD / Last Year). Used by the Insights page
  * and any future page that compares period-over-period totals.
  *
  * Why this exists: prior to this primitive each surface inlined its own

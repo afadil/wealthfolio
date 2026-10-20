@@ -235,6 +235,7 @@
     "mtdShort": "Mois",
     "lastMonth": "Mois dernier",
     "prevShort": "Préc.",
+    "lastYear": "Année dernière",
     "viewingMonth": "Affichage de {{label}}, cliquez pour modifier",
     "pickMonth": "Choisir un mois précis",
     "selectMonth": "Sélectionner un mois",

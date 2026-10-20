@@ -228,6 +228,7 @@
     "mtdShort": "MTD",
     "lastMonth": "上月",
     "prevShort": "上一",
+    "lastYear": "去年",
     "viewingMonth": "正在查看 {{label}}，點選可變更",
     "pickMonth": "選取特定月份",
     "selectMonth": "選取月份",
