@@ -243,6 +243,7 @@
   "table_price_amount": "價格／金額",
   "table_fee": "手續費",
   "table_total": "總計",
+  "table_balance": "餘額",
   "table_account": "帳戶",
   "table_currency": "幣別",
   "table_comment": "備註",
@@ -303,6 +304,7 @@
     "import_from_csv": "從 CSV 匯入",
     "transfer_holdings": "移轉持有部位",
     "add_personal_asset": "新增個人資產",
+    "connect_account": "連結帳戶",
     "add_activities": "新增交易紀錄",
     "ask_ai_categorize": "請 AI 分類",
     "investments": "投資",
@@ -605,6 +607,7 @@
     "err_select_source_account": "請選取一個來源帳戶。",
     "err_select_destination_account": "請選取一個目標帳戶。",
     "err_accounts_different": "來源帳戶與目標帳戶必須不同。",
+    "err_same_account_currencies": "同帳戶轉帳請選擇不同的幣別。",
     "err_currency_required": "幣別為必填。",
     "err_select_date": "請選取一個日期。",
     "err_enter_amount": "請輸入金額。",
@@ -702,6 +705,7 @@
     "duplicated_comment": "已複製",
     "edit_transfer_pair": "請透過「編輯」在轉帳表單中修改帳戶與幣別。請先儲存尚未提交的變更。",
     "save_edits_first": "請先儲存編輯",
+    "duplicate_transfer_failed": "無法複製轉帳配對，請重新整理後再試。",
     "save_before_link": "配對此轉帳前，請先儲存或放棄待處理的編輯。",
     "save_before_unlink": "取消此轉帳的配對前，請先儲存或放棄待處理的編輯。",
     "link_reason_save_new": "配對前請先儲存新交易紀錄",
@@ -770,7 +774,10 @@
     "clear_filters": "清除篩選",
     "ratio": "比例",
     "premium": "權利金",
-    "total_value": "總價值"
+    "total_value": "總價值",
+    "day_count_one": "{{count}} 筆交易紀錄",
+    "day_count_other": "{{count}} 筆交易紀錄",
+    "day_end_cash": "現金"
   },
   "mobile_type_category": {
     "trade": "交易",
@@ -1130,7 +1137,8 @@
       "total": "總計",
       "importAnother": "再次匯入",
       "viewHoldings": "檢視持有部位",
-      "viewActivities": "檢視交易紀錄"
+      "viewActivities": "檢視交易紀錄",
+      "syncAutomatically": "想要自動同步嗎？"
     },
     "assets": {
       "noAssetsTitle": "沒有需要檢查的資產",

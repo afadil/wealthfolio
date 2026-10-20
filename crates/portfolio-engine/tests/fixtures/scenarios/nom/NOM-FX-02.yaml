@@ -75,5 +75,5 @@ expected_notes: >
   x 1.36 = 786. net_contribution 2810 throughout; no flows after the first
   row. Valuation 01-08/01-09: market value 1500 USD x 1.37 = 2055, cash 650
   + 137 = 787, total 2842 CAD; TWR = 2842/2810 - 1 = 1.13879%. Attribution:
-  unrealized 25 (2055 - 2030); the FX gain on the USD cash (7 CAD) is not
-  attributed ("difference 7.00").
+  unrealized 25 (2055 - 2030) plus 7 CAD of FX on the USD cash bucket,
+  for a reconciled gain of 32 CAD in account and portfolio attribution.

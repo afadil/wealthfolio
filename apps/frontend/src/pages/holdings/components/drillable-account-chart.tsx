@@ -12,8 +12,10 @@ import {
   CardHeader,
   CardTitle,
   DonutChart,
-  EmptyPlaceholder,
   Skeleton,
+  Empty,
+  EmptyHeader,
+  EmptyDescription,
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -176,11 +178,11 @@ export function DrillableAccountChart({
     return (
       <Card className="overflow-hidden backdrop-blur-sm">
         <CardHeader className="px-5 pb-1 pt-5">
-          <Skeleton className="h-4 w-[120px]" />
+          <Skeleton className="w-30 h-4" />
         </CardHeader>
         <CardContent className="px-5 pb-5 pt-0">
-          <div className="flex h-[160px] items-center justify-center">
-            <Skeleton className="h-[120px] w-[120px] rounded-full" />
+          <div className="flex h-40 items-center justify-center">
+            <Skeleton className="h-30 w-30 rounded-full" />
           </div>
         </CardContent>
       </Card>
@@ -191,7 +193,7 @@ export function DrillableAccountChart({
     <Card className="overflow-hidden backdrop-blur-sm">
       <CardHeader className="px-5 pb-1 pt-5">
         {isAtRoot ? (
-          <CardTitle className="text-muted-foreground text-[12px] font-semibold uppercase tracking-[0.18em]">
+          <CardTitle className="text-muted-foreground text-xs font-semibold uppercase tracking-[0.18em]">
             {t("holdings:accounts")}
           </CardTitle>
         ) : (
@@ -212,7 +214,11 @@ export function DrillableAccountChart({
             endAngle={0}
           />
         ) : (
-          <EmptyPlaceholder description={t("holdings:no_account_data")} />
+          <Empty>
+            <EmptyHeader>
+              <EmptyDescription>{t("holdings:no_account_data")}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         )}
       </CardContent>
     </Card>

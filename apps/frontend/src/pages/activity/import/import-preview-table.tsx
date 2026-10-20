@@ -221,7 +221,7 @@ export const ImportPreviewTable = ({
                         className={cn(
                           "relative px-4 py-2",
                           cell.column.id === "isValid" &&
-                            "border-border bg-muted/30 sticky left-0 z-20 w-[60px] border-r p-2",
+                            "border-border bg-muted/30 w-15 sticky start-0 z-20 border-e p-2",
                         )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -267,17 +267,18 @@ const ErrorCell = ({
 
   return (
     <TooltipProvider>
-      <Tooltip delayDuration={30}>
-        <TooltipTrigger asChild>
-          <div className="bg-destructive/10 absolute inset-0 cursor-help">
-            <div className="relative flex h-full w-full items-center justify-between px-4 py-2">
-              <div className="mr-2 flex-1">{children}</div>
-              <Icons.AlertCircle className="text-destructive h-3.5 w-3.5 shrink-0" />
-            </div>
+      <Tooltip>
+        <TooltipTrigger
+          delay={30}
+          render={<div className="bg-destructive/10 absolute inset-0 cursor-help" />}
+        >
+          <div className="relative flex h-full w-full items-center justify-between px-4 py-2">
+            <div className="me-2 flex-1">{children}</div>
+            <Icons.AlertCircle className="text-destructive h-3.5 w-3.5 shrink-0" />
           </div>
         </TooltipTrigger>
-        <TooltipContent className="bg-destructive text-destructive-foreground dark:border-destructive max-w-[400px] space-y-2 border-none p-3 shadow-lg">
-          <ul className="list-disc space-y-1 pl-5 text-sm">
+        <TooltipContent className="max-w-100 flex flex-col gap-2 p-3">
+          <ul className="list-disc space-y-1 ps-5 text-sm">
             {errorMessages.map((error, index) => (
               <li key={index}>{error}</li>
             ))}
@@ -316,8 +317,8 @@ function getColumns(
         );
 
         return isValid ? (
-          <div className="flex w-[60px] items-center gap-1 text-xs">
-            <div className="bg-success/20 text-success flex h-5 w-5 items-center justify-center rounded-full">
+          <div className="w-15 flex items-center gap-1 text-xs">
+            <div className="text-success-subtle-foreground bg-current/15 flex h-5 w-5 items-center justify-center rounded-full">
               <Icons.CheckCircle className="h-3.5 w-3.5" />
             </div>
             <span className="text-muted-foreground text-xs">
@@ -326,26 +327,23 @@ function getColumns(
           </div>
         ) : (
           <TooltipProvider>
-            <Tooltip delayDuration={30}>
-              <TooltipTrigger asChild>
-                <div className="flex w-[60px] cursor-help items-center gap-1 text-xs">
-                  <div className="bg-destructive/20 text-destructive flex h-5 w-5 items-center justify-center rounded-full">
-                    <Icons.XCircle className="h-3.5 w-3.5" />
-                  </div>
-                  <span className="text-muted-foreground text-xs">
-                    {String(lineNumber).padStart(2, "0")}
-                  </span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent
-                side="right"
-                sideOffset={10}
-                className="bg-destructive text-destructive-foreground max-w-xs border-none p-3"
+            <Tooltip>
+              <TooltipTrigger
+                delay={30}
+                render={<div className="w-15 flex cursor-help items-center gap-1 text-xs" />}
               >
+                <div className="text-destructive-subtle-foreground bg-current/15 flex h-5 w-5 items-center justify-center rounded-full">
+                  <Icons.XCircle className="h-3.5 w-3.5" />
+                </div>
+                <span className="text-muted-foreground text-xs">
+                  {String(lineNumber).padStart(2, "0")}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="inline-end" sideOffset={10} className="max-w-xs p-3">
                 <h4 className="mb-2 font-medium">
                   {t("activity:import.preview.validationErrors")}
                 </h4>
-                <ul className="max-h-[300px] list-disc space-y-1 overflow-y-auto pl-5 text-sm">
+                <ul className="max-h-75 list-disc space-y-1 overflow-y-auto ps-5 text-sm">
                   {allErrors.length > 0 ? (
                     allErrors.map((error, index) => <li key={index}>{error}</li>)
                   ) : (
@@ -444,7 +442,7 @@ function getColumns(
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
             {symbol && typeof symbol === "string" && symbol.length > 0 ? (
-              <Badge variant="secondary" className="min-w-[50px] rounded-sm text-xs font-medium">
+              <Badge variant="secondary" className="min-w-12.5 rounded-sm text-xs font-medium">
                 {symbol}
               </Badge>
             ) : (
@@ -466,7 +464,7 @@ function getColumns(
       enableHiding: false,
       header: ({ column }) => (
         <DataTableColumnHeader
-          className="justify-end text-right"
+          className="justify-end text-end"
           column={column}
           title={t("activity:import.preview.shares")}
         />
@@ -479,7 +477,7 @@ function getColumns(
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-            <div className="text-right font-medium tabular-nums">
+            <div className="text-end font-medium tabular-nums">
               {activityType === "SPLIT"
                 ? "-"
                 : safeDisplayNumber(quantity as string | number | null | undefined)}
@@ -495,7 +493,7 @@ function getColumns(
       enableSorting: false,
       header: ({ column }) => (
         <DataTableColumnHeader
-          className="justify-end text-right"
+          className="justify-end text-end"
           column={column}
           title={t("activity:import.preview.price")}
         />
@@ -514,7 +512,7 @@ function getColumns(
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-            <div className="text-right font-medium tabular-nums">
+            <div className="text-end font-medium tabular-nums">
               {activityType === "SPLIT"
                 ? (() => {
                     const ratio = toNumber(unitPrice);
@@ -531,7 +529,7 @@ function getColumns(
       accessorKey: "amount",
       header: ({ column }) => (
         <DataTableColumnHeader
-          className="justify-end text-right"
+          className="justify-end text-end"
           column={column}
           title={t("activity:import.preview.amount")}
         />
@@ -552,7 +550,7 @@ function getColumns(
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-            <div className="text-right font-medium tabular-nums">
+            <div className="text-end font-medium tabular-nums">
               {activityType === "SPLIT" ? "-" : safeFormatAmount(amount, currency, formatting)}
             </div>
           </ErrorCell>
@@ -566,7 +564,7 @@ function getColumns(
       enableSorting: false,
       header: ({ column }) => (
         <DataTableColumnHeader
-          className="justify-end text-right"
+          className="justify-end text-end"
           column={column}
           title={t("activity:import.preview.fee")}
         />
@@ -585,7 +583,7 @@ function getColumns(
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-            <div className="text-muted-foreground text-right tabular-nums">
+            <div className="text-muted-foreground text-end tabular-nums">
               {activityType === "SPLIT" ? "-" : safeFormatAmount(fee, currency, formatting)}
             </div>
           </ErrorCell>
@@ -599,7 +597,7 @@ function getColumns(
       enableSorting: false,
       header: ({ column }) => (
         <DataTableColumnHeader
-          className="justify-end text-right"
+          className="justify-end text-end"
           column={column}
           title={t("activity:import.preview.tax")}
         />
@@ -618,7 +616,7 @@ function getColumns(
 
         return (
           <ErrorCell hasError={hasError} errorMessages={errorMessages}>
-            <div className="text-muted-foreground text-right tabular-nums">
+            <div className="text-muted-foreground text-end tabular-nums">
               {activityType === "SPLIT" ? "-" : safeFormatAmount(tax, currency, formatting)}
             </div>
           </ErrorCell>

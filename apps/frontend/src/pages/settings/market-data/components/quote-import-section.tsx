@@ -7,8 +7,8 @@ import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion, useIsPresent } from "motion/react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { QuoteImportForm } from "./quote-import-form";
 import { QuoteImportHelpPopover } from "./quote-import-help-popover";
@@ -21,6 +21,25 @@ interface ImportQuotesSectionProps {
   quoteImport?: QuoteImportState & QuoteImportActions;
   currentStep?: number;
   onStepChange?: (step: number) => void;
+}
+
+function QuoteImportStep({ children }: { children: (isPresent: boolean) => ReactNode }) {
+  const isPresent = useIsPresent();
+
+  // AnimatePresence retains the outgoing step's last props. Presence still
+  // updates during exit, so disable its controls and keyboard interaction.
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.3 }}
+      className="p-4 sm:p-6"
+      inert={!isPresent}
+    >
+      {children(isPresent)}
+    </motion.div>
+  );
 }
 
 export function ImportQuotesSection({
@@ -77,7 +96,7 @@ export function ImportQuotesSection({
   };
 
   // Render the current step
-  const renderStep = () => {
+  const renderStep = (isPresent: boolean) => {
     switch (currentStep) {
       case 1:
         // The form stays mounted and clickable while it animates out to the
@@ -116,20 +135,22 @@ export function ImportQuotesSection({
                         <span className="text-muted-foreground">
                           {t("settings:market_data_page.field_valid")}:
                         </span>
-                        <span className="font-semibold text-green-600">{preview.validRows}</span>
+                        <span className="text-success font-semibold">{preview.validRows}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className="text-muted-foreground">
                           {t("settings:market_data_page.field_invalid")}:
                         </span>
-                        <span className="font-semibold text-red-600">{preview.invalidRows}</span>
+                        <span className="text-destructive font-semibold">
+                          {preview.invalidRows}
+                        </span>
                       </div>
                       {preview.duplicateCount > 0 && (
                         <div className="flex items-center gap-1.5">
                           <span className="text-muted-foreground">
                             {t("settings:market_data_page.field_duplicates")}:
                           </span>
-                          <span className="font-semibold text-yellow-600">
+                          <span className="text-warning font-semibold">
                             {preview.duplicateCount}
                           </span>
                         </div>
@@ -137,8 +158,12 @@ export function ImportQuotesSection({
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" onClick={handleStartOver} disabled={isImporting}>
-                        <Icons.ArrowLeft className="mr-2 h-4 w-4" />
+                      <Button
+                        variant="outline"
+                        onClick={handleStartOver}
+                        disabled={!isPresent || isImporting}
+                      >
+                        <Icons.ArrowLeft className="me-2 h-4 w-4 rtl:rotate-180" />
                         {t("common:back")}
                       </Button>
                       <Button
@@ -148,9 +173,9 @@ export function ImportQuotesSection({
                             handleImportComplete();
                           }
                         }}
-                        disabled={preview.validRows === 0 || isImporting}
+                        disabled={!isPresent || preview.validRows === 0 || isImporting}
                       >
-                        <Icons.Import className="mr-2 h-4 w-4" />
+                        <Icons.Import className="me-2 h-4 w-4" />
                         {t("settings:market_data_page.import_quotes_count", {
                           count: preview.validRows,
                         })}
@@ -205,7 +230,7 @@ export function ImportQuotesSection({
                 onClick={handleStartOver}
                 disabled={isValidating || isImporting}
               >
-                <Icons.Refresh className="mr-2 h-4 w-4" />
+                <Icons.Refresh className="me-2 h-4 w-4" />
                 {t("settings:market_data_page.start_over")}
               </Button>
             </div>
@@ -221,16 +246,7 @@ export function ImportQuotesSection({
         </CardHeader>
         <CardContent className="overflow-hidden p-0">
           <AnimatePresence mode="wait">
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.3 }}
-              className="p-4 sm:p-6"
-            >
-              {renderStep()}
-            </motion.div>
+            <QuoteImportStep key={currentStep}>{renderStep}</QuoteImportStep>
           </AnimatePresence>
         </CardContent>
       </Card>

@@ -69,12 +69,14 @@ const mocks = vi.hoisted(() => {
     getTransferPairForActivity: vi.fn(),
     invalidateQueries: vi.fn(),
     createActivity: vi.fn(),
+    saveActivities: vi.fn(),
     useMutation: vi.fn(),
   };
 });
 
 vi.mock("@/adapters", () => ({
   createActivity: mocks.createActivity,
+  saveActivities: mocks.saveActivities,
   deleteActivity: vi.fn(),
   updateActivity: vi.fn(),
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
@@ -189,7 +191,11 @@ vi.mock("./transaction-row", async () => {
   const React = await import("react");
   const TransactionRow = React.forwardRef(
     (
-      props: { row: { activity: { id: string } }; onEdit: (row: unknown) => void },
+      props: {
+        row: { activity: { id: string } };
+        onEdit: (row: unknown) => void;
+        onToggleSelect: (id: string) => void;
+      },
       _ref: unknown,
     ) => (
       <tr>
@@ -201,6 +207,13 @@ vi.mock("./transaction-row", async () => {
           >
             edit
           </button>
+          <button
+            type="button"
+            data-testid={`select-${props.row.activity.id}`}
+            onClick={() => props.onToggleSelect(props.row.activity.id)}
+          >
+            select
+          </button>
         </td>
       </tr>
     ),
@@ -211,13 +224,74 @@ vi.mock("./transaction-row", async () => {
 
 describe("SpendingTransactionsTab transfer edit", () => {
   beforeEach(() => {
-    mocks.getTransferPairForActivity.mockReset();
+    mocks.getTransferPairForActivity.mockReset().mockResolvedValue({
+      transferOut: mocks.transferOut,
+      transferIn: {
+        ...mocks.transferOut,
+        id: "in-1",
+        accountId: EUR_ACCOUNT,
+        activityType: "TRANSFER_IN",
+        currency: "EUR",
+        amount: "920",
+      },
+    });
     mocks.createActivity.mockReset();
+    mocks.saveActivities.mockReset();
     mocks.useMutation.mockReset().mockReturnValue(mocks.mutation);
   });
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("duplicates both legs of a same-account exchange through the atomic bulk API", async () => {
+    const transferIn = {
+      ...mocks.transferOut,
+      id: "in-1",
+      activityType: "TRANSFER_IN",
+      currency: "EUR",
+      amount: "920",
+    };
+    mocks.getTransferPairForActivity.mockResolvedValue({
+      transferOut: mocks.transferOut,
+      transferIn,
+    });
+    mocks.saveActivities.mockResolvedValue({
+      created: [mocks.transferOut, transferIn],
+      errors: [],
+    });
+    render(<SpendingTransactionsTab />);
+    const duplicateOptions = mocks.useMutation.mock.calls[0][0] as {
+      mutationFn: (row: TransactionRowVM) => Promise<unknown>;
+    };
+    await duplicateOptions.mutationFn({
+      activity: {
+        ...mocks.transferOut,
+        activityType: ActivityType.TRANSFER_OUT,
+        status: ActivityStatus.POSTED,
+        cashFlowBucket: "neutral",
+      },
+      category: null,
+      splitCount: 0,
+      needsReview: false,
+    });
+    expect(mocks.createActivity).not.toHaveBeenCalled();
+    expect(mocks.saveActivities).toHaveBeenCalledWith({
+      creates: [
+        expect.objectContaining({
+          activityType: "TRANSFER_OUT",
+          amount: "1000",
+          currency: "USD",
+          accountId: USD_ACCOUNT,
+        }),
+        expect.objectContaining({
+          activityType: "TRANSFER_IN",
+          amount: "920",
+          currency: "EUR",
+          accountId: USD_ACCOUNT,
+        }),
+      ],
+    });
   });
 
   it.each(["Original notes\nSecond line", "", undefined])(
@@ -318,5 +392,26 @@ describe("SpendingTransactionsTab transfer edit", () => {
     ) as Record<string, unknown>;
     expect(activityForm.counterpartAccountId).toBeUndefined();
     expect(activityForm.sourceGroupId).toBe("group-1");
+  });
+});
+
+describe("SpendingTransactionsTab selection", () => {
+  beforeEach(() => {
+    mocks.useMutation.mockReset().mockReturnValue(mocks.mutation);
+  });
+
+  // Row checkboxes hide until hovered; this attribute is what keeps them all
+  // on screen while a selection exists.
+  it("marks the table as selecting while any row is selected", async () => {
+    const { container } = render(<SpendingTransactionsTab />);
+    const select = await screen.findByTestId("select-out-1");
+    const list = container.querySelector(".group\\/list");
+    expect(list).not.toHaveAttribute("data-selecting");
+
+    select.click();
+    await waitFor(() => expect(list).toHaveAttribute("data-selecting"));
+
+    select.click();
+    await waitFor(() => expect(list).not.toHaveAttribute("data-selecting"));
   });
 });

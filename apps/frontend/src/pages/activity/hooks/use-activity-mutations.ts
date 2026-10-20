@@ -24,6 +24,7 @@ import { ActivityType, InstrumentType } from "@/lib/constants";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { NewActivityFormValues } from "../components/forms/schemas";
+import { buildSameAccountFxDuplicate } from "../utils/duplicate-fx-transfer";
 
 export function useActivityMutations(
   onSuccess?: (activity: { accountId?: string | null }) => void,
@@ -332,6 +333,18 @@ export function useActivityMutations(
   });
 
   const duplicateActivity = async (activityToDuplicate: ActivityDetails) => {
+    const exchange = await buildSameAccountFxDuplicate(activityToDuplicate);
+    if (exchange) {
+      const result = await saveActivities({ creates: exchange });
+      if (result.errors.length)
+        throw new Error(result.errors.map((error) => error.message).join("; "));
+      const duplicated = result.created.find(
+        (leg) => leg.activityType === activityToDuplicate.activityType,
+      );
+      if (!duplicated || result.created.length !== 2)
+        throw new Error("Failed duplicating transfer pair.");
+      return duplicated;
+    }
     const {
       id: _id,
       createdAt: _createdAt,

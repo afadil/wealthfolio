@@ -246,6 +246,7 @@
     "manual": "수동",
     "manual_hint": "잔액을 직접 업데이트",
     "debt_free": "{{date}} 완납",
+    "original_balance": "최초 잔액 {{date}}",
     "updated": "{{date}} 업데이트",
     "status_paid_off": "완납",
     "status_renewal_due": "갱신 필요",

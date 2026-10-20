@@ -79,15 +79,24 @@ interface ValueFormatter {
   format(value: number): string;
 }
 
+interface AmountFormatter {
+  format(value: number, currency: string): string;
+}
+
 export function createActivityAmountFormatter(
-  formatting: Pick<FormattingApi, "formatDecimal">,
-): ValueFormatter {
+  formatting: Pick<FormattingApi, "formatAmount">,
+): AmountFormatter {
   return {
-    format: (value) =>
-      formatting.formatDecimal(value, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }),
+    format: (value, currency) => formatting.formatAmount(value, currency, false),
+  };
+}
+
+/** Unit prices keep the precision the activities table shows. */
+export function createActivityPriceFormatter(
+  formatting: Pick<FormattingApi, "formatPrice">,
+): AmountFormatter {
+  return {
+    format: (value, currency) => formatting.formatPrice(value, currency, false),
   };
 }
 
@@ -105,14 +114,15 @@ export function createActivityQuantityFormatter(
 
 export function formatActivityAmount(
   value: number | null | undefined,
-  formatter: ValueFormatter,
+  formatter: AmountFormatter,
   isHidden: boolean,
-  currency?: string,
+  currency: string,
+  { showCurrency = true }: { showCurrency?: boolean } = {},
 ): string {
   if (value == null) return "-";
   if (isHidden) return "******";
-  const formatted = formatter.format(Math.abs(value));
-  return currency ? `${formatted} ${currency}` : formatted;
+  const formatted = formatter.format(Math.abs(value), currency);
+  return showCurrency && currency ? `${formatted} ${currency}` : formatted;
 }
 
 export function formatActivityQuantity(

@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AccountType } from "@/lib/constants";
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   useAccounts: vi.fn(),
   setVisibilityFilters: vi.fn(),
   isMobile: false,
+  showConnectAccountLink: false,
 }));
 
 vi.mock("@/hooks/use-holdings", () => ({
@@ -32,6 +34,10 @@ const account: Account = {
 
 vi.mock("@/hooks/use-accounts", () => ({
   useAccounts: mocks.useAccounts,
+}));
+
+vi.mock("@/features/wealthfolio-connect/hooks/use-show-connect-account-link", () => ({
+  useShowConnectAccountLink: () => mocks.showConnectAccountLink,
 }));
 
 vi.mock("@/hooks/use-platform", () => ({
@@ -61,6 +67,7 @@ describe("AccountHoldings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isMobile = false;
+    mocks.showConnectAccountLink = false;
     mocks.useAccounts.mockReturnValue({ accounts: [account] });
   });
 
@@ -116,6 +123,19 @@ describe("AccountHoldings", () => {
     );
   });
 
+  it("names the icon-only update holdings button", () => {
+    mocks.useAccounts.mockReturnValue({ accounts: [{ ...account, trackingMode: "HOLDINGS" }] });
+    mocks.useHoldingsWithClosedProbe.mockReturnValue({
+      holdings: [{ id: "cash-usd", holdingType: "cash" } as Holding],
+      isLoading: false,
+      hasHiddenClosedPositions: false,
+    });
+
+    render(<AccountHoldings accountId={account.id} onAddHoldings={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Update holdings" })).toBeInTheDocument();
+  });
+
   it("shows cash-only results under the default open status", () => {
     const cashHolding = {
       id: "cash-usd",
@@ -134,5 +154,67 @@ describe("AccountHoldings", () => {
       "data-hidden-positions",
       "false",
     );
+  });
+
+  describe("Connect account link", () => {
+    beforeEach(() => {
+      mocks.showConnectAccountLink = true;
+      mocks.useHoldingsWithClosedProbe.mockReturnValue({
+        holdings: [],
+        isLoading: false,
+        hasHiddenClosedPositions: false,
+      });
+    });
+
+    function renderEmptyAccount(overrides: Partial<Account>) {
+      mocks.useAccounts.mockReturnValue({ accounts: [{ ...account, ...overrides }] });
+      render(
+        <MemoryRouter>
+          <AccountHoldings accountId={account.id} showTitle={false} />
+        </MemoryRouter>,
+      );
+    }
+
+    it.each([["TRANSACTIONS"], ["HOLDINGS"]] as const)(
+      "appears on an empty manual %s account",
+      (trackingMode) => {
+        renderEmptyAccount({ trackingMode });
+
+        expect(screen.getByRole("link", { name: "Connect account" })).toHaveAttribute(
+          "href",
+          "/connect?placement=account_empty",
+        );
+      },
+    );
+
+    it("stays off a broker-synced account", () => {
+      renderEmptyAccount({ provider: "SNAPTRADE", providerAccountId: "broker-1" });
+
+      expect(screen.queryByRole("link", { name: "Connect account" })).not.toBeInTheDocument();
+    });
+
+    it("stays off a cash account", () => {
+      renderEmptyAccount({ accountType: AccountType.CASH });
+
+      expect(screen.queryByRole("link", { name: "Connect account" })).not.toBeInTheDocument();
+    });
+
+    it("stays off until the account is found", () => {
+      mocks.useAccounts.mockReturnValue({ accounts: [] });
+      render(
+        <MemoryRouter>
+          <AccountHoldings accountId={account.id} showTitle={false} />
+        </MemoryRouter>,
+      );
+
+      expect(screen.queryByRole("link", { name: "Connect account" })).not.toBeInTheDocument();
+    });
+
+    it("stays off when the link is not shown", () => {
+      mocks.showConnectAccountLink = false;
+      renderEmptyAccount({});
+
+      expect(screen.queryByRole("link", { name: "Connect account" })).not.toBeInTheDocument();
+    });
   });
 });

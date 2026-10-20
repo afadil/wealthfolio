@@ -12,6 +12,7 @@ export type LiabilityStatus = "paid_off" | "renewal_due" | "renew_soon" | "updat
 export interface LiabilityCardModel {
   type: string;
   balance: number;
+  balanceAvailable: boolean;
   original: number | null;
   /** Share of the original principal repaid, 0–1. */
   paidShare: number | null;
@@ -36,6 +37,7 @@ export function liabilityCardModel(
   const scheduled = loan?.scheduled ?? false;
   const subType = metadata.sub_type ?? metadata.liability_type;
   const balance = Math.abs(Number(holding.marketValue) || 0);
+  const balanceAvailable = loan?.balanceSource !== null;
   const original = loan?.originalAmount ?? null;
   const maturity = loan?.renewalMaturity;
   const daysToMaturity = maturity
@@ -45,8 +47,9 @@ export function liabilityCardModel(
     parseISO(today),
     parseISO(holding.valuationDate.slice(0, 10)),
   );
-  const status: LiabilityStatus | null =
-    balance === 0
+  const status: LiabilityStatus | null = !balanceAvailable
+    ? "update_balance"
+    : balance === 0
       ? "paid_off"
       : daysToMaturity < 0
         ? "renewal_due"
@@ -58,8 +61,12 @@ export function liabilityCardModel(
   return {
     type: typeof subType === "string" && subType ? subType : "other",
     balance,
+    balanceAvailable,
     original,
-    paidShare: original ? Math.max(0, Math.min(1, (original - balance) / original)) : null,
+    paidShare:
+      original && balanceAvailable
+        ? Math.max(0, Math.min(1, (original - balance) / original))
+        : null,
     scheduled,
     rate: loan?.annualRate ?? null,
     payment: scheduled ? (loan?.paymentAmount ?? null) : null,
@@ -80,7 +87,7 @@ export interface LiabilitySummary {
 
 /** Totals for liabilities in one currency; mixed currencies cannot be added up here. */
 export function liabilitySummary(models: LiabilityCardModel[]): LiabilitySummary {
-  const withOriginal = models.filter((model) => model.original != null);
+  const withOriginal = models.filter((model) => model.original != null && model.balanceAvailable);
   const original = withOriginal.reduce((sum, model) => sum + model.original!, 0);
   const paidDown = withOriginal.reduce(
     (sum, model) => sum + Math.max(0, model.original! - model.balance),

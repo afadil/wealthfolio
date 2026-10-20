@@ -44,7 +44,7 @@ export const LinkedLiabilitiesCard: React.FC<LinkedLiabilitiesCardProps> = ({
         <CardTitle className="text-sm font-medium">{t("asset:linkedLiabilities.title")}</CardTitle>
         {onAddLiability && (
           <Button variant="ghost" size="sm" className="h-8 px-2" onClick={onAddLiability}>
-            <Icons.Plus className="mr-1 h-4 w-4" />
+            <Icons.Plus className="me-1 h-4 w-4" />
             {t("asset:linkedLiabilities.add")}
           </Button>
         )}
@@ -65,7 +65,7 @@ export const LinkedLiabilitiesCard: React.FC<LinkedLiabilitiesCardProps> = ({
                   <div className="bg-muted flex h-8 w-8 items-center justify-center rounded-full">
                     <Icons.LiabilityDuotone size={16} />
                   </div>
-                  <div className="text-left">
+                  <div className="text-start">
                     <p className="text-sm font-medium">{liability.name}</p>
                     <p className="text-muted-foreground text-xs">
                       {getLiabilityTypeLabel(liability.metadata, t)}
@@ -74,13 +74,17 @@ export const LinkedLiabilitiesCard: React.FC<LinkedLiabilitiesCardProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-destructive text-sm font-medium">
-                    <AmountDisplay
-                      value={-Math.abs(parseFloat(liability.marketValue))}
-                      currency={liability.currency}
-                      isHidden={isBalanceHidden}
-                    />
+                    {liability.loan?.balanceSource === null ? (
+                      t("asset:loanOverview.unavailable")
+                    ) : (
+                      <AmountDisplay
+                        value={-Math.abs(parseFloat(liability.marketValue))}
+                        currency={liability.currency}
+                        isHidden={isBalanceHidden}
+                      />
+                    )}
                   </span>
-                  <Icons.ChevronRight className="text-muted-foreground h-4 w-4" />
+                  <Icons.ChevronRight className="text-muted-foreground h-4 w-4 rtl:rotate-180" />
                 </div>
               </button>
             ))}
@@ -147,7 +151,7 @@ export const LinkedLiabilitiesSection: React.FC<LinkedLiabilitiesSectionProps> =
         <span className="text-sm font-medium">{t("asset:linkedLiabilities.title")}</span>
         {onAddLiability && (
           <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={onAddLiability}>
-            <Icons.Plus className="mr-1 h-3 w-3" />
+            <Icons.Plus className="me-1 h-3 w-3" />
             {t("asset:linkedLiabilities.add")}
           </Button>
         )}
@@ -166,7 +170,7 @@ export const LinkedLiabilitiesSection: React.FC<LinkedLiabilitiesSectionProps> =
                 <div className="bg-muted flex h-8 w-8 items-center justify-center rounded-full">
                   <Icons.LiabilityDuotone size={16} />
                 </div>
-                <div className="text-left">
+                <div className="text-start">
                   <p className="text-sm font-medium">{liability.name}</p>
                   <p className="text-muted-foreground text-xs">
                     {getLiabilityTypeLabel(liability.metadata, t)}
@@ -175,13 +179,17 @@ export const LinkedLiabilitiesSection: React.FC<LinkedLiabilitiesSectionProps> =
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-destructive text-sm font-medium">
-                  <AmountDisplay
-                    value={-Math.abs(parseFloat(liability.marketValue))}
-                    currency={liability.currency}
-                    isHidden={isBalanceHidden}
-                  />
+                  {liability.loan?.balanceSource === null ? (
+                    t("asset:loanOverview.unavailable")
+                  ) : (
+                    <AmountDisplay
+                      value={-Math.abs(parseFloat(liability.marketValue))}
+                      currency={liability.currency}
+                      isHidden={isBalanceHidden}
+                    />
+                  )}
                 </span>
-                <Icons.ChevronRight className="text-muted-foreground h-4 w-4" />
+                <Icons.ChevronRight className="text-muted-foreground h-4 w-4 rtl:rotate-180" />
               </div>
             </button>
           ))}

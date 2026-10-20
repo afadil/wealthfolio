@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { AlternativeAssetKind } from "@/lib/types";
+import { AlternativeAssetKind, type AlternativeAssetHolding } from "@/lib/types";
 import {
   assetDetailsSchema,
   formValuesToMetadata,
   getDefaultDetailsFormValues,
   liabilityLoanSetup,
+  toLinkedLiability,
   type LiabilityDetailsFormValues,
 } from "./asset-details-sheet-schema";
 
@@ -214,4 +215,20 @@ describe("the paid from account", () => {
     const values = { ...liability(), automaticLoan: false, paymentAccountId: "chequing" };
     expect(liabilityLoanSetup(values).schedule).toBeUndefined();
   });
+});
+
+it("lists an unavailable linked balance without an amount, but keeps a recorded zero", () => {
+  const holding = {
+    id: "loan",
+    name: "Manual loan",
+    kind: "liability",
+    currency: "USD",
+    marketValue: "0",
+    loan: { balanceSource: null },
+  } as AlternativeAssetHolding;
+  expect(toLinkedLiability(holding)).toEqual({ id: "loan", name: "Manual loan" });
+  expect(
+    toLinkedLiability({ ...holding, loan: { ...holding.loan!, balanceSource: "recorded" } }),
+  ).toEqual({ id: "loan", name: "Manual loan", balance: "0" });
+  expect(toLinkedLiability({ ...holding, loan: undefined }).balance).toBe("0");
 });

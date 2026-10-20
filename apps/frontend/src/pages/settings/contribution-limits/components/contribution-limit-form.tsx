@@ -23,6 +23,7 @@ import {
   FormDescription,
   DatePickerInput,
   Input,
+  Spinner,
 } from "@wealthfolio/ui";
 
 import { newContributionLimitSchema } from "@/lib/schemas";
@@ -250,10 +251,12 @@ export function ContributionLimitForm({
 
         <DialogFooter className="px-1 pt-2">
           <div className="flex w-full justify-end gap-3">
-            <DialogTrigger asChild>
-              <Button variant="outline" type="button" className="h-11 min-w-24 text-base">
-                {t("common:cancel")}
-              </Button>
+            <DialogTrigger
+              render={
+                <Button variant="outline" type="button" className="h-11 min-w-24 text-base" />
+              }
+            >
+              {t("common:cancel")}
             </DialogTrigger>
             <Button
               type="submit"
@@ -265,14 +268,14 @@ export function ContributionLimitForm({
               {addContributionLimitMutation.isPending ||
               updateContributionLimitMutation.isPending ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {defaultValues?.id
                     ? t("settings:limits_form_updating")
                     : t("settings:limits_form_saving")}
                 </>
               ) : (
                 <>
-                  <Icons.Check className="mr-2 h-4 w-4" />
+                  <Icons.Check className="me-2 h-4 w-4" />
                   {defaultValues?.id
                     ? t("settings:limits_form_update_button")
                     : t("settings:limits_form_save_button")}

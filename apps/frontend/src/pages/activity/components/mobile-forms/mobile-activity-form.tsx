@@ -26,6 +26,7 @@ import {
 } from "@/lib/activity-utils";
 import { buildOccSymbol, isValidOptionExpiration, parseOccSymbol } from "@/lib/occ-symbol";
 import { generateId } from "@/lib/id";
+import { normalizeCurrency } from "@/lib/utils";
 import type { ActivityCreate, ActivityDetails, ActivityUpdate } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -38,6 +39,7 @@ import { showValidationToast, type AccountSelectOption } from "../forms/fields";
 import { newActivitySchema, type NewActivityFormValues } from "../forms/schemas";
 import { MobileActivitySteps } from "./mobile-activity-steps";
 import { getMobileActivityAssetId, hasStoredCustomTradeAmount } from "./mobile-activity-utils";
+import { Spinner } from "@wealthfolio/ui";
 
 interface MobileActivityFormProps {
   accounts: AccountSelectOption[];
@@ -54,6 +56,7 @@ interface MobileActivityFormProps {
 
 export interface TransferValidationInput {
   activityType: string;
+  accountId?: string;
   transferMode?: string;
   isExternal?: boolean;
   direction?: string;
@@ -197,6 +200,30 @@ export function validateTransferFields(
           field,
           message: tr("activity:form.err_currency_required", "Currency is required."),
         };
+    }
+  }
+
+  if (!isExternal && input.accountId && input.accountId === input.toAccountId) {
+    if (!isCash) {
+      return {
+        field: "toAccountId",
+        message: tr(
+          "activity:form.err_accounts_different",
+          "Source and destination accounts must be different.",
+        ),
+      };
+    }
+    if (
+      normalizeCurrency(input.sourceCurrency ?? undefined) ===
+      normalizeCurrency(input.destinationCurrency ?? undefined)
+    ) {
+      return {
+        field: "destinationCurrency",
+        message: tr(
+          "activity:form.err_same_account_currencies",
+          "Choose different currencies for a same-account transfer.",
+        ),
+      };
     }
   }
 
@@ -425,7 +452,7 @@ export function MobileActivityForm({
       ...(isOptionActivity && {
         assetType: "option" as const,
         assetKind: "OPTION",
-        symbolQuoteCcy: activity?.currency ?? undefined,
+        symbolQuoteCcy: activity?.assetQuoteCcy ?? activity?.currency ?? undefined,
         underlyingSymbol: parsedOcc?.underlying ?? "",
         strikePrice: parsedOcc?.strikePrice,
         expirationDate: parsedOcc?.expiration,
@@ -565,6 +592,7 @@ export function MobileActivityForm({
       const transferError = validateTransferFields(
         {
           activityType: submitData.activityType,
+          accountId: submitData.accountId,
           transferMode: _tm,
           isExternal: _isExternal,
           direction: _direction,
@@ -623,6 +651,7 @@ export function MobileActivityForm({
           }
 
           await saveInternalTransferPairMutation.mutateAsync({
+            editedActivityId: id,
             transferOutId: id ? transferOutId : undefined,
             transferInId: id ? transferInId : undefined,
             fromAccountId: submitData.accountId,
@@ -992,7 +1021,7 @@ export function MobileActivityForm({
                 onClick={handleBack}
                 className="flex-1"
               >
-                <Icons.ArrowLeft className="mr-2 h-4 w-4" />
+                <Icons.ArrowLeft className="me-2 h-4 w-4 rtl:rotate-180" />
                 {t("activity:mobile_back")}
               </Button>
             )}
@@ -1006,7 +1035,7 @@ export function MobileActivityForm({
                 disabled={!form.watch("activityType") && currentStep === 1}
               >
                 {t("activity:mobile_next")}
-                <Icons.ArrowRight className="ml-2 h-4 w-4" />
+                <Icons.ArrowRight className="ms-2 h-4 w-4 rtl:rotate-180" />
               </Button>
             ) : (
               <Button
@@ -1017,9 +1046,9 @@ export function MobileActivityForm({
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="me-2 h-4 w-4" />
                 ) : (
-                  <Icons.Check className="mr-2 h-4 w-4" />
+                  <Icons.Check className="me-2 h-4 w-4" />
                 )}
                 {activity?.id
                   ? t("activity:mobile_update_activity")

@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
   download: vi.fn(),
   preview: vi.fn(),
+  toast: vi.fn(),
   profile: "profile-a",
   user: "user-a",
   connected: true,
@@ -40,6 +41,7 @@ vi.mock("@/hooks/use-platform", () => ({
   usePlatform: () => ({ isMobile: mocks.mobile, loading: false }),
   useIsMobileViewport: () => mocks.compact,
 }));
+vi.mock("@wealthfolio/ui/components/ui/use-toast", () => ({ toast: mocks.toast }));
 vi.mock("./backup-import-dialog", () => ({
   BackupImportDialog: () => <div>Immutable restore preview</div>,
 }));
@@ -176,10 +178,7 @@ it("cloud delete keeps failure feedback inside its confirmation and clears it on
     });
   });
   mount();
-  fireEvent.pointerDown(await screen.findByRole("button", { name: copy.cloud_backup_options }), {
-    button: 0,
-    ctrlKey: false,
-  });
+  fireEvent.click(await screen.findByRole("button", { name: copy.cloud_backup_options }));
   fireEvent.click(await screen.findByRole("menuitem", { name: copy.cloud_backup_delete_all }));
   expect(mocks.action.mock.calls.some(([op]) => op.action === "delete")).toBe(false);
   await screen.findByText(copy.cloud_backup_delete_confirm);
@@ -207,10 +206,7 @@ it("deletes cloud history only after confirmation without requiring another sign
     });
   });
   mount();
-  fireEvent.pointerDown(await screen.findByRole("button", { name: copy.cloud_backup_options }), {
-    button: 0,
-    ctrlKey: false,
-  });
+  fireEvent.click(await screen.findByRole("button", { name: copy.cloud_backup_options }));
   fireEvent.click(await screen.findByRole("menuitem", { name: copy.cloud_backup_delete_all }));
   expect(mocks.action.mock.calls.some(([op]) => op.action === "delete")).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: copy.cloud_backup_delete }));
@@ -323,6 +319,26 @@ it("Connect shows real backup status and links to management without uploading",
     "/settings/exports",
   );
   expect(mocks.capture).not.toHaveBeenCalled();
+});
+it("Connect shows an overdue backup as waiting, not as a next backup in the past", async () => {
+  mocks.action.mockResolvedValue({
+    ...status,
+    hasKey: true,
+    keyReady: true,
+    isSource: true,
+    sourceConsented: true,
+    history: [{ backupId: "point", publishedAt: "2026-10-01T00:00:00Z", sizeBytes: 123 }],
+    policy: {
+      ...status.policy,
+      enabled: true,
+      lastBackupAt: "2026-10-01T00:00:00Z",
+      nextDueAt: "2026-10-02T00:00:00Z",
+    },
+  });
+  mount(true);
+  expect(await screen.findByText(copy.cloud_backup_state_due)).toBeInTheDocument();
+  expect(screen.getByText(new RegExp(`^${copy.cloud_backup_last_label} `))).toBeInTheDocument();
+  expect(screen.queryByText(new RegExp(copy.cloud_backup_next_label))).not.toBeInTheDocument();
 });
 it("keeps automatic backups paused until the user enables the source", async () => {
   mocks.action.mockResolvedValue({
@@ -671,4 +687,91 @@ it("puts every row action in the titled action palette on phone widths", async (
   expect(screen.getByRole("button", { name: copy.cloud_backup_delete })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: copy.cloud_backup_restore }));
   await waitFor(() => expect(mocks.preview).toHaveBeenCalledWith("point"));
+});
+
+const running = {
+  ...status,
+  hasKey: true,
+  keyReady: true,
+  isSource: true,
+  sourceConsented: true,
+  policy: {
+    ...status.policy,
+    enabled: true,
+    lastBackupAt: "2026-10-01T00:00:00Z",
+    nextDueAt: "2999-10-02T00:00:00Z",
+  },
+};
+async function openBackupMenu() {
+  fireEvent.click(await screen.findByRole("button", { name: copy.cloud_backup_options }));
+}
+it("offers a manual backup in the menu and sends it as manual", async () => {
+  mocks.action.mockImplementation((op) =>
+    Promise.resolve(op.action === "runtimeStatus" ? { state: "idle", retryAt: null } : running),
+  );
+  mocks.capture.mockResolvedValue({ backupId: "now", publishedAt: "2026-10-01T01:00:00Z" });
+  mount();
+  await openBackupMenu();
+  fireEvent.click(await screen.findByRole("menuitem", { name: copy.backup_now }));
+  await waitFor(() => expect(mocks.capture).toHaveBeenCalledWith(true));
+  await waitFor(() =>
+    expect(mocks.toast).toHaveBeenCalledWith({ title: copy.backup_saved, variant: "success" }),
+  );
+});
+it("says so when no backup was started", async () => {
+  mocks.action.mockImplementation((op) =>
+    Promise.resolve(op.action === "runtimeStatus" ? { state: "idle", retryAt: null } : running),
+  );
+  mocks.capture.mockResolvedValue(null);
+  mount();
+  await openBackupMenu();
+  fireEvent.click(await screen.findByRole("menuitem", { name: copy.backup_now }));
+  await waitFor(() =>
+    expect(mocks.toast).toHaveBeenCalledWith({ title: copy.cloud_backup_not_started }),
+  );
+});
+it("explains the daily manual limit instead of a generic failure", async () => {
+  mocks.action.mockImplementation((op) =>
+    Promise.resolve(op.action === "runtimeStatus" ? { state: "idle", retryAt: null } : running),
+  );
+  mocks.capture.mockRejectedValue(
+    new Error("API error (409): BACKUP_MANUAL_LIMIT: Manual backup limit reached"),
+  );
+  mount();
+  await openBackupMenu();
+  fireEvent.click(await screen.findByRole("menuitem", { name: copy.backup_now }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(copy.cloud_backup_manual_limit);
+});
+it.each([
+  {
+    when: "before the first backup",
+    runtime: { state: "idle", retryAt: null },
+    policy: { lastBackupAt: null },
+    badge: copy.cloud_backup_state_waiting,
+  },
+  {
+    when: "after a failure",
+    runtime: { state: "failed", retryAt: null },
+    policy: {},
+    badge: copy.cloud_backup_state_failed,
+  },
+  {
+    when: "while a backup runs",
+    runtime: { state: "running", retryAt: null },
+    policy: {},
+    badge: copy.cloud_backup_state_running,
+  },
+])("keeps the manual backup out of the menu $when", async ({ runtime, policy, badge }) => {
+  mocks.action.mockImplementation((op) =>
+    Promise.resolve(
+      op.action === "runtimeStatus"
+        ? runtime
+        : { ...running, policy: { ...running.policy, ...policy } },
+    ),
+  );
+  mount();
+  await screen.findAllByText(badge);
+  await openBackupMenu();
+  await screen.findByRole("menuitem", { name: copy.cloud_backup_disable });
+  expect(screen.queryByRole("menuitem", { name: copy.backup_now })).not.toBeInTheDocument();
 });

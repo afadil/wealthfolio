@@ -1,4 +1,4 @@
-import { useDateFormatting, type FormattingApi } from "@wealthfolio/ui";
+import { useDateFormatting, type FormattingApi, Spinner } from "@wealthfolio/ui";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -164,7 +164,7 @@ export function UpdateDialog() {
           <div className="relative px-6 pb-4 pt-6">
             <button
               onClick={handleDismiss}
-              className="bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground absolute right-4 top-4 rounded-full p-2 transition-all duration-200 hover:scale-105"
+              className="bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground absolute end-4 top-4 rounded-full p-2 transition-all duration-200 hover:scale-105"
               aria-label={t("common:component.close_dialog")}
             >
               <Icons.Close className="h-4 w-4" />
@@ -212,8 +212,8 @@ export function UpdateDialog() {
                 </CarouselContent>
                 {screenshots.length > 1 && (
                   <>
-                    <CarouselPrevious className="left-3" />
-                    <CarouselNext className="right-3" />
+                    <CarouselPrevious className="start-3" />
+                    <CarouselNext className="end-3" />
                   </>
                 )}
               </Carousel>
@@ -239,15 +239,13 @@ export function UpdateDialog() {
                     </span>
                   </div>
                   <Progress
-                    value={
-                      progress.total ? (progress.downloaded / progress.total) * 100 : undefined
-                    }
+                    value={progress.total ? (progress.downloaded / progress.total) * 100 : null}
                     className="h-2"
                   />
                 </>
               ) : (
                 <div className="flex items-center gap-2 text-sm">
-                  <Icons.Spinner className="h-4 w-4 animate-spin" />
+                  <Spinner className="h-4 w-4" />
                   <span className="text-muted-foreground">
                     {t("common:component.installing_update")}
                   </span>
@@ -286,13 +284,13 @@ export function UpdateDialog() {
                     </Button>
                   ) : (
                     <Button onClick={handleInstall}>
-                      <Icons.Download className="mr-2 h-4 w-4" />
+                      <Icons.Download className="me-2 h-4 w-4" />
                       {t("common:component.update_now")}
                     </Button>
                   )
                 ) : (
                   <Button onClick={handleOpenStore} disabled={!updateInfo.storeUrl}>
-                    <Icons.ExternalLink className="mr-2 h-4 w-4" />
+                    <Icons.ExternalLink className="me-2 h-4 w-4" />
                     {t("common:component.view_release")}
                   </Button>
                 )}

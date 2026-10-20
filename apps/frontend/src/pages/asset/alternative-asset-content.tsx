@@ -10,11 +10,16 @@ import type { AlternativeAssetHolding, Asset, DateRange, Quote, TimePeriod } fro
 import { AlternativeAssetKind } from "@/lib/types";
 import {
   AmountDisplay,
-  EmptyPlaceholder,
   Icons,
   IntervalSelector,
   useDateFormatting,
   useNumberFormatting,
+  Spinner,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
 } from "@wealthfolio/ui";
 import {
   AlertDialog,
@@ -36,6 +41,7 @@ import {
   AlternativeAssetQuickAddModal,
   AssetDetailsSheet,
   type AssetDetailsSheetAsset,
+  toLinkedLiability,
   UpdateValuationModal,
   ValueHistoryDataGrid,
 } from "./alternative-assets";
@@ -185,7 +191,10 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
 
   // Calculate net equity for linkable assets
   const netEquity = useMemo(() => {
-    if (linkedLiabilities.length === 0) {
+    if (
+      linkedLiabilities.length === 0 ||
+      linkedLiabilities.some((loan) => loan.loan?.balanceSource === null)
+    ) {
       return null;
     }
     const liabilityTotal = linkedLiabilities.reduce((sum, liability) => {
@@ -251,12 +260,18 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
                     />
                   </>
                 ) : (
-                  <div className="flex h-[200px] items-center justify-center">
-                    <EmptyPlaceholder
-                      icon={<Icons.Activity className="text-muted-foreground h-8 w-8" />}
-                      title={t("asset:altContent.no_valuation_data")}
-                      description={t("asset:altContent.no_valuation_description")}
-                    />
+                  <div className="h-50 flex items-center justify-center">
+                    <Empty>
+                      <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                          {<Icons.Activity className="text-muted-foreground size-8" />}
+                        </EmptyMedia>
+                        <EmptyTitle>{t("asset:altContent.no_valuation_data")}</EmptyTitle>
+                        <EmptyDescription>
+                          {t("asset:altContent.no_valuation_description")}
+                        </EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
                   </div>
                 )}
               </CardContent>
@@ -265,7 +280,9 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
             {/* Right: Detail card */}
             <AlternativeAssetDetailCard
               holding={holding}
-              netEquity={isLinkableAsset ? (netEquity ?? marketValue) : null}
+              netEquity={
+                isLinkableAsset ? (linkedLiabilities.length ? netEquity : marketValue) : null
+              }
               hasLinkedLiabilities={linkedLiabilities.length > 0}
               linkedLiabilities={isLinkableAsset ? linkedLiabilities : []}
               className="col-span-1"
@@ -518,7 +535,7 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
                   isHidden={isBalanceHidden}
                 />
               </div>
-              <div className="text-muted-foreground text-right text-sm font-normal">
+              <div className="text-muted-foreground text-end text-sm font-normal">
                 {holding.currency}
               </div>
             </div>
@@ -575,7 +592,7 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
             {detailRows.map((row, idx) => (
               <div key={idx} className="flex justify-between">
                 <span className="text-muted-foreground">{row.label}</span>
-                <span className="text-right font-medium">{row.value}</span>
+                <span className="text-end font-medium">{row.value}</span>
               </div>
             ))}
           </div>
@@ -816,16 +833,8 @@ export function useAlternativeAssetActions({
         onSave={handleEditSave}
         linkedAssetName={linkedAssetName}
         linkableAssets={linkableAssets.map((a) => ({ id: a.id, name: a.name }))}
-        linkedLiabilities={linkedLiabilities.map((l) => ({
-          id: l.id,
-          name: l.name,
-          balance: l.marketValue,
-        }))}
-        availableMortgages={availableMortgages.map((m) => ({
-          id: m.id,
-          name: m.name,
-          balance: m.marketValue,
-        }))}
+        linkedLiabilities={linkedLiabilities.map(toLinkedLiability)}
+        availableMortgages={availableMortgages.map(toLinkedLiability)}
         onLinkMortgage={handleLinkMortgage}
         onUnlinkMortgage={handleUnlinkMortgage}
         isSaving={updateMetadataMutation.isPending}
@@ -857,11 +866,11 @@ export function useAlternativeAssetActions({
             <AlertDialogAction
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
             >
               {deleteMutation.isPending ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {t("asset:altContent.deleting")}
                 </>
               ) : (

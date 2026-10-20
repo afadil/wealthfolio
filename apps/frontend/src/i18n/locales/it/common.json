@@ -520,5 +520,9 @@
       "rebind": "Ricollega Wealthfolio Connect per confermare l’account e il nucleo familiare di questo profilo.",
       "cooldown_many": "Troppi tentativi. Riprova tra {{count}} secondi."
     }
-  }
+  },
+  "remove": "Rimuovi",
+  "remove_item": "Rimuovi {{name}}",
+  "actions_for": "Azioni per {{name}}",
+  "settings_for": "Impostazioni di {{name}}"
 }

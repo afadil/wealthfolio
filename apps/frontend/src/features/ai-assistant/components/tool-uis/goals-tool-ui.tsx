@@ -1,4 +1,5 @@
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { cn } from "@/lib/utils";
 import type { ToolCallMessagePartProps } from "@assistant-ui/react";
@@ -225,7 +226,7 @@ function GoalsLoadingSkeleton() {
           <Skeleton className="h-5 w-16" />
         </div>
       </CardHeader>
-      <CardContent className="max-h-[320px] space-y-3 overflow-y-auto">
+      <CardContent className="max-h-80 space-y-3 overflow-y-auto">
         {Array.from({ length: 3 }).map((_, index) => (
           <div key={index} className="bg-background/60 flex flex-col gap-2 rounded-lg border p-3">
             <div className="flex items-center justify-between">
@@ -292,7 +293,10 @@ function GoalCard({
         <Progress value={Math.min(goal.progressPercent, 100)} className="h-2" />
         {/* Colored overlay for the progress indicator */}
         <div
-          className={cn("absolute inset-y-0 left-0 h-2 rounded-full transition-all", progressColor)}
+          className={cn(
+            "absolute inset-y-0 start-0 h-2 rounded-full transition-all",
+            progressColor,
+          )}
           style={{ width: `${Math.min(goal.progressPercent, 100)}%` }}
         />
       </div>
@@ -334,12 +338,11 @@ function EmptyState() {
 function ErrorState({ message }: { message?: string }) {
   const { t } = useTranslation();
   return (
-    <Card className="border-destructive/30 bg-destructive/5">
-      <CardContent className="py-4">
-        <p className="text-destructive text-sm font-medium">{t("ai:goals.error")}</p>
-        {message && <p className="text-muted-foreground mt-1 text-xs">{message}</p>}
-      </CardContent>
-    </Card>
+    <Alert variant="destructive">
+      <Icons.AlertCircle />
+      <AlertTitle>{t("ai:goals.error")}</AlertTitle>
+      {message && <AlertDescription className="text-xs">{message}</AlertDescription>}
+    </Alert>
   );
 }
 
@@ -415,7 +418,7 @@ function GoalsToolUIContentImpl({ args, result, status }: GoalsToolUIContentProp
           )}
         </div>
       </CardHeader>
-      <CardContent className="max-h-[320px] space-y-3 overflow-y-auto">
+      <CardContent className="max-h-80 space-y-3 overflow-y-auto">
         {goals.map((goal) => (
           <GoalCard
             key={goal.id}

@@ -4,6 +4,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import type { ListCategorizationContextArgs, ListCategorizationContextOutput } from "../../types";
+import { Spinner } from "@wealthfolio/ui";
 
 type Props = ToolCallMessagePartProps<
   ListCategorizationContextArgs,
@@ -16,7 +17,7 @@ function ListCategorizationContextContentImpl({ result, status }: Props) {
   if (isLoading) {
     return (
       <div className="text-muted-foreground flex items-center gap-2 px-1 text-xs">
-        <Icons.Spinner className="h-3 w-3 animate-spin" />
+        <Spinner className="h-3 w-3" />
         <span>{t("ai:categorizationContext.loading")}</span>
       </div>
     );

@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::{error::ApiResult, main_lib::AppState};
 use axum::{
-    extract::{Multipart, Path, Query},
+    extract::{DefaultBodyLimit, Multipart, Path, Query},
     routing::{delete, get, post},
     Json, Router,
 };
@@ -57,6 +57,9 @@ struct ActivitySearchBody {
     instrument_type_filter: Option<StringOrVec>,
     #[serde(rename = "activityIdFilter")]
     activity_id_filter: Option<StringOrVec>,
+    /// Cash balance after each row, for one cash or credit-card account.
+    #[serde(rename = "includeCashBalances")]
+    include_cash_balances: Option<bool>,
 }
 
 async fn search_activities(
@@ -101,7 +104,7 @@ async fn search_activities(
     let (date_from_utc, date_to_utc_exclusive) =
         local_date_range_utc_bounds(date_from_parsed, date_to_parsed, tz)?;
 
-    let resp = state.activity_service.search_activities_in_utc_range(
+    let mut resp = state.activity_service.search_activities_in_utc_range(
         body.page,
         body.page_size,
         account_ids,
@@ -114,6 +117,12 @@ async fn search_activities(
         instrument_types,
         activity_ids,
     )?;
+    if body.include_cash_balances.unwrap_or(false) {
+        state
+            .activity_service
+            .attach_cash_balances(&mut resp)
+            .await?;
+    }
     Ok(Json(resp))
 }
 
@@ -442,6 +451,10 @@ async fn parse_csv_endpoint(
     Ok(Json(result))
 }
 
+/// Imports send every row of a CSV in one request; axum's 2 MB default rejects
+/// a few thousand rows with 413 Payload Too Large.
+const IMPORT_BODY_LIMIT: usize = 64 * 1024 * 1024;
+
 pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route("/activities/search", post(search_activities))
@@ -462,13 +475,22 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
         )
         .route("/activities/link", post(link_transfer_activities))
         .route("/activities/unlink", post(unlink_transfer_activities))
-        .route("/activities/import/check", post(check_activities_import))
+        .route(
+            "/activities/import/check",
+            post(check_activities_import).layer(DefaultBodyLimit::max(IMPORT_BODY_LIMIT)),
+        )
         .route(
             "/activities/import/assets/preview",
             post(preview_import_assets),
         )
-        .route("/activities/import", post(import_activities))
-        .route("/activities/import/parse", post(parse_csv_endpoint))
+        .route(
+            "/activities/import",
+            post(import_activities).layer(DefaultBodyLimit::max(IMPORT_BODY_LIMIT)),
+        )
+        .route(
+            "/activities/import/parse",
+            post(parse_csv_endpoint).layer(DefaultBodyLimit::max(IMPORT_BODY_LIMIT)),
+        )
         .route(
             "/activities/import/mapping",
             get(get_account_import_mapping).post(save_account_import_mapping),

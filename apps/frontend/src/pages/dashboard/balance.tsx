@@ -1,6 +1,6 @@
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import NumberFlow from "@number-flow/react";
-import { useAmountFormatting, useLocalizationSettings, useNumberFormatting } from "@wealthfolio/ui";
+import { useAmountFormatting } from "@wealthfolio/ui";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useMemo } from "react";
 
@@ -27,11 +27,13 @@ const Balance: React.FC<BalanceProps> = ({
   isUnavailable = false,
 }) => {
   const amountFormatting = useAmountFormatting();
-  const numberFormatting = useNumberFormatting();
-  const { locale } = useLocalizationSettings();
+  const locale = amountFormatting.currencyLocale(currency);
 
   const { isBalanceHidden } = useBalancePrivacy();
   const validCurrency = isValidCurrencyCode(currency);
+  const fractionDigits = displayDecimal ? amountFormatting.currencyFractionDigits(currency) : 0;
+  const displayValue =
+    !compact && Math.abs(targetValue) < 0.5 * 10 ** -fractionDigits ? 0 : targetValue;
 
   const currencySymbol = useMemo(() => {
     if (!validCurrency) return currency;
@@ -41,23 +43,23 @@ const Balance: React.FC<BalanceProps> = ({
   const formattedValue = useMemo(() => {
     const useCurrencyStyle = displayCurrency && validCurrency;
     if (compact && useCurrencyStyle)
-      return amountFormatting.formatCompactAmount(targetValue, currency);
-    return numberFormatting.formatDecimal(targetValue, {
+      return amountFormatting.formatCompactAmount(displayValue, currency);
+    return new Intl.NumberFormat(locale, {
       ...(useCurrencyStyle ? { currency, currencyDisplay: "narrowSymbol" as const } : {}),
       style: useCurrencyStyle ? "currency" : "decimal",
       notation: compact ? "compact" : "standard",
-      minimumFractionDigits: compact ? 0 : displayDecimal ? 2 : 0,
-      maximumFractionDigits: compact ? 1 : displayDecimal ? 2 : 0,
-    });
+      minimumFractionDigits: compact ? 0 : fractionDigits,
+      maximumFractionDigits: compact ? 1 : fractionDigits,
+    }).format(displayValue);
   }, [
     currency,
     amountFormatting,
-    numberFormatting,
+    locale,
     validCurrency,
     displayCurrency,
-    displayDecimal,
+    fractionDigits,
     compact,
-    targetValue,
+    displayValue,
   ]);
 
   if (isLoading) {
@@ -86,7 +88,7 @@ const Balance: React.FC<BalanceProps> = ({
         <>
           <NumberFlow
             className="muted-fraction"
-            value={targetValue}
+            value={displayValue}
             isolate={false}
             locales={locale}
             style={{
@@ -100,8 +102,8 @@ const Balance: React.FC<BalanceProps> = ({
                 : {}),
               style: displayCurrency && validCurrency ? "currency" : "decimal",
               notation: compact ? ("compact" as const) : ("standard" as const),
-              minimumFractionDigits: compact ? 0 : displayDecimal ? 2 : 0,
-              maximumFractionDigits: compact ? 1 : displayDecimal ? 2 : 0,
+              minimumFractionDigits: compact ? 0 : fractionDigits,
+              maximumFractionDigits: compact ? 1 : fractionDigits,
             }}
           />
           <span className="sr-only" data-testid="portfolio-balance-value">

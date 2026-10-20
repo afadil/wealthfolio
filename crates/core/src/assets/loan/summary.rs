@@ -7,9 +7,19 @@ use serde_json::Value;
 use super::model::{INTEREST_RATE_KEY, ORIGINAL_AMOUNT_KEY, RENEWAL_MATURITY_KEY};
 use super::{LoanCalculation, LoanFrequency, LoanTerms};
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LoanBalanceSource {
+    Recorded,
+    Schedule,
+    Original,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LoanSummary {
+    /// None means the loan has neither a valuation nor a usable original principal.
+    pub balance_source: Option<LoanBalanceSource>,
     /// The balance follows a payment schedule rather than manual updates.
     pub scheduled: bool,
     /// The original principal, for the share repaid.
@@ -42,6 +52,7 @@ impl LoanSummary {
             (None, None) => (number(metadata, INTEREST_RATE_KEY), None, None),
         };
         Self {
+            balance_source: None,
             scheduled: terms.is_some(),
             // Liabilities from earlier releases stored the principal as purchase_price.
             original_amount: number(metadata, ORIGINAL_AMOUNT_KEY)

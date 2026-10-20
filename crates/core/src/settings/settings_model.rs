@@ -1,8 +1,10 @@
 //! Settings domain models.
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 pub const INSIGHTS_OVERVIEW_LAYOUT_KEY: &str = "insights_overview_layout";
+pub const CURRENCY_FORMATTING_REGIONS_KEY: &str = "currency_formatting_regions";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -11,6 +13,10 @@ pub struct Settings {
     pub font: String,
     pub language: String,
     pub formatting_region: String,
+    /// Formatting regions for amounts in specific currencies, keyed by currency
+    /// code. Other currencies follow `formatting_region`.
+    #[serde(default)]
+    pub currency_formatting_regions: BTreeMap<String, String>,
     pub base_currency: String,
     pub timezone: String,
     pub onboarding_completed: bool,
@@ -33,6 +39,7 @@ impl Default for Settings {
             font: "font-mono".to_string(),
             language: "en".to_string(),
             formatting_region: "system".to_string(),
+            currency_formatting_regions: BTreeMap::new(),
             base_currency: "".to_string(),
             timezone: "".to_string(),
             onboarding_completed: false,
@@ -53,6 +60,8 @@ pub struct SettingsUpdate {
     pub font: Option<String>,
     pub language: Option<String>,
     pub formatting_region: Option<String>,
+    /// Replaces the whole map; an empty map removes every override.
+    pub currency_formatting_regions: Option<BTreeMap<String, String>>,
     pub base_currency: Option<String>,
     pub timezone: Option<String>,
     pub onboarding_completed: Option<bool>,

@@ -43,11 +43,11 @@ const ChartCenterLabel: React.FC<ChartCenterLabelProps> = ({ activeData, totalVa
 
   return (
     <TooltipProvider>
-      <div className="pointer-events-auto absolute left-1/2 top-[108px] -translate-x-1/2 -translate-y-1/2 text-center">
+      <div className="top-27 pointer-events-auto absolute left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
         <p className="text-muted-foreground text-xs font-medium">{activeData.name}</p>
-        <Tooltip delayDuration={100}>
-          <TooltipTrigger asChild>
-            <p className="text-foreground cursor-default text-xs font-bold">{compactValue}</p>
+        <Tooltip>
+          <TooltipTrigger delay={100} render={<p className="text-foreground cursor-default text-xs font-bold" />}>
+            {compactValue}
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-center">
             <AmountDisplay value={activeData.value} currency={activeData.currency} isHidden={isBalanceHidden} />
@@ -147,7 +147,7 @@ export const DonutChart: React.FC<DonutChartProps> = ({
     const payload = entry.payload as { currency: string };
     return (
       <div className="flex flex-col">
-        <span className="text-muted-foreground text-[0.70rem] uppercase">{name}</span>
+        <span className="text-muted-foreground text-2xs uppercase">{name}</span>
         <span className="font-bold">
           <AmountDisplay value={Number(value ?? 0)} currency={payload.currency} isHidden={isBalanceHidden} />
         </span>
@@ -181,7 +181,7 @@ export const DonutChart: React.FC<DonutChartProps> = ({
   } as PieComponentProps;
 
   return (
-    <div className="relative h-[160px] w-full p-0">
+    <div className="relative h-40 w-full p-0">
       <ChartContainer config={{}} className="h-full w-full">
         <PieChart onMouseLeave={handleMouseLeave} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
           {displayTooltip && (

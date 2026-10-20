@@ -1,7 +1,7 @@
 use crate::activities::IncomeData;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,12 +29,21 @@ pub struct IncomeSummary {
     pub by_month: HashMap<String, Decimal>,
     pub by_type: HashMap<String, Decimal>,
     pub by_asset: HashMap<String, IncomeByAsset>,
+    /// Income per currency, in that currency.
     pub by_currency: HashMap<String, Decimal>,
+    /// Income per currency, converted to `currency`. Like the other converted
+    /// totals, it leaves out income without an exchange rate.
+    pub by_currency_base: HashMap<String, Decimal>,
     pub by_account: HashMap<String, IncomeByAccount>,
     pub total_income: Decimal,
     pub currency: String,
     pub monthly_average: Decimal,
     pub yoy_growth: Option<Decimal>,
+    /// Currencies with income but no exchange rate to `currency`, in this
+    /// period or in the previous one `yoy_growth` compares against. That
+    /// income is left out of every converted total; `by_currency` still
+    /// counts this period's.
+    pub unconverted_currencies: BTreeSet<String>,
 }
 
 impl IncomeSummary {
@@ -45,11 +54,13 @@ impl IncomeSummary {
             by_type: HashMap::new(),
             by_asset: HashMap::new(),
             by_currency: HashMap::new(),
+            by_currency_base: HashMap::new(),
             by_account: HashMap::new(),
             total_income: Decimal::ZERO,
             currency,
             monthly_average: Decimal::ZERO,
             yoy_growth: None,
+            unconverted_currencies: BTreeSet::new(),
         }
     }
 
@@ -76,6 +87,10 @@ impl IncomeSummary {
             .by_currency
             .entry(data.currency.clone())
             .or_insert_with(|| Decimal::ZERO) += &data.amount;
+        *self
+            .by_currency_base
+            .entry(data.currency.clone())
+            .or_insert_with(|| Decimal::ZERO) += &converted_amount;
         self.by_account
             .entry(data.account_id.clone())
             .and_modify(|entry| {
@@ -96,6 +111,16 @@ impl IncomeSummary {
                 }
             });
         self.total_income += &converted_amount;
+    }
+
+    /// Counts income that has no exchange rate to `currency`: only in its own
+    /// currency, so the converted totals leave it out.
+    pub fn add_unconverted_income(&mut self, data: &IncomeData) {
+        *self
+            .by_currency
+            .entry(data.currency.clone())
+            .or_insert_with(|| Decimal::ZERO) += &data.amount;
+        self.unconverted_currencies.insert(data.currency.clone());
     }
 
     pub fn calculate_monthly_average(&mut self, num_months: Option<u32>) {

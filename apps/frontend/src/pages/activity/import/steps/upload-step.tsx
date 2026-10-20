@@ -64,6 +64,7 @@ import {
   mergeActivityMappingsForImportProfile,
   sanitizeImportMappingForProfile,
 } from "../utils/activity-import-profile";
+import { badgeVariants } from "@wealthfolio/ui";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CSV Preview Component
@@ -85,13 +86,13 @@ function CsvPreviewTable({ headers, rows, maxRows = 50 }: CsvPreviewTableProps) 
       <table className="w-full">
         <thead className="bg-muted sticky top-0">
           <tr>
-            <th className="text-muted-foreground bg-muted w-12 border-r px-2 py-1.5 text-right font-mono text-xs">
+            <th className="text-muted-foreground bg-muted w-12 border-e px-2 py-1.5 text-end font-mono text-xs">
               #
             </th>
             {headers.map((header, idx) => (
               <th
                 key={idx}
-                className="border-r px-2 py-1.5 text-left font-mono text-xs font-semibold last:border-r-0"
+                className="border-e px-2 py-1.5 text-start font-mono text-xs font-semibold last:border-e-0"
               >
                 {header || (
                   <span className="text-muted-foreground italic">
@@ -112,13 +113,13 @@ function CsvPreviewTable({ headers, rows, maxRows = 50 }: CsvPreviewTableProps) 
                 "hover:bg-muted/50",
               )}
             >
-              <td className="text-muted-foreground bg-muted/20 w-12 border-r px-2 py-1 text-right">
+              <td className="text-muted-foreground bg-muted/20 w-12 border-e px-2 py-1 text-end">
                 {rowIdx + 1}
               </td>
               {row.map((cell, cellIdx) => (
                 <td
                   key={cellIdx}
-                  className="max-w-[200px] truncate border-r px-2 py-1 last:border-r-0"
+                  className="max-w-50 truncate border-e px-2 py-1 last:border-e-0"
                   title={cell}
                 >
                   {cell || <span className="text-muted-foreground italic">-</span>}
@@ -126,7 +127,7 @@ function CsvPreviewTable({ headers, rows, maxRows = 50 }: CsvPreviewTableProps) 
               ))}
               {row.length < headers.length &&
                 Array.from({ length: headers.length - row.length }).map((_, idx) => (
-                  <td key={`empty-${idx}`} className="border-r px-2 py-1 last:border-r-0">
+                  <td key={`empty-${idx}`} className="border-e px-2 py-1 last:border-e-0">
                     <span className="text-muted-foreground italic">-</span>
                   </td>
                 ))}
@@ -196,7 +197,8 @@ function CsvPreviewTabs({
         </CardHeader>
         <CardContent className="p-0">
           <TabsContent value="parsed" className="m-0 border-0 p-0">
-            <div className="max-h-[300px] overflow-auto border-t">
+            {/* `isolate` stops WebKitGTK painting the sticky header over this scrollbar inside a scrolling parent */}
+            <div className="max-h-75 isolate overflow-auto border-t">
               <CsvPreviewTable headers={headers} rows={rows} maxRows={50} />
             </div>
           </TabsContent>
@@ -387,34 +389,42 @@ function TemplateSelector({
 
       {/* Parse Settings — collapsible */}
       <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <CollapsibleTrigger asChild>
-          <div
-            className={cn(
-              "hover:bg-muted/40 flex cursor-pointer items-center justify-between px-3 py-2 transition-colors",
-              "border-t",
-            )}
-          >
-            <div className="flex items-center gap-2">
-              <Icons.Settings2 className="text-muted-foreground h-3.5 w-3.5" />
-              <span className="text-muted-foreground text-xs font-medium">
-                {t("activity:import.parseSettings.title")}
-              </span>
-              {hasConfigErrors && (
-                <span className="bg-destructive/10 text-destructive rounded-full px-2 py-px text-[10px]">
-                  {t("activity:import.parseSettings.adjustToFix")}
-                </span>
-              )}
-              {!settingsOpen && !hasConfigErrors && (
-                <span className="text-muted-foreground text-[11px]">{configSummary}</span>
-              )}
-            </div>
-            <Icons.ChevronDown
+        <CollapsibleTrigger
+          nativeButton={false}
+          render={
+            <div
               className={cn(
-                "text-muted-foreground h-3.5 w-3.5 transition-transform duration-200",
-                settingsOpen && "rotate-180",
+                "hover:bg-muted/40 flex cursor-pointer items-center justify-between px-3 py-2 transition-colors",
+                "border-t",
               )}
             />
+          }
+        >
+          <div className="flex items-center gap-2">
+            <Icons.Settings2 className="text-muted-foreground h-3.5 w-3.5" />
+            <span className="text-muted-foreground text-xs font-medium">
+              {t("activity:import.parseSettings.title")}
+            </span>
+            {hasConfigErrors && (
+              <span
+                className={cn(
+                  badgeVariants({ variant: "destructive-subtle" }),
+                  "text-2xs py-px font-normal",
+                )}
+              >
+                {t("activity:import.parseSettings.adjustToFix")}
+              </span>
+            )}
+            {!settingsOpen && !hasConfigErrors && (
+              <span className="text-muted-foreground text-2xs">{configSummary}</span>
+            )}
           </div>
+          <Icons.ChevronDown
+            className={cn(
+              "text-muted-foreground h-3.5 w-3.5 transition-transform duration-200",
+              settingsOpen && "rotate-180",
+            )}
+          />
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="border-t px-3 pb-4 pt-3">
@@ -469,7 +479,15 @@ function TemplateSelector({
                 </Label>
                 <Select
                   value={config.delimiter}
-                  onValueChange={(value) => onConfigChange({ delimiter: value })}
+                  items={{
+                    auto: t("activity:import.parseSettings.delimiterAuto"),
+                    ",": t("activity:import.parseSettings.delimiterComma"),
+                    ";": t("activity:import.parseSettings.delimiterSemicolon"),
+                    "\\t": t("activity:import.parseSettings.delimiterTab"),
+                  }}
+                  onValueChange={(value) => {
+                    if (value !== null) onConfigChange({ delimiter: value });
+                  }}
                 >
                   <SelectTrigger id="delimiter" className="h-8 text-sm">
                     <SelectValue placeholder={t("activity:import.parseSettings.selectDelimiter")} />
@@ -499,7 +517,14 @@ function TemplateSelector({
                 </Label>
                 <Select
                   value={config.decimalSeparator}
-                  onValueChange={(value) => onConfigChange({ decimalSeparator: value })}
+                  items={{
+                    auto: t("activity:import.parseSettings.decimalAuto"),
+                    ".": t("activity:import.parseSettings.decimalPeriod"),
+                    ",": t("activity:import.parseSettings.decimalComma"),
+                  }}
+                  onValueChange={(value) => {
+                    if (value !== null) onConfigChange({ decimalSeparator: value });
+                  }}
                 >
                   <SelectTrigger id="decimalSeparator" className="h-8 text-sm">
                     <SelectValue placeholder={t("activity:import.parseSettings.selectSeparator")} />
@@ -852,11 +877,11 @@ export function UploadStep() {
         {/* Account */}
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground font-mono text-[10px] tabular-nums">01</span>
+            <span className="text-muted-foreground text-2xs font-mono tabular-nums">01</span>
             <h2 className="text-sm font-semibold">{t("activity:import.upload.selectAccount")}</h2>
             <HelpTooltip content={t("activity:import.upload.selectAccountHelp")} />
           </div>
-          <div className="h-[116px]">
+          <div className="h-29">
             {isMobile ? (
               <div
                 className={cn(
@@ -907,11 +932,11 @@ export function UploadStep() {
         {/* File upload */}
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground font-mono text-[10px] tabular-nums">02</span>
+            <span className="text-muted-foreground text-2xs font-mono tabular-nums">02</span>
             <h2 className="text-sm font-semibold">{t("activity:import.upload.uploadCsv")}</h2>
             <HelpTooltip content={t("activity:import.upload.uploadCsvHelp")} />
           </div>
-          <div className="h-[116px]">
+          <div className="h-29">
             <FileDropzone
               file={state.file}
               onFileChange={handleFileSelect}
@@ -927,9 +952,9 @@ export function UploadStep() {
       {/* Select Format */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-muted-foreground font-mono text-[10px] tabular-nums">03</span>
+          <span className="text-muted-foreground text-2xs font-mono tabular-nums">03</span>
           <h2 className="text-sm font-semibold">{t("activity:import.upload.selectFormat")}</h2>
-          <span className="text-muted-foreground rounded border px-1.5 py-px text-[10px] leading-none">
+          <span className="text-muted-foreground text-2xs rounded border px-1.5 py-px leading-none">
             {t("activity:import.upload.optional")}
           </span>
         </div>

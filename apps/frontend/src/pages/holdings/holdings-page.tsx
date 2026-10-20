@@ -1,6 +1,13 @@
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { EmptyPlaceholder } from "@wealthfolio/ui";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "@wealthfolio/ui";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -57,6 +64,7 @@ import {
   AlternativeAssetQuickAddModal,
   AssetDetailsSheet,
   UpdateValuationModal,
+  toLinkedLiability,
   type AssetDetailsSheetAsset,
   type LinkableAsset,
   type LinkedLiability,
@@ -307,11 +315,7 @@ export const HoldingsPage = () => {
           const linkedAssetId = metadata?.linked_asset_id;
           return linkedAssetId === propertyId;
         })
-        .map((h) => ({
-          id: h.id,
-          name: h.name,
-          balance: h.marketValue,
-        }));
+        .map(toLinkedLiability);
     },
     [liabilitiesHoldings],
   );
@@ -329,11 +333,7 @@ export const HoldingsPage = () => {
             liabilityType === "mortgage" && (!linkedAssetId || linkedAssetId === excludePropertyId)
           );
         })
-        .map((h) => ({
-          id: h.id,
-          name: h.name,
-          balance: h.marketValue,
-        }));
+        .map(toLinkedLiability);
     },
     [liabilitiesHoldings],
   );
@@ -503,41 +503,46 @@ export const HoldingsPage = () => {
         />
       ) : hasNoInvestments ? (
         <div className="flex items-center justify-center py-16">
-          <EmptyPlaceholder
-            icon={<Icons.TrendingUp className="text-muted-foreground h-10 w-10" />}
-            title={t("holdings:empty_no_holdings_yet")}
-            description={
-              canEditHoldings
-                ? t("holdings:empty_get_started_manual")
-                : t("holdings:empty_get_started_transaction")
-            }
-          >
-            <div className="flex flex-col items-center gap-3 sm:flex-row">
-              {canEditHoldings ? (
-                <>
-                  <Button size="default" onClick={() => setIsEditMode(true)}>
-                    <Icons.Pencil className="mr-2 h-4 w-4" />
-                    {t("holdings:update_holdings")}
-                  </Button>
-                  <Button size="default" variant="outline" onClick={() => navigate("/import")}>
-                    <Icons.Import className="mr-2 h-4 w-4" />
-                    {t("holdings:import_from_csv")}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button size="default" onClick={() => navigate("/activities/manage")}>
-                    <Icons.Plus className="mr-2 h-4 w-4" />
-                    {t("holdings:add_transaction")}
-                  </Button>
-                  <Button size="default" variant="outline" onClick={() => navigate("/import")}>
-                    <Icons.Import className="mr-2 h-4 w-4" />
-                    {t("holdings:import_from_csv")}
-                  </Button>
-                </>
-              )}
-            </div>
-          </EmptyPlaceholder>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                {<Icons.TrendingUp className="text-muted-foreground size-10" />}
+              </EmptyMedia>
+              <EmptyTitle>{t("holdings:empty_no_holdings_yet")}</EmptyTitle>
+              <EmptyDescription>
+                {canEditHoldings
+                  ? t("holdings:empty_get_started_manual")
+                  : t("holdings:empty_get_started_transaction")}
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <div className="flex flex-col items-center gap-3 sm:flex-row">
+                {canEditHoldings ? (
+                  <>
+                    <Button size="default" onClick={() => setIsEditMode(true)}>
+                      <Icons.Pencil className="me-2 h-4 w-4" />
+                      {t("holdings:update_holdings")}
+                    </Button>
+                    <Button size="default" variant="outline" onClick={() => navigate("/import")}>
+                      <Icons.Import className="me-2 h-4 w-4" />
+                      {t("holdings:import_from_csv")}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button size="default" onClick={() => navigate("/activities/manage")}>
+                      <Icons.Plus className="me-2 h-4 w-4" />
+                      {t("holdings:add_transaction")}
+                    </Button>
+                    <Button size="default" variant="outline" onClick={() => navigate("/import")}>
+                      <Icons.Import className="me-2 h-4 w-4" />
+                      {t("holdings:import_from_csv")}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </EmptyContent>
+          </Empty>
         </div>
       ) : (
         <>
@@ -606,16 +611,21 @@ export const HoldingsPage = () => {
     <>
       {hasNoAssets ? (
         <div className="flex items-center justify-center py-16">
-          <EmptyPlaceholder
-            icon={<Icons.Wallet className="text-muted-foreground h-10 w-10" />}
-            title={t("holdings:empty_no_assets_yet")}
-            description={t("holdings:empty_add_first_asset")}
-          >
-            <Button size="default" onClick={() => setIsAlternativeAssetModalOpen(true)}>
-              <Icons.Plus className="mr-2 h-4 w-4" />
-              {t("holdings:add_asset")}
-            </Button>
-          </EmptyPlaceholder>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                {<Icons.Wallet className="text-muted-foreground size-10" />}
+              </EmptyMedia>
+              <EmptyTitle>{t("holdings:empty_no_assets_yet")}</EmptyTitle>
+              <EmptyDescription>{t("holdings:empty_add_first_asset")}</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button size="default" onClick={() => setIsAlternativeAssetModalOpen(true)}>
+                <Icons.Plus className="me-2 h-4 w-4" />
+                {t("holdings:add_asset")}
+              </Button>
+            </EmptyContent>
+          </Empty>
         </div>
       ) : (
         <>
@@ -652,16 +662,21 @@ export const HoldingsPage = () => {
     <>
       {hasNoLiabilities ? (
         <div className="flex items-center justify-center py-16">
-          <EmptyPlaceholder
-            icon={<Icons.CreditCard className="text-muted-foreground h-10 w-10" />}
-            title={t("holdings:empty_no_liabilities_yet")}
-            description={t("holdings:empty_track_debts")}
-          >
-            <Button size="default" onClick={() => setIsAlternativeAssetModalOpen(true)}>
-              <Icons.Plus className="mr-2 h-4 w-4" />
-              {t("holdings:add_liability")}
-            </Button>
-          </EmptyPlaceholder>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                {<Icons.CreditCard className="text-muted-foreground size-10" />}
+              </EmptyMedia>
+              <EmptyTitle>{t("holdings:empty_no_liabilities_yet")}</EmptyTitle>
+              <EmptyDescription>{t("holdings:empty_track_debts")}</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button size="default" onClick={() => setIsAlternativeAssetModalOpen(true)}>
+                <Icons.Plus className="me-2 h-4 w-4" />
+                {t("holdings:add_liability")}
+              </Button>
+            </EmptyContent>
+          </Empty>
         </div>
       ) : (
         <LiabilityOverview
@@ -686,7 +701,7 @@ export const HoldingsPage = () => {
         {/* Show Update button for HOLDINGS-mode manual accounts (only on investments tab) */}
         {canEditHoldings && !isEditMode && currentTab === "investments" && (
           <Button size="sm" variant="outline" onClick={() => setIsEditMode(true)}>
-            <Icons.Pencil className="mr-2 h-4 w-4" />
+            <Icons.Pencil className="me-2 h-4 w-4" />
             {t("holdings:update")}
           </Button>
         )}

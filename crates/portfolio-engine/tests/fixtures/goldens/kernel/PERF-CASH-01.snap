@@ -263,7 +263,7 @@ baseline:
         contributions: "1050"
         distributions: "216"
         fees: "0"
-        fx_effect: "0"
+        fx_effect: "46"
         income: "0"
         realized_pnl: "0"
         residual: "0"
@@ -275,7 +275,7 @@ baseline:
       method: timeWeighted
       period_end: 2025-01-09
       period_start: 2025-01-02
-      quality: partial
+      quality: ok
       returns:
         annualized_irr: "9.71340305"
         annualized_twr: ~
@@ -308,14 +308,14 @@ baseline:
         - date: 2025-01-09
           value: "0.04761905"
       summary:
-        amount: "0"
+        amount: "46"
         amount_status: complete
         basis: marketValue
         basis_status: notApplicable
         method: timeWeighted
         percent: "0.04761905"
         percent_status: complete
-        quality: partial
+        quality: ok
   portfolio_flows:
     - date: 2025-01-07
       inflow_base: "0"

@@ -92,10 +92,11 @@ for (const mobile of [false, true]) {
     const overlay = document.querySelector<HTMLElement>(".qr-overlay")!;
     const cancel = within(overlay).getByRole("button", { name: "common:cancel" });
     await waitFor(() => expect(cancel).toHaveFocus());
+    // Tab lands on a focus guard, which sends focus back on the next animation frame.
     await user.tab();
-    expect(cancel).toHaveFocus();
+    await waitFor(() => expect(cancel).toHaveFocus());
     await user.tab({ shift: true });
-    expect(cancel).toHaveFocus();
+    await waitFor(() => expect(cancel).toHaveFocus());
     await user.keyboard("{Enter}");
     await waitFor(() => expect(document.querySelector(".qr-overlay")).toBeNull());
     await waitFor(() => expect(trigger).toHaveFocus());

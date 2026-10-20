@@ -142,7 +142,12 @@ describe("AddonIframeManager", () => {
   });
 
   it("passes host localization into the sandbox and broadcasts updates", async () => {
-    setAddonLocalizationSnapshot({ locale: "ja-JP", uiLocale: "en", timezone: "Asia/Tokyo" });
+    setAddonLocalizationSnapshot({
+      locale: "ja-JP",
+      uiLocale: "en",
+      direction: "rtl",
+      timezone: "Asia/Tokyo",
+    });
     const manager = new AddonIframeManager();
     const starting = manager.startAddon(input);
     const cancelled = expect(starting).rejects.toMatchObject({ name: "AddonLoadCancelled" });
@@ -152,6 +157,7 @@ describe("AddonIframeManager", () => {
     const bootstrap = new URLSearchParams(iframe.name);
     expect(bootstrap.get("locale")).toBe("ja-JP");
     expect(bootstrap.get("uiLocale")).toBe("en");
+    expect(bootstrap.get("direction")).toBe("rtl");
     expect(bootstrap.get("timezone")).toBe("Asia/Tokyo");
 
     const postMessage = vi.spyOn(iframe.contentWindow!, "postMessage").mockImplementation(() => {});
@@ -160,6 +166,48 @@ describe("AddonIframeManager", () => {
     expect(postMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         localization: { locale: "ko-KR", uiLocale: "fr", timezone: "Asia/Seoul" },
+        type: "localizationUpdate",
+      }),
+      "*",
+    );
+
+    const withCurrencyFormats = {
+      locale: "ko-KR",
+      uiLocale: "fr",
+      timezone: "Asia/Seoul",
+      currencyFormattingRegions: { INR: "IN", USD: "DE" },
+    };
+    postMessage.mockClear();
+    setAddonLocalizationSnapshot(withCurrencyFormats);
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ localization: withCurrencyFormats, type: "localizationUpdate" }),
+      "*",
+    );
+
+    // Settings refetches may rebuild the same map in a different insertion order.
+    postMessage.mockClear();
+    setAddonLocalizationSnapshot({
+      ...withCurrencyFormats,
+      currencyFormattingRegions: { USD: "DE", INR: "IN" },
+    });
+    expect(postMessage).not.toHaveBeenCalled();
+
+    const changedCurrencyFormats = {
+      ...withCurrencyFormats,
+      currencyFormattingRegions: { USD: "US", INR: "IN" },
+    };
+    setAddonLocalizationSnapshot(changedCurrencyFormats);
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ localization: changedCurrencyFormats, type: "localizationUpdate" }),
+      "*",
+    );
+
+    // A direction switch alone reaches the sandbox, so addons mirror with the host.
+    postMessage.mockClear();
+    setAddonLocalizationSnapshot({ ...changedCurrencyFormats, direction: "ltr" });
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        localization: { ...changedCurrencyFormats, direction: "ltr" },
         type: "localizationUpdate",
       }),
       "*",

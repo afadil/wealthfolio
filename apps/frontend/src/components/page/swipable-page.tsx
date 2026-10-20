@@ -240,15 +240,15 @@ export function SwipablePage({
                 className={cn(
                   "grid w-full items-center gap-2",
                   mobileActionsInHeader
-                    ? "grid-cols-[minmax(0,1fr)_auto] min-[430px]:grid-cols-[2.5rem_minmax(0,1fr)_auto]"
+                    ? "xs:grid-cols-[2.5rem_minmax(0,1fr)_auto] grid-cols-[minmax(0,1fr)_auto]"
                     : "grid-cols-[1fr_auto_1fr]",
                 )}
               >
-                <div className={mobileActionsInHeader ? "hidden w-10 min-[430px]:block" : "w-10"} />
+                <div className={mobileActionsInHeader ? "xs:block hidden w-10" : "w-10"} />
                 <div
                   className={cn(
                     "min-w-0",
-                    mobileActionsInHeader && "flex justify-end min-[430px]:justify-center",
+                    mobileActionsInHeader && "xs:justify-center flex justify-end",
                   )}
                 >
                   <MobileNavigation

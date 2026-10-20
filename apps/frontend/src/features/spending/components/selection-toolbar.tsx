@@ -17,8 +17,8 @@ interface SelectionToolbarProps {
 
 /**
  * The mobile card list's selection control: a `Select` affordance at rest, and
- * a select-all plus `Cancel` once selection is on. The table shows checkboxes
- * permanently instead, so this has no desktop counterpart.
+ * a select-all plus `Cancel` once selection is on. The table reveals its
+ * checkboxes on row hover or focus instead, so this has no desktop counterpart.
  */
 export function SelectionToolbar({
   rowCount,
@@ -41,7 +41,8 @@ export function SelectionToolbar({
       {selectionMode ? (
         <>
           <SelectionCheckbox
-            checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+            checked={allVisibleSelected}
+            indeterminate={!allVisibleSelected && someVisibleSelected}
             onCheckedChange={onToggleSelectAllVisible}
             aria-label={
               allVisibleSelected
@@ -55,7 +56,7 @@ export function SelectionToolbar({
           <Button
             variant="ghost"
             size="sm"
-            className="ml-auto h-7 px-2 text-xs"
+            className="ms-auto h-7 px-2 text-xs"
             onClick={onExitSelectionMode}
           >
             {t("common:cancel")}
@@ -65,7 +66,7 @@ export function SelectionToolbar({
         <Button
           variant="ghost"
           size="sm"
-          className="ml-auto h-7 px-2 text-xs"
+          className="ms-auto h-7 px-2 text-xs"
           onClick={onEnterSelectionMode}
         >
           {t("common:select")}

@@ -1,3 +1,4 @@
+import { cloneElement } from "react";
 import { getHoldingsList } from "@/adapters";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useRecalculatePortfolioMutation } from "@/hooks/use-calculate-portfolio";
@@ -15,10 +16,11 @@ import type {
 } from "@/lib/types";
 import { AccountType } from "@/lib/types";
 import { ActivityForm } from "@/pages/activity/components/activity-form";
+import ActivityTable from "@/pages/activity/components/activity-table/activity-table";
 import { useActivitySearch } from "@/pages/activity/hooks/use-activity-search";
 import { useCalculatePerformanceHistory } from "@/pages/performance/hooks/use-performance-data";
 import { useQuery } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AccountPage from "./account-page";
 
@@ -82,7 +84,7 @@ vi.mock("@/pages/activity/components/activity-pagination", () => ({
 }));
 
 vi.mock("@/pages/activity/components/activity-table/activity-table", () => ({
-  default: () => <div>activity-table</div>,
+  default: vi.fn(() => <div>activity-table</div>),
 }));
 
 vi.mock("@/pages/activity/components/activity-table/activity-table-mobile", () => ({
@@ -213,19 +215,26 @@ vi.mock("@wealthfolio/ui", async () => {
     Tooltip: Passthrough,
     TooltipContent: Passthrough,
     TooltipProvider: Passthrough,
-    TooltipTrigger: Passthrough,
+    TooltipTrigger: ({
+      children,
+      render,
+    }: {
+      children?: React.ReactNode;
+      render?: React.ReactElement;
+    }) => (render ? cloneElement(render, undefined, children) : <>{children}</>),
+    buttonVariants: () => "",
   };
 });
 
 vi.mock("@wealthfolio/ui/components/ui/button", () => ({
   Button: ({
     children,
-    asChild,
+    render,
     ...props
   }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-    asChild?: boolean;
+    render?: React.ReactElement;
     children?: React.ReactNode;
-  }) => (asChild ? <>{children}</> : <button {...props}>{children}</button>),
+  }) => (render ? cloneElement(render, props, children) : <button {...props}>{children}</button>),
 }));
 
 vi.mock("@wealthfolio/ui/components/ui/command", () => ({
@@ -311,6 +320,7 @@ const mockUseSettingsContext = vi.mocked(useSettingsContext);
 const mockUseCalculatePerformanceHistory = vi.mocked(useCalculatePerformanceHistory);
 const mockUseActivitySearch = vi.mocked(useActivitySearch);
 const mockActivityForm = vi.mocked(ActivityForm);
+const mockActivityTable = vi.mocked(ActivityTable);
 const mockUseQuery = vi.mocked(useQuery);
 const mockUseRecalculatePortfolioMutation = vi.mocked(useRecalculatePortfolioMutation);
 
@@ -488,6 +498,55 @@ describe("AccountPage", () => {
     expect(mockUseActivitySearch.mock.calls.at(-1)?.[0]).toMatchObject({
       mode: "infinite",
       filters: { accountIds: ["account-1"] },
+    });
+  });
+
+  it.each([AccountType.CASH, AccountType.CREDIT_CARD])(
+    "asks for running balances on a %s account's activities",
+    (accountType) => {
+      mockAccountPage([{ ...createAccount(), accountType, name: "Checking" }]);
+
+      render(<AccountPage />);
+
+      expect(mockUseActivitySearch.mock.calls.at(-1)?.[0]).toMatchObject({
+        filters: { accountIds: ["account-1"] },
+        includeCashBalances: true,
+      });
+    },
+  );
+
+  it("asks for end-of-day cash on an investment account while its list runs in date order", () => {
+    mockAccountPage([createAccount()]);
+    render(<AccountPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Activities" }));
+
+    expect(mockUseActivitySearch.mock.calls.at(-1)?.[0]).toMatchObject({
+      filters: { accountIds: ["account-1"] },
+      includeCashBalances: true,
+    });
+    expect(mockActivityTable.mock.calls.at(-1)?.[0]).toMatchObject({ groupByDay: true });
+
+    // Sorted by another column, the list is flat and has no cash to show.
+    act(() => {
+      mockActivityTable.mock.calls
+        .at(-1)?.[0]
+        .onSortingChange([{ id: "activityType", desc: false }]);
+    });
+
+    expect(mockUseActivitySearch.mock.calls.at(-1)?.[0]).toMatchObject({
+      includeCashBalances: false,
+    });
+    expect(mockActivityTable.mock.calls.at(-1)?.[0]).toMatchObject({ groupByDay: false });
+  });
+
+  it("does not ask for balances on a holdings-mode account", () => {
+    mockAccountPage([
+      { ...createAccount(), accountType: AccountType.CASH, trackingMode: "HOLDINGS" },
+    ]);
+    render(<AccountPage />);
+
+    expect(mockUseActivitySearch.mock.calls.at(-1)?.[0]).toMatchObject({
+      includeCashBalances: false,
     });
   });
 

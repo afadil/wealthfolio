@@ -135,6 +135,9 @@ pub struct AssetSpec {
     pub instrument_type: String,
     #[serde(default)]
     pub contract_multiplier: Option<Dec>,
+    /// The host's alternative-asset fact (core derives it from the kind).
+    #[serde(default)]
+    pub alternative: bool,
 }
 
 fn investment() -> String {
@@ -278,6 +281,7 @@ impl Scenario {
                     instrument_type: (a.instrument_type != "NONE")
                         .then(|| a.instrument_type.clone()),
                     contract_multiplier: a.contract_multiplier.map(|d| d.0),
+                    alternative: a.alternative,
                 })
                 .collect(),
             activities: self
@@ -316,26 +320,6 @@ impl Scenario {
                             .and_then(|m| m.get("flow"))
                             .and_then(|f| f.get("is_external"))
                             .and_then(Value::as_bool),
-                        fx_conversion: a.metadata.as_ref().and_then(|m| m.get("fx")).map(|fx| {
-                            let text = |key: &str| {
-                                fx.get(key)
-                                    .and_then(Value::as_str)
-                                    .unwrap_or_default()
-                                    .to_string()
-                            };
-                            let amount = |key: &str| {
-                                fx.get(key)
-                                    .and_then(Value::as_str)
-                                    .and_then(|v| Decimal::from_str(v).ok())
-                            };
-                            RawFxConversion {
-                                rate_source: text("rateSource"),
-                                source_currency: text("sourceCurrency"),
-                                destination_currency: text("destinationCurrency"),
-                                source_amount: amount("sourceAmount"),
-                                destination_amount: amount("destinationAmount"),
-                            }
-                        }),
                         source_system: a.source_system.clone(),
                         is_user_modified: a.is_user_modified,
                         updated_at: timestamp,
@@ -1070,6 +1054,7 @@ impl Pipeline {
             lots,
             &self.bundle.disposals,
             &self.bundle.rejected_activities(),
+            MeasureProfile::Full,
         )
     }
 

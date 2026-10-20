@@ -496,5 +496,9 @@
       "teamChanged": "您的家庭已更改。请重新连接 Wealthfolio Connect 以继续。",
       "rebind": "请重新连接 Wealthfolio Connect，以确认此个人资料的账户和家庭。"
     }
-  }
+  },
+  "remove": "移除",
+  "remove_item": "移除 {{name}}",
+  "actions_for": "{{name}} 的操作",
+  "settings_for": "{{name}} 设置"
 }

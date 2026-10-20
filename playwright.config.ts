@@ -13,7 +13,7 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
-  testIgnore: ["**/addon-sandbox/**", "**/net-worth/**", "**/profiles/**"],
+  testIgnore: ["**/addon-sandbox/**", "**/design-system/**", "**/net-worth/**", "**/profiles/**"],
   /* Run tests in files sequentially to ensure onboarding runs before activity tests */
   fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -30,8 +30,9 @@ export default defineConfig({
     // baseURL: 'http://localhost:3000',
     locale: "en-US",
 
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: "on-first-retry",
+    /* Keep a trace for each failed test; local runs have no retries to record one on.
+       See https://playwright.dev/docs/trace-viewer */
+    trace: "retain-on-failure",
   },
 
   /* Configure projects for major browsers */

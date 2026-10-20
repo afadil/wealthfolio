@@ -1,4 +1,5 @@
 import {
+  createAmountFormatting,
   createFormatter,
   dateFnsLocaleFor,
   formatAmount,
@@ -30,6 +31,9 @@ describe("locale formatting", () => {
     expect(resolveFormattingLocale("DE", "en")).toBe("de-DE");
     expect(resolveFormattingLocale("DE", "ja")).toBe("de-DE");
     expect(resolveFormattingLocale("TW", "en")).toBe("zh-TW");
+    expect(resolveFormattingLocale("AT", "en")).toBe("de-AT");
+    expect(resolveFormattingLocale("RO", "en")).toBe("ro-RO");
+    expect(resolveFormattingLocale("BG", "en")).toBe("bg-BG");
     expect(resolveFormattingLocale("en-US", "fr")).toBe("en-US");
   });
 
@@ -400,9 +404,10 @@ describe("locale formatting", () => {
           strikePrice: 1234.5,
           optionType: "CALL",
         },
+        "USD",
         formatting,
       ),
-    ).toContain("$1.234,5");
+    ).toContain("1.234,50\u00a0$");
   });
 });
 
@@ -490,6 +495,53 @@ describe("de-CH formatting", () => {
   });
 });
 
+describe("de-AT formatting", () => {
+  const locale = resolveFormattingLocale("AT");
+  const formatter = createFormatter(locale);
+
+  it.each([
+    ["EUR", 1234.56, "1234.56"],
+    ["USD", 1234.56, "1234.56"],
+    ["CAD", 1234.56, "1234.56"],
+    ["EUR", -1234567.89, "-1234567.89"],
+    ["JPY", 1234, "1234"],
+  ] as const)("round-trips Austrian %s currency amounts (%s)", (currency, value, expected) => {
+    const amount = formatter.formatAmount(value, currency);
+
+    expect(formatter.parseNumber(amount)).toBe(value);
+    expect(parseLocalizedNumber(amount, locale)).toBe(value);
+    expect(parseLocalizedDecimalString(amount, locale)).toBe(expected);
+  });
+
+  it("accepts decimal and currency grouping while preserving precision", () => {
+    expect(formatter.parseNumber(formatter.formatDecimal(1234.56))).toBe(1234.56);
+    expect(parseLocalizedDecimalString("1.234,56", locale)).toBe("1234.56");
+    expect(parseLocalizedDecimalString("€ 123.456.789.012.345.678,12345678", locale)).toBe(
+      "123456789012345678.12345678",
+    );
+  });
+
+  it("uses a currency affix to disambiguate whole amounts", () => {
+    expect(formatter.parseNumber("€ 1.234")).toBe(1234);
+    expect(parseLocalizedDecimalString("€ 1.234", locale)).toBe("1234");
+    expect(formatter.parseNumber("1.234")).toBe(1.234);
+    expect(parseLocalizedDecimalString("1.234", locale)).toBe("1.234");
+  });
+
+  it.each(["1234.56", "1,234.56", "$1,234.56"])("preserves machine-formatted input %s", (value) => {
+    expect(formatter.parseNumber(value)).toBe(1234.56);
+    expect(parseLocalizedDecimalString(value, locale)).toBe("1234.56");
+  });
+
+  it.each(["12.34,56", "1.23.456,78", "1.234,5.6", "1.234,56,78"])(
+    "rejects malformed Austrian currency grouping %s",
+    (value) => {
+      expect(formatter.parseNumber(`€ ${value}`)).toBeUndefined();
+      expect(parseLocalizedDecimalString(`€ ${value}`, locale)).toBeUndefined();
+    },
+  );
+});
+
 describe("en-IN formatting", () => {
   it("resolves India to Indian English", () => {
     expect(resolveFormattingLocale("IN")).toBe("en-IN");
@@ -523,5 +575,103 @@ describe("en-IN formatting", () => {
 
     expect(locale.localize.month(0)).toBe("January");
     expect(locale.options?.weekStartsOn).toBe(0);
+  });
+});
+
+describe("per-currency formatting regions", () => {
+  it("formats symbol-free amounts with the requested decimal precision", () => {
+    const formatting = createAmountFormatting("US", undefined, { INR: "IN", JPY: "JP" });
+    const fixedTwo = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+
+    expect(formatting.formatDecimalAmount(1234567.89, "INR", fixedTwo)).toBe("12,34,567.89");
+    expect(formatting.formatDecimalAmount(1234567.89, "USD", fixedTwo)).toBe("1,234,567.89");
+    // Precision belongs to the display, even for currencies with other minor units.
+    expect(formatting.formatDecimalAmount(1234.5, "JPY", fixedTwo)).toBe("1,234.50");
+    expect(formatting.formatDecimalAmount(1234.5, "BHD", fixedTwo)).toBe("1,234.50");
+    expect(formatting.formatDecimalAmount(-1234567.89, "INR", { maximumFractionDigits: 0 })).toBe(
+      "-12,34,568",
+    );
+    expect(formatting.formatDecimalAmount(1234567.8912, "INR")).toBe("12,34,567.891");
+    expect(formatting.formatDecimalAmount("2500", "USD")).toBe("2,500");
+    expect(formatting.formatDecimalAmount(1234.5, "GBp")).toBe("1,234.5");
+  });
+
+  it("shares cached decimal formatters across currencies in the same region", () => {
+    const formatting = createAmountFormatting("US", undefined, { INR: "IN", NPR: "IN" });
+    const OriginalNumberFormat = Intl.NumberFormat;
+    const constructor = vi.spyOn(Intl, "NumberFormat").mockImplementation(function (...args) {
+      return new OriginalNumberFormat(...args);
+    });
+    try {
+      formatting.formatDecimalAmount(1234.5, "INR");
+      formatting.formatDecimalAmount(1234.5, "INR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      formatting.formatDecimalAmount(1234.5, "INR", { maximumFractionDigits: 0 });
+      expect(constructor).not.toHaveBeenCalled();
+
+      formatting.formatDecimalAmount(1234.5, "INR", {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 4,
+      });
+      formatting.formatDecimalAmount(1234.5, "NPR", {
+        maximumFractionDigits: 4,
+        minimumFractionDigits: 1,
+      });
+      expect(constructor).toHaveBeenCalledTimes(1);
+    } finally {
+      constructor.mockRestore();
+    }
+  });
+
+  it("formats each overridden currency in its own region", () => {
+    const formatting = createAmountFormatting("US", undefined, { INR: "IN" });
+
+    expect(formatting.formatAmount(1234567.89, "INR")).toBe("₹12,34,567.89");
+    expect(formatting.formatAmount(1234567.89, "USD")).toBe("$1,234,567.89");
+    expect(formatting.formatCompactAmount(123456789, "INR")).toBe("₹12.35Cr");
+    expect(formatting.formatCompactAmount(123456789, "USD")).toBe("$123.46M");
+    expect(formatting.formatRoundedAmount(1234567.89, "INR")).toBe("₹12,34,568");
+    expect(formatting.formatPrice(1234567.5, "INR")).toBe("₹12,34,567.50");
+    expect(formatting.formatAmount(1234567.89, "INR", false)).toBe("12,34,567.89");
+    expect(formatting.currencyLocale("inr")).toBe("en-IN");
+    expect(formatting.currencyLocale("USD")).toBe("en-US");
+  });
+
+  it("keeps US grouping for USD when the global region is India", () => {
+    const formatting = createAmountFormatting("IN", undefined, { USD: "US" });
+
+    expect(formatting.formatAmount(1234567.89, "INR")).toBe("₹12,34,567.89");
+    expect(formatting.formatAmount(1234567.89, "USD")).toBe("$1,234,567.89");
+    expect(formatting.formatCompactAmount(1234567.89, "USD")).toBe("$1.23M");
+  });
+
+  it("formats quote units in the region of their major currency", () => {
+    const formatting = createAmountFormatting("US", undefined, { GBP: "DE" });
+
+    expect(formatting.formatAmount(1234.5, "GBp")).toBe("1.234,50p");
+    expect(formatting.currencyLocale("GBX")).toBe("de-DE");
+  });
+
+  it("matches the global formatter when there are no overrides", () => {
+    const global = createAmountFormatting("DE");
+
+    for (const formatting of [
+      createAmountFormatting("DE", undefined, {}),
+      createAmountFormatting("DE", undefined, { INR: "IN" }),
+    ]) {
+      expect(formatting.formatAmount(1234567.89, "EUR")).toBe(
+        global.formatAmount(1234567.89, "EUR"),
+      );
+      expect(formatting.formatCompactAmount(1234567.89, "USD")).toBe(
+        global.formatCompactAmount(1234567.89, "USD"),
+      );
+      expect(formatting.formatCurrencySymbol("USD")).toBe(global.formatCurrencySymbol("USD"));
+      expect(formatting.formatDecimalAmount(1234567.89, "EUR")).toBe(
+        global.formatDecimalAmount(1234567.89, "EUR"),
+      );
+      expect(formatting.currencyLocale("EUR")).toBe("de-DE");
+    }
   });
 });

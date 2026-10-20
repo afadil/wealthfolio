@@ -24,7 +24,9 @@ RUN npm install -g "$(node -p "require('./package.json').packageManager")" && pn
 RUN pnpm --filter frontend... build && mv dist /web-dist
 
 # Stage 2: build server with cross-compilation
-FROM --platform=$BUILDPLATFORM tonistiigi/xx AS xx
+# Pinned: a new xx image invalidates the chef and deps layers that PR builds
+# import from the GHCR cache, which only rewarms on main
+FROM --platform=$BUILDPLATFORM tonistiigi/xx:1.10.0 AS xx
 
 FROM --platform=$BUILDPLATFORM ${RUST_IMAGE} AS chef
 # Copy xx scripts to handle cross-compilation

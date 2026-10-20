@@ -1,4 +1,5 @@
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { cn } from "@/lib/utils";
 import type { ToolCallMessagePartProps } from "@assistant-ui/react";
@@ -10,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
   Skeleton,
+  useAmountFormatting,
   useDateFormatting,
   useNumberFormatting,
 } from "@wealthfolio/ui";
@@ -55,7 +57,7 @@ function PerformanceLoadingSkeleton() {
           <Skeleton className="h-4 w-32" />
         </div>
       </CardHeader>
-      <CardContent className="max-h-[320px] space-y-4">
+      <CardContent className="max-h-80 space-y-4">
         {/* Main return display skeleton */}
         <div className="flex items-baseline gap-3">
           <Skeleton className="h-10 w-28" />
@@ -83,12 +85,11 @@ function EmptyState() {
 function ErrorState({ message }: { message?: string }) {
   const { t } = useTranslation();
   return (
-    <Card className="border-destructive/30 bg-destructive/5">
-      <CardContent className="py-4">
-        <p className="text-destructive text-sm font-medium">{t("ai:performance.error")}</p>
-        {message && <p className="text-muted-foreground mt-1 text-xs">{message}</p>}
-      </CardContent>
-    </Card>
+    <Alert variant="destructive">
+      <Icons.AlertCircle />
+      <AlertTitle>{t("ai:performance.error")}</AlertTitle>
+      {message && <AlertDescription className="text-xs">{message}</AlertDescription>}
+    </Alert>
   );
 }
 
@@ -129,6 +130,7 @@ type PerformanceToolUIContentProps = ToolCallMessagePartProps<
 >;
 
 function PerformanceToolUIContentImpl({ args, result, status }: PerformanceToolUIContentProps) {
+  const amountFormatting = useAmountFormatting();
   const numberFormatting = useNumberFormatting();
   const dateFormatting = useDateFormatting();
 
@@ -151,17 +153,12 @@ function PerformanceToolUIContentImpl({ args, result, status }: PerformanceToolU
       formatCurrency: (value: number) =>
         isBalanceHidden
           ? "\u2022\u2022\u2022\u2022\u2022"
-          : numberFormatting.formatDecimal(value, {
-              style: "currency",
-              currency,
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 0,
-            }),
+          : amountFormatting.formatRoundedAmount(value, currency),
       formatPercent: (value: number) => numberFormatting.formatPercent(value),
       formatPercentSigned: (value: number) =>
         numberFormatting.formatPercent(value, { signDisplay: "exceptZero" }),
     };
-  }, [parsed?.currency, isBalanceHidden, baseCurrency, numberFormatting]);
+  }, [parsed?.currency, isBalanceHidden, baseCurrency, amountFormatting, numberFormatting]);
 
   // Format date range
   const periodLabel = useMemo(() => {
@@ -244,7 +241,7 @@ function PerformanceToolUIContentImpl({ args, result, status }: PerformanceToolU
           )}
         </div>
       </CardHeader>
-      <CardContent className="max-h-[320px] space-y-4 overflow-y-auto">
+      <CardContent className="max-h-80 space-y-4 overflow-y-auto">
         {/* Primary Return Display */}
         <div className="flex flex-wrap items-baseline gap-3">
           <div className="flex items-center gap-2">

@@ -27,6 +27,8 @@ pub struct NativeProfiles {
     // Serializes transitions and retains sync state while profiles are locked.
     lifecycle: tokio::sync::Mutex<HashMap<Uuid, Arc<ProfileSyncState>>>,
     starting: AtomicBool,
+    // Why the only profile did not open at startup, kept until the next unlock.
+    auto_open_error: Mutex<Option<String>>,
     lock_epoch: AtomicU64,
 }
 
@@ -38,6 +40,7 @@ pub struct ProfileState {
     pub session: Option<ProfileSession>,
     pub starting: bool,
     pub startup_error: Option<String>,
+    pub auto_open_error: Option<String>,
 }
 
 /// Construct each reopened runtime with the state retained by the profile lifecycle.
@@ -124,11 +127,14 @@ impl NativeProfiles {
         let (root, legacy) =
             crate::data_dir::profile_paths(root, identifier, std::env::var_os("WF_DATA_DIR"))?;
         let registry = if start_new {
-            ProfileRegistry::start_new(root, legacy, shared_secret_store(identifier))
+            ProfileRegistry::start_new(root, legacy.clone(), shared_secret_store(identifier))
         } else {
-            ProfileRegistry::open(root, legacy, shared_secret_store(identifier))
+            ProfileRegistry::open(root, legacy.clone(), shared_secret_store(identifier))
         }
         .map_err(|e| e.to_string())?;
+        // Mobile sandboxes can move while preserving profiles.json.
+        #[cfg(any(target_os = "ios", target_os = "android"))]
+        let registry = registry.with_legacy_database_path(legacy);
         for id in registry.pending_deletions().map_err(|e| e.to_string())? {
             if let Err(error) = registry.finish_delete(id) {
                 let (kind, io_kind, os_code) = match error {
@@ -149,6 +155,7 @@ impl NativeProfiles {
             active: Mutex::new(None),
             lifecycle: tokio::sync::Mutex::new(HashMap::new()),
             starting: AtomicBool::new(true),
+            auto_open_error: Mutex::new(None),
             lock_epoch: AtomicU64::new(0),
         })
     }
@@ -190,7 +197,11 @@ impl NativeProfiles {
                 match self.unlock(handle, list[0].id, None).await {
                     Ok(_) => return Ok(self.try_context()),
                     Err(error) if error.starts_with("PROFILE_LOCKED") => return Ok(None),
-                    Err(error) => return Err(error),
+                    // Store it before startup ends so the chooser can show it.
+                    Err(error) => {
+                        log::error!("Failed to open the profile: {error}");
+                        *self.auto_open_error()? = Some(error);
+                    }
                 }
             }
             Ok(None)
@@ -232,7 +243,14 @@ impl NativeProfiles {
             session,
             starting: self.starting.load(Ordering::SeqCst),
             startup_error: None,
+            auto_open_error: self.auto_open_error()?.clone(),
         })
+    }
+
+    fn auto_open_error(&self) -> Result<std::sync::MutexGuard<'_, Option<String>>, String> {
+        self.auto_open_error
+            .lock()
+            .map_err(|_| "Profile startup status is unavailable.".into())
     }
 
     pub async fn unlock(
@@ -243,6 +261,7 @@ impl NativeProfiles {
     ) -> Result<ProfileSession, String> {
         let epoch = self.lock_epoch.load(Ordering::SeqCst);
         let mut profile_sync_states = self.lifecycle.lock().await;
+        *self.auto_open_error()? = None;
         let registry = self.registry.clone();
         let protected = tauri::async_runtime::spawn_blocking(move || {
             let proof = proof.map(Zeroizing::new);
@@ -520,8 +539,18 @@ pub async fn delete_profile(
     .map_err(|e| e.to_string())?
 }
 
+// Profile checks hold the registry while they read the keyring, which can wait
+// on an unlock prompt. Sync commands run on the UI thread, so wait elsewhere.
 #[tauri::command]
-pub fn get_profile_state(handle: AppHandle) -> Result<ProfileState, String> {
+pub async fn get_profile_state<R: tauri::Runtime>(
+    handle: AppHandle<R>,
+) -> Result<ProfileState, String> {
+    tauri::async_runtime::spawn_blocking(move || profile_state(&handle))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn profile_state<R: tauri::Runtime>(handle: &AppHandle<R>) -> Result<ProfileState, String> {
     if let Some(profiles) = handle.try_state::<NativeProfiles>() {
         return profiles.state();
     }
@@ -534,6 +563,7 @@ pub fn get_profile_state(handle: AppHandle) -> Result<ProfileState, String> {
         session: None,
         starting: error.is_none(),
         startup_error: error,
+        auto_open_error: None,
     })
 }
 
@@ -805,11 +835,16 @@ mod sync_state_tests {
     use super::*;
     use wealthfolio_core::secrets::SecretStore;
 
+    /// Secrets plus the threads that read them.
     #[derive(Default)]
-    struct Secrets(Mutex<HashMap<String, String>>);
+    struct Secrets(
+        Mutex<HashMap<String, String>>,
+        Mutex<Vec<std::thread::ThreadId>>,
+    );
 
     impl SecretStore for Secrets {
         fn get_secret(&self, key: &str) -> wealthfolio_core::Result<Option<String>> {
+            self.1.lock().unwrap().push(std::thread::current().id());
             Ok(self.0.lock().unwrap().get(key).cloned())
         }
         fn set_secret(&self, key: &str, value: &str) -> wealthfolio_core::Result<()> {
@@ -828,12 +863,23 @@ mod sync_state_tests {
         Arc<DatabaseRuntime>,
         Uuid,
     ) {
+        connect_profile_with(Arc::new(Secrets::default()))
+    }
+
+    fn connect_profile_with(
+        secrets: Arc<Secrets>,
+    ) -> (
+        tempfile::TempDir,
+        NativeProfiles,
+        Arc<DatabaseRuntime>,
+        Uuid,
+    ) {
         let directory = tempfile::tempdir().unwrap();
         let registry = Arc::new(
             ProfileRegistry::open(
                 directory.path().to_path_buf(),
                 directory.path().join("app.db"),
-                Arc::new(Secrets::default()),
+                secrets,
             )
             .unwrap(),
         );
@@ -851,6 +897,7 @@ mod sync_state_tests {
             active: Mutex::new(Some(runtime.clone())),
             lifecycle: tokio::sync::Mutex::new(HashMap::new()),
             starting: AtomicBool::new(false),
+            auto_open_error: Mutex::new(None),
             lock_epoch: AtomicU64::new(0),
         };
         (directory, profiles, runtime, session.scope_id)
@@ -924,6 +971,78 @@ mod sync_state_tests {
         drop(login.await.unwrap());
         profiles.registry.sessions.revoke(NATIVE_OWNER).unwrap();
         assert!(invoke("get_holdings_list", scope).is_err());
+        runtime.shutdown_for_test().await;
+    }
+
+    #[cfg(any(feature = "connect-sync", feature = "device-sync"))]
+    #[tokio::test]
+    async fn keyring_commands_read_secrets_off_the_ipc_thread() {
+        use crate::commands::{secrets, wealthfolio_connect};
+        use tauri::test::{get_ipc_response, mock_builder, mock_context, noop_assets};
+
+        // Sync commands run on the thread that delivers IPC (the UI thread on desktop),
+        // where a slow or locked keyring freezes the window.
+        let store = Arc::new(Secrets::default());
+        let (_directory, profiles, runtime, scope) = connect_profile_with(store.clone());
+        runtime.initialize_for_test(None).await;
+        let scope = profiles
+            .registry
+            .sessions
+            .rotate(NATIVE_OWNER, scope, runtime.generation())
+            .unwrap()
+            .scope_id;
+        let app = mock_builder()
+            .manage(profiles)
+            .invoke_handler(tauri::generate_handler![
+                secrets::get_profile_sync_identity,
+                secrets::update_profile_sync_identity,
+                wealthfolio_connect::get_sync_session_status
+            ])
+            .build(mock_context(noop_assets()))
+            .unwrap();
+        let window = tauri::WebviewWindowBuilder::new(&app, NATIVE_OWNER, Default::default())
+            .build()
+            .unwrap();
+        for (command, body) in [
+            (
+                "get_profile_sync_identity",
+                serde_json::json!({"scopeId": scope}),
+            ),
+            (
+                "update_profile_sync_identity",
+                serde_json::json!({"scopeId": scope, "identity": "{}"}),
+            ),
+            (
+                "get_sync_session_status",
+                serde_json::json!({"scopeId": scope}),
+            ),
+        ] {
+            let before = store.1.lock().unwrap().len();
+            let _ = get_ipc_response(
+                &window,
+                tauri::webview::InvokeRequest {
+                    cmd: command.into(),
+                    callback: tauri::ipc::CallbackFn(0),
+                    error: tauri::ipc::CallbackFn(1),
+                    url: if cfg!(windows) {
+                        "http://tauri.localhost"
+                    } else {
+                        "tauri://localhost"
+                    }
+                    .parse()
+                    .unwrap(),
+                    body: tauri::ipc::InvokeBody::Json(body),
+                    headers: Default::default(),
+                    invoke_key: tauri::test::INVOKE_KEY.into(),
+                },
+            );
+            let readers = store.1.lock().unwrap();
+            assert!(readers.len() > before, "{command} must read the keyring");
+            assert!(
+                !readers[before..].contains(&std::thread::current().id()),
+                "{command} read the keyring on the IPC thread"
+            );
+        }
         runtime.shutdown_for_test().await;
     }
 
@@ -1041,6 +1160,130 @@ mod sync_state_tests {
             2,
             "reopening must reuse the original state"
         );
+    }
+
+    #[test]
+    fn profile_state_waits_for_a_keyring_prompt_off_the_ipc_thread() {
+        use std::{sync::mpsc, time::Duration};
+        use tauri::test::{mock_builder, mock_context, noop_assets};
+
+        /// A keyring whose next read, once armed, waits like an unlock prompt
+        /// until it is answered or times out.
+        #[derive(Default)]
+        struct PromptingSecrets {
+            secrets: Secrets,
+            prompt: Mutex<Option<(mpsc::Sender<()>, mpsc::Receiver<()>)>>,
+            timed_out: AtomicBool,
+        }
+
+        impl SecretStore for PromptingSecrets {
+            fn get_secret(&self, key: &str) -> wealthfolio_core::Result<Option<String>> {
+                let prompt = self.prompt.lock().unwrap().take();
+                if let Some((opened, answer)) = prompt {
+                    opened.send(()).unwrap();
+                    if answer.recv_timeout(Duration::from_secs(10)).is_err() {
+                        self.timed_out.store(true, Ordering::SeqCst);
+                    }
+                }
+                self.secrets.get_secret(key)
+            }
+            fn set_secret(&self, key: &str, value: &str) -> wealthfolio_core::Result<()> {
+                self.secrets.set_secret(key, value)
+            }
+            fn delete_secret(&self, key: &str) -> wealthfolio_core::Result<()> {
+                self.secrets.delete_secret(key)
+            }
+        }
+
+        let store = Arc::new(PromptingSecrets::default());
+        let directory = tempfile::tempdir().unwrap();
+        let registry = Arc::new(
+            ProfileRegistry::open(
+                directory.path().to_path_buf(),
+                directory.path().join("app.db"),
+                store.clone(),
+            )
+            .unwrap(),
+        );
+        let id = registry.default_id().unwrap();
+        // Once a profile has had a password, verifying it reads the keyring.
+        registry.set_password(id, None, Some("password")).unwrap();
+        registry.set_password(id, Some("password"), None).unwrap();
+        let app = mock_builder()
+            .manage(NativeProfiles {
+                registry: registry.clone(),
+                active: Mutex::new(None),
+                lifecycle: tokio::sync::Mutex::new(HashMap::new()),
+                starting: AtomicBool::new(true),
+                auto_open_error: Mutex::new(None),
+                lock_epoch: AtomicU64::new(0),
+            })
+            .invoke_handler(tauri::generate_handler![get_profile_state])
+            .build(mock_context(noop_assets()))
+            .unwrap();
+        let window = tauri::WebviewWindowBuilder::new(&app, NATIVE_OWNER, Default::default())
+            .build()
+            .unwrap();
+
+        // Startup verifies the only profile on a blocking thread, which holds the
+        // registry while the keyring prompts.
+        let (opened, prompt_open) = mpsc::channel();
+        let (answer, answered) = mpsc::channel();
+        *store.prompt.lock().unwrap() = Some((opened, answered));
+        let verify = std::thread::spawn(move || registry.verify(id, None));
+        prompt_open.recv().unwrap();
+
+        // Sync commands run on the thread that delivers IPC (the UI thread on
+        // desktop), so this call returns only once the command has finished.
+        let (respond, response) = mpsc::channel();
+        window.clone().on_message(
+            tauri::webview::InvokeRequest {
+                cmd: "get_profile_state".into(),
+                callback: tauri::ipc::CallbackFn(0),
+                error: tauri::ipc::CallbackFn(1),
+                url: if cfg!(windows) {
+                    "http://tauri.localhost"
+                } else {
+                    "tauri://localhost"
+                }
+                .parse()
+                .unwrap(),
+                body: tauri::ipc::InvokeBody::Json(serde_json::json!({})),
+                headers: Default::default(),
+                invoke_key: tauri::test::INVOKE_KEY.into(),
+            },
+            Box::new(move |_, _, result, _, _| respond.send(result).unwrap()),
+        );
+        assert!(
+            !store.timed_out.load(Ordering::SeqCst),
+            "get_profile_state waited for the keyring prompt on the IPC thread"
+        );
+
+        answer.send(()).unwrap();
+        let tauri::ipc::InvokeResponse::Ok(state) =
+            response.recv_timeout(Duration::from_secs(10)).unwrap()
+        else {
+            panic!("get_profile_state failed");
+        };
+        let state: serde_json::Value = state.deserialize().unwrap();
+        assert_eq!(state["profiles"].as_array().map(Vec::len), Some(1));
+        assert_eq!(state["profiles"][0]["id"], id.to_string());
+        assert_eq!(state["starting"], true);
+        assert!(!verify.join().unwrap().unwrap());
+    }
+
+    #[test]
+    fn profile_state_reports_why_the_only_profile_did_not_open() {
+        let (_directory, profiles, _runtime, _scope) = connect_profile();
+        let failure =
+            ProfileError::Unavailable("The profile credential store could not be accessed.".into())
+                .to_string();
+        *profiles.auto_open_error().unwrap() = Some(failure.clone());
+
+        // The chooser shows this; only a registry failure opens startup recovery.
+        let state = serde_json::to_value(profiles.state().unwrap()).unwrap();
+        assert_eq!(state["autoOpenError"], failure);
+        assert!(state["startupError"].is_null());
     }
 
     #[cfg(desktop)]

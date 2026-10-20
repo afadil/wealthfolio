@@ -78,7 +78,7 @@ function FilterOptionRow({
         aria-pressed={selected}
         onClick={onSelect}
         className={cn(
-          "flex w-full cursor-pointer items-center justify-between rounded-md p-2 text-left text-sm",
+          "flex w-full cursor-pointer items-center justify-between rounded-md p-2 text-start text-sm",
           "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
           selected ? "bg-accent" : "hover:bg-accent/50",
         )}
@@ -166,11 +166,11 @@ export const ActivityMobileFilterSheet = ({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="rounded-t-4xl mx-1 flex h-[80vh] flex-col">
-        <SheetHeader className="text-left">
+        <SheetHeader className="text-start">
           <SheetTitle>{t("activity:filter_activities")}</SheetTitle>
         </SheetHeader>
         <ScrollArea className="flex-1 py-4">
-          <div className="space-y-6 pr-4">
+          <div className="space-y-6 pe-4">
             {/* Status Filter Section — the needs-review banner sets this, so it
                 has to be visible and changeable here, not just resettable. */}
             <div>

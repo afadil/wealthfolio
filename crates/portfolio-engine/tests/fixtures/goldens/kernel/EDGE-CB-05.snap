@@ -125,7 +125,7 @@ baseline:
             contributions: "3300"
             distributions: "635"
             fees: "0"
-            fx_effect: "75"
+            fx_effect: "275"
             income: "0"
             realized_pnl: "0"
             residual: "0"
@@ -172,7 +172,7 @@ baseline:
             - date: 2025-01-10
               value: "-0.51666667"
           summary:
-            amount: "-1905"
+            amount: "-1705"
             amount_status: complete
             basis: marketValue
             basis_status: notApplicable
@@ -463,7 +463,7 @@ baseline:
             contributions: "745"
             distributions: "0"
             fees: "0"
-            fx_effect: "10.03636364"
+            fx_effect: "20.03636364"
             income: "0"
             realized_pnl: "85.61454545"
             residual: "0"
@@ -510,7 +510,7 @@ baseline:
             - date: 2025-01-10
               value: "-0.15385912"
           summary:
-            amount: "-169.30909091"
+            amount: "-159.30909091"
             amount_status: complete
             basis: marketValue
             basis_status: notApplicable
@@ -709,7 +709,7 @@ baseline:
         contributions: "3410"
         distributions: "0"
         fees: "0"
-        fx_effect: "85.03636364"
+        fx_effect: "295.03636364"
         income: "0"
         realized_pnl: "85.61454545"
         residual: "0"
@@ -756,7 +756,7 @@ baseline:
         - date: 2025-01-10
           value: "-0.54674487"
       summary:
-        amount: "-2074.30909091"
+        amount: "-1864.30909091"
         amount_status: complete
         basis: marketValue
         basis_status: notApplicable

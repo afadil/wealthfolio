@@ -25,6 +25,9 @@ import { format } from "date-fns";
 import React, { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
+import { statusSurfaceVariants } from "@wealthfolio/ui/components/ui/status-surface";
+import { cn } from "@/lib/utils";
 
 interface AccountSummaryDisplayData {
   accountName: string;
@@ -133,6 +136,8 @@ const AccountSummarySkeleton = () => (
   </div>
 );
 
+// Keep account cards free of backdrop filters: WebKitGTK 2.54.1 can hang
+// as their count grows (https://bugs.webkit.org/show_bug.cgi?id=327701).
 const AccountSummaryComponent = React.memo(
   ({
     item,
@@ -174,7 +179,7 @@ const AccountSummaryComponent = React.memo(
       }
 
       return (
-        <div className="border-border/40 bg-card/90 shadow-xs flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 backdrop-blur-xl md:px-5 md:py-4">
+        <div className="border-border/40 bg-card/90 shadow-xs flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 md:px-5 md:py-4">
           {skeletonContent}
         </div>
       );
@@ -281,9 +286,11 @@ const AccountSummaryComponent = React.memo(
             <span className="truncate">{name}</span>
             {shouldShowWarning && (
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="inline-block h-2 w-2 shrink-0 cursor-help rounded-full bg-amber-500" />
-                </TooltipTrigger>
+                <TooltipTrigger
+                  render={
+                    <span className="bg-warning inline-block h-2 w-2 shrink-0 cursor-help rounded-full" />
+                  }
+                />
                 <TooltipContent className="max-w-80">
                   <div className="space-y-1">
                     {warningMessages.slice(0, 3).map((message) => (
@@ -324,7 +331,7 @@ const AccountSummaryComponent = React.memo(
             !isLoadingValuation &&
             accountId && (
               <div className="flex items-center justify-center">
-                <Icons.ChevronRight className="text-muted-foreground h-5 w-5 shrink-0" />
+                <Icons.ChevronRight className="text-muted-foreground h-5 w-5 shrink-0 rtl:rotate-180" />
               </div>
             )
           )}
@@ -357,7 +364,7 @@ const AccountSummaryComponent = React.memo(
       return (
         <Link
           to={`/accounts/${accountId}`}
-          className="border-border/40 bg-card/90 shadow-xs flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border px-4 py-3 backdrop-blur-xl transition-all duration-150 hover:shadow-md md:px-5 md:py-4"
+          className="border-border/40 bg-card/90 shadow-xs flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-all duration-150 hover:shadow-md md:px-5 md:py-4"
         >
           {content}
         </Link>
@@ -365,7 +372,7 @@ const AccountSummaryComponent = React.memo(
     }
 
     return (
-      <div className="border-border/40 bg-card/90 shadow-xs flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 backdrop-blur-xl md:px-5 md:py-4">
+      <div className="border-border/40 bg-card/90 shadow-xs flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 md:px-5 md:py-4">
         {content}
       </div>
     );
@@ -527,7 +534,7 @@ export const AccountsSummary = React.memo(
         return Array.from({ length: 4 }).map((_, index) => (
           <div
             key={`skeleton-${index}`}
-            className="border-border/40 bg-card/90 shadow-xs rounded-xl border px-4 py-3 backdrop-blur-xl md:px-5 md:py-4"
+            className="border-border/40 bg-card/90 shadow-xs rounded-xl border px-4 py-3 md:px-5 md:py-4"
           >
             <AccountSummarySkeleton />
           </div>
@@ -536,31 +543,28 @@ export const AccountsSummary = React.memo(
 
       if (isErrorAccounts) {
         return (
-          <div className="border-destructive/30 bg-destructive/5 rounded-xl border p-4 md:p-5">
-            <div className="flex items-start gap-3">
-              <div className="bg-destructive/10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
-                <Icons.AlertTriangle className="text-destructive h-4 w-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-destructive text-sm font-medium">
-                  {t("dashboard:summary.failed_to_load")}
-                </p>
-                <p className="text-muted-foreground mt-1 break-words text-xs">
-                  {errorAccounts?.message || t("dashboard:summary.unexpected_error")}
-                </p>
-                <p className="text-muted-foreground mt-2 text-xs">
-                  {t("dashboard:summary.try_restarting")}
-                </p>
-              </div>
-            </div>
-          </div>
+          <Alert variant="destructive" className="rounded-xl p-4 md:p-5">
+            <Icons.AlertTriangle />
+            <AlertTitle>{t("dashboard:summary.failed_to_load")}</AlertTitle>
+            <AlertDescription className="break-words text-xs">
+              <p className="mb-2">
+                {errorAccounts?.message || t("dashboard:summary.unexpected_error")}
+              </p>
+              <p>{t("dashboard:summary.try_restarting")}</p>
+            </AlertDescription>
+          </Alert>
         );
       }
 
       if (!combinedAccountViews || !combinedAccountViews.some((account) => account.isActive)) {
         const isPortfolioScope = selectedAccountIds !== undefined;
         return (
-          <div className="border-border/50 bg-success/10 rounded-xl border p-6 text-center md:p-8">
+          <div
+            className={cn(
+              statusSurfaceVariants({ status: "success" }),
+              "rounded-xl p-6 text-center md:p-8",
+            )}
+          >
             <p className="text-sm">
               {t(
                 isPortfolioScope
@@ -577,7 +581,7 @@ export const AccountsSummary = React.memo(
                   ? "dashboard:portfolio_filter.manage"
                   : "dashboard:add_first_account",
               )}
-              <Icons.ChevronRight className="h-3 w-3" />
+              <Icons.ChevronRight className="h-3 w-3 rtl:rotate-180" />
             </Link>
           </div>
         );
@@ -661,7 +665,7 @@ export const AccountsSummary = React.memo(
               return (
                 <div
                   key={group.accountName}
-                  className="border-border/40 bg-card/90 shadow-xs overflow-hidden rounded-xl border backdrop-blur-xl transition-shadow duration-150 hover:shadow-md"
+                  className="border-border/40 bg-card/90 shadow-xs overflow-hidden rounded-xl border transition-shadow duration-150 hover:shadow-md"
                 >
                   <div className="cursor-pointer">
                     <AccountSummaryComponent
@@ -742,7 +746,7 @@ export const AccountsSummary = React.memo(
           <h2 className="text-sm font-semibold tracking-tight">{t("dashboard:accounts")}</h2>
           <Button
             variant="ghost"
-            className="text-muted-foreground hover:bg-success/10"
+            className="text-muted-foreground hover:bg-success-subtle"
             size="sm"
             onClick={() => setAccountsGrouped(!accountsGrouped)}
             aria-label={accountsGrouped ? t("dashboard:list_view") : t("dashboard:group_view")}
@@ -761,19 +765,13 @@ export const AccountsSummary = React.memo(
           </Button>
         </div>
         {isPerformanceError && (
-          <div className="border-destructive/30 bg-destructive/5 mb-2 rounded-lg border p-3">
-            <div className="flex items-start gap-2">
-              <Icons.AlertTriangle className="text-destructive mt-0.5 h-4 w-4 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-destructive text-sm font-medium">
-                  {t("dashboard:summary.failed_to_load_performance")}
-                </p>
-                <p className="text-muted-foreground mt-1 break-words text-xs">
-                  {performanceError?.message || t("dashboard:summary.values_without_returns")}
-                </p>
-              </div>
-            </div>
-          </div>
+          <Alert variant="destructive" className="mb-2 p-3">
+            <Icons.AlertTriangle />
+            <AlertTitle>{t("dashboard:summary.failed_to_load_performance")}</AlertTitle>
+            <AlertDescription className="break-words text-xs">
+              {performanceError?.message || t("dashboard:summary.values_without_returns")}
+            </AlertDescription>
+          </Alert>
         )}
         <div className="space-y-2 md:space-y-3">{renderedContent}</div>
       </div>

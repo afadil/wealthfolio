@@ -61,7 +61,7 @@ describe("QuoteHistoryDataGrid localization", () => {
   });
   it.each([false, true])("preserves the quote day through editing (mobile: %s)", (mobile) => {
     vi.mocked(useIsMobileViewport).mockReturnValue(mobile);
-    const onSaveQuote = vi.fn();
+    const onSaveQuote = vi.fn().mockResolvedValue(undefined);
     render(
       <MemoryRouter>
         <FormattingProvider locale="en-US" uiLocale="en">

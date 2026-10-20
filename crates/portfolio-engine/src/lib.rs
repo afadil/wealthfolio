@@ -46,4 +46,6 @@ pub use resolve::{
     ResolvedSurfaces, SplitEvent, SplitRow,
 };
 pub use scope::{facts_needed, FactsRequest};
-pub use value::{aggregate_scope, effects, value, value_window, Resolved, ValueInputs, Window};
+pub use value::{
+    aggregate_scope, effects, measure_inputs, value, value_window, Resolved, ValueInputs, Window,
+};

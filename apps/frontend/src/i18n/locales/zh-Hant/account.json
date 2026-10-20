@@ -47,7 +47,17 @@
   "search_accounts": "搜尋帳戶……",
   "no_accounts_found": "找不到帳戶。",
   "holdings": "持有部位",
-  "click_to_update_cash_balance": "點選以更新現金餘額",
+  "balance_edit": {
+    "title": "調整現金餘額",
+    "description": "每次調整一個幣別。差額將記錄為該幣別的一筆存款或提款。",
+    "current_balance": "目前餘額",
+    "new_balance": "新餘額",
+    "no_change": "餘額未變更",
+    "unavailable": "現金餘額暫時無法使用，請等待載入完成或重新整理頁面。",
+    "invalid_amount": "請輸入大於或等於零的有效餘額。",
+    "success": "餘額已更新",
+    "error": "更新餘額失敗，請重試。"
+  },
   "investments": "投資",
   "net_contribution": "淨投入",
   "cost_basis": "成本基礎",

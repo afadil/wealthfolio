@@ -10,7 +10,8 @@ use crate::schema::{accounts, assets};
 use wealthfolio_core::assets::AssetKind;
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::settings::{
-    Settings, SettingsRepositoryTrait, SettingsUpdate, INSIGHTS_OVERVIEW_LAYOUT_KEY,
+    Settings, SettingsRepositoryTrait, SettingsUpdate, CURRENCY_FORMATTING_REGIONS_KEY,
+    INSIGHTS_OVERVIEW_LAYOUT_KEY,
 };
 
 pub struct SettingsRepository {
@@ -42,6 +43,10 @@ impl SettingsRepositoryTrait for SettingsRepository {
                 "font" => settings.font = value,
                 "language" => settings.language = value,
                 "formatting_region" => settings.formatting_region = value,
+                CURRENCY_FORMATTING_REGIONS_KEY => {
+                    settings.currency_formatting_regions =
+                        serde_json::from_str(&value).unwrap_or_default();
+                }
                 "base_currency" => settings.base_currency = value,
                 "timezone" => settings.timezone = value,
                 "onboarding_completed" => {
@@ -109,6 +114,22 @@ impl SettingsRepositoryTrait for SettingsRepository {
                         .values(&AppSettingDB {
                             setting_key: "formatting_region".to_string(),
                             setting_value: formatting_region.clone(),
+                        })
+                        .execute(tx.conn())
+                        .map_err(StorageError::from)?;
+                }
+
+                if let Some(ref regions) = settings.currency_formatting_regions {
+                    let regions: serde_json::Map<String, serde_json::Value> = regions
+                        .iter()
+                        .map(|(currency, region)| {
+                            (currency.clone(), serde_json::Value::String(region.clone()))
+                        })
+                        .collect();
+                    diesel::replace_into(app_settings)
+                        .values(&AppSettingDB {
+                            setting_key: CURRENCY_FORMATTING_REGIONS_KEY.to_string(),
+                            setting_value: serde_json::Value::Object(regions).to_string(),
                         })
                         .execute(tx.conn())
                         .map_err(StorageError::from)?;
@@ -339,6 +360,55 @@ mod tests {
                 .unwrap()["hiddenWidgets"],
             json!([])
         );
+    }
+
+    #[tokio::test]
+    async fn currency_formatting_regions_round_trip_without_syncing() {
+        use crate::schema::sync_outbox;
+        let (repo, _dir) = setup().await;
+        assert!(repo
+            .get_settings()
+            .unwrap()
+            .currency_formatting_regions
+            .is_empty());
+        let update: SettingsUpdate = serde_json::from_value(json!({
+            "currencyFormattingRegions": {"USD": "US", "INR": "IN"}
+        }))
+        .unwrap();
+        repo.update_settings(&update).await.unwrap();
+        let theme_update = serde_json::from_value(json!({"theme": "dark"})).unwrap();
+        repo.update_settings(&theme_update).await.unwrap();
+        assert_eq!(
+            Some(repo.get_settings().unwrap().currency_formatting_regions),
+            update.currency_formatting_regions
+        );
+
+        let clear = serde_json::from_value(json!({"currencyFormattingRegions": {}})).unwrap();
+        repo.update_settings(&clear).await.unwrap();
+        assert!(repo
+            .get_settings()
+            .unwrap()
+            .currency_formatting_regions
+            .is_empty());
+
+        let mut conn = get_connection(&repo.pool).unwrap();
+        let outbox: i64 = sync_outbox::table.count().get_result(&mut conn).unwrap();
+        assert_eq!(outbox, 0, "Formatting preferences stay on this device");
+    }
+
+    #[tokio::test]
+    async fn malformed_stored_currency_formatting_regions_use_default() {
+        let (repo, _dir) = setup().await;
+        for invalid in ["not json", "null", "[]", r#"{"INR": 1}"#] {
+            repo.update_setting(CURRENCY_FORMATTING_REGIONS_KEY, invalid)
+                .await
+                .unwrap();
+            assert!(repo
+                .get_settings()
+                .unwrap()
+                .currency_formatting_regions
+                .is_empty());
+        }
     }
 
     #[tokio::test]

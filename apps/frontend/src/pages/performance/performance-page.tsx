@@ -62,11 +62,16 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  useAmountFormatting,
   useNumberFormatting,
   type FormattingApi,
 } from "@wealthfolio/ui";
-import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@wealthfolio/ui/components/ui/empty";
 import { isSameDay, subDays, subMonths } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -325,16 +330,18 @@ function humanizeAccountIds(text: string, namesById: Map<string, string>): strin
 /** Trim long raw decimals (e.g. "95.50000000") in warnings to readable amounts. */
 function formatWarningNumbers(
   text: string,
-  formatting: Pick<FormattingApi, "formatAmount">,
+  formatting: Pick<FormattingApi, "formatDecimal">,
 ): string {
-  return text.replace(DECIMAL_RE, (value) => formatting.formatAmount(Number(value), "USD", false));
+  return text.replace(DECIMAL_RE, (value) =>
+    formatting.formatDecimal(Number(value), { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+  );
 }
 
 /** Make a data-quality warning user-facing: real account names + tidy numbers. */
 function presentWarning(
   text: string,
   namesById: Map<string, string>,
-  formatting: Pick<FormattingApi, "formatAmount">,
+  formatting: Pick<FormattingApi, "formatDecimal">,
 ): string {
   return formatWarningNumbers(humanizeAccountIds(text, namesById), formatting);
 }
@@ -343,7 +350,7 @@ function presentMoneyWeightedWarning(
   text: string,
   namesById: Map<string, string>,
   t: TFunction,
-  formatting: Pick<FormattingApi, "formatAmount">,
+  formatting: Pick<FormattingApi, "formatDecimal">,
 ): string {
   return presentWarning(text, namesById, formatting)
     .replace(/\bXIRR\b/gi, t("performance:metric.annualized_mwr"))
@@ -405,9 +412,9 @@ function HeaderMetric({
     <div
       className={cn(
         "flex min-w-0 flex-col gap-1",
-        align === "left" && "items-start text-left",
+        align === "left" && "items-start text-start",
         align === "center" && "items-center text-center",
-        align === "right" && "items-end text-right",
+        align === "right" && "items-end text-end",
       )}
     >
       <MetricLabelWithInfo
@@ -437,11 +444,11 @@ function HeaderMetric({
 }
 
 const STRIP_SECTION_CLASS =
-  "border-border/70 flex min-h-[4.75rem] min-w-0 flex-col justify-center border-l pl-5";
+  "border-border/70 flex min-h-[4.75rem] min-w-0 flex-col justify-center border-s ps-5";
 const STRIP_TITLE_CLASS =
-  "text-muted-foreground/70 mb-2.5 font-mono text-[9px] font-semibold uppercase tracking-[0.28em]";
+  "text-muted-foreground/70 mb-2.5 font-mono text-2xs font-semibold uppercase tracking-[0.28em]";
 const STRIP_LABEL_CLASS =
-  "text-muted-foreground truncate font-mono text-[11px] font-medium tracking-[0.02em]";
+  "text-muted-foreground truncate font-mono text-2xs font-medium tracking-[0.02em]";
 const STRIP_VALUE_CLASS = "font-mono text-lg font-semibold leading-none";
 
 function StripSection({
@@ -487,17 +494,19 @@ function StripMetric({
         <span className={STRIP_LABEL_CLASS}>{label}</span>
         {warningItems.length > 0 && (
           <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-warning hover:text-warning h-4 w-4 shrink-0 rounded-full p-0"
-              >
-                <Icons.AlertTriangle className="h-3 w-3" />
-                <span className="sr-only">
-                  {t("common:component.calculation_note_for", { label })}
-                </span>
-              </Button>
+            <PopoverTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-warning hover:text-warning h-4 w-4 shrink-0 rounded-full p-0"
+                />
+              }
+            >
+              <Icons.AlertTriangle className="h-3 w-3" />
+              <span className="sr-only">
+                {t("common:component.calculation_note_for", { label })}
+              </span>
             </PopoverTrigger>
             <PopoverContent
               className="w-[34rem] max-w-[calc(100vw-2rem)] p-0 text-sm"
@@ -534,15 +543,17 @@ function StripHelpPopover({ items }: { items: StripHelpItem[] }) {
   const { t } = useTranslation();
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-muted-foreground hover:text-foreground absolute right-0 top-0 h-6 w-6 rounded-full"
-          aria-label={t("performance:help.aria_label")}
-        >
-          <Icons.Info className="h-3.5 w-3.5" />
-        </Button>
+      <PopoverTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-foreground absolute end-0 top-0 h-6 w-6 rounded-full"
+            aria-label={t("performance:help.aria_label")}
+          />
+        }
+      >
+        <Icons.Info className="h-3.5 w-3.5" />
       </PopoverTrigger>
       <PopoverContent className="w-[34rem] max-w-[calc(100vw-2rem)] p-0" side="bottom" align="end">
         <div className="space-y-4 p-5">
@@ -779,7 +790,7 @@ function AttributionDetailMetric({
         currency={currency}
         className={cn("text-base font-semibold", sectionTitle && STRIP_VALUE_CLASS, valueClassName)}
       />
-      <Icons.ChevronRight className="text-muted-foreground/60 group-hover:text-muted-foreground h-3.5 w-3.5 shrink-0 transition-all group-hover:translate-x-0.5" />
+      <Icons.ChevronRight className="text-muted-foreground/60 group-hover:text-muted-foreground h-3.5 w-3.5 shrink-0 transition-all group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
     </div>
   );
 
@@ -792,12 +803,12 @@ function AttributionDetailMetric({
           sectionTitle
             ? cn(
                 STRIP_SECTION_CLASS,
-                "hover:bg-muted/30 group h-auto w-full items-start rounded-none px-0 pl-5 text-left",
+                "hover:bg-muted/30 group h-auto w-full items-start rounded-none px-0 ps-5 text-start",
               )
             : "hover:bg-muted/50 group h-auto w-full min-w-0 rounded-md px-2 py-1",
-          align === "left" && "text-left",
+          align === "left" && "text-start",
           align === "center" && "text-center",
-          align === "right" && "text-right",
+          align === "right" && "text-end",
           className,
         )}
         onClick={() => setIsOpen(true)}
@@ -819,7 +830,7 @@ function AttributionDetailMetric({
       </Button>
 
       <SheetContent
-        side={isMobile ? "bottom" : "right"}
+        side={isMobile ? "bottom" : "inline-end"}
         className={cn(
           "flex w-full flex-col p-0",
           isMobile ? "h-[85vh] rounded-t-3xl" : "h-full sm:max-w-md",
@@ -834,15 +845,17 @@ function AttributionDetailMetric({
                 {[itemName, dateRangeLabel].filter(Boolean).join(" · ")}
               </SheetDescription>
             </div>
-            <SheetClose asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground h-8 w-8 shrink-0"
-              >
-                <Icons.X className="h-4 w-4" />
-                <span className="sr-only">{t("performance:attribution.close")}</span>
-              </Button>
+            <SheetClose
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground h-8 w-8 shrink-0"
+                />
+              }
+            >
+              <Icons.X className="h-4 w-4" />
+              <span className="sr-only">{t("performance:attribution.close")}</span>
             </SheetClose>
           </div>
           <div className="pt-3">
@@ -913,24 +926,25 @@ function PerformanceContent({
       )}
 
       {!chartData?.length && !isLoading && !hasErrors && (
-        <EmptyPlaceholder
-          className="mx-auto flex max-w-[420px] items-center justify-center"
-          icon={<Icons.BarChart className="h-10 w-10" />}
-          title={t("performance:empty.title")}
-          description={t("performance:empty.description")}
-        />
+        <Empty className="max-w-105 mx-auto flex items-center justify-center">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">{<Icons.BarChart className="size-10" />}</EmptyMedia>
+            <EmptyTitle>{t("performance:empty.title")}</EmptyTitle>
+            <EmptyDescription>{t("performance:empty.description")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       )}
 
       {/* Modern horizontal loader with improved UX */}
       {isLoading && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <div className="animate-subtle-pulse absolute inset-0 border-2 border-transparent">
-            <div className="animate-progress-border bg-primary absolute left-0 top-0 h-[2px]"></div>
+            <div className="animate-progress-border bg-primary absolute start-0 top-0 h-[2px] rtl:-scale-x-100"></div>
           </div>
-          <div className="absolute bottom-4 right-4">
+          <div className="absolute bottom-4 end-4">
             <div className="bg-background/80 rounded-md border px-3 py-1.5 shadow-sm backdrop-blur-sm">
               <p className="text-muted-foreground flex items-center text-xs font-medium">
-                <span className="bg-primary mr-2 inline-block h-2 w-2 animate-pulse rounded-full"></span>
+                <span className="bg-primary me-2 inline-block h-2 w-2 animate-pulse rounded-full"></span>
                 {t("performance:calculating")}
               </p>
             </div>
@@ -986,25 +1000,23 @@ const SelectedItemBadge = ({
       className={cn(
         "text-foreground group relative cursor-pointer rounded-md border px-2.5 py-1.5 shadow-sm transition-all sm:px-3",
         "hover:bg-accent/80 hover:shadow-md",
-        "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+        "has-[[data-badge-select]:focus-visible]:ring-ring has-[[data-badge-select]:focus-visible]:ring-2 has-[[data-badge-select]:focus-visible]:ring-offset-2",
         !isPlotted &&
           "text-muted-foreground bg-muted/30 hover:bg-muted/50 border-dashed shadow-none hover:shadow-sm",
-        isSelected && "bg-warning/20 hover:bg-warning/30",
+        isSelected && "bg-warning-subtle hover:bg-warning-subtle/70",
       )}
-      onClick={onSelect}
-      role="button"
       variant="secondary"
-      tabIndex={0}
       title={plotReason}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
-      aria-pressed={isSelected}
     >
-      <div className="flex items-center space-x-2 sm:space-x-3">
+      {/* The select button stretches over the whole badge with ::after; the
+          remove button sits beside it rather than inside another control. */}
+      <button
+        type="button"
+        data-badge-select=""
+        onClick={onSelect}
+        aria-pressed={isSelected}
+        className="flex cursor-pointer items-center space-x-2 outline-none after:absolute after:inset-0 after:content-[''] sm:space-x-3"
+      >
         <div
           className={cn(
             "h-3 w-1 rounded-full sm:h-4",
@@ -1014,7 +1026,7 @@ const SelectedItemBadge = ({
                 ? "transition-opacity group-hover:opacity-80"
                 : item.type === "account"
                   ? "bg-muted-foreground group-hover:bg-foreground transition-colors"
-                  : "bg-orange-500 transition-colors group-hover:bg-orange-600 dark:bg-orange-400",
+                  : "bg-warning group-hover:bg-warning transition-colors",
           )}
           style={isPlotted && color ? { backgroundColor: color } : undefined}
         />
@@ -1022,22 +1034,22 @@ const SelectedItemBadge = ({
           {item.name}
         </span>
         {!isPlotted && (
-          <span className="bg-background/70 text-muted-foreground rounded px-1.5 py-0.5 text-[10px] font-medium">
+          <span className="bg-background/70 text-muted-foreground text-2xs rounded px-1.5 py-0.5 font-medium">
             {t("performance:not_plotted")}
           </span>
         )}
         {isPlotted && contextLabel && (
-          <span className="bg-background/70 text-muted-foreground rounded px-1.5 py-0.5 text-[10px] font-medium">
+          <span className="bg-background/70 text-muted-foreground text-2xs rounded px-1.5 py-0.5 font-medium">
             {contextLabel}
           </span>
         )}
-      </div>
+      </button>
       <Button
         variant="ghost"
         size="icon-xs"
         className={cn(
-          "ml-2 size-5 transition-all duration-150",
-          "hover:bg-destructive/10 hover:text-destructive hover:scale-110",
+          "relative ms-2 size-5 transition-all duration-150",
+          "hover:bg-destructive-subtle hover:text-destructive-subtle-foreground hover:scale-110",
           "focus-visible:ring-destructive/50 focus-visible:ring-2",
         )}
         onClick={onDelete}
@@ -1050,7 +1062,7 @@ const SelectedItemBadge = ({
 };
 
 export default function PerformancePage() {
-  const amountFormatting = useAmountFormatting();
+  const numberFormatting = useNumberFormatting();
 
   const { t } = useTranslation();
   const isMobile = useIsMobileViewport();
@@ -1263,9 +1275,9 @@ export default function PerformancePage() {
     const rawMoneyWeightedWarnings = rawWarnings.filter(isMoneyWeightedMessage);
     const visibleWarnings = rawWarnings
       .filter((warning) => !isMoneyWeightedMessage(warning))
-      .map((warning) => presentWarning(warning, accountNamesById, amountFormatting));
+      .map((warning) => presentWarning(warning, accountNamesById, numberFormatting));
     const moneyWeightedWarnings = rawMoneyWeightedWarnings.map((warning) =>
-      presentMoneyWeightedWarning(warning, accountNamesById, t, amountFormatting),
+      presentMoneyWeightedWarning(warning, accountNamesById, t, numberFormatting),
     );
     const rawReason = selectedMetricValue == null ? firstNotApplicableReason(found) : undefined;
     const showAnnualizedMoneyWeightedReturn =
@@ -1276,7 +1288,7 @@ export default function PerformancePage() {
     const rawMoneyWeightedReason =
       moneyWeightedReturn == null ? firstMoneyWeightedReason(found) : undefined;
     const presentedMoneyWeightedReason = rawMoneyWeightedReason
-      ? presentMoneyWeightedWarning(rawMoneyWeightedReason, accountNamesById, t, amountFormatting)
+      ? presentMoneyWeightedWarning(rawMoneyWeightedReason, accountNamesById, t, numberFormatting)
       : undefined;
     const moneyWeightedReason =
       presentedMoneyWeightedReason ??
@@ -1339,7 +1351,7 @@ export default function PerformancePage() {
       chartMetric: selectedMetric,
       selectedMetricValue,
       selectedMetricReason: rawReason
-        ? presentWarning(rawReason, accountNamesById, amountFormatting)
+        ? presentWarning(rawReason, accountNamesById, numberFormatting)
         : undefined,
       warningTerms: Array.from(accountNamesById.values()),
       annualizedReturn: annualizedDisplayMetricValue(found, selectedMetric),
@@ -1364,7 +1376,7 @@ export default function PerformancePage() {
       warnings: visibleWarnings,
       notApplicableReasons: found.dataQuality.notApplicableReasons ?? [],
     };
-  }, [selectedPerformanceData, accountNamesById, amountFormatting, t]);
+  }, [selectedPerformanceData, accountNamesById, numberFormatting, t]);
 
   const preserveCurrentChartAnchor = (fallbackId: string) => {
     setSelectedItemId(
@@ -1462,7 +1474,7 @@ export default function PerformancePage() {
   return (
     <>
       {/* Account scope + date range selectors - fixed position in header area */}
-      <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden items-center gap-2 md:flex lg:right-4">
+      <div className="pointer-events-auto fixed end-2 top-4 z-20 hidden items-center gap-2 md:flex lg:end-4">
         <AccountScopeSelector value={accountScope} onChange={setAccountScope} />
         <DateRangeSelector
           asOf={today}
@@ -1495,11 +1507,11 @@ export default function PerformancePage() {
               className="flex-1 touch-pan-x overscroll-x-contain"
               data-no-swipe-drag
             >
-              <CarouselContent className="-ml-2">
+              <CarouselContent className="-ms-2">
                 {selectedItems.map((item) => {
                   const plotState = itemPlotStateById.get(item.id) ?? PLOTTED_ITEM_STATE;
                   return (
-                    <CarouselItem key={item.id} className="basis-auto pl-2">
+                    <CarouselItem key={item.id} className="basis-auto ps-2">
                       <SelectedItemBadge
                         item={item}
                         isSelected={activeChartAnchorId === item.id}
@@ -1523,26 +1535,28 @@ export default function PerformancePage() {
 
           {/* Mobile: Plus button with dropdown */}
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="bg-secondary/30 hover:bg-muted/80 size-9 flex-shrink-0 rounded-md border-[1.5px] border-none"
-                aria-label={t("performance:add_item")}
-              >
-                <Icons.Plus className="h-4 w-4" />
-              </Button>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="bg-secondary/30 hover:bg-muted/80 size-9 flex-shrink-0 rounded-md border-[1.5px] border-none"
+                  aria-label={t("performance:add_item")}
+                />
+              }
+            >
+              <Icons.Plus className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onSelect={() => setAccountSheetOpen(true)} className="py-4 md:py-2">
-                <Icons.Briefcase className="mr-2 h-4 w-4" />
+              <DropdownMenuItem onClick={() => setAccountSheetOpen(true)} className="py-4 md:py-2">
+                <Icons.Briefcase className="me-2 h-4 w-4" />
                 {t("performance:add_account")}
               </DropdownMenuItem>
               <DropdownMenuItem
-                onSelect={() => setBenchmarkSheetOpen(true)}
+                onClick={() => setBenchmarkSheetOpen(true)}
                 className="py-4 md:py-2"
               >
-                <Icons.TrendingUp className="mr-2 h-4 w-4" />
+                <Icons.TrendingUp className="me-2 h-4 w-4" />
                 {t("performance:add_benchmark")}
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -1561,11 +1575,11 @@ export default function PerformancePage() {
                 }}
                 className="w-full max-w-[calc(100vw-24rem)] md:max-w-[calc(100vw-28rem)]"
               >
-                <CarouselContent className="-ml-2">
+                <CarouselContent className="-ms-2">
                   {selectedItems.map((item) => {
                     const plotState = itemPlotStateById.get(item.id) ?? PLOTTED_ITEM_STATE;
                     return (
-                      <CarouselItem key={item.id} className="basis-auto pl-2">
+                      <CarouselItem key={item.id} className="basis-auto ps-2">
                         <SelectedItemBadge
                           item={item}
                           isSelected={activeChartAnchorId === item.id}
@@ -1648,8 +1662,8 @@ export default function PerformancePage() {
                   <CardDescription
                     className={cn(
                       "text-xs sm:text-sm",
-                      !isMobile && "whitespace-nowrap text-right 2xl:text-left",
-                      isMobile && "text-[10px]",
+                      !isMobile && "whitespace-nowrap text-end 2xl:text-start",
+                      isMobile && "text-2xs",
                     )}
                   >
                     {displayDateRange}
@@ -1658,7 +1672,7 @@ export default function PerformancePage() {
                     <Badge
                       variant={selectedItemData.trackingModeBadge.variant}
                       className={cn(
-                        "mt-2 h-5 rounded-md px-1.5 text-[10px] font-medium",
+                        "text-2xs mt-2 h-5 rounded-md px-1.5 font-medium",
                         !isMobile && "col-start-1 mt-1 w-fit 2xl:mt-2",
                       )}
                     >
@@ -1678,8 +1692,8 @@ export default function PerformancePage() {
                         className="w-full touch-pan-x overscroll-x-contain"
                         data-no-swipe-drag
                       >
-                        <CarouselContent className="-ml-2">
-                          <CarouselItem className="basis-[42%] pl-2">
+                        <CarouselContent className="-ms-2">
+                          <CarouselItem className="basis-[42%] ps-2">
                             <div className="bg-muted/30 rounded-lg px-3 py-2">
                               <HeaderMetric
                                 label={
@@ -1695,7 +1709,7 @@ export default function PerformancePage() {
                               />
                             </div>
                           </CarouselItem>
-                          <CarouselItem className="basis-[42%] pl-2">
+                          <CarouselItem className="basis-[42%] ps-2">
                             <div className="bg-muted/30 rounded-lg px-3 py-2">
                               <HeaderMetric
                                 label={
@@ -1712,7 +1726,7 @@ export default function PerformancePage() {
                             </div>
                           </CarouselItem>
                           {selectedItemData?.showMoneyWeightedReturn && (
-                            <CarouselItem className="basis-[42%] pl-2">
+                            <CarouselItem className="basis-[42%] ps-2">
                               <div className="bg-muted/30 rounded-lg px-3 py-2">
                                 <HeaderMetric
                                   label={selectedItemData.moneyWeightedReturnMobileLabel}
@@ -1726,7 +1740,7 @@ export default function PerformancePage() {
                               </div>
                             </CarouselItem>
                           )}
-                          <CarouselItem className="basis-[42%] pl-2">
+                          <CarouselItem className="basis-[42%] ps-2">
                             <div className="bg-muted/30 rounded-lg px-3 py-2">
                               <HeaderMetric
                                 label={t("performance:metric.volatility")}
@@ -1739,7 +1753,7 @@ export default function PerformancePage() {
                               />
                             </div>
                           </CarouselItem>
-                          <CarouselItem className="basis-[42%] pl-2">
+                          <CarouselItem className="basis-[42%] ps-2">
                             <div className="bg-muted/30 rounded-lg px-3 py-2">
                               <HeaderMetric
                                 label={t("performance:metric.max_drawdown")}
@@ -1751,7 +1765,7 @@ export default function PerformancePage() {
                             </div>
                           </CarouselItem>
                           {selectedItemData?.periodPnl != null && (
-                            <CarouselItem className="basis-[52%] pl-2">
+                            <CarouselItem className="basis-[52%] ps-2">
                               <AttributionDetailMetric
                                 result={selectedItemData.result}
                                 itemName={selectedItemData.name}
@@ -1766,7 +1780,7 @@ export default function PerformancePage() {
                         </CarouselContent>
                       </Carousel>
                     ) : (
-                      <div className="relative w-full overflow-x-auto pb-1 pr-8 2xl:w-auto 2xl:overflow-visible">
+                      <div className="relative w-full overflow-x-auto pb-1 pe-8 2xl:w-auto 2xl:overflow-visible">
                         {selectedItemData && (
                           <StripHelpPopover items={selectedItemData.helpItems} />
                         )}

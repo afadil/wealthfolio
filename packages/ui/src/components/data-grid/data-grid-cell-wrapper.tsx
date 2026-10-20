@@ -189,8 +189,8 @@ export function DataGridCellWrapper<TData>({
         "has-data-[slot=checkbox]:pt-2.5 size-full px-2 py-1.5 text-start text-sm outline-none",
         {
           "ring-ring ring-1 ring-inset": isFocused,
-          "bg-yellow-100 dark:bg-yellow-900/30": isSearchMatch && !isActiveSearchMatch,
-          "bg-orange-200 dark:bg-orange-900/50": isActiveSearchMatch,
+          "bg-warning-subtle": isSearchMatch && !isActiveSearchMatch,
+          "bg-warning-subtle-border": isActiveSearchMatch,
           "bg-primary/10": isSelected && !isEditing,
           "cursor-default": !isEditing,
           "**:data-[slot=grid-cell-content]:line-clamp-1": !isEditing && rowHeight === "short",

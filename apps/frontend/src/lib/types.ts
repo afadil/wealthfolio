@@ -246,6 +246,8 @@ export interface ActivityDetails {
   assetSymbol: string;
   assetName?: string;
   assetQuoteMode?: QuoteMode;
+  /** Currency the asset is quoted in, which can differ from the activity currency. */
+  assetQuoteCcy?: string | null;
   /** Canonical exchange MIC code for asset identification */
   exchangeMic?: string;
   instrumentType?: string;
@@ -267,7 +269,22 @@ export interface ActivityDetails {
   counterpartCurrency?: string | null;
   counterpartFxRate?: string | null;
   subRows?: ActivityDetails[];
+  /**
+   * The account's cash in `cashBalanceCurrency`, as `cashBalanceScope` says:
+   * only when the search asked for balances and the account's holdings come
+   * from its activities.
+   */
+  cashBalance?: string | null;
+  cashBalanceCurrency?: string | null;
+  cashBalanceScope?: CashBalanceScope | null;
 }
+
+/**
+ * What a row's `cashBalance` measures: the cash after the row (`ROW`, cash and
+ * credit-card accounts), or at the end of the row's day in the account
+ * currency (`DAY`, every posted row of that day carries it).
+ */
+export type CashBalanceScope = "ROW" | "DAY";
 
 export interface ActivitySearchResponse {
   data: ActivityDetails[];
@@ -371,6 +388,7 @@ export interface ActivityBulkMutationResult {
 }
 
 export interface InternalTransferPairRequest {
+  editedActivityId?: string;
   transferOutId?: string;
   transferInId?: string;
   sourceGroupId?: string;
@@ -923,6 +941,8 @@ export interface Settings {
   font: string;
   language: string;
   formattingRegion: string;
+  /** Formatting regions for amounts in specific currencies, keyed by currency code. */
+  currencyFormattingRegions?: Record<string, string>;
   baseCurrency: string;
   defaultReturnMetric: "twr" | "irr" | "valueReturn";
   timezone: string;
@@ -1039,12 +1059,15 @@ export interface IncomeSummary {
   byMonth: Record<string, number>;
   byType: Record<string, number>;
   byAsset: Record<string, IncomeByAsset>;
-  byCurrency: Record<string, number>;
+  byCurrency: Record<string, number>; // In each currency
+  byCurrencyBase: Record<string, number>; // Converted to the base currency
   byAccount: Record<string, IncomeByAccount>;
   totalIncome: number;
   currency: string;
   monthlyAverage: number;
   yoyGrowth: number | null; // Changed from optional to nullable
+  /** Currencies with no exchange rate to `currency`, left out of the converted totals. */
+  unconvertedCurrencies: string[];
 }
 
 // Define custom DateRange type matching react-day-picker's
@@ -1731,6 +1754,8 @@ export interface AlternativeAssetHolding {
 
 /** A liability's terms in effect and its milestones, as Holdings values it. */
 export interface LoanSummary {
+  /** Null means no balance is available; original principal is an unconfirmed fallback. */
+  balanceSource?: "recorded" | "schedule" | "original" | null;
   /** The balance follows a payment schedule rather than manual updates. */
   scheduled: boolean;
   originalAmount: number | null;
@@ -2220,6 +2245,8 @@ export interface SetDefaultProviderRequest {
 export interface FetchedModel {
   id: string;
   name?: string;
+  /** From the provider's model metadata, or the provider's defaults. */
+  capabilities?: ModelCapabilities;
 }
 
 /**

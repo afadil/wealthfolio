@@ -58,8 +58,12 @@ export function BaseCurrencyForm() {
           name="baseCurrency"
           render={({ field }) => (
             <FormItem className="flex flex-col">
-              <FormControl className="w-[300px]">
-                <CurrencyInput value={field.value} onChange={field.onChange} />
+              <FormControl className="w-[min(100%,18.75rem)]">
+                <CurrencyInput
+                  value={field.value}
+                  onChange={field.onChange}
+                  aria-label={t("settings:base_currency")}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

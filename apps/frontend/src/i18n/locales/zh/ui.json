@@ -5,7 +5,9 @@
   },
   "currency": {
     "selectTitle": "选择货币",
-    "selectDescription": "选择您的活动货币",
+    "selectDescription": "请选择货币",
+    "placeholder": "选择货币",
+    "popular": "热门",
     "more": "更多",
     "search": "搜索货币...",
     "searchAll": "搜索所有货币...",
@@ -191,5 +193,9 @@
   },
   "sheet": {
     "close": "关闭"
-  }
+  },
+  "page": {
+    "back": "返回"
+  },
+  "remove": "移除 {{label}}"
 }

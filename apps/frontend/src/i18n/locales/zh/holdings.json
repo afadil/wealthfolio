@@ -246,6 +246,7 @@
     "manual": "手动",
     "manual_hint": "手动更新余额",
     "debt_free": "{{date}} 还清",
+    "original_balance": "初始余额 {{date}}",
     "updated": "更新于 {{date}}",
     "status_paid_off": "已还清",
     "status_renewal_due": "需要续期",

@@ -28,7 +28,7 @@ export function WizardStepIndicator({ steps, currentStep }: WizardStepIndicatorP
     <div className="w-full">
       {/* Mobile: compact, scrollable rail with current title */}
       <div className="md:hidden">
-        <div className="mx-auto flex w-full max-w-[340px] items-center px-5 py-3">
+        <div className="max-w-85 mx-auto flex w-full items-center px-5 py-3">
           {steps.map((step, index) => {
             const isCompleted = index < currentIndex;
             const isCurrent = step.id === currentStep;
@@ -43,7 +43,11 @@ export function WizardStepIndicator({ steps, currentStep }: WizardStepIndicatorP
                     opacity: 1,
                   }}
                   transition={{ type: "spring", stiffness: 400, damping: 20, duration: 0.25 }}
-                  style={{ boxShadow: isCurrent ? "0 0 0 3px rgba(var(--primary), 0.2)" : "none" }}
+                  style={{
+                    boxShadow: isCurrent
+                      ? "0 0 0 3px color-mix(in oklab, var(--primary) 20%, transparent)"
+                      : "none",
+                  }}
                   className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
                     isCompleted
                       ? "border-primary bg-primary text-primary-foreground"
@@ -93,7 +97,9 @@ export function WizardStepIndicator({ steps, currentStep }: WizardStepIndicatorP
                 animate={{
                   scale: isCurrent ? 1.1 : 1,
                   opacity: 1,
-                  boxShadow: isCurrent ? "0 0 0 4px rgba(var(--primary), 0.15)" : "none",
+                  boxShadow: isCurrent
+                    ? "0 0 0 4px color-mix(in oklab, var(--primary) 15%, transparent)"
+                    : "none",
                 }}
                 whileHover={{ scale: 1.05 }}
                 transition={{ type: "spring", stiffness: 400, damping: 20, duration: 0.3 }}
@@ -131,7 +137,7 @@ export function WizardStepIndicator({ steps, currentStep }: WizardStepIndicatorP
                 initial={{ opacity: 0, y: 3 }}
                 animate={{ opacity: 1, y: 0, fontWeight: isCurrent ? 600 : 500 }}
                 transition={{ duration: 0.3, delay: 0.1 }}
-                className={`ml-3 text-sm ${
+                className={`ms-3 text-sm ${
                   isCurrent
                     ? "text-primary"
                     : isCompleted

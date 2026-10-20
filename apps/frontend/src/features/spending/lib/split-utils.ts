@@ -1,38 +1,39 @@
-export function toCents(value: number | string | null | undefined): number {
+/** Counts an amount in whole units of `10 ** -decimals`. */
+export function toSplitUnits(value: number | string | null | undefined, decimals: number): number {
   const parsed = typeof value === "number" ? value : Number.parseFloat(value ?? "0");
   if (!Number.isFinite(parsed)) return 0;
-  return Math.round(parsed * 100);
+  return Math.round(parsed * 10 ** decimals);
 }
 
-export function centsToAmount(cents: number): number {
-  return cents / 100;
+export function splitUnitsToAmount(units: number, decimals: number): number {
+  return units / 10 ** decimals;
 }
 
-export function distributeRemainingCents(
-  totalCents: number,
-  assignedCents: number,
+export function distributeRemainingUnits(
+  totalUnits: number,
+  assignedUnits: number,
   emptyLineCount: number,
 ): number[] {
   if (emptyLineCount <= 0) return [];
-  const remaining = totalCents - assignedCents;
+  const remaining = totalUnits - assignedUnits;
   if (remaining <= 0) return Array.from({ length: emptyLineCount }, () => 0);
   const base = Math.floor(remaining / emptyLineCount);
   const extra = remaining % emptyLineCount;
   return Array.from({ length: emptyLineCount }, (_, index) => base + (index < extra ? 1 : 0));
 }
 
-export function distributeEvenlyCents(totalCents: number, lineCount: number): number[] {
-  return distributeRemainingCents(Math.abs(totalCents), 0, lineCount);
+export function distributeEvenlyUnits(totalUnits: number, lineCount: number): number[] {
+  return distributeRemainingUnits(Math.abs(totalUnits), 0, lineCount);
 }
 
-export function canDistributeSplitCents(
-  totalCents: number,
-  assignedCents: number,
+export function canDistributeSplitUnits(
+  totalUnits: number,
+  assignedUnits: number,
   emptyLineCount: number,
   lineCount: number,
 ): boolean {
-  const total = Math.abs(totalCents);
+  const total = Math.abs(totalUnits);
   if (total <= 0 || emptyLineCount <= 0 || lineCount <= 0) return false;
-  const remaining = total - assignedCents;
+  const remaining = total - assignedUnits;
   return remaining > 0 || (remaining === 0 && lineCount > emptyLineCount);
 }

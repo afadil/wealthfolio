@@ -58,7 +58,7 @@ const ReasoningImpl: ReasoningMessagePartComponent = () => {
 };
 
 /**
- * Collapsible reasoning group using Radix Collapsible.
+ * Collapsible reasoning group.
  * Collapsed by default; user can toggle open/closed manually.
  */
 const ReasoningGroupImpl: ReasoningGroupComponent = ({ children, startIndex, endIndex }) => {
@@ -110,8 +110,8 @@ const ReasoningGroupImpl: ReasoningGroupComponent = ({ children, startIndex, end
       <CollapsibleContent
         className={cn(
           "text-muted-foreground mt-4 text-sm outline-none",
-          "data-[state=open]:animate-in data-[state=open]:slide-in-from-top-2",
-          "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2",
+          "data-open:animate-in data-open:slide-in-from-top-2",
+          "data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-top-2",
         )}
       >
         {children}

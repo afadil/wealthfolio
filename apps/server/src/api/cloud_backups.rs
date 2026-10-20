@@ -13,7 +13,7 @@ use axum::{
 };
 use std::sync::Arc;
 use wealthfolio_device_sync::backups::client::{
-    BackupClient, BackupOperation, BackupPoint, BackupSource,
+    BackupClient, BackupOperation, BackupPoint, BackupSource, CapturePlan,
 };
 use wealthfolio_storage_sqlite::db;
 fn client() -> ApiResult<BackupClient> {
@@ -26,6 +26,12 @@ fn client() -> ApiResult<BackupClient> {
 #[derive(serde::Deserialize)]
 struct OperationRequest {
     operation: BackupOperation,
+}
+/// Optional body: a request without one is a scheduled check.
+#[derive(serde::Deserialize)]
+struct CaptureRequest {
+    #[serde(default)]
+    manual: bool,
 }
 async fn action(
     Extension(state): Extension<Arc<AppState>>,
@@ -75,17 +81,22 @@ async fn capture_token(
 
 async fn check_and_capture(
     state: &Arc<AppState>,
+    manual: bool,
 ) -> ApiResult<(Option<BackupPoint>, Option<std::time::Duration>)> {
     // Single-flight admission is distinct from lifecycle locks. A competing
     // automatic/manual check observes the active capture instead of failing it.
     let Ok(_permit) = state.backup_exports.slot.clone().try_acquire_owned() else {
-        return Ok((None, Some(std::time::Duration::from_secs(30 * 60))));
+        // A busy slot is a local check; retry soon rather than after the failure fallback.
+        return Ok((None, Some(std::time::Duration::from_secs(60))));
     };
     let generation = state.backup_scheduler.generation();
     state.backup_scheduler.checking(generation);
+    if manual {
+        state.backup_scheduler.early(generation);
+    }
     let result = state
         .backup_scheduler
-        .until_changed(generation, capture_in_phases(state, generation))
+        .until_changed(generation, capture_in_phases(state, generation, manual))
         .await
         .unwrap_or(Ok((None, None)));
     state.backup_scheduler.finished(generation, result.is_err());
@@ -94,6 +105,7 @@ async fn check_and_capture(
 async fn capture_in_phases(
     state: &Arc<AppState>,
     generation: u64,
+    manual: bool,
 ) -> ApiResult<(Option<BackupPoint>, Option<std::time::Duration>)> {
     if state.backup_scheduler.is_paused() {
         return Ok((None, None));
@@ -117,12 +129,17 @@ async fn capture_in_phases(
         BackupSource::Ready(policy) => policy,
         wait => return Ok((None, wait.wait_delay())),
     };
-    let delay = policy
-        .delay_until_due()
-        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
-    if !delay.is_zero() {
-        return Ok((None, Some(delay)));
-    }
+    let trigger = match policy
+        .capture_plan(manual)
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?
+    {
+        CapturePlan::Wait(delay) => return Ok((None, Some(delay))),
+        CapturePlan::Due(trigger) => {
+            state.backup_scheduler.due(generation);
+            trigger
+        }
+        CapturePlan::Early => "manual",
+    };
     let material = client
         .capture_material(&token, state.secret_store.as_ref(), &policy)
         .await
@@ -166,11 +183,7 @@ async fn capture_in_phases(
     let encoded = BackupClient::encode_capture(
         material,
         image,
-        if policy.last_backup_at.is_some() {
-            "scheduled"
-        } else {
-            "setup"
-        },
+        trigger,
         wealthfolio_device_sync::backups::client::BackupMetadata {
             device_name: Some("Wealthfolio Server".into()),
             profile_name: state
@@ -219,7 +232,7 @@ pub(crate) fn start_scheduler(state: Arc<AppState>) -> tokio::task::JoinHandle<(
         state.backup_scheduler.run(|| {
             let state = state.clone();
             async move {
-                let result = check_and_capture(&state).await.map(|(_, next)| next);
+                let result = check_and_capture(&state, false).await.map(|(_, next)| next);
                 if result.is_err() {
                     tracing::warn!("Cloud backup attempt failed; check the last successful backup in settings");
                 }
@@ -230,8 +243,10 @@ pub(crate) fn start_scheduler(state: Arc<AppState>) -> tokio::task::JoinHandle<(
 }
 async fn capture_route(
     Extension(state): Extension<Arc<AppState>>,
+    body: Option<Json<CaptureRequest>>,
 ) -> ApiResult<Json<Option<BackupPoint>>> {
-    let result = check_and_capture(&state).await?;
+    let manual = body.is_some_and(|Json(request)| request.manual);
+    let result = check_and_capture(&state, manual).await?;
     if result.0.is_some() {
         state.backup_scheduler.request_check();
     }
@@ -271,14 +286,12 @@ mod tests {
     use std::time::Duration;
     use wealthfolio_device_sync::backups::scheduler::CaptureState;
 
-    #[tokio::test]
-    async fn runtime_health_is_local_and_competing_checks_do_not_fail_an_active_capture() {
-        let root = tempfile::tempdir().unwrap();
-        let config = Config {
+    fn test_config(root: &std::path::Path) -> Config {
+        Config {
             listen_addr: "127.0.0.1:0".parse().unwrap(),
-            db_path: root.path().join("app.db").to_string_lossy().into_owned(),
-            addons_root: root.path().join("addons").to_string_lossy().into_owned(),
-            static_dir: root.path().join("static").to_string_lossy().into_owned(),
+            db_path: root.join("app.db").to_string_lossy().into_owned(),
+            addons_root: root.join("addons").to_string_lossy().into_owned(),
+            static_dir: root.join("static").to_string_lossy().into_owned(),
             cors_allow: vec![],
             request_timeout: Duration::from_secs(10),
             raw_secret_key: vec![7; 32],
@@ -290,8 +303,34 @@ mod tests {
             mcp_enabled: false,
             mcp_audit_enabled: false,
             mcp_allowed_hosts: None,
-        };
-        let state = crate::build_state(&config).await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn a_manual_backup_failing_before_the_policy_leaves_the_schedule_healthy() {
+        let root = tempfile::tempdir().unwrap();
+        let state = crate::build_state(&test_config(root.path())).await.unwrap();
+        // Consent exists but Connect credentials don't, so token minting fails before
+        // the policy can show whether a backup is due.
+        state
+            .secret_store
+            .set_secret(
+                wealthfolio_core::secrets::CLOUD_BACKUP_CONSENT_KEY,
+                "consented",
+            )
+            .unwrap();
+        assert!(check_and_capture(&state, true).await.is_err());
+        let status = state.backup_scheduler.status();
+        assert_eq!(status.state, CaptureState::Idle);
+        assert!(status.retry_at.is_none());
+        assert!(check_and_capture(&state, false).await.is_err());
+        assert_eq!(state.backup_scheduler.status().state, CaptureState::Failed);
+    }
+
+    #[tokio::test]
+    async fn runtime_health_is_local_and_competing_checks_do_not_fail_an_active_capture() {
+        let root = tempfile::tempdir().unwrap();
+        let state = crate::build_state(&test_config(root.path())).await.unwrap();
         let stale_generation = state.backup_scheduler.generation();
         state.backup_scheduler.wake();
         assert!(
@@ -329,9 +368,16 @@ mod tests {
             .await
             .unwrap();
         state.backup_scheduler.started(generation);
-        let competing = check_and_capture(&state).await.unwrap();
+        let competing = check_and_capture(&state, false).await.unwrap();
         assert!(competing.0.is_none());
-        let Json(competing_manual) = capture_route(Extension(state.clone())).await.unwrap();
+        // The due timer retries a busy slot within a minute, not after the failure fallback.
+        assert_eq!(competing.1, Some(Duration::from_secs(60)));
+        let Json(competing_manual) = capture_route(
+            Extension(state.clone()),
+            Some(Json(CaptureRequest { manual: true })),
+        )
+        .await
+        .unwrap();
         assert!(competing_manual.is_none());
         assert!(
             state.backup_scheduler.is_current(generation),

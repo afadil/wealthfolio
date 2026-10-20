@@ -55,7 +55,7 @@ export function OverviewTab({
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(340px,0.75fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(21.25rem,0.75fr)]">
         <CurrentVsTargetCard
           report={resolvedReport}
           taxonomyLabel={displayTaxonomy}

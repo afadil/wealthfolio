@@ -50,16 +50,19 @@ export function LoanOverview({
         calculation={calculation}
         metadata={metadata}
         balance={balance}
+        balanceAvailable={holding.loan?.balanceSource !== null}
         originalAmount={originalAmount}
         currency={holding.currency}
       />
       <LoanTimeline
-        className="min-h-[400px]"
+        className="min-h-100"
         calculation={calculation}
         quotes={quotes}
         metadata={metadata}
         currency={holding.currency}
         balance={balance}
+        balanceAvailable={holding.loan?.balanceSource !== null}
+        originalBalance={holding.loan?.balanceSource === "original"}
         originalAmount={originalAmount}
         lastConfirmed={lastConfirmed}
         mortgage={mortgage}

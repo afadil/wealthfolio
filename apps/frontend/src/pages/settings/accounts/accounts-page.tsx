@@ -1,17 +1,24 @@
-import { getPlatforms, useWealthfolioConnect } from "@/features/wealthfolio-connect";
-import { isSubscriptionStatusActive } from "@/features/wealthfolio-connect/lib/plan-capabilities";
+import { getPlatforms } from "@/features/wealthfolio-connect";
+import { connectPagePath } from "@/features/wealthfolio-connect/lib/connect-url";
+import { useShowConnectAccountLink } from "@/features/wealthfolio-connect/hooks/use-show-connect-account-link";
 import { useAccounts } from "@/hooks/use-accounts";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, Platform } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import {
   Button,
-  EmptyPlaceholder,
   Icons,
   Separator,
   Skeleton,
   ToggleGroup,
   ToggleGroupItem,
+  buttonVariants,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
 } from "@wealthfolio/ui";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { useMemo, useState } from "react";
@@ -21,29 +28,14 @@ import { SettingsHeader } from "../settings-header";
 import { AccountEditModal } from "./components/account-edit-modal";
 import { AccountItem } from "./components/account-item";
 import { useAccountMutations } from "./components/use-account-mutations";
+import { badgeVariants } from "@wealthfolio/ui";
 
 type FilterType = "all" | "active" | "archived" | "hidden";
 
 const SettingsAccountsPage = () => {
   const { t } = useTranslation();
   const { accounts, isLoading } = useAccounts({ filterActive: false, includeArchived: true });
-  const {
-    isEnabled,
-    isConnected,
-    isInitializing,
-    isLoadingUserInfo,
-    isSessionUnavailable,
-    userInfo,
-    error: connectError,
-  } = useWealthfolioConnect();
-  const showConnectLink =
-    isEnabled &&
-    !isInitializing &&
-    !isLoadingUserInfo &&
-    !isSessionUnavailable &&
-    !connectError &&
-    (!isConnected ||
-      (!!userInfo && !isSubscriptionStatusActive(userInfo.team?.subscription_status)));
+  const showConnectLink = useShowConnectAccountLink();
 
   const { data: platforms } = useQuery<Platform[], Error>({
     queryKey: [QueryKeys.PLATFORMS],
@@ -197,7 +189,7 @@ const SettingsAccountsPage = () => {
               className="hidden sm:inline-flex"
               onClick={() => handleAddAccount()}
             >
-              <Icons.Plus className="mr-2 h-4 w-4" />
+              <Icons.Plus className="me-2 h-4 w-4" />
               {t("settings:accounts_add_button")}
             </Button>
           </>
@@ -207,19 +199,19 @@ const SettingsAccountsPage = () => {
         {/* Search and Filter Bar */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1 sm:max-w-sm">
-            <Icons.Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+            <Icons.Search className="text-muted-foreground absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2" />
             <Input
               type="text"
               placeholder={t("settings:accounts.search_placeholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="!h-9 pl-9 pr-9 text-sm"
+              className="!h-9 pe-9 ps-9 text-sm"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="text-muted-foreground hover:text-foreground absolute right-3 top-1/2 -translate-y-1/2"
+                className="text-muted-foreground hover:text-foreground absolute end-3 top-1/2 -translate-y-1/2"
                 aria-label={t("settings:accounts.clear_search")}
               >
                 <Icons.Close className="h-4 w-4" />
@@ -228,32 +220,31 @@ const SettingsAccountsPage = () => {
           </div>
 
           <ToggleGroup
-            type="single"
-            value={filter}
-            onValueChange={(value) => value && setFilter(value as FilterType)}
+            value={[filter]}
+            onValueChange={([value]) => value && setFilter(value as FilterType)}
             className="bg-muted h-9 rounded-md p-1"
           >
             <ToggleGroupItem
               value="all"
-              className="data-[state=on]:bg-background h-7 rounded px-3 text-xs"
+              className="aria-pressed:bg-background h-7 rounded px-3 text-xs"
             >
               {t("settings:accounts.filter_all")}
             </ToggleGroupItem>
             <ToggleGroupItem
               value="active"
-              className="data-[state=on]:bg-background h-7 rounded px-3 text-xs"
+              className="aria-pressed:bg-background h-7 rounded px-3 text-xs"
             >
               {t("settings:accounts.filter_active")}
             </ToggleGroupItem>
             <ToggleGroupItem
               value="hidden"
-              className="data-[state=on]:bg-background h-7 rounded px-3 text-xs"
+              className="aria-pressed:bg-background h-7 rounded px-3 text-xs"
             >
               {t("settings:accounts.filter_hidden")}
             </ToggleGroupItem>
             <ToggleGroupItem
               value="archived"
-              className="data-[state=on]:bg-background h-7 rounded px-3 text-xs"
+              className="aria-pressed:bg-background h-7 rounded px-3 text-xs"
             >
               {t("settings:accounts.filter_archived")}
             </ToggleGroupItem>
@@ -263,22 +254,29 @@ const SettingsAccountsPage = () => {
         {/* Account Lists */}
         <div className="space-y-8">
           {accounts.length === 0 ? (
-            <EmptyPlaceholder>
-              <EmptyPlaceholder.Icon name="Wallet" />
-              <EmptyPlaceholder.Title>{t("settings:accounts_empty_title")}</EmptyPlaceholder.Title>
-              <EmptyPlaceholder.Description>
-                {t("settings:accounts_empty_description")}
-              </EmptyPlaceholder.Description>
-              <Button data-testid="add-account-empty-button" onClick={() => handleAddAccount()}>
-                <Icons.Plus className="mr-2 h-4 w-4" />
-                {t("settings:accounts_add_first")}
-              </Button>
-              {showConnectLink && (
-                <Button variant="link" asChild>
-                  <Link to="/connect">{t("settings:accounts_connect_account")}</Link>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Icons.Wallet />
+                </EmptyMedia>
+                <EmptyTitle>{t("settings:accounts_empty_title")}</EmptyTitle>
+                <EmptyDescription>{t("settings:accounts_empty_description")}</EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button data-testid="add-account-empty-button" onClick={() => handleAddAccount()}>
+                  <Icons.Plus className="me-2 h-4 w-4" />
+                  {t("settings:accounts_add_first")}
                 </Button>
-              )}
-            </EmptyPlaceholder>
+                {showConnectLink && (
+                  <Link
+                    to={connectPagePath("settings_accounts")}
+                    className={buttonVariants({ variant: "link" })}
+                  >
+                    {t("settings:accounts_connect_account")}
+                  </Link>
+                )}
+              </EmptyContent>
+            </Empty>
           ) : filteredAccounts.length === 0 ? (
             <div className="text-muted-foreground py-8 text-center">
               {t("settings:accounts.no_search_results")}
@@ -292,7 +290,7 @@ const SettingsAccountsPage = () => {
                     <h3 className="text-muted-foreground text-sm font-medium">
                       {t("settings:accounts.section_active")}
                     </h3>
-                    <span className="bg-success/20 text-success rounded-full px-2 py-0.5 text-xs font-medium">
+                    <span className={badgeVariants({ variant: "success-subtle" })}>
                       {counts.active}
                     </span>
                   </div>

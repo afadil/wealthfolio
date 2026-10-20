@@ -28,6 +28,16 @@ use wealthfolio_ai::tools::{
     SearchActivities,
 };
 
+/// A JSON snapshot with sorted keys. Rig enables serde_json's
+/// `preserve_order`, so keys would otherwise follow insertion order.
+macro_rules! assert_sorted_json_snapshot {
+    ($value:expr) => {
+        insta::with_settings!({ sort_maps => true }, {
+            insta::assert_json_snapshot!($value);
+        })
+    };
+}
+
 fn env() -> Arc<MockEnvironment> {
     Arc::new(MockEnvironment::new())
 }
@@ -49,7 +59,7 @@ fn adapted(tool: impl AgentTool + 'static) -> RigAgentTool {
 /// drift legitimately and shouldn't fail CI.
 async fn schema_snapshot<T: Tool>(tool: T) -> serde_json::Value {
     let def = rig::completion::ToolDefinition {
-        name: T::NAME.into(),
+        name: rig::message::ToolName::new(T::NAME).unwrap(),
         description: tool.description(),
         parameters: tool.parameters(),
     };
@@ -96,7 +106,7 @@ macro_rules! schema_test {
         async fn $test_name() {
             let tool = $tool_ctor;
             let snapshot = schema_snapshot(tool).await;
-            insta::assert_json_snapshot!(snapshot);
+            assert_sorted_json_snapshot!(snapshot);
         }
     };
 }
@@ -104,101 +114,104 @@ macro_rules! schema_test {
 #[tokio::test]
 async fn snapshot_propose_transaction_categories() {
     let snapshot = schema_snapshot_dyn(&adapted(ProposeCategories)).await;
-    insta::assert_json_snapshot!(snapshot);
+    assert_sorted_json_snapshot!(snapshot);
 }
 #[tokio::test]
 async fn snapshot_list_categorization_context() {
     let snapshot = schema_snapshot_dyn(&adapted(ListCategorizationContext)).await;
-    insta::assert_json_snapshot!(snapshot);
+    assert_sorted_json_snapshot!(snapshot);
 }
 #[tokio::test]
 async fn snapshot_create_categorization_rule() {
     let snapshot = schema_snapshot_dyn(&adapted(CreateCategorizationRule)).await;
-    insta::assert_json_snapshot!(snapshot);
+    assert_sorted_json_snapshot!(snapshot);
 }
 #[tokio::test]
 async fn snapshot_list_asset_taxonomies() {
     let snapshot = schema_snapshot_dyn(&adapted(ListAssetTaxonomies)).await;
-    insta::assert_json_snapshot!(snapshot);
+    assert_sorted_json_snapshot!(snapshot);
 }
 #[tokio::test]
 async fn snapshot_get_asset_taxonomy_assignments() {
     let snapshot = schema_snapshot_dyn(&adapted(GetAssetTaxonomyAssignments)).await;
-    insta::assert_json_snapshot!(snapshot);
+    assert_sorted_json_snapshot!(snapshot);
 }
 #[tokio::test]
 async fn snapshot_prepare_asset_classification() {
     let snapshot = schema_snapshot_dyn(&adapted(PrepareAssetClassification)).await;
-    insta::assert_json_snapshot!(snapshot);
+    assert_sorted_json_snapshot!(snapshot);
 }
 #[tokio::test]
 async fn snapshot_get_accounts() {
     let snapshot = schema_snapshot_dyn(&adapted(GetAccounts)).await;
-    insta::assert_json_snapshot!(snapshot);
+    assert_sorted_json_snapshot!(snapshot);
 }
 
 #[tokio::test]
 async fn snapshot_get_holdings() {
     let snapshot = schema_snapshot_dyn(&adapted(GetHoldings)).await;
-    insta::assert_json_snapshot!(snapshot);
+    assert_sorted_json_snapshot!(snapshot);
 }
 #[tokio::test]
 async fn snapshot_get_asset_allocation() {
     let snapshot = schema_snapshot_dyn(&adapted(GetAssetAllocation)).await;
-    insta::assert_json_snapshot!(snapshot);
+    assert_sorted_json_snapshot!(snapshot);
 }
 
 #[tokio::test]
 async fn snapshot_get_cash_balances() {
     let snapshot = schema_snapshot_dyn(&adapted(GetCashBalances)).await;
-    insta::assert_json_snapshot!(snapshot);
+    assert_sorted_json_snapshot!(snapshot);
 }
 
 #[tokio::test]
 async fn snapshot_search_activities() {
     let snapshot = schema_snapshot_dyn(&adapted(SearchActivities)).await;
-    insta::assert_json_snapshot!(snapshot);
+    assert_sorted_json_snapshot!(snapshot);
 }
 
 #[tokio::test]
 async fn snapshot_get_income() {
     let snapshot = schema_snapshot_dyn(&adapted(GetIncome)).await;
-    insta::assert_json_snapshot!(snapshot);
+    assert_sorted_json_snapshot!(snapshot);
 }
 
 #[tokio::test]
 async fn snapshot_get_valuation_history() {
     let snapshot = schema_snapshot_dyn(&adapted(GetValuationHistory)).await;
-    insta::assert_json_snapshot!(snapshot);
+    assert_sorted_json_snapshot!(snapshot);
 }
 
 #[tokio::test]
 async fn snapshot_get_goals() {
     let snapshot = schema_snapshot_dyn(&adapted(GetGoals)).await;
-    insta::assert_json_snapshot!(snapshot);
+    assert_sorted_json_snapshot!(snapshot);
 }
 
 #[tokio::test]
 async fn snapshot_get_performance() {
     let snapshot = schema_snapshot_dyn(&adapted(GetPerformance)).await;
-    insta::assert_json_snapshot!(snapshot);
+    assert_sorted_json_snapshot!(snapshot);
 }
 #[tokio::test]
 async fn snapshot_record_activity() {
     let snapshot = schema_snapshot_dyn(&adapted(RecordActivity)).await;
-    insta::assert_json_snapshot!(snapshot);
+    assert_sorted_json_snapshot!(snapshot);
 }
 #[tokio::test]
 async fn snapshot_record_activities() {
     let snapshot = schema_snapshot_dyn(&adapted(RecordActivities)).await;
-    insta::assert_json_snapshot!(snapshot);
+    assert_sorted_json_snapshot!(snapshot);
 }
-schema_test!(snapshot_import_csv, ImportCsvTool::new(env(), "USD".into()));
+schema_test!(
+    snapshot_import_csv,
+    ImportCsvTool::new(env(), "USD".into(), Vec::new())
+);
 
 #[tokio::test]
 async fn snapshot_get_health_status() {
     let snapshot = schema_snapshot_dyn(&adapted(GetHealthStatus)).await;
-    insta::assert_json_snapshot!(snapshot);
+    assert_sorted_json_snapshot!(snapshot);
 }
 
 #[tokio::test]

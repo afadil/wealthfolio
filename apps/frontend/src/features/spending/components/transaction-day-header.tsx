@@ -1,6 +1,7 @@
 import { memo, type Ref } from "react";
 import { useTranslation } from "react-i18next";
 
+import { SELECTION_SLOT } from "@/lib/hover-slot";
 import { Checkbox, PrivacyAmount, TableCell, TableRow, useDateFormatting } from "@wealthfolio/ui";
 
 import type { TransactionDayGroup } from "../lib/transactions-helpers";
@@ -50,6 +51,8 @@ interface TransactionDayHeaderProps {
    * are pending, since that day is still missing rows.
    */
   isPartial: boolean;
+  /** Keeps the row aligned with a table that shows the Balance column. */
+  showBalance?: boolean;
   /**
    * Virtualizer wiring: it measures the rendered header through the ref and
    * identifies it by `data-index`. Both are unset when the list renders
@@ -67,6 +70,7 @@ function TransactionDayHeaderImpl({
   selectionState,
   onToggleDay,
   isPartial,
+  showBalance = false,
 }: TransactionDayHeaderProps) {
   const { t } = useTranslation();
   const label = useDayLabel(group, appTimezone);
@@ -75,17 +79,19 @@ function TransactionDayHeaderImpl({
     <TableRow
       ref={ref as Ref<HTMLTableRowElement>}
       data-index={dataIndex}
-      className="bg-muted/40 hover:bg-muted/40"
+      className="group/row bg-muted/40 hover:bg-muted/40"
     >
       <TableCell className="relative px-3 py-1.5">
         <Checkbox
-          checked={selectionState}
+          checked={selectionState === true}
+          indeterminate={selectionState === "indeterminate"}
           onCheckedChange={() => onToggleDay(group)}
           aria-label={
             selectionState === true
               ? t("spending:txTab.deselectDay", { date: label })
               : t("spending:txTab.selectDay", { date: label })
           }
+          className={SELECTION_SLOT}
         />
       </TableCell>
       <TableCell colSpan={3} className="px-3 py-1.5">
@@ -100,9 +106,10 @@ function TransactionDayHeaderImpl({
           )}
         </div>
       </TableCell>
-      <TableCell className="w-28 px-3 py-1.5 text-right">
+      <TableCell className="w-28 px-3 py-1.5 text-end">
         {!isPartial && <DayNet group={group} />}
       </TableCell>
+      {showBalance && <TableCell className="hidden px-3 py-1.5 sm:table-cell" />}
       <TableCell className="px-3 py-1.5" />
     </TableRow>
   );
@@ -127,7 +134,7 @@ function TransactionDayHeadingImpl({ group, appTimezone, isPartial }: Transactio
           {t("spending:txTab.dayCount", { count: group.rows.length })}
         </span>
       )}
-      <span className="ml-auto">{!isPartial && <DayNet group={group} />}</span>
+      <span className="ms-auto">{!isPartial && <DayNet group={group} />}</span>
     </div>
   );
 }

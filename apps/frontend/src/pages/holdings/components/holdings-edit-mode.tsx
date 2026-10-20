@@ -1,4 +1,10 @@
-import { CurrencyInput, DatePickerInput, MoneyInput, QuantityInput } from "@wealthfolio/ui";
+import {
+  CurrencyInput,
+  DatePickerInput,
+  MoneyInput,
+  QuantityInput,
+  Spinner,
+} from "@wealthfolio/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -508,9 +514,9 @@ export const HoldingsEditMode = ({
               {/* Table Header */}
               <div className="text-muted-foreground grid grid-cols-12 gap-2 border-b pb-2 text-xs font-medium">
                 <div className="col-span-5">{t("holdings:symbol")}</div>
-                <div className="col-span-2 text-right">{t("holdings:shares")}</div>
-                <div className="col-span-2 text-right">{t("holdings:avg_cost")}</div>
-                <div className="col-span-2 text-right">{t("holdings:total")}</div>
+                <div className="col-span-2 text-end">{t("holdings:shares")}</div>
+                <div className="col-span-2 text-end">{t("holdings:avg_cost")}</div>
+                <div className="col-span-2 text-end">{t("holdings:total")}</div>
                 <div className="col-span-1"></div>
               </div>
 
@@ -565,6 +571,7 @@ export const HoldingsEditMode = ({
                         {/* Avg Cost */}
                         <div className="col-span-2">
                           <MoneyInput
+                            aria-label={t("holdings:avg_cost")}
                             value={holding.averageCost}
                             onValueChange={(value, isUserEdit) =>
                               handleAverageCostChange(holding.assetId, value, isUserEdit)
@@ -577,6 +584,7 @@ export const HoldingsEditMode = ({
                         {/* Total cost */}
                         <div className="col-span-2">
                           <MoneyInput
+                            aria-label={t("holdings:total")}
                             value={holding.totalCost}
                             onValueChange={(value, isUserEdit) =>
                               handleTotalCostChange(holding.assetId, value, isUserEdit)
@@ -593,7 +601,8 @@ export const HoldingsEditMode = ({
                             variant="ghost"
                             size="sm"
                             onClick={() => handleRemoveHolding(holding.assetId)}
-                            className="hover:bg-destructive/20 hover:text-destructive h-7 w-7 p-0"
+                            aria-label={t("common:remove")}
+                            className="hover:bg-destructive-subtle hover:text-destructive-subtle-foreground h-7 w-7 p-0"
                           >
                             <Icons.Trash className="h-3.5 w-3.5" />
                           </Button>
@@ -640,7 +649,7 @@ export const HoldingsEditMode = ({
                   onClick={openAddHolding}
                   className="border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground h-10 w-full border border-dashed"
                 >
-                  <Icons.PlusCircle className="mr-2 h-4 w-4" />
+                  <Icons.PlusCircle className="me-2 h-4 w-4" />
                   {t("holdings:add_another_holding")}
                 </Button>
               )}
@@ -663,7 +672,7 @@ export const HoldingsEditMode = ({
               {cashBalances.length > 0 && (
                 <div className="text-muted-foreground grid grid-cols-12 gap-2 border-b pb-2 text-xs font-medium">
                   <div className="col-span-6">{t("holdings:currency")}</div>
-                  <div className="col-span-5 text-right">{t("holdings:amount")}</div>
+                  <div className="col-span-5 text-end">{t("holdings:amount")}</div>
                   <div className="col-span-1"></div>
                 </div>
               )}
@@ -691,6 +700,7 @@ export const HoldingsEditMode = ({
                       {/* Amount */}
                       <div className="col-span-5">
                         <MoneyInput
+                          aria-label={t("holdings:amount")}
                           ref={(el) => {
                             cashAmountInputRefs.current[cash.currency] = el;
                           }}
@@ -707,7 +717,8 @@ export const HoldingsEditMode = ({
                           variant="ghost"
                           size="sm"
                           onClick={() => handleRemoveCashBalance(cash.currency)}
-                          className="hover:bg-destructive/20 hover:text-destructive h-7 w-7 p-0"
+                          aria-label={t("common:remove")}
+                          className="hover:bg-destructive-subtle hover:text-destructive-subtle-foreground h-7 w-7 p-0"
                         >
                           <Icons.Trash className="h-3.5 w-3.5" />
                         </Button>
@@ -719,7 +730,7 @@ export const HoldingsEditMode = ({
                 {/* Add Currency Input */}
                 {showAddCurrency && (
                   <div className="flex items-center gap-2 py-2">
-                    <div className="w-[160px]">
+                    <div className="w-40">
                       <CurrencyInput
                         placeholder={t("holdings:select_currency")}
                         valueDisplay="code"
@@ -756,7 +767,7 @@ export const HoldingsEditMode = ({
                   onClick={openAddCurrency}
                   className="border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground h-10 w-full border border-dashed"
                 >
-                  <Icons.PlusCircle className="mr-2 h-4 w-4" />
+                  <Icons.PlusCircle className="me-2 h-4 w-4" />
                   {t("holdings:add_cash_balance")}
                 </Button>
               )}
@@ -775,9 +786,9 @@ export const HoldingsEditMode = ({
                 variant="outline"
                 onClick={() => setShowDeleteDialog(true)}
                 disabled={isSaving || isDeleting}
-                className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                className="text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"
               >
-                <Icons.Trash className="mr-2 h-4 w-4" />
+                <Icons.Trash className="me-2 h-4 w-4" />
                 {t("holdings:delete_snapshot")}
               </Button>
             )}
@@ -789,12 +800,12 @@ export const HoldingsEditMode = ({
             <Button onClick={handleSave} disabled={isSaving || isDeleting || !hasChanges}>
               {isSaving ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {t("holdings:saving")}
                 </>
               ) : (
                 <>
-                  <Icons.Check className="mr-2 h-4 w-4" />
+                  <Icons.Check className="me-2 h-4 w-4" />
                   {t("holdings:save_changes")}
                 </>
               )}
@@ -835,11 +846,11 @@ export const HoldingsEditMode = ({
             <AlertDialogAction
               onClick={handleDeleteSnapshot}
               disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
             >
               {isDeleting ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {t("holdings:deleting")}
                 </>
               ) : (

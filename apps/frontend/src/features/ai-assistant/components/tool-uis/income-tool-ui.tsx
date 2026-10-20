@@ -1,4 +1,7 @@
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { UnconvertedCurrenciesNotice } from "@/pages/income/unconverted-currencies-notice";
+import { Alert, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import type { ToolCallMessagePartProps } from "@assistant-ui/react";
 import { makeAssistantToolUI } from "@assistant-ui/react";
 import {
@@ -14,6 +17,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  useAmountFormatting,
   useNumberFormatting,
 } from "@wealthfolio/ui";
 import type { TFunction } from "i18next";
@@ -46,6 +50,7 @@ interface GetIncomeOutput {
   topAssets: TopAssetDto[];
   byMonth: Record<string, number>;
   period: string;
+  unconvertedCurrencies: string[];
 }
 
 // ============================================================================
@@ -118,6 +123,11 @@ function normalizeResult(result: unknown): GetIncomeOutput | null {
 
   const period = (candidate.period as string | undefined) ?? "YTD";
 
+  const unconvertedCurrencies =
+    (candidate.unconvertedCurrencies as string[] | undefined) ??
+    (candidate.unconverted_currencies as string[] | undefined) ??
+    [];
+
   return {
     totalIncome,
     currency,
@@ -127,6 +137,7 @@ function normalizeResult(result: unknown): GetIncomeOutput | null {
     topAssets,
     byMonth,
     period,
+    unconvertedCurrencies,
   };
 }
 
@@ -201,7 +212,8 @@ type IncomeContentProps = ToolCallMessagePartProps<GetIncomeArgs, GetIncomeOutpu
 
 const IncomeContent = memo(IncomeContentImpl);
 
-function IncomeContentImpl({ args, result, status }: IncomeContentProps) {
+export function IncomeContentImpl({ args, result, status }: IncomeContentProps) {
+  const amountFormatting = useAmountFormatting();
   const formatting = useNumberFormatting();
   const { t } = useTranslation();
   const { isBalanceHidden } = useBalancePrivacy();
@@ -211,15 +223,9 @@ function IncomeContentImpl({ args, result, status }: IncomeContentProps) {
 
   const formatter = useMemo(
     () => ({
-      format: (value: number) =>
-        formatting.formatDecimal(value, {
-          style: "currency",
-          currency,
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 0,
-        }),
+      format: (value: number) => amountFormatting.formatRoundedAmount(value, currency),
     }),
-    [currency, formatting],
+    [currency, amountFormatting],
   );
 
   // Calculate type percentages
@@ -310,16 +316,18 @@ function IncomeContentImpl({ args, result, status }: IncomeContentProps) {
   // Error state
   if (hasError) {
     return (
-      <Card className="border-destructive/30 bg-destructive/5 w-full">
-        <CardContent className="py-4">
-          <p className="text-destructive text-sm font-medium">{t("ai:income.error")}</p>
-        </CardContent>
-      </Card>
+      <Alert variant="destructive">
+        <Icons.AlertCircle />
+        <AlertTitle>{t("ai:income.error")}</AlertTitle>
+      </Alert>
     );
   }
 
-  // Empty state
-  if (isComplete && (!parsed || parsed.totalIncome === 0)) {
+  // Empty state; income without an exchange rate isn't counted, so it is not empty
+  if (
+    isComplete &&
+    (!parsed || (parsed.totalIncome === 0 && parsed.unconvertedCurrencies.length === 0))
+  ) {
     return (
       <Card className="bg-muted/40 border-primary/10 w-full">
         <CardContent className="py-4">
@@ -349,14 +357,14 @@ function IncomeContentImpl({ args, result, status }: IncomeContentProps) {
             <div className="text-muted-foreground mt-1 flex items-center gap-2 text-xs">
               <span>{getPeriodLabel(parsed.period, t)}</span>
               {parsed.yoyGrowth !== undefined && parsed.yoyGrowth !== null && (
-                <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
-                  <span className="mr-0.5">YoY</span>
+                <Badge variant="outline" className="text-2xs px-1.5 py-0">
+                  <span className="me-0.5">YoY</span>
                   <GainPercent value={parsed.yoyGrowth} />
                 </Badge>
               )}
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-end">
             <PrivacyAmount
               value={parsed.totalIncome}
               currency={currency}
@@ -367,6 +375,10 @@ function IncomeContentImpl({ args, result, status }: IncomeContentProps) {
       </CardHeader>
 
       <CardContent className="space-y-4">
+        <UnconvertedCurrenciesNotice
+          currencies={parsed.unconvertedCurrencies}
+          baseCurrency={currency}
+        />
         {/* Stat cards */}
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-background/60 rounded-lg border p-3">
@@ -405,7 +417,7 @@ function IncomeContentImpl({ args, result, status }: IncomeContentProps) {
                     dataKey="label"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    tick={{ fontSize: "0.6875rem", fill: "var(--muted-foreground)" }}
                     interval={monthlyData.length > 12 ? Math.floor(monthlyData.length / 12) : 0}
                   />
                   <ChartTooltip
@@ -443,27 +455,30 @@ function IncomeContentImpl({ args, result, status }: IncomeContentProps) {
                     topAssetsTotal > 0 ? (asset.income / topAssetsTotal) * 100 : 0;
                   if (widthPercent < 0.5) return null;
                   return (
-                    <Tooltip key={asset.symbol} delayDuration={100}>
-                      <TooltipTrigger asChild>
-                        <div
-                          className="flex h-full cursor-default items-center justify-center transition-opacity hover:opacity-80"
-                          style={{
-                            width: `${widthPercent}%`,
-                            backgroundColor: `var(--chart-${(index % 9) + 1})`,
-                            minWidth: widthPercent >= 1 ? "4px" : undefined,
-                          }}
-                        >
-                          {widthPercent > 14 && (
-                            <span className="text-background truncate px-1 text-[10px] font-medium">
-                              {asset.symbol}
-                            </span>
-                          )}
-                        </div>
+                    <Tooltip key={asset.symbol}>
+                      <TooltipTrigger
+                        delay={100}
+                        render={
+                          <div
+                            className="flex h-full cursor-default items-center justify-center transition-opacity hover:opacity-80"
+                            style={{
+                              width: `${widthPercent}%`,
+                              backgroundColor: `var(--chart-${(index % 9) + 1})`,
+                              minWidth: widthPercent >= 1 ? "4px" : undefined,
+                            }}
+                          />
+                        }
+                      >
+                        {widthPercent > 14 && (
+                          <span className="text-background text-2xs truncate px-1 font-medium">
+                            {asset.symbol}
+                          </span>
+                        )}
                       </TooltipTrigger>
                       <TooltipContent side="top" align="center">
                         <div className="text-center">
                           <div className="font-medium">{asset.symbol}</div>
-                          <div className="text-muted-foreground text-xs">
+                          <div className="text-background/70 text-xs">
                             {formatValue(asset.income)} (
                             {formatting.formatPercent(asset.percentage / 100)})
                           </div>

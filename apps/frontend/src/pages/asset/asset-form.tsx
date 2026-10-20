@@ -13,11 +13,11 @@ import {
   FormLabel,
   FormMessage,
 } from "@wealthfolio/ui/components/ui/form";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
+
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { QuoteMode } from "@/lib/constants";
-import { ResponsiveSelect, type ResponsiveSelectOption } from "@wealthfolio/ui";
+import { ResponsiveSelect, type ResponsiveSelectOption, Spinner } from "@wealthfolio/ui";
 import { SingleSelectTaxonomy } from "@/components/classification/single-select-taxonomy";
 import { MultiSelectTaxonomy } from "@/components/classification/multi-select-taxonomy";
 import { useTaxonomies } from "@/hooks/use-taxonomies";
@@ -203,7 +203,7 @@ export function AssetForm({ asset, onSubmit, onCancel, isSaving }: AssetFormProp
           <Button type="submit" disabled={isSaving || form.formState.isSubmitting}>
             {isSaving || form.formState.isSubmitting ? (
               <span className="flex items-center gap-2">
-                <Icons.Spinner className="h-4 w-4 animate-spin" /> {t("asset:assetForm.saving")}
+                <Spinner className="h-4 w-4" /> {t("asset:assetForm.saving")}
               </span>
             ) : (
               t("asset:assetForm.save_changes")

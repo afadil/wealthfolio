@@ -1,9 +1,10 @@
 import { ConnectSessionUnavailable } from "../components/connect-session-unavailable";
-import { CloudBackupSummary } from "@/pages/settings/exports/cloud-backup-card";
+import { CloudBackupCompactSummary } from "@/pages/settings/exports/cloud-backup-card";
 import { openUrlInBrowser, syncTriggerCycle } from "@/adapters";
 import { Page, PageContent, PageHeader } from "@/components/page";
 import { useDevices, useSyncStatus } from "@/features/devices-sync/hooks";
 import { SyncStates } from "@/features/devices-sync/types";
+import { BrokerageLogo } from "../components/brokerage-logo";
 import { PortalLink } from "../components/portal-link";
 import { ConnectedView } from "../components/connected-view";
 import { ConnectEmptyState } from "@/features/wealthfolio-connect/components/connect-empty-state";
@@ -18,14 +19,21 @@ import { isSubscriptionStatusActive } from "@/features/wealthfolio-connect/lib/p
 import { useAccounts } from "@/hooks/use-accounts";
 import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
-import { formatDistanceToNow } from "@/lib/utils";
+import { cn, formatDistanceToNow } from "@/lib/utils";
+import { BankIcon } from "@phosphor-icons/react/dist/csr/Bank";
+import { ClockCounterClockwiseIcon } from "@phosphor-icons/react/dist/csr/ClockCounterClockwise";
+import { DesktopIcon } from "@phosphor-icons/react/dist/csr/Desktop";
+import { DeviceMobileIcon } from "@phosphor-icons/react/dist/csr/DeviceMobile";
+import { DevicesIcon } from "@phosphor-icons/react/dist/csr/Devices";
+import { GlobeIcon } from "@phosphor-icons/react/dist/csr/Globe";
+import { HardDrivesIcon } from "@phosphor-icons/react/dist/csr/HardDrives";
+import { InfoIcon } from "@phosphor-icons/react/dist/csr/Info";
+import { WarningIcon } from "@phosphor-icons/react/dist/csr/Warning";
+import { XCircleIcon } from "@phosphor-icons/react/dist/csr/XCircle";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocalizationSettings } from "@wealthfolio/ui";
-import { Alert } from "@wealthfolio/ui/components/ui/alert";
-import { Avatar, AvatarFallback, AvatarImage } from "@wealthfolio/ui/components/ui/avatar";
-import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { useLocalizationSettings, buttonVariants, Spinner } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
+import { Card } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import {
@@ -35,21 +43,31 @@ import {
   TooltipTrigger,
 } from "@wealthfolio/ui/components/ui/tooltip";
 import type { TFunction } from "i18next";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { listBrokerConnections } from "../services/broker-service";
-import type { BrokerConnection, BrokerSyncState, ImportRun } from "../types";
+import type { ImportRun } from "../types";
 
 import type { Device } from "@/features/devices-sync/types";
 import type { Account } from "@/lib/types";
 import { NewAccountsFoundModal } from "../components/new-accounts-found-modal";
+import { BROKER_SYNC_RUN_NEEDS_REVIEW_MESSAGE } from "../lib/broker-sync-messages";
 import {
-  BROKER_SYNC_RUN_NEEDS_REVIEW_MESSAGE,
-  getBrokerSyncIssueMessage,
-} from "../lib/broker-sync-messages";
+  buildAttentionItems,
+  buildBrokerageRows,
+  getLastBrokerSyncAt,
+  type AttentionItem,
+  type BrokerAccountState,
+  type BrokerageRow,
+  type BrokerageState,
+} from "../lib/connect-overview";
 import { hasReviewableActivityWarnings } from "../lib/import-run-review";
 import { hasBrokerSync } from "../lib/plan-capabilities";
+
+const BROKERAGE_PREVIEW_COUNT = 6;
+const INACTIVE_DEVICE_DAYS = 30;
+const SECTION_ICON_CLASS = "text-muted-foreground size-5 shrink-0";
 
 export default function ConnectPage() {
   const localizationSettings = useLocalizationSettings();
@@ -57,9 +75,14 @@ export default function ConnectPage() {
   const { t } = useTranslation();
   const { isEnabled, isConnected, isInitializing, isSessionUnavailable, userInfo } =
     useWealthfolioConnect();
-  const { status, lastSyncTime, syncStates } = useAggregatedSyncStatus();
+  const { status, syncStates } = useAggregatedSyncStatus();
   const showBrokerSync = hasBrokerSync(userInfo);
-  const { data: brokerAccounts = [] } = useBrokerAccounts({ enabled: showBrokerSync });
+  const {
+    data: brokerAccounts = [],
+    isLoading: isLoadingBrokerAccounts,
+    isError: hasBrokerAccountsError,
+    refetch: refetchBrokerAccounts,
+  } = useBrokerAccounts({ enabled: showBrokerSync });
   const { mutate: syncBrokerData, isPending: isSyncing } = useSyncBrokerData();
   const deviceSyncStatus = useSyncStatus();
   const showConnectDeviceAction =
@@ -67,7 +90,7 @@ export default function ConnectPage() {
     !deviceSyncStatus.error &&
     (deviceSyncStatus.syncState !== SyncStates.READY ||
       deviceSyncStatus.device?.trustState === "untrusted");
-  const { data: devices } = useDevices("my");
+  const { data: devices, isLoading: isLoadingDevices } = useDevices("my");
   const queryClient = useQueryClient();
   const [isTriggeringDeviceSync, setIsTriggeringDeviceSync] = useState(false);
 
@@ -87,10 +110,18 @@ export default function ConnectPage() {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] });
     }
   }, [showBrokerSync, syncBrokerData, queryClient]);
-  const { data: importRunsData } = useImportRunsInfinite({ pageSize: 10, enabled: showBrokerSync });
+  const { data: importRunsData, isLoading: isLoadingActivity } = useImportRunsInfinite({
+    pageSize: 10,
+    enabled: showBrokerSync,
+  });
   const { accounts: localAccounts } = useAccounts({ filterActive: false, includeArchived: false });
 
-  const { data: brokerConnections = [] } = useQuery({
+  const {
+    data: brokerConnections = [],
+    isLoading: isLoadingConnections,
+    isError: hasConnectionsError,
+    refetch: refetchConnections,
+  } = useQuery({
     queryKey: [QueryKeys.BROKER_CONNECTIONS],
     queryFn: listBrokerConnections,
     enabled: isConnected && showBrokerSync,
@@ -113,35 +144,31 @@ export default function ConnectPage() {
     return () => window.removeEventListener("open-new-accounts-modal", handler as EventListener);
   }, [localAccounts]);
 
-  const accountsNeedingSetup = useMemo(() => {
-    return localAccounts.filter((acc) => {
-      if (!acc.providerAccountId) return false;
-      return acc.trackingMode === "NOT_SET";
-    });
-  }, [localAccounts]);
-
-  const hasAccountsNeedingSetup = accountsNeedingSetup.length > 0;
-
   const recentActivity = useMemo(() => {
     if (!importRunsData?.pages) return [];
     return importRunsData.pages.flat().slice(0, 10);
   }, [importRunsData]);
 
-  const recentActivityIssueCount = useMemo(() => {
-    return recentActivity.filter((run) => {
-      const summary = run.summary;
-      return (
-        run.status === "FAILED" ||
-        run.status === "NEEDS_REVIEW" ||
-        (summary?.warnings ?? 0) > 0 ||
-        (summary?.errors ?? 0) > 0
-      );
-    }).length;
-  }, [recentActivity]);
+  const brokerageRows = useMemo(
+    () =>
+      buildBrokerageRows(
+        brokerConnections,
+        brokerAccounts,
+        localAccounts,
+        syncStates,
+        t("connect:connections.unknown"),
+      ),
+    [brokerConnections, brokerAccounts, localAccounts, syncStates, t],
+  );
 
-  const brokerSyncIssues = useMemo(
-    () => syncStates.filter((s) => s.syncStatus === "NEEDS_REVIEW" || s.syncStatus === "FAILED"),
-    [syncStates],
+  const attentionItems = useMemo(
+    () => buildAttentionItems(brokerageRows, syncStates, localAccounts, recentActivity),
+    [brokerageRows, syncStates, localAccounts, recentActivity],
+  );
+
+  const lastBrokerSyncAt = useMemo(
+    () => getLastBrokerSyncAt(syncStates, recentActivity),
+    [syncStates, recentActivity],
   );
 
   const accountNameMap = useMemo(() => {
@@ -169,57 +196,17 @@ export default function ConnectPage() {
       <Page>
         <PageHeader heading={t("connect:page.title")} />
         <PageContent>
-          <div className="mx-auto max-w-5xl space-y-6">
-            <Card>
-              <CardContent className="p-0">
-                <div className="divide-border grid grid-cols-3 divide-x">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="flex items-center gap-4 p-5">
-                      <Skeleton className="h-12 w-12 rounded-lg" />
-                      <div className="space-y-2">
-                        <Skeleton className="h-6 w-16" />
-                        <Skeleton className="h-4 w-24" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {[...Array(2)].map((_, i) => (
-                <Card key={i} className="border">
-                  <CardHeader className="pb-3">
-                    <Skeleton className="h-5 w-24" />
-                  </CardHeader>
-                  <CardContent className="space-y-3 pt-0">
-                    {[...Array(3)].map((_, j) => (
-                      <div key={j} className="flex items-center gap-3 py-2">
-                        <Skeleton className="h-10 w-10 rounded-full" />
-                        <div className="space-y-1.5">
-                          <Skeleton className="h-4 w-32" />
-                          <Skeleton className="h-3 w-20" />
-                        </div>
-                      </div>
-                    ))}
-                  </CardContent>
+          <div className="@container mx-auto max-w-5xl pt-4 sm:pt-6">
+            <div className="@3xl:grid-cols-[minmax(0,1fr)_18rem] grid grid-cols-1 items-start gap-4">
+              {[5, 3].map((rows, i) => (
+                <Card key={i} className="overflow-hidden">
+                  <div className="flex min-h-12 items-center border-b px-4">
+                    <Skeleton className="h-5 w-28" />
+                  </div>
+                  <ListSkeleton rows={rows} />
                 </Card>
               ))}
             </div>
-            <Card className="border">
-              <CardHeader className="pb-3">
-                <Skeleton className="h-5 w-36" />
-              </CardHeader>
-              <CardContent className="space-y-2 pt-0">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="flex items-center gap-4 py-3">
-                    <Skeleton className="h-2 w-2 rounded-full" />
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton className="h-4 w-28" />
-                    <Skeleton className="h-4 w-24" />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
           </div>
         </PageContent>
       </Page>
@@ -243,11 +230,30 @@ export default function ConnectPage() {
     );
   }
 
+  const headerText = !showBrokerSync
+    ? t("connect:page.subtitle")
+    : isSyncRunning
+      ? t("connect:status.syncingEllipsis")
+      : lastBrokerSyncAt
+        ? t("connect:status.lastSynced", {
+            time: formatDistanceToNow(lastBrokerSyncAt, localizationSettings, { addSuffix: true }),
+          })
+        : t("connect:page.subtitleWithBrokers");
+
+  const devicesCard = (
+    <DevicesCard
+      devices={devices ?? []}
+      isLoading={isLoadingDevices}
+      engineStatus={deviceSyncStatus.engineStatus}
+      showConnectDeviceAction={showConnectDeviceAction}
+    />
+  );
+
   return (
     <Page>
       <PageHeader
         heading={t("connect:page.title")}
-        text={showBrokerSync ? t("connect:page.subtitleWithBrokers") : t("connect:page.subtitle")}
+        text={headerText}
         actions={
           <div className="flex items-center gap-2 sm:gap-3">
             <Button
@@ -259,24 +265,31 @@ export default function ConnectPage() {
             >
               {isSyncRunning ? (
                 <>
-                  <Icons.Spinner className="h-4 w-4 animate-spin sm:mr-2" />
+                  <Spinner className="h-4 w-4 sm:me-2" />
                   <span className="hidden sm:inline">{t("connect:sync.syncingShort")}</span>
                 </>
               ) : (
                 <>
-                  <Icons.RefreshCw className="h-4 w-4 sm:mr-2" />
+                  <Icons.RefreshCw className="h-4 w-4 sm:me-2" />
                   <span className="hidden sm:inline">{t("connect:sync.syncNow")}</span>
                 </>
               )}
             </Button>
-            <TooltipProvider delayDuration={300}>
+            <TooltipProvider delay={300}>
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" className="size-11 sm:size-9" asChild>
-                    <Link to="/settings/connect" aria-label={t("common:settings")}>
-                      <Icons.Settings className="size-4" />
-                    </Link>
-                  </Button>
+                <TooltipTrigger
+                  render={
+                    <Link
+                      to="/settings/connect"
+                      aria-label={t("common:settings")}
+                      className={cn(
+                        buttonVariants({ variant: "outline", size: "icon" }),
+                        "size-11 sm:size-9",
+                      )}
+                    />
+                  }
+                >
+                  <Icons.Settings className="size-4" />
                 </TooltipTrigger>
                 <TooltipContent>{t("common:settings")}</TooltipContent>
               </Tooltip>
@@ -285,230 +298,100 @@ export default function ConnectPage() {
         }
       />
       <PageContent>
-        <div className="mx-auto max-w-5xl space-y-6 pt-4 sm:pt-6">
-          {showBrokerSync && hasAccountsNeedingSetup && (
-            <Alert variant="warning" className="mb-4">
-              <Icons.AlertTriangle className="h-4 w-4" />
-              <div className="flex flex-1 items-center justify-between">
-                <div>
-                  <p className="font-medium">{t("connect:setup.newAccountsTitle")}</p>
-                  <p className="text-muted-foreground text-sm">
-                    {t("connect:setup.newAccountsDescription", {
-                      count: accountsNeedingSetup.length,
-                    })}
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setPendingNewAccounts(accountsNeedingSetup);
-                    setShowNewAccountsModal(true);
-                  }}
-                >
-                  {t("connect:setup.reviewAccounts")}
-                </Button>
-              </div>
-            </Alert>
-          )}
-
-          {showBrokerSync && brokerSyncIssues.length > 0 && (
-            <BrokerSyncAttentionSection
-              issues={brokerSyncIssues}
-              accounts={localAccounts}
-              onRetry={() => syncBrokerData()}
-              onManage={() => openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/connections`)}
-              isSyncing={isSyncRunning}
-            />
-          )}
-
-          <CloudBackupSummary />
-
-          <div className={`grid grid-cols-1 gap-4 ${showBrokerSync ? "md:grid-cols-2" : ""}`}>
-            {showBrokerSync && (
-              <Card className="flex flex-col border">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center justify-between text-base font-medium">
-                    <div className="flex items-center gap-2">
-                      <div className="bg-muted flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
-                        <Icons.Link className="text-muted-foreground h-3.5 w-3.5" />
-                      </div>
-                      {t("connect:page.brokerages")}
-                      {lastSyncTime && (
-                        <span className="text-muted-foreground text-xs font-normal">
-                          ·{" "}
-                          {t("connect:page.timeAgo", {
-                            time: formatDistanceToNow(new Date(lastSyncTime), localizationSettings),
-                          })}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <PortalLink
-                        href={`${WEALTHFOLIO_CONNECT_PORTAL_URL}/connections`}
-                        label={t("connect:connections.manage")}
-                      />
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1 pt-0">
-                  {brokerConnections.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <div className="bg-muted/50 mb-3 rounded-full p-3">
-                        <Icons.Link className="text-muted-foreground h-6 w-6" />
-                      </div>
-                      <p className="text-muted-foreground text-sm">
-                        {t("connect:page.noBrokeragesConnected")}
-                      </p>
-                      <p className="text-muted-foreground mt-1 text-xs">
-                        {t("connect:page.noBrokeragesDescription")}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {brokerConnections.map((connection) => {
-                        const connectionAccounts = brokerAccounts.filter(
-                          (a) => a.brokerage_authorization === connection.id,
-                        );
-                        const syncEnabledCount = connectionAccounts.filter(
-                          (a) => a.sync_enabled,
-                        ).length;
-                        return (
-                          <ConnectionItem
-                            key={connection.id}
-                            connection={connection}
-                            syncEnabledCount={syncEnabledCount}
-                            totalAccountCount={connectionAccounts.length}
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            <Card className="flex flex-col border">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center justify-between text-base font-medium">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-muted flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
-                      <Icons.Smartphone className="text-muted-foreground h-3.5 w-3.5" />
-                    </div>
-                    {t("connect:page.devices")}
-                    <DeviceSyncStatusBadge engineStatus={deviceSyncStatus.engineStatus} />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <PortalLink
-                      href={`${WEALTHFOLIO_CONNECT_PORTAL_URL}/settings/devices`}
-                      label={t("sync:section.manageDevices")}
+        <div className="@container mx-auto max-w-5xl pt-4 sm:pt-6">
+          <div className="@3xl:grid-cols-[minmax(0,1fr)_18rem] grid grid-cols-1 items-start gap-4">
+            <div className="min-w-0 space-y-4">
+              {showBrokerSync ? (
+                <>
+                  {attentionItems.length > 0 && (
+                    <AttentionCard
+                      items={attentionItems}
+                      isSyncing={isSyncRunning}
+                      onRetry={() => syncBrokerData()}
+                      onSetup={(accounts) => {
+                        setPendingNewAccounts(accounts);
+                        setShowNewAccountsModal(true);
+                      }}
                     />
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex-1 pt-0">
-                {!devices || devices.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <div className="bg-muted/50 mb-3 rounded-full p-3">
-                      <Icons.Smartphone className="text-muted-foreground h-6 w-6" />
-                    </div>
-                    <p className="text-muted-foreground text-sm">
-                      {t("connect:page.noDevicesSyncing")}
-                    </p>
-                    <p className="text-muted-foreground mt-1 text-xs">
-                      {t("connect:page.noDevicesDescription")}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {sortDevicesByCurrent(devices).map((device) => (
-                      <DeviceItem key={device.id} device={device} />
-                    ))}
-                  </div>
-                )}
-                {showConnectDeviceAction && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground mt-3 h-auto min-h-11 max-w-full whitespace-normal sm:min-h-9"
-                    asChild
-                  >
-                    <Link to="/settings/connect">
-                      <Icons.Link className="mr-2 h-4 w-4 shrink-0" />
-                      {t("sync:connect.connectThisDevice")}
-                    </Link>
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {showBrokerSync && (
-            <Card className="border">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base font-medium">
-                  <div className="bg-muted flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
-                    <Icons.History className="text-muted-foreground h-3.5 w-3.5" />
-                  </div>
-                  {t("connect:page.recentActivity")}
-                  {recentActivityIssueCount > 0 && (
-                    <Badge variant="default" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
-                      {recentActivityIssueCount}
-                    </Badge>
                   )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                {recentActivity.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <div className="bg-muted/50 mb-3 rounded-full p-3">
-                      <Icons.History className="text-muted-foreground h-6 w-6" />
-                    </div>
-                    <p className="text-muted-foreground text-sm">{t("connect:page.noActivity")}</p>
-                    <p className="text-muted-foreground mt-1 text-xs">
-                      {t("connect:page.noActivityDescription")}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="divide-border -mx-3 divide-y">
-                    {recentActivity.map((run) => (
-                      <SyncHistoryItem
-                        key={run.id}
-                        run={run}
-                        accountName={accountNameMap.get(run.accountId)}
-                        trackingMode={accountTrackingModeMap.get(run.accountId)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {!showBrokerSync && (
-            <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-medium">{t("connect:upgrade.title")}</h3>
-                    <p className="text-muted-foreground mt-0.5 text-xs">
-                      {t("connect:upgrade.description")}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    title={t("connect:opensInBrowser")}
-                    onClick={() =>
-                      openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/settings/billing`)
+                  <BrokeragesCard
+                    rows={brokerageRows}
+                    isLoading={isLoadingConnections || isLoadingBrokerAccounts}
+                    // Rows need both lists: without accounts, every brokerage would read
+                    // "No accounts found". Rows from an earlier load stay on a failed refresh.
+                    isUnavailable={
+                      (hasConnectionsError && brokerConnections.length === 0) ||
+                      (hasBrokerAccountsError && brokerAccounts.length === 0)
                     }
+                    onRetry={() => {
+                      void refetchConnections();
+                      void refetchBrokerAccounts();
+                    }}
+                  />
+                  <SectionCard
+                    icon={
+                      <ClockCounterClockwiseIcon weight="duotone" className={SECTION_ICON_CLASS} />
+                    }
+                    title={t("connect:page.recentActivity")}
                   >
-                    {t("connect:upgrade.button")}
-                    <Icons.ExternalLink className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                    {isLoadingActivity ? (
+                      <ListSkeleton rows={3} withTile={false} />
+                    ) : recentActivity.length === 0 ? (
+                      <EmptySection
+                        icon={
+                          <ClockCounterClockwiseIcon
+                            weight="duotone"
+                            className="text-muted-foreground size-6"
+                          />
+                        }
+                        title={t("connect:page.noActivity")}
+                        description={t("connect:page.noActivityDescription")}
+                      />
+                    ) : (
+                      <div className="divide-border divide-y">
+                        {recentActivity.map((run) => (
+                          <SyncHistoryItem
+                            key={run.id}
+                            run={run}
+                            accountName={accountNameMap.get(run.accountId)}
+                            trackingMode={accountTrackingModeMap.get(run.accountId)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </SectionCard>
+                </>
+              ) : (
+                <>
+                  {devicesCard}
+                  <Card className="border-primary/20 bg-primary/5">
+                    <div className="flex items-center justify-between gap-3 p-4">
+                      <div>
+                        <h3 className="text-sm font-medium">{t("connect:upgrade.title")}</h3>
+                        <p className="text-muted-foreground mt-0.5 text-xs">
+                          {t("connect:upgrade.description")}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        title={t("connect:opensInBrowser")}
+                        onClick={() =>
+                          openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/settings/billing`)
+                        }
+                      >
+                        {t("connect:upgrade.button")}
+                        <Icons.ExternalLink className="ms-1 h-3.5 w-3.5" aria-hidden="true" />
+                      </Button>
+                    </div>
+                  </Card>
+                </>
+              )}
+            </div>
+            <div className="min-w-0 space-y-4">
+              {showBrokerSync && devicesCard}
+              <CloudBackupCompactSummary />
+            </div>
+          </div>
         </div>
       </PageContent>
 
@@ -524,6 +407,507 @@ export default function ConnectPage() {
   );
 }
 
+/** Placeholder rows shaped like the list they stand in for. */
+function ListSkeleton({ rows, withTile = true }: { rows: number; withTile?: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <div role="status">
+      <span className="sr-only">{t("common:loading")}</span>
+      <ul className="divide-y" aria-hidden="true">
+        {Array.from({ length: rows }, (_, index) => (
+          <li key={index} className="flex min-h-14 items-center gap-3 px-4 py-2.5">
+            {withTile && <Skeleton className="size-9 shrink-0 rounded-lg" />}
+            <div className="flex-1 space-y-1.5">
+              <Skeleton className="h-4 w-32 max-w-full" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function SectionCard({
+  icon,
+  title,
+  count,
+  actions,
+  className,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  count?: number;
+  actions?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Card className={cn("overflow-hidden", className)}>
+      <div className="flex min-h-12 items-center justify-between gap-2 border-b px-4 py-1">
+        <h2 className="flex min-w-0 items-center gap-2 text-base font-semibold">
+          {icon}
+          <span className="truncate">{title}</span>
+          {count !== undefined && (
+            <span className="text-muted-foreground text-sm font-normal tabular-nums">{count}</span>
+          )}
+        </h2>
+        {actions}
+      </div>
+      {children}
+    </Card>
+  );
+}
+
+function EmptySection({
+  icon,
+  title,
+  description,
+  action,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center px-4 py-8 text-center">
+      <div className="bg-muted/50 mb-3 rounded-full p-3">{icon}</div>
+      <p className="text-muted-foreground text-sm">{title}</p>
+      <p className="text-muted-foreground mt-1 text-xs">{description}</p>
+      {action}
+    </div>
+  );
+}
+
+function AttentionCard({
+  items,
+  isSyncing,
+  onRetry,
+  onSetup,
+}: {
+  items: AttentionItem[];
+  isSyncing: boolean;
+  onRetry: () => void;
+  onSetup: (accounts: Account[]) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Card className="border-warning/40 overflow-hidden">
+      <h2 className="border-warning/20 bg-warning/10 flex min-h-12 items-center gap-2 border-b px-4 py-1 text-base font-semibold">
+        <WarningIcon weight="duotone" className="text-warning size-5 shrink-0" />
+        {t("connect:attention.heading")}
+        <span className="text-muted-foreground text-sm font-normal tabular-nums">
+          {items.length}
+        </span>
+      </h2>
+      <ul className="divide-y">
+        {items.map((item) => (
+          <AttentionRow
+            key={item.key}
+            item={item}
+            isSyncing={isSyncing}
+            onRetry={onRetry}
+            onSetup={onSetup}
+          />
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+function AttentionRow({
+  item,
+  isSyncing,
+  onRetry,
+  onSetup,
+}: {
+  item: AttentionItem;
+  isSyncing: boolean;
+  onRetry: () => void;
+  onSetup: (accounts: Account[]) => void;
+}) {
+  const { t } = useTranslation();
+  const buttonClass = "pointer-coarse:h-11 shrink-0";
+  const retry = (
+    <Button
+      size="sm"
+      variant="outline"
+      className={buttonClass}
+      onClick={onRetry}
+      disabled={isSyncing}
+    >
+      {t("common:retry")}
+    </Button>
+  );
+
+  let icon: ReactNode;
+  let title: string;
+  let details: (string | undefined)[];
+  let action: ReactNode;
+  switch (item.kind) {
+    case "reconnect":
+      icon = <XCircleIcon weight="duotone" className="text-destructive size-5 shrink-0" />;
+      title = item.name;
+      details = [
+        t("connect:attention.connectionLost"),
+        item.accountCount > 0
+          ? t("connect:attention.accountsNotSyncing", { count: item.accountCount })
+          : undefined,
+      ];
+      action = (
+        <Button
+          size="sm"
+          className={buttonClass}
+          title={t("connect:opensInBrowser")}
+          onClick={() => openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/connections`)}
+        >
+          {t("connect:connections.reconnect")}
+          <Icons.ExternalLink className="size-3.5" aria-hidden="true" />
+        </Button>
+      );
+      break;
+    case "failed":
+      icon = <XCircleIcon weight="duotone" className="text-destructive size-5 shrink-0" />;
+      title = item.name;
+      details = [item.brokerage, item.issueMessage ?? t("connect:attention.syncFailed")];
+      action = retry;
+      break;
+    case "needsReview":
+      icon = <WarningIcon weight="duotone" className="text-warning size-5 shrink-0" />;
+      title = item.name;
+      details = [
+        item.brokerage,
+        item.reviewCount > 0
+          ? t("connect:activity.itemsNeedReview", { count: item.reviewCount })
+          : (item.issueMessage ?? t("connect:status.needsReview")),
+      ];
+      action =
+        item.reviewCount > 0 ? (
+          <Link
+            to={`/activities?account=${item.accountId}&needsReview=true`}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), buttonClass)}
+          >
+            {t("connect:syncHistory.review")}
+          </Link>
+        ) : (
+          retry
+        );
+      break;
+    case "setup":
+      icon = <InfoIcon weight="duotone" className="text-muted-foreground size-5 shrink-0" />;
+      title = t("connect:setup.newAccountsTitle");
+      details = [item.accounts.map((account) => account.name).join(", ")];
+      action = (
+        <Button
+          size="sm"
+          variant="outline"
+          className={buttonClass}
+          onClick={() => onSetup(item.accounts)}
+        >
+          {t("connect:setup.setUp")}
+        </Button>
+      );
+      break;
+  }
+
+  return (
+    <li className="flex items-center gap-3 px-4 py-3">
+      {icon}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{title}</p>
+        <p className="text-muted-foreground line-clamp-2 text-xs">
+          {details.filter(Boolean).join(" · ")}
+        </p>
+      </div>
+      {action}
+    </li>
+  );
+}
+
+function BrokeragesCard({
+  rows,
+  isLoading,
+  isUnavailable,
+  onRetry,
+}: {
+  rows: BrokerageRow[];
+  isLoading: boolean;
+  isUnavailable: boolean;
+  onRetry: () => void;
+}) {
+  const { t } = useTranslation();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const visibleRows = showAll ? rows : rows.slice(0, BROKERAGE_PREVIEW_COUNT);
+  const hiddenCount = rows.length - BROKERAGE_PREVIEW_COUNT;
+  const connectionsUrl = `${WEALTHFOLIO_CONNECT_PORTAL_URL}/connections`;
+
+  return (
+    <SectionCard
+      icon={<BankIcon weight="duotone" className={SECTION_ICON_CLASS} />}
+      title={t("connect:page.brokerages")}
+      count={!isUnavailable && rows.length > 0 ? rows.length : undefined}
+      actions={<PortalLink href={connectionsUrl} label={t("connect:connections.manage")} />}
+    >
+      {isLoading ? (
+        <ListSkeleton rows={2} />
+      ) : isUnavailable ? (
+        // A failed request is not "no brokerages": don't offer to connect one.
+        <EmptySection
+          icon={<BankIcon weight="duotone" className="text-muted-foreground size-6" />}
+          title={t("connect:serviceUnavailable.title")}
+          description={t("connect:serviceUnavailable.description")}
+          action={
+            <Button
+              size="sm"
+              variant="outline"
+              className="pointer-coarse:h-11 mt-4"
+              onClick={onRetry}
+            >
+              {t("connect:serviceUnavailable.tryAgain")}
+            </Button>
+          }
+        />
+      ) : rows.length === 0 ? (
+        <EmptySection
+          icon={<BankIcon weight="duotone" className="text-muted-foreground size-6" />}
+          title={t("connect:page.noBrokeragesConnected")}
+          description={t("connect:page.noBrokeragesDescription")}
+          action={
+            <Button
+              size="sm"
+              variant="outline"
+              className="pointer-coarse:h-11 mt-4"
+              title={t("connect:opensInBrowser")}
+              onClick={() => openUrlInBrowser(connectionsUrl)}
+            >
+              {t("connect:connections.connectBroker")}
+              <Icons.ExternalLink className="size-3.5" aria-hidden="true" />
+            </Button>
+          }
+        />
+      ) : (
+        <>
+          <ul className="divide-y">
+            {visibleRows.map((row) => (
+              <BrokerageItem
+                key={row.connection.id}
+                row={row}
+                expanded={expandedId === row.connection.id}
+                onToggle={() =>
+                  setExpandedId((id) => (id === row.connection.id ? null : row.connection.id))
+                }
+              />
+            ))}
+          </ul>
+          {hiddenCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowAll((value) => !value)}
+              className="text-muted-foreground hover:bg-muted/40 hover:text-foreground flex min-h-11 w-full items-center border-t px-4 text-start text-sm"
+            >
+              {showAll
+                ? t("connect:page.showLess")
+                : t("connect:page.showMore", { count: hiddenCount })}
+            </button>
+          )}
+        </>
+      )}
+    </SectionCard>
+  );
+}
+
+const STATE_TONE: Record<BrokerAccountState | BrokerageState, string> = {
+  reconnect: "text-destructive",
+  failed: "text-destructive",
+  needsReview: "text-warning",
+  needsSetup: "text-warning",
+  syncing: "text-muted-foreground",
+  excluded: "text-muted-foreground",
+  ok: "",
+  inactive: "",
+};
+
+function stateLabel(state: BrokerAccountState | BrokerageState, t: TFunction): string | null {
+  switch (state) {
+    case "reconnect":
+      return t("connect:connections.disconnected");
+    case "failed":
+      return t("connect:status.failed");
+    case "needsReview":
+      return t("connect:status.needsReview");
+    case "needsSetup":
+      return t("connect:accounts.needsSetup");
+    case "syncing":
+      return t("connect:status.syncing");
+    case "excluded":
+      return t("connect:accounts.excludedFromSync");
+    default:
+      return null;
+  }
+}
+
+function getBrokerageSummary(row: BrokerageRow, t: TFunction): string {
+  if (row.accounts.length === 0) return t("connect:connections.noAccountsFound");
+  if (row.syncEnabledCount === 0) return t("connect:connections.allAccountsExcluded");
+  const excludedCount = row.accounts.length - row.syncEnabledCount;
+  const accounts = t("connect:connections.accountCount", { count: row.syncEnabledCount });
+  return excludedCount > 0
+    ? `${accounts} · ${t("connect:connections.excludedCount", { count: excludedCount })}`
+    : accounts;
+}
+
+function BrokerageItem({
+  row,
+  expanded,
+  onToggle,
+}: {
+  row: BrokerageRow;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const { t } = useTranslation();
+  const label = stateLabel(row.state, t);
+  const inactive = row.state === "inactive";
+
+  return (
+    <li>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={onToggle}
+        className="hover:bg-muted/40 flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-start"
+      >
+        <BrokerageLogo
+          brokerage={row.connection.brokerage}
+          name={row.name}
+          className={cn(inactive && "opacity-60")}
+        />
+        <div className="min-w-0 flex-1">
+          <p className={cn("truncate text-sm font-medium", inactive && "text-muted-foreground")}>
+            {row.name}
+          </p>
+          <p className="text-muted-foreground truncate text-xs">{getBrokerageSummary(row, t)}</p>
+        </div>
+        {label && (
+          <span className={cn("shrink-0 text-xs font-medium", STATE_TONE[row.state])}>{label}</span>
+        )}
+        <Icons.ChevronRight
+          className={cn(
+            "text-muted-foreground size-4 shrink-0 transition-transform",
+            expanded ? "rotate-90" : "rtl:rotate-180",
+          )}
+          aria-hidden="true"
+        />
+      </button>
+      {expanded && (
+        <ul className="bg-muted/30 border-t py-1 pe-4 ps-16">
+          {row.accounts.length === 0 ? (
+            <li className="text-muted-foreground py-2 text-xs">
+              {t("connect:connections.noAccountsFound")}
+            </li>
+          ) : (
+            row.accounts.map(({ account, localAccount, state }) => {
+              const name =
+                localAccount?.name ?? account.name ?? t("connect:accounts.accountFallback");
+              return (
+                <li
+                  key={account.id ?? name}
+                  className="flex items-center justify-between gap-3 py-2 text-xs"
+                >
+                  {localAccount ? (
+                    <Link to={`/accounts/${localAccount.id}`} className="truncate hover:underline">
+                      {name}
+                    </Link>
+                  ) : (
+                    <span className="text-muted-foreground truncate">{name}</span>
+                  )}
+                  <span className={cn("shrink-0", STATE_TONE[state])}>{stateLabel(state, t)}</span>
+                </li>
+              );
+            })
+          )}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+type EngineStatus = ReturnType<typeof useSyncStatus>["engineStatus"];
+
+function DevicesCard({
+  devices,
+  isLoading,
+  engineStatus,
+  showConnectDeviceAction,
+}: {
+  devices: Device[];
+  isLoading: boolean;
+  engineStatus: EngineStatus;
+  showConnectDeviceAction: boolean;
+}) {
+  const { t } = useTranslation();
+  const [showInactive, setShowInactive] = useState(false);
+  const sorted = sortDevicesByCurrent(devices);
+  const active = sorted.filter((device) => !isDeviceInactive(device));
+  const inactive = sorted.filter(isDeviceInactive);
+  const footerClass =
+    "text-muted-foreground hover:bg-muted/40 hover:text-foreground flex min-h-11 w-full items-center gap-2 border-t px-4 text-start text-sm";
+
+  return (
+    <SectionCard
+      icon={<DevicesIcon weight="duotone" className={SECTION_ICON_CLASS} />}
+      title={t("connect:page.devices")}
+      count={sorted.length > 0 ? sorted.length : undefined}
+      actions={
+        <PortalLink
+          href={`${WEALTHFOLIO_CONNECT_PORTAL_URL}/settings/devices`}
+          label={t("connect:page.manage")}
+        />
+      }
+    >
+      {isLoading ? (
+        <ListSkeleton rows={2} />
+      ) : sorted.length === 0 ? (
+        <EmptySection
+          icon={<DevicesIcon weight="duotone" className="text-muted-foreground size-6" />}
+          title={t("connect:page.noDevicesSyncing")}
+          description={t("connect:page.noDevicesDescription")}
+        />
+      ) : (
+        <ul className="divide-y">
+          {[...active, ...(showInactive ? inactive : [])].map((device) => (
+            <DeviceItem
+              key={device.id}
+              device={device}
+              engineStatus={device.isCurrent ? engineStatus : null}
+            />
+          ))}
+        </ul>
+      )}
+      {inactive.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowInactive((value) => !value)}
+          className={footerClass}
+        >
+          {showInactive
+            ? t("connect:devices.hideInactive")
+            : t("connect:devices.showInactive", { count: inactive.length })}
+        </button>
+      )}
+      {showConnectDeviceAction && (
+        <Link to="/settings/connect" className={cn(footerClass, "text-foreground font-medium")}>
+          <Icons.Plus className="size-4 shrink-0" aria-hidden="true" />
+          {t("sync:connect.connectThisDevice")}
+        </Link>
+      )}
+    </SectionCard>
+  );
+}
+
 function sortDevicesByCurrent(devices: Device[]): Device[] {
   return [...devices].sort((a, b) => {
     if (a.isCurrent && !b.isCurrent) return -1;
@@ -534,283 +918,85 @@ function sortDevicesByCurrent(devices: Device[]): Device[] {
   });
 }
 
-function ConnectionItem({
-  connection,
-  syncEnabledCount,
-  totalAccountCount,
-}: {
-  connection: BrokerConnection;
-  syncEnabledCount: number;
-  totalAccountCount: number;
-}) {
-  const { t } = useTranslation();
-  const name =
-    connection.brokerage?.display_name ||
-    connection.brokerage?.name ||
-    connection.name ||
-    t("connect:connections.unknown");
-  const logoUrl =
-    connection.brokerage?.aws_s3_square_logo_url ?? connection.brokerage?.aws_s3_logo_url;
-  const isConnected = connection.status === "connected" && !connection.disabled;
-  const syncSummary = getConnectionSyncSummary(syncEnabledCount, totalAccountCount, t);
-
-  return (
-    <div className="bg-muted/30 flex items-center gap-3 rounded-lg border p-3">
-      <Avatar className="h-9 w-9 shrink-0 rounded-lg">
-        <AvatarImage src={logoUrl} alt={name} className="bg-white object-contain p-1" />
-        <AvatarFallback className="rounded-lg text-sm font-semibold">
-          {name.charAt(0)}
-        </AvatarFallback>
-      </Avatar>
-      <div className="min-w-0 flex-1">
-        <span className="truncate text-sm font-medium">{name}</span>
-        <p className="text-muted-foreground text-xs">{syncSummary}</p>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <Badge
-          className={`shrink-0 ${
-            isConnected
-              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-              : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-          }`}
-        >
-          {isConnected ? t("connect:connections.connected") : t("connect:connections.disconnected")}
-        </Badge>
-        {!isConnected && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/connections`)}
-          >
-            {t("connect:connections.reconnect")}
-          </Button>
-        )}
-      </div>
-    </div>
-  );
+function isDeviceInactive(device: Device): boolean {
+  if (device.isCurrent) return false;
+  if (!device.lastSeenAt) return true;
+  return Date.now() - new Date(device.lastSeenAt).getTime() > INACTIVE_DEVICE_DAYS * 86_400_000;
 }
 
-function getConnectionSyncSummary(
-  syncEnabledCount: number,
-  totalAccountCount: number,
-  t: TFunction,
-): string {
-  if (totalAccountCount === 0) {
-    return t("connect:connections.noAccountsFound");
-  }
-
-  if (syncEnabledCount === 0) {
-    return t("connect:connections.allAccountsExcluded");
-  }
-
-  if (syncEnabledCount === totalAccountCount) {
-    return t("connect:connections.accountsSyncing", { count: totalAccountCount });
-  }
-
-  const excludedCount = totalAccountCount - syncEnabledCount;
-  return t("connect:connections.partialSyncing", {
-    syncing: syncEnabledCount,
-    total: totalAccountCount,
-    excluded: excludedCount,
-    count: excludedCount,
-  });
-}
-
-function DeviceSyncStatusBadge({
-  engineStatus,
-}: {
-  engineStatus: {
-    backgroundRunning: boolean;
-    lastCycleStatus: string | null;
-    lastError: string | null;
-    consecutiveFailures: number;
-  } | null;
-}) {
-  const { t } = useTranslation();
+/** This device's sync engine health, as a dot color and a label. */
+function getEngineStatus(engineStatus: EngineStatus, t: TFunction) {
   if (!engineStatus) return null;
-
   const { backgroundRunning, lastCycleStatus, lastError, consecutiveFailures } = engineStatus;
-
-  let color: string;
-  let label: string;
-
-  if (lastError || consecutiveFailures > 2) {
-    color = "bg-red-500";
-    label = t("connect:deviceStatus.syncError");
-  } else if (!backgroundRunning) {
-    color = "bg-gray-400";
-    label = t("connect:deviceStatus.syncPaused");
-  } else if (lastCycleStatus === "ok") {
-    color = "bg-green-500";
-    label = t("connect:deviceStatus.upToDate");
-  } else {
-    color = "bg-yellow-500";
-    label = t("connect:deviceStatus.syncing");
-  }
-
-  return (
-    <TooltipProvider delayDuration={300}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="flex items-center gap-1.5">
-            <span className={`inline-block h-2 w-2 rounded-full ${color}`} />
-            <span className="text-muted-foreground text-xs">{label}</span>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="left" className="max-w-64 text-xs">
-          {label}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
+  if (lastError || consecutiveFailures > 2)
+    return { dot: "bg-destructive", label: t("connect:deviceStatus.syncError") };
+  if (!backgroundRunning)
+    return { dot: "bg-muted-foreground", label: t("connect:deviceStatus.syncPaused") };
+  if (lastCycleStatus === "ok")
+    return { dot: "bg-success", label: t("connect:deviceStatus.upToDate") };
+  return { dot: "bg-warning", label: t("connect:deviceStatus.syncing") };
 }
 
-const platformIcons: Record<string, typeof Icons.Monitor> = {
-  macos: Icons.Monitor,
-  mac: Icons.Monitor,
-  windows: Icons.Monitor,
-  linux: Icons.Monitor,
-  ios: Icons.Smartphone,
-  android: Icons.Smartphone,
-  server: Icons.Cloud,
-  web: Icons.Cloud,
+// Product names stay untranslated; only generic kinds go through i18n.
+const PLATFORM_NAMES: Partial<Record<string, string>> = {
+  ios: "iOS",
+  android: "Android",
+  mac: "macOS",
+  macos: "macOS",
+  windows: "Windows",
+  linux: "Linux",
 };
 
-function DeviceItem({ device }: { device: Device }) {
+/** Same tile as the brokerage logos, so both lists line up. */
+function DevicePlatformIcon({ platform }: { platform: string }) {
+  const Icon =
+    platform === "ios" || platform === "android"
+      ? DeviceMobileIcon
+      : platform === "server"
+        ? HardDrivesIcon
+        : platform === "web"
+          ? GlobeIcon
+          : DesktopIcon;
+  return (
+    <span className="bg-muted flex size-9 shrink-0 items-center justify-center rounded-lg">
+      <Icon weight="duotone" className="text-muted-foreground size-5" aria-hidden="true" />
+    </span>
+  );
+}
+
+function DeviceItem({ device, engineStatus }: { device: Device; engineStatus: EngineStatus }) {
   const { t } = useTranslation();
-  const platform = device.platform?.toLowerCase() || "unknown";
-  const Icon = platformIcons[platform] || Icons.Monitor;
-  const isOnline = isDeviceOnline(device);
-  const lastSeenText = formatDeviceLastSeen(device, t);
+  const localizationSettings = useLocalizationSettings();
+  const platform = device.platform?.toLowerCase() ?? "";
+  const platformName =
+    PLATFORM_NAMES[platform] ??
+    (platform === "server" || platform === "web"
+      ? t(`connect:devices.platforms.${platform}`)
+      : undefined);
+  const online =
+    device.isCurrent ||
+    (!!device.lastSeenAt && Date.now() - new Date(device.lastSeenAt).getTime() < 5 * 60_000);
+  const engine = device.isCurrent ? getEngineStatus(engineStatus, t) : null;
+  const lastSeen = device.lastSeenAt
+    ? formatDistanceToNow(new Date(device.lastSeenAt), localizationSettings, { addSuffix: true })
+    : t("connect:devices.never");
+  // Status sits under the name so long device names keep the full row width.
+  const details = device.isCurrent
+    ? [t("connect:devices.thisDevice"), engine?.label]
+    : [platformName, online ? t("connect:devices.online") : lastSeen];
+  const dot = engine?.dot ?? (online ? "bg-success" : null);
 
   return (
-    <div className="bg-muted/30 flex items-center gap-3 rounded-lg border p-3">
-      <Avatar className="h-9 w-9 shrink-0 rounded-lg">
-        <AvatarFallback className="rounded-lg">
-          <Icon className="text-muted-foreground h-4 w-4" />
-        </AvatarFallback>
-      </Avatar>
+    <li className="flex min-h-14 items-center gap-3 px-4 py-2.5">
+      <DevicePlatformIcon platform={platform} />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium">{device.displayName}</span>
-          {device.isCurrent && (
-            <Badge variant="outline" className="h-5 shrink-0 text-[10px]">
-              {t("connect:devices.thisDevice")}
-            </Badge>
-          )}
-        </div>
-        <p className="text-muted-foreground text-xs">
-          {isOnline
-            ? t("connect:devices.activeNow")
-            : t("connect:devices.lastSeen", { time: lastSeenText })}
+        <p className="truncate text-sm font-medium">{device.displayName}</p>
+        <p className="text-muted-foreground truncate text-xs">
+          {details.filter(Boolean).join(" · ")}
         </p>
       </div>
-      {isOnline ? (
-        <Badge className="shrink-0 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-          {t("connect:devices.online")}
-        </Badge>
-      ) : (
-        <span className="text-muted-foreground shrink-0 text-xs">{lastSeenText}</span>
-      )}
-    </div>
-  );
-}
-
-function isDeviceOnline(device: Device): boolean {
-  if (device.isCurrent) return true;
-  if (!device.lastSeenAt) return false;
-  const diffMins = Math.floor((Date.now() - new Date(device.lastSeenAt).getTime()) / 60000);
-  return diffMins < 5;
-}
-
-function formatDeviceLastSeen(device: Device, t: TFunction): string {
-  if (device.isCurrent) return t("connect:devices.online");
-  if (!device.lastSeenAt) return t("connect:devices.never");
-  const diffMins = Math.floor((Date.now() - new Date(device.lastSeenAt).getTime()) / 60000);
-  if (diffMins < 5) return t("connect:devices.online");
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
-}
-
-function BrokerSyncAttentionSection({
-  issues,
-  accounts,
-  onRetry,
-  onManage,
-  isSyncing,
-}: {
-  issues: BrokerSyncState[];
-  accounts: Account[];
-  onRetry: () => void;
-  onManage: () => void;
-  isSyncing: boolean;
-}) {
-  const { t } = useTranslation();
-  const accountById = useMemo(
-    () => new Map(accounts.map((account) => [account.id, account])),
-    [accounts],
-  );
-
-  return (
-    <Alert variant="warning" className="mb-4">
-      <Icons.AlertTriangle className="h-4 w-4" />
-      <div className="flex flex-1 flex-col gap-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="font-medium">{t("connect:attention.title")}</p>
-            <p className="text-muted-foreground text-sm">
-              {t("connect:attention.description", { count: issues.length })}
-            </p>
-          </div>
-          <div className="flex shrink-0 gap-2">
-            <Button size="sm" variant="outline" onClick={onRetry} disabled={isSyncing}>
-              {isSyncing ? (
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Icons.RefreshCw className="mr-2 h-4 w-4" />
-              )}
-              {t("common:retry")}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={onManage}
-              title={t("connect:opensInBrowser")}
-            >
-              <Icons.ExternalLink className="mr-2 h-4 w-4" />
-              {t("connect:page.manage")}
-            </Button>
-          </div>
-        </div>
-        <div className="space-y-2">
-          {issues.map((issue) => {
-            const account = accountById.get(issue.accountId);
-            const accountName = account?.name || issue.accountId;
-            const broker = account?.provider || issue.provider;
-            const message = getBrokerSyncIssueMessage(issue.syncStatus, issue.lastError);
-
-            return (
-              <div key={`${issue.provider}:${issue.accountId}`} className="rounded-md border p-3">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span className="font-medium">{accountName}</span>
-                  <Badge variant={issue.syncStatus === "FAILED" ? "destructive" : "outline"}>
-                    {issue.syncStatus === "FAILED"
-                      ? t("connect:status.failed")
-                      : t("connect:status.needsReview")}
-                  </Badge>
-                  <span className="text-muted-foreground text-xs">{broker}</span>
-                </div>
-                <p className="text-muted-foreground mt-1 text-sm">{message}</p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </Alert>
+      {dot && <span className={cn("size-2 shrink-0 rounded-full", dot)} aria-hidden="true" />}
+    </li>
   );
 }
 
@@ -874,29 +1060,36 @@ function SyncHistoryItem({
 
   return (
     <div
-      className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-3 sm:flex-nowrap sm:gap-4 ${
-        needsAttention ? "bg-yellow-500/10 dark:bg-yellow-500/5" : "hover:bg-muted/30"
-      }`}
+      className={cn(
+        "flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 sm:flex-nowrap sm:gap-4",
+        isFailed ? "bg-destructive/5" : needsAttention ? "bg-warning/10" : "hover:bg-muted/30",
+      )}
     >
       <span
-        className={`inline-block h-2 w-2 shrink-0 rounded-full ${
-          needsAttention || isFailed ? "bg-yellow-500" : "bg-green-500"
-        }`}
+        className={cn(
+          "inline-block h-2 w-2 shrink-0 rounded-full",
+          isFailed ? "bg-destructive" : needsAttention ? "bg-warning" : "bg-success",
+        )}
       />
-      <span className="text-muted-foreground shrink-0 whitespace-nowrap text-xs sm:min-w-[80px] sm:text-sm">
+      <span className="text-muted-foreground shrink-0 whitespace-nowrap text-xs sm:min-w-20 sm:text-sm">
         {t("connect:page.timeAgo", { time: timeAgo })}
       </span>
       {accountName && (
-        <span className="hidden shrink-0 truncate text-sm font-medium sm:inline sm:min-w-[100px]">
+        <span className="sm:min-w-25 hidden shrink-0 truncate text-sm font-medium sm:inline">
           {accountName}
         </span>
       )}
       <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:w-auto sm:flex-1 sm:text-sm">
         {accountName && <span className="font-medium sm:hidden">{accountName}</span>}
-        <span className={needsAttention ? "font-medium text-amber-600 dark:text-amber-400" : ""}>
+        <span
+          className={cn(
+            isFailed && "text-destructive font-medium",
+            needsAttention && !isFailed && "text-warning font-medium",
+          )}
+        >
           {description}
         </span>
-        {isRunning && <Icons.Spinner className="h-3 w-3 animate-spin" />}
+        {isRunning && <Spinner className="h-3 w-3" />}
       </div>
       {canReviewActivities && (
         <Link

@@ -9,6 +9,7 @@ import { createContext, ReactNode, useContext, useEffect, useState } from "react
 import { getPlatform } from "@/hooks/use-platform";
 import { useSettings } from "@/hooks/use-settings";
 import { useSettingsMutation } from "@/hooks/use-settings-mutation";
+import { setLanguageDirection, useDocumentDirection } from "@/i18n/direction";
 import i18n, { LANGUAGE_STORAGE_KEY } from "@/i18n/i18n";
 import { DEFAULT_LOCALE } from "@/i18n/locales";
 import { Settings, SettingsContextType } from "@/lib/types";
@@ -23,6 +24,7 @@ interface ExtendedSettingsContextType extends SettingsContextType {
         | "font"
         | "language"
         | "formattingRegion"
+        | "currencyFormattingRegions"
         | "baseCurrency"
         | "defaultReturnMetric"
         | "timezone"
@@ -64,6 +66,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         | "font"
         | "language"
         | "formattingRegion"
+        | "currencyFormattingRegions"
         | "baseCurrency"
         | "defaultReturnMetric"
         | "timezone"
@@ -131,14 +134,24 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const uiLocale = settings ? settings.language : DEFAULT_LOCALE;
   const resolvedFormattingLocale = resolveFormattingLocale(formattingRegion);
   const formattingTimezone = settings?.timezone || undefined;
+  const currencyFormattingRegions = settings?.currencyFormattingRegions;
+  const direction = useDocumentDirection();
 
   useEffect(() => {
     setAddonLocalizationSnapshot({
       locale: resolvedFormattingLocale,
       uiLocale,
+      direction,
       timezone: formattingTimezone,
+      currencyFormattingRegions,
     });
-  }, [resolvedFormattingLocale, uiLocale, formattingTimezone]);
+  }, [
+    resolvedFormattingLocale,
+    uiLocale,
+    direction,
+    formattingTimezone,
+    currencyFormattingRegions,
+  ]);
 
   if (settings && !formattingRegion) {
     throw new Error("Loaded settings are missing the required formatting region");
@@ -177,6 +190,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         locale={formattingRegion}
         uiLocale={uiLocale}
         timezone={formattingTimezone}
+        currencyFormattingRegions={settings?.currencyFormattingRegions}
       >
         {children}
       </FormattingProvider>
@@ -246,7 +260,7 @@ const applySettingsToDocument = async (newSettings: Settings) => {
   }
   if (application !== appearanceGeneration) return;
   document.documentElement.setAttribute("lang", language);
-  document.documentElement.setAttribute("dir", i18n.dir(language));
+  setLanguageDirection(language);
 
   // Font classes
   document.body.classList.remove("font-mono", "font-sans", "font-serif");

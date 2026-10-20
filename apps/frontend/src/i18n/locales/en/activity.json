@@ -243,6 +243,7 @@
   "table_price_amount": "Price/Amount",
   "table_fee": "Fee",
   "table_total": "Total",
+  "table_balance": "Balance",
   "table_account": "Account",
   "table_currency": "Currency",
   "table_comment": "Comment",
@@ -303,6 +304,7 @@
     "import_from_csv": "Import from CSV",
     "transfer_holdings": "Transfer Holdings",
     "add_personal_asset": "Add Personal Asset",
+    "connect_account": "Connect Account",
     "add_activities": "Add Activities",
     "ask_ai_categorize": "Ask AI to categorize",
     "investments": "Investments",
@@ -605,6 +607,7 @@
     "err_select_source_account": "Please select a source account.",
     "err_select_destination_account": "Please select a destination account.",
     "err_accounts_different": "Source and destination accounts must be different.",
+    "err_same_account_currencies": "Choose different currencies for a same-account transfer.",
     "err_currency_required": "Currency is required.",
     "err_select_date": "Please select a date.",
     "err_enter_amount": "Please enter an amount.",
@@ -702,6 +705,7 @@
     "duplicated_comment": "Duplicated",
     "edit_transfer_pair": "Use Edit to change both accounts and currencies in the transfer form. Save pending changes first.",
     "save_edits_first": "Save edits first",
+    "duplicate_transfer_failed": "Could not duplicate the transfer pair. Refresh and try again.",
     "save_before_link": "Save or discard pending edits before linking this transfer.",
     "save_before_unlink": "Save or discard pending edits before unlinking this transfer.",
     "link_reason_save_new": "Save new activities before linking",
@@ -770,7 +774,10 @@
     "clear_filters": "Clear filters",
     "ratio": "Ratio",
     "premium": "Premium",
-    "total_value": "Total Value"
+    "total_value": "Total Value",
+    "day_count_one": "{{count}} activity",
+    "day_count_other": "{{count}} activities",
+    "day_end_cash": "Cash"
   },
   "mobile_type_category": {
     "trade": "Trade",
@@ -1130,7 +1137,8 @@
       "total": "Total",
       "importAnother": "Import Another",
       "viewHoldings": "View Holdings",
-      "viewActivities": "View Activities"
+      "viewActivities": "View Activities",
+      "syncAutomatically": "Want this to sync automatically?"
     },
     "assets": {
       "noAssetsTitle": "No assets require review",

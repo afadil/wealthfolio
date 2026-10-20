@@ -507,7 +507,7 @@ pub async fn get_net_worth(
 
 /// Gets net worth history over a date range.
 #[tauri::command]
-pub fn get_net_worth_history(
+pub async fn get_net_worth_history(
     start_date: String,
     end_date: String,
     state: ProfileAccess,
@@ -521,6 +521,7 @@ pub fn get_net_worth_history(
     let history = context
         .net_worth_service()
         .get_net_worth_history(start, end)
+        .await
         .map_err(|e| format!("Failed to get net worth history: {}", e))?;
 
     let response: Vec<NetWorthHistoryPoint> = history

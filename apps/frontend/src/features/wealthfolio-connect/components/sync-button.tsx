@@ -1,5 +1,5 @@
 import { formatDistanceToNow } from "@/lib/utils";
-import { useLocalizationSettings } from "@wealthfolio/ui";
+import { useLocalizationSettings, Spinner } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
@@ -23,10 +23,10 @@ const statusColors: Record<AggregatedSyncStatus, string> = {
   restoring: "text-muted-foreground",
   unavailable: "text-warning",
   subscription_required: "text-warning",
-  idle: "text-green-500",
-  running: "text-blue-500",
-  needs_review: "text-yellow-500",
-  failed: "text-red-500",
+  idle: "text-success",
+  running: "text-info",
+  needs_review: "text-warning",
+  failed: "text-destructive",
 };
 
 /**
@@ -49,35 +49,53 @@ export function SyncButton({ className, showLabel = false, size = "icon" }: Sync
   const isRunning = status === "running" || isSyncing;
   const colorClass = statusColors[status];
 
+  // Without a completed sync time (e.g. every latest attempt failed), name the
+  // current state rather than claiming it never synced.
   const tooltipContent = lastSyncTime
     ? t("connect:status.lastSynced", {
         time: formatDistanceToNow(new Date(lastSyncTime), localizationSettings, {
           addSuffix: true,
         }),
       })
-    : t("connect:status.neverSynced");
+    : isRunning
+      ? t("connect:status.syncingEllipsis")
+      : status === "failed"
+        ? t("connect:status.failed")
+        : status === "needs_review"
+          ? t("connect:status.needsReview")
+          : t("connect:status.neverSynced");
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          size={size}
-          onClick={() => syncBrokerData()}
-          disabled={isRunning}
-          className={className}
-        >
-          {isRunning ? (
-            <Icons.Spinner className="h-4 w-4 animate-spin" />
-          ) : (
-            <Icons.RefreshCw className={`h-4 w-4 ${colorClass}`} />
-          )}
-          {showLabel && (
-            <span className="ml-2">
-              {isRunning ? t("connect:sync.syncingShort") : t("connect:sync.sync")}
-            </span>
-          )}
-        </Button>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size={size}
+            onClick={() => syncBrokerData()}
+            disabled={isRunning}
+            className={className}
+            // Without its visible label the button is an icon; name it for screen readers.
+            aria-label={
+              showLabel
+                ? undefined
+                : isRunning
+                  ? t("connect:sync.syncingShort")
+                  : t("connect:sync.sync")
+            }
+          />
+        }
+      >
+        {isRunning ? (
+          <Spinner className="h-4 w-4" />
+        ) : (
+          <Icons.RefreshCw className={`h-4 w-4 ${colorClass}`} />
+        )}
+        {showLabel && (
+          <span className="ms-2">
+            {isRunning ? t("connect:sync.syncingShort") : t("connect:sync.sync")}
+          </span>
+        )}
       </TooltipTrigger>
       <TooltipContent>
         <p>{isRunning ? t("connect:sync.syncingShort") : tooltipContent}</p>

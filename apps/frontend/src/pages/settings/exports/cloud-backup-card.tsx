@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { ShieldCheckIcon } from "@phosphor-icons/react/dist/csr/ShieldCheck";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { useDateFormatting } from "@wealthfolio/ui";
+import { useDateFormatting, useLocalizationSettings, buttonVariants } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/card";
@@ -10,6 +13,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { PasswordInput } from "@wealthfolio/ui/components/ui/password-input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +32,7 @@ import {
   type CloudBackupStatus,
   type BackupImportPreview,
 } from "@/adapters";
+import { formatDistanceToNow } from "@/lib/utils";
 import { BackupImportDialog } from "./backup-import-dialog";
 import type { BackupFailure } from "./backup-error";
 import {
@@ -35,6 +40,7 @@ import {
   BackupCardHeader,
   BackupDeleteDialog,
   BackupEmpty,
+  BackupFileTile,
   BackupList,
   BackupRow,
   BackupActions,
@@ -45,18 +51,40 @@ import {
 } from "./backup-ui";
 import { formatBackupSize } from "./backup-size";
 import { backupDate, backupState, useCloudBackups } from "./use-cloud-backups";
+import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 
 type Flow = "setup" | "resume" | "unlock" | "replace" | "pause" | "help";
 /** The one operation in progress: `restore:<id>` and `download:<id>` name their row. */
-type Pending = "capture" | "flow" | "delete" | `restore:${string}` | `download:${string}`;
+type Pending =
+  | "capture"
+  | "manual"
+  | "flow"
+  | "delete"
+  | `restore:${string}`
+  | `download:${string}`;
+
+/** An extra backup now, offered while automatic backups run here and have run at least once. */
+function canBackUpNow(data: CloudBackupStatus) {
+  const state = backupState(data);
+  return (
+    data.policy.uploadEntitled &&
+    data.policy.enabled &&
+    data.isSource &&
+    data.sourceConsented !== false &&
+    data.keyReady &&
+    !!data.policy.lastBackupAt &&
+    state !== "failed" &&
+    state !== "running"
+  );
+}
 
 function ProtectionStatus({ data }: { data: CloudBackupStatus }) {
   const { t } = useTranslation();
   const state = backupState(data);
   return (
     <Badge
-      variant="outline"
-      className={`shrink-0 gap-1.5 border-0 px-2 py-0.5 text-[11px] font-medium ${state === "on" ? "bg-success/10 text-success" : "bg-muted/60 text-muted-foreground"}`}
+      variant={state === "on" ? "success-subtle" : "outline"}
+      className={`text-2xs shrink-0 gap-1.5 border-0 px-2 py-0.5 font-medium ${state === "on" ? "" : "bg-muted/60 text-muted-foreground"}`}
     >
       <span
         aria-hidden
@@ -67,13 +95,8 @@ function ProtectionStatus({ data }: { data: CloudBackupStatus }) {
   );
 }
 
-/** Last and next backup as one line; "not scheduled" is left to the status badge. */
-function BackupTimes({ data }: { data: CloudBackupStatus }) {
-  const { t } = useTranslation();
-  const formatting = useDateFormatting();
-  const format = (date: Date) =>
-    formatting.formatDateTime(date, { dateStyle: "medium", timeStyle: "short" });
-  const last = backupDate(data.policy.lastBackupAt);
+/** The next scheduled backup, or the retry after a failure; null when nothing is scheduled. */
+function nextBackup(data: CloudBackupStatus) {
   const failed = data.capture?.state === "failed";
   const due = backupDate(failed ? (data.capture?.retryAt ?? null) : data.policy.nextDueAt);
   const scheduled =
@@ -81,33 +104,36 @@ function BackupTimes({ data }: { data: CloudBackupStatus }) {
     data.policy.enabled &&
     !(data.isSource && data.sourceConsented === false) &&
     backupState(data) !== "running";
+  if (!scheduled || !due) return null;
+  return {
+    date: due,
+    labelKey: failed ? "settings:cloud_backup_retry_label" : "settings:cloud_backup_next_label",
+  } as const;
+}
+
+/** Last and next backup as one line; "not scheduled" is left to the status badge. */
+function BackupTimes({ data }: { data: CloudBackupStatus }) {
+  const { t } = useTranslation();
+  const formatting = useDateFormatting();
+  const format = (date: Date) =>
+    formatting.formatDateTime(date, { dateStyle: "medium", timeStyle: "short" });
+  const last = backupDate(data.policy.lastBackupAt);
+  const next = nextBackup(data);
   const items = [
     {
       label: t("settings:cloud_backup_last_label"),
       value: last ? format(last) : t("settings:cloud_backup_none"),
     },
-    ...(scheduled && due
-      ? [
-          {
-            label: t(
-              failed ? "settings:cloud_backup_retry_label" : "settings:cloud_backup_next_label",
-            ),
-            value: format(due),
-          },
-        ]
-      : []),
+    ...(next ? [{ label: t(next.labelKey), value: format(next.date) }] : []),
   ];
   return <InlineFacts items={items} />;
 }
 
 /** Shown only when it explains more than the badge, dates and action already say. */
-function BackupHint({ data, summary = false }: { data: CloudBackupStatus; summary?: boolean }) {
+function BackupHint({ data }: { data: CloudBackupStatus }) {
   const { t } = useTranslation();
   const state = backupState(data);
-  const shown = summary
-    ? state !== "on" && state !== "paused"
-    : ["failed", "other", "waiting", "due", "running"].includes(state);
-  if (!shown) return null;
+  if (!["failed", "other", "waiting", "due", "running"].includes(state)) return null;
   return (
     <p className="text-muted-foreground text-sm leading-relaxed">
       {t(`settings:cloud_backup_hint_${state}`)}
@@ -121,17 +147,14 @@ function RecoveryDeadline({ data }: { data: CloudBackupStatus }) {
   const deadline = backupDate(data.policy.readGraceExpiresAt ?? null);
   if (data.policy.uploadEntitled || !data.history.length || !deadline) return null;
   return (
-    <p
-      role="status"
-      className="border-warning/30 bg-warning/10 flex gap-3 rounded-lg border p-3 text-sm leading-relaxed"
-    >
-      <Icons.AlertTriangle className="text-warning mt-0.5 size-4 shrink-0" aria-hidden />
-      <span>
+    <Alert variant="warning" role="status" className="p-3">
+      <Icons.AlertTriangle aria-hidden />
+      <AlertDescription className="leading-relaxed">
         {t("settings:cloud_backup_recovery_deadline", {
           date: formatting.formatDateTime(deadline, { dateStyle: "medium", timeStyle: "short" }),
         })}
-      </span>
-    </p>
+      </AlertDescription>
+    </Alert>
   );
 }
 
@@ -139,7 +162,7 @@ function CloudBackupPromotion() {
   const { t } = useTranslation();
   return (
     <Card className="@container border-connect-brand/15 from-connect-brand/5 via-card to-card overflow-hidden rounded-xl bg-gradient-to-br shadow-none">
-      <CardContent className="@min-[640px]:grid-cols-[auto_minmax(0,1fr)_auto] @min-[640px]:gap-x-4 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 px-4 py-3">
+      <CardContent className="@min-[40rem]:grid-cols-[auto_minmax(0,1fr)_auto] @min-[40rem]:gap-x-4 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 px-4 py-3">
         <div className="bg-connect-brand/10 text-connect-brand row-start-1 flex size-8 shrink-0 items-center justify-center rounded-lg">
           <Icons.ShieldCheck className="size-4" aria-hidden />
         </div>
@@ -153,94 +176,213 @@ function CloudBackupPromotion() {
         </div>
         <Link
           to="/settings/connect"
-          className="text-connect-brand hover:text-foreground focus-visible:ring-ring @min-[640px]:col-start-3 @min-[640px]:row-start-1 col-start-2 inline-flex min-h-11 w-fit items-center gap-1.5 rounded-md text-xs font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+          className="text-connect-brand hover:text-foreground focus-visible:ring-ring @min-[40rem]:col-start-3 @min-[40rem]:row-start-1 col-start-2 inline-flex min-h-11 w-fit items-center gap-1.5 rounded-md text-xs font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
         >
           {t("settings:cloud_backup_promotion_action")}
-          <Icons.ArrowRight className="size-3.5 shrink-0" aria-hidden />
+          <Icons.ArrowRight className="size-3.5 shrink-0 rtl:rotate-180" aria-hidden />
         </Link>
       </CardContent>
     </Card>
   );
 }
 
-/** Read-only Connect overview; the backup settings own consent and recovery. */
+/** State, last and next backup as short phrases, plus the status dot color. */
+function describeBackupStatus(
+  data: CloudBackupStatus,
+  t: TFunction,
+  localization: ReturnType<typeof useLocalizationSettings>,
+) {
+  const state = backupState(data);
+  const relative = (date: Date) => formatDistanceToNow(date, localization, { addSuffix: true });
+  const last = backupDate(data.policy.lastBackupAt);
+  // An overdue backup or retry has no upcoming time; "Next backup 2 hours ago" reads wrong.
+  const next = nextBackup(data);
+  const upcoming = next && next.date.getTime() > Date.now() ? next : null;
+  return {
+    isOn: state === "on",
+    state: t(`settings:cloud_backup_state_${state}`),
+    last: last ? `${t("settings:cloud_backup_last_label")} ${relative(last)}` : null,
+    next: upcoming ? `${t(upcoming.labelKey)} ${relative(upcoming.date)}` : null,
+    dot:
+      state === "on" ? "bg-success" : state === "failed" ? "bg-destructive" : "bg-muted-foreground",
+  };
+}
+
+function BackupStatusLine({ dot, parts }: { dot: string; parts: (string | null)[] }) {
+  return (
+    <p className="text-muted-foreground flex items-start gap-1.5 text-xs">
+      <span className={`mt-[0.3125rem] size-1.5 shrink-0 rounded-full ${dot}`} aria-hidden />
+      <span>
+        {parts.filter(Boolean).map((part, index) => (
+          <Fragment key={index}>
+            {index > 0 && <span aria-hidden> · </span>}
+            <span>{part}</span>
+          </Fragment>
+        ))}
+      </span>
+    </p>
+  );
+}
+
+function sortNewestFirst(history: CloudBackupStatus["history"]) {
+  return [...history].sort(
+    (a, b) =>
+      (backupDate(b.publishedAt)?.getTime() ?? 0) - (backupDate(a.publishedAt)?.getTime() ?? 0),
+  );
+}
+
+/** Read-only Connect overview in one row; the backup settings own consent and recovery. */
 export function CloudBackupSummary() {
   const { t } = useTranslation();
-  const formatting = useDateFormatting();
+  const localization = useLocalizationSettings();
   const { available, status } = useCloudBackups();
   if (!available) return null;
-  if (status.data && !status.data.policy.uploadEntitled && !status.data.history.length)
-    return <CloudBackupPromotion />;
+  const data = status.data;
+  if (data && !data.policy.uploadEntitled && !data.history.length) return <CloudBackupPromotion />;
+  const summary = data && describeBackupStatus(data, t, localization);
   return (
-    <Card className="overflow-hidden rounded-2xl shadow-none">
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0 p-5 pb-3 sm:p-6 sm:pb-3">
-        <h2 className="flex items-center gap-2 text-base font-semibold">
-          <Icons.ShieldCheck className="text-muted-foreground size-5" aria-hidden />
-          {t("settings:cloud_backup_title")}
-        </h2>
-        {status.data && <ProtectionStatus data={status.data} />}
-      </CardHeader>
-      <CardContent className="space-y-4 p-5 pt-0 sm:p-6 sm:pt-0">
-        {status.isPending ? (
-          <OverviewSkeleton />
-        ) : status.isError ? (
-          <p className="text-muted-foreground text-sm">{t("settings:cloud_backup_failed")}</p>
-        ) : (
-          status.data && (
-            <>
-              <RecoveryDeadline data={status.data} />
-              <BackupTimes data={status.data} />
-              <BackupHint data={status.data} summary />
-              {status.data.history.length > 0 && (
-                <details className="group text-xs">
-                  <summary className="text-muted-foreground flex cursor-pointer list-none items-center gap-2">
-                    <Icons.ChevronRight
-                      className="size-4 transition-transform group-open:rotate-90"
-                      aria-hidden
-                    />
-                    {t("settings:cloud_backup_saved_count", { count: status.data.history.length })}
-                  </summary>
-                  <ul
-                    className="mt-3 divide-y pl-6"
-                    aria-label={t("settings:cloud_backup_history")}
-                  >
-                    {[...status.data.history]
-                      .sort(
-                        (a, b) =>
-                          (backupDate(b.publishedAt)?.getTime() ?? 0) -
-                          (backupDate(a.publishedAt)?.getTime() ?? 0),
-                      )
-                      .slice(0, 3)
-                      .map((point) => {
-                        const date = backupDate(point.publishedAt);
-                        return (
-                          <li
-                            key={point.backupId}
-                            className="text-muted-foreground flex items-center gap-2 py-2 text-xs"
-                          >
-                            <Icons.CheckCircle className="size-3.5 shrink-0" aria-hidden />
-                            {date
-                              ? formatting.formatDateTime(date, {
-                                  dateStyle: "medium",
-                                  timeStyle: "short",
-                                })
-                              : t("settings:backup_unknown_date")}
-                          </li>
-                        );
-                      })}
-                  </ul>
-                </details>
+    <Card>
+      <CardContent className="space-y-3 p-4">
+        <div className="flex items-center gap-3">
+          <div className="bg-muted flex size-8 shrink-0 items-center justify-center rounded-lg">
+            <ShieldCheckIcon
+              weight="duotone"
+              className="text-muted-foreground size-4"
+              aria-hidden
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="flex items-center gap-2 text-base font-semibold">
+              {t("settings:cloud_backup_title")}
+              {!!data?.history.length && (
+                <span className="text-muted-foreground text-sm font-normal tabular-nums">
+                  {data.history.length}
+                </span>
               )}
-            </>
-          )
-        )}
-        <Button variant="outline" size="sm" className="pointer-coarse:h-11" asChild>
-          <Link to="/settings/exports">
-            {t("settings:cloud_backup_manage")}
-            <Icons.ArrowRight className="size-4" aria-hidden />
+            </h3>
+            {status.isPending ? (
+              <OverviewSkeleton />
+            ) : status.isError || !summary ? (
+              <p className="text-muted-foreground text-xs">{t("settings:cloud_backup_failed")}</p>
+            ) : (
+              // The next run matters only when it differs from the routine schedule.
+              <BackupStatusLine
+                dot={summary.dot}
+                parts={
+                  summary.isOn
+                    ? [summary.state, summary.last]
+                    : [summary.state, summary.next ?? summary.last]
+                }
+              />
+            )}
+          </div>
+          <Link
+            to="/settings/exports"
+            aria-label={t("settings:cloud_backup_manage")}
+            className={cn(
+              buttonVariants({ variant: "ghost", size: "sm" }),
+              "text-muted-foreground hover:text-foreground pointer-coarse:h-11 shrink-0",
+            )}
+          >
+            <span className="hidden sm:inline">{t("settings:cloud_backup_manage")}</span>
+            <Icons.ChevronRight className="size-4 rtl:rotate-180" aria-hidden />
           </Link>
-        </Button>
+        </div>
+        {data && <RecoveryDeadline data={data} />}
       </CardContent>
+    </Card>
+  );
+}
+
+const COMPACT_HISTORY_LIMIT = 3;
+
+/** List variant of the summary for the Connect page's side column: status line, latest copies. */
+export function CloudBackupCompactSummary() {
+  const { t, i18n } = useTranslation();
+  const formatting = useDateFormatting();
+  const localization = useLocalizationSettings();
+  const { available, status } = useCloudBackups();
+  if (!available) return null;
+  const data = status.data;
+  if (data && !data.policy.uploadEntitled && !data.history.length) return <CloudBackupPromotion />;
+  const summary = data && describeBackupStatus(data, t, localization);
+  const latest = sortNewestFirst(data?.history ?? []).slice(0, COMPACT_HISTORY_LIMIT);
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="border-b px-4 py-2.5">
+        <h2 className="flex items-center gap-2 text-base font-semibold">
+          <ShieldCheckIcon weight="duotone" className="text-muted-foreground size-5" aria-hidden />
+          {t("settings:cloud_backup_title")}
+          {!!data?.history.length && (
+            <span className="text-muted-foreground text-sm font-normal tabular-nums">
+              {data.history.length}
+            </span>
+          )}
+        </h2>
+        {summary && (
+          <div className="mt-0.5 ps-7">
+            {/* "On" is implied by a scheduled next backup; other states name themselves. */}
+            <BackupStatusLine
+              dot={summary.dot}
+              parts={summary.isOn && summary.next ? [summary.next] : [summary.state, summary.next]}
+            />
+          </div>
+        )}
+      </div>
+      {status.isPending ? (
+        <div className="px-4 py-3">
+          <OverviewSkeleton />
+        </div>
+      ) : status.isError || !data ? (
+        <p className="text-muted-foreground px-4 py-3 text-sm">
+          {t("settings:cloud_backup_failed")}
+        </p>
+      ) : (
+        <>
+          <div className="px-4 pt-3 empty:hidden">
+            <RecoveryDeadline data={data} />
+          </div>
+          {latest.length === 0 ? (
+            <p className="text-muted-foreground px-4 py-3 text-sm">
+              {t("settings:cloud_backup_none")}
+            </p>
+          ) : (
+            <ul className="divide-y" aria-label={t("settings:cloud_backup_history")}>
+              {latest.map((point) => {
+                const date = backupDate(point.publishedAt);
+                const details = [
+                  date && formatting.formatTime(date, { timeStyle: "short" }),
+                  formatBackupSize(point.sizeBytes, i18n.language),
+                  point.metadata?.device_name,
+                ].filter(Boolean);
+                return (
+                  <li key={point.backupId} className="flex min-h-14 items-center gap-3 px-4 py-2.5">
+                    <BackupFileTile />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">
+                        {date
+                          ? formatting.formatDate(date, { dateStyle: "medium" })
+                          : t("settings:backup_unknown_date")}
+                      </p>
+                      <p className="text-muted-foreground truncate text-xs">
+                        {details.join(" · ")}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
+      )}
+      <Link
+        to="/settings/exports"
+        className="text-muted-foreground hover:bg-muted/40 hover:text-foreground flex min-h-11 items-center justify-between border-t px-4 text-sm"
+      >
+        {t("settings:cloud_backup_manage")}
+        <Icons.ChevronRight className="size-4 rtl:rotate-180" aria-hidden />
+      </Link>
     </Card>
   );
 }
@@ -330,7 +472,13 @@ function CloudBackupPanel({ backup }: { backup: ReturnType<typeof useCloudBackup
     setReauth(recentLogin);
     setError({
       cause,
-      message: t(recentLogin ? "settings:cloud_backup_reauth" : "settings:cloud_backup_failed"),
+      message: t(
+        recentLogin
+          ? "settings:cloud_backup_reauth"
+          : String(cause).includes("BACKUP_MANUAL_LIMIT")
+            ? "settings:cloud_backup_manual_limit"
+            : "settings:cloud_backup_failed",
+      ),
     });
   }
   async function run(operation: CloudBackupOperation) {
@@ -481,7 +629,7 @@ function CloudBackupPanel({ backup }: { backup: ReturnType<typeof useCloudBackup
       <CardHeader className="space-y-4 p-5 sm:p-6">
         <BackupCardHeader
           brand
-          icon={<Icons.ShieldCheck aria-hidden />}
+          icon={<ShieldCheckIcon weight="duotone" aria-hidden />}
           title={t("settings:cloud_backup_title")}
           info={
             <InfoPopover
@@ -532,8 +680,29 @@ function CloudBackupPanel({ backup }: { backup: ReturnType<typeof useCloudBackup
                 title={t("settings:cloud_backup_title")}
                 label={t("settings:cloud_backup_options")}
                 disabled={busy}
+                pending={pending === "manual"}
                 groups={[
                   [
+                    ...(canBackUpNow(data)
+                      ? [
+                          {
+                            icon: Icons.Upload,
+                            label: t("settings:backup_now"),
+                            onSelect: () =>
+                              void perform("manual", async () => {
+                                const point = await captureCloudBackup(true);
+                                if (!active.current) return;
+                                // No point: the slot was busy, eligibility changed, or the
+                                // attempt was cancelled. The status refresh shows which.
+                                toast(
+                                  point
+                                    ? { title: t("settings:backup_saved"), variant: "success" }
+                                    : { title: t("settings:cloud_backup_not_started") },
+                                );
+                              }),
+                          },
+                        ]
+                      : []),
                     ...(data.keyReady
                       ? [
                           {
@@ -715,11 +884,11 @@ function CloudBackupPanel({ backup }: { backup: ReturnType<typeof useCloudBackup
             <Button
               variant="link"
               size="sm"
-              className="text-muted-foreground h-auto whitespace-normal p-0 text-left text-xs font-normal"
+              className="text-muted-foreground h-auto whitespace-normal p-0 text-start text-xs font-normal"
               onClick={() => showFlow("help")}
             >
               {t("settings:cloud_backup_restore_help")}
-              <Icons.ArrowRight className="size-3.5" aria-hidden />
+              <Icons.ArrowRight className="size-3.5 rtl:rotate-180" aria-hidden />
             </Button>
           )}
           {isMobile && history.length > 0 && (
@@ -740,7 +909,7 @@ function CloudBackupPanel({ backup }: { backup: ReturnType<typeof useCloudBackup
           mobileClassName="h-auto max-h-[85dvh] overflow-y-auto"
           showCloseButton={!busy && !recoveryCode}
         >
-          <DialogHeader className="pr-6 text-left">
+          <DialogHeader className="pe-6 text-start">
             <DialogTitle>
               {t(
                 flow === "help"

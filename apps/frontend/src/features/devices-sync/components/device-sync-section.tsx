@@ -4,8 +4,13 @@
 // ==================================================================
 
 import { PortalLink } from "@/features/wealthfolio-connect/components/portal-link";
+import { DesktopIcon } from "@phosphor-icons/react/dist/csr/Desktop";
+import { DeviceMobileIcon } from "@phosphor-icons/react/dist/csr/DeviceMobile";
+import { DevicesIcon } from "@phosphor-icons/react/dist/csr/Devices";
+import { GlobeIcon } from "@phosphor-icons/react/dist/csr/Globe";
+import { HardDrivesIcon } from "@phosphor-icons/react/dist/csr/HardDrives";
 import { useQueryClient } from "@tanstack/react-query";
-import { Icons, isKeyboardEventComposing, Skeleton } from "@wealthfolio/ui";
+import { Icons, isKeyboardEventComposing, Skeleton, Spinner } from "@wealthfolio/ui";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -87,15 +92,15 @@ function wantsRestoreDialog(operation: RestoreOperation): boolean {
   return operation.phase === "awaiting_consent" || wanted === true;
 }
 
-const platformIcons: Record<string, typeof Icons.Monitor> = {
-  macos: Icons.Monitor,
-  mac: Icons.Monitor,
-  windows: Icons.Monitor,
-  linux: Icons.Monitor,
-  ios: Icons.Smartphone,
-  android: Icons.Smartphone,
-  server: Icons.Cloud,
-  web: Icons.Cloud,
+const platformIcons: Record<string, typeof DesktopIcon> = {
+  macos: DesktopIcon,
+  mac: DesktopIcon,
+  windows: DesktopIcon,
+  linux: DesktopIcon,
+  ios: DeviceMobileIcon,
+  android: DeviceMobileIcon,
+  server: HardDrivesIcon,
+  web: GlobeIcon,
 };
 
 export function DeviceSyncSection() {
@@ -438,7 +443,7 @@ export function DeviceSyncSection() {
                 {userFacingSyncErrorMessage(status.error)}
               </p>
               <Button variant="outline" className="mt-4" onClick={handleRefresh}>
-                <Icons.RefreshCw className="mr-2 h-4 w-4" />
+                <Icons.RefreshCw className="me-2 h-4 w-4" />
                 {t("common:retry")}
               </Button>
             </div>
@@ -460,7 +465,7 @@ export function DeviceSyncSection() {
             {/* Header row - matches other cards pattern */}
             <div className="flex items-center gap-2">
               <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
-                <Icons.Smartphone className="text-muted-foreground h-4 w-4" />
+                <DevicesIcon weight="duotone" className="text-muted-foreground h-4 w-4" />
               </div>
               <h3 className="text-base font-semibold">{t("sync:section.deviceSync")}</h3>
             </div>
@@ -482,7 +487,7 @@ export function DeviceSyncSection() {
             {/* Header row - matches other cards pattern */}
             <div className="flex items-center gap-2">
               <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
-                <Icons.Smartphone className="text-muted-foreground h-4 w-4" />
+                <DevicesIcon weight="duotone" className="text-muted-foreground h-4 w-4" />
               </div>
               <h3 className="text-base font-semibold">{t("sync:section.connectedDevices")}</h3>
             </div>
@@ -508,14 +513,14 @@ export function DeviceSyncSection() {
             {/* Header row - matches other cards pattern */}
             <div className="flex items-center gap-2">
               <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
-                <Icons.Smartphone className="text-muted-foreground h-4 w-4" />
+                <DevicesIcon weight="duotone" className="text-muted-foreground h-4 w-4" />
               </div>
               <h3 className="text-base font-semibold">{t("sync:section.deviceSync")}</h3>
             </div>
 
             <div className="flex flex-col items-center justify-center py-4 text-center sm:py-6">
-              <div className="mb-3 rounded-full bg-amber-100 p-2.5 sm:mb-4 sm:p-3 dark:bg-amber-900/30">
-                <Icons.RefreshCw className="h-5 w-5 text-amber-600 sm:h-6 sm:w-6 dark:text-amber-400" />
+              <div className="bg-warning-subtle mb-3 rounded-full p-2.5 sm:mb-4 sm:p-3">
+                <Icons.RefreshCw className="text-warning h-5 w-5 sm:h-6 sm:w-6" />
               </div>
               <p className="text-foreground text-sm font-medium">
                 {t("sync:stale.keysNeedUpdating")}
@@ -524,7 +529,7 @@ export function DeviceSyncSection() {
                 {t("sync:stale.keysNeedUpdatingDescription")}
               </p>
               <Button className="mt-3 sm:mt-4" onClick={openPairingDialog}>
-                <Icons.Link className="mr-2 h-4 w-4" />
+                <Icons.Link className="me-2 h-4 w-4" />
                 {t("sync:stale.updateThisDevice")}
               </Button>
             </div>
@@ -551,7 +556,7 @@ export function DeviceSyncSection() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
-                  <Icons.Smartphone className="text-muted-foreground h-4 w-4" />
+                  <DevicesIcon weight="duotone" className="text-muted-foreground h-4 w-4" />
                 </div>
                 <h3 className="text-base font-semibold">{t("sync:section.connectedDevices")}</h3>
                 <SyncStatusDot engineStatus={status.engineStatus} />
@@ -568,7 +573,7 @@ export function DeviceSyncSection() {
                   disabled={isTogglingEngine}
                 >
                   {isTogglingEngine ? (
-                    <Icons.Loader className="h-4 w-4 animate-spin" />
+                    <Spinner className="h-4 w-4" />
                   ) : isBackgroundRunning ? (
                     <Icons.PauseCircle className="h-4 w-4" />
                   ) : (
@@ -584,7 +589,7 @@ export function DeviceSyncSection() {
                 >
                   {isTogglingEngine ? (
                     <>
-                      <Icons.Loader className="h-4 w-4 animate-spin" />
+                      <Spinner className="h-4 w-4" />
                       {t("sync:engine.updating")}
                     </>
                   ) : isBackgroundRunning ? (
@@ -647,12 +652,12 @@ export function DeviceSyncSection() {
                         >
                           {restore.start.isPending ? (
                             <>
-                              <Icons.Spinner className="mr-2 h-3.5 w-3.5 animate-spin" />
+                              <Spinner className="me-2 h-3.5 w-3.5" />
                               {t("sync:waitingSnapshot.checking")}
                             </>
                           ) : (
                             <>
-                              <Icons.RefreshCw className="mr-2 h-3.5 w-3.5" />
+                              <Icons.RefreshCw className="me-2 h-3.5 w-3.5" />
                               {t("sync:waitingSnapshot.checkAgain")}
                             </>
                           )}
@@ -666,12 +671,12 @@ export function DeviceSyncSection() {
                           >
                             {isUploadingSnapshot ? (
                               <>
-                                <Icons.Spinner className="mr-2 h-3.5 w-3.5 animate-spin" />
+                                <Spinner className="me-2 h-3.5 w-3.5" />
                                 {t("sync:waitingSnapshot.preparing")}
                               </>
                             ) : (
                               <>
-                                <Icons.Upload className="mr-2 h-3.5 w-3.5" />
+                                <Icons.Upload className="me-2 h-3.5 w-3.5" />
                                 {t("sync:waitingSnapshot.speedUpSetup")}
                               </>
                             )}
@@ -701,10 +706,10 @@ export function DeviceSyncSection() {
           </CardContent>
 
           <AlertDialog open={showReinitConfirmDialog} onOpenChange={setShowReinitConfirmDialog}>
-            <AlertDialogContent className="max-sm:bg-background/90 gap-8 text-center max-sm:bottom-6 max-sm:left-4 max-sm:right-4 max-sm:top-auto max-sm:w-auto max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-3xl max-sm:shadow-2xl max-sm:backdrop-blur-2xl sm:max-w-lg">
+            <AlertDialogContent className="max-sm:bg-background/90 gap-8 text-center max-sm:bottom-6 max-sm:end-4 max-sm:start-4 max-sm:top-auto max-sm:w-auto max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-3xl max-sm:shadow-2xl max-sm:backdrop-blur-2xl sm:max-w-lg">
               <AlertDialogHeader className="items-center gap-4 px-8 text-center">
-                <div className="border-warning/30 bg-warning/10 dark:border-warning/20 dark:bg-warning/15 flex h-14 w-14 items-center justify-center rounded-full border">
-                  <Icons.AlertTriangle className="h-6 w-6 text-amber-500" />
+                <div className="text-warning-subtle-foreground bg-current/15 flex h-14 w-14 items-center justify-center rounded-full">
+                  <Icons.AlertTriangle className="h-6 w-6" />
                 </div>
                 <AlertDialogTitle className="text-center text-xl">
                   {t("sync:reinit.title")}
@@ -771,9 +776,9 @@ function RestoreBanner({
     >
       <div className="flex items-start gap-2">
         {needsAction ? (
-          <Icons.AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+          <Icons.AlertTriangle className="text-warning mt-0.5 h-3.5 w-3.5 shrink-0" />
         ) : (
-          <Icons.Spinner className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin" />
+          <Spinner className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         )}
         <div className="min-w-0 flex-1">
           <p className="text-foreground font-medium">{t("sync:restore.banner.title")}</p>
@@ -816,7 +821,7 @@ function UntrustedDevicePrompt({
           : t("sync:untrusted.enterCodeGeneric")}
       </p>
       <Button className="mt-3 sm:mt-4" onClick={onStartPairing}>
-        <Icons.Link className="mr-2 h-4 w-4" />
+        <Icons.Link className="me-2 h-4 w-4" />
         {t("sync:untrusted.connectThisDevice")}
       </Button>
     </div>
@@ -845,8 +850,8 @@ function OrphanedKeysPrompt({ onReinitialize }: { onReinitialize: () => Promise<
   return (
     <>
       <div className="flex flex-col items-center justify-center py-4 text-center sm:py-6">
-        <div className="mb-3 rounded-full bg-amber-100 p-2.5 sm:mb-4 sm:p-3 dark:bg-amber-900/30">
-          <Icons.AlertTriangle className="h-5 w-5 text-amber-600 sm:h-6 sm:w-6 dark:text-amber-400" />
+        <div className="bg-warning-subtle mb-3 rounded-full p-2.5 sm:mb-4 sm:p-3">
+          <Icons.AlertTriangle className="text-warning h-5 w-5 sm:h-6 sm:w-6" />
         </div>
         <p className="text-foreground text-sm font-medium">{t("sync:orphaned.restoreTitle")}</p>
         <p className="text-muted-foreground mt-1 max-w-xs text-xs">
@@ -858,7 +863,7 @@ function OrphanedKeysPrompt({ onReinitialize }: { onReinitialize: () => Promise<
           onClick={() => setShowConfirmDialog(true)}
           disabled={isReinitializing}
         >
-          <Icons.RefreshCw className="mr-2 h-4 w-4" />
+          <Icons.RefreshCw className="me-2 h-4 w-4" />
           {t("sync:orphaned.restoreTitle")}
         </Button>
       </div>
@@ -874,7 +879,7 @@ function OrphanedKeysPrompt({ onReinitialize }: { onReinitialize: () => Promise<
             <Button onClick={handleReinitialize} disabled={isReinitializing}>
               {isReinitializing ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {t("sync:orphaned.restarting")}
                 </>
               ) : (
@@ -988,7 +993,7 @@ function ConnectedDevicesList({
       {mode === "trusted" && (
         <div className="mt-4">
           <Button onClick={onLinkDevice} size="sm">
-            <Icons.Link className="mr-2 h-4 w-4" />
+            <Icons.Link className="me-2 h-4 w-4" />
             {t("sync:connect.connectAnotherDevice")}
           </Button>
         </div>
@@ -1024,47 +1029,46 @@ function PairThisDeviceItem({ onPair }: { onPair: () => void }) {
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Avatar className="h-9 w-9 shrink-0 rounded-lg">
             <AvatarFallback className="rounded-lg">
-              <Icons.Smartphone className="text-muted-foreground h-4 w-4" />
+              <DevicesIcon weight="duotone" className="text-muted-foreground size-5" />
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="truncate text-sm font-medium">{t("sync:status.thisDevice")}</span>
-              <Badge
-                variant="outline"
-                className="text-warning border-warning/20 bg-warning/20 h-5 shrink-0 text-[10px]"
-              >
+              <Badge variant="warning-subtle" className="text-2xs h-5 shrink-0">
                 {t("sync:status.notConnected")}
               </Badge>
             </div>
             <div className="text-muted-foreground flex items-center gap-1 text-xs">
-              <Icons.ShieldAlert className="h-3 w-3 text-amber-600 dark:text-amber-500" />
+              <Icons.ShieldAlert className="text-warning h-3 w-3" />
               {t("sync:untrusted.connectToStartSyncing")}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Button size="default" className="w-full shrink-0 sm:w-auto" onClick={onPair}>
-            <Icons.Link className="mr-2 h-4 w-4" />
+            <Icons.Link className="me-2 h-4 w-4" />
             {t("sync:connect.connectThisDevice")}
           </Button>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground size-11 shrink-0 sm:size-8"
-              >
-                <Icons.MoreVertical className="h-4 w-4" />
-                <span className="sr-only">{t("sync:section.options")}</span>
-              </Button>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground size-11 shrink-0 sm:size-8"
+                />
+              }
+            >
+              <Icons.MoreVertical className="h-4 w-4" />
+              <span className="sr-only">{t("sync:section.options")}</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem
-                onSelect={() => setShowResetAlert(true)}
+                onClick={() => setShowResetAlert(true)}
                 className="text-destructive focus:text-destructive"
               >
-                <Icons.LogOut className="mr-2 h-4 w-4" />
+                <Icons.LogOut className="me-2 h-4 w-4" />
                 {t("sync:connect.disconnect")}
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -1085,7 +1089,7 @@ function PairThisDeviceItem({ onPair }: { onPair: () => void }) {
             <Button variant="destructive" onClick={handleDisconnect} disabled={isResetting}>
               {isResetting ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {t("sync:disconnectDialog.disconnecting")}
                 </>
               ) : (
@@ -1113,26 +1117,26 @@ function SyncStatusDot({
   let label: string;
 
   if (lastError || consecutiveFailures > 2) {
-    color = "bg-red-500";
+    color = "bg-destructive";
     label = t("sync:status.syncError");
   } else if (!backgroundRunning) {
-    color = "bg-gray-400";
+    color = "bg-muted-foreground";
     label = t("sync:status.syncPaused");
   } else if (lastCycleStatus === "ok") {
-    color = "bg-green-500";
+    color = "bg-success";
     label = t("sync:status.synced");
   } else {
-    color = "bg-yellow-500";
+    color = "bg-warning";
     label = t("sync:status.syncing");
   }
 
   return (
-    <TooltipProvider delayDuration={300}>
+    <TooltipProvider delay={300}>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${color}`} />
-        </TooltipTrigger>
-        <TooltipContent side="right" className="text-xs">
+        <TooltipTrigger
+          render={<span className={`inline-block h-2 w-2 shrink-0 rounded-full ${color}`} />}
+        />
+        <TooltipContent side="inline-end" className="text-xs">
           {label}
         </TooltipContent>
       </Tooltip>
@@ -1163,7 +1167,7 @@ function DeviceCard({
   const [isUnpairing, setIsUnpairing] = useState(false);
 
   const platform = device.platform?.toLowerCase() || "unknown";
-  const Icon = platformIcons[platform] || Icons.Monitor;
+  const Icon = platformIcons[platform] || DesktopIcon;
   const isTrusted = device.trustState === "trusted";
   const isUntrusted = device.trustState === "untrusted";
   const isRevoked = device.trustState === "revoked";
@@ -1215,11 +1219,11 @@ function DeviceCard({
       <div className="hover:bg-muted/40 group flex items-center gap-4 rounded-xl border px-4 py-3 transition-colors">
         {/* Device icon with online indicator */}
         <div className="relative shrink-0">
-          <div className="bg-muted/60 flex h-10 w-10 items-center justify-center rounded-full">
-            <Icon className="text-foreground/70 h-[18px] w-[18px]" />
+          <div className="bg-muted flex size-9 items-center justify-center rounded-lg">
+            <Icon weight="duotone" className="text-muted-foreground size-5" />
           </div>
           {isOnline && (
-            <span className="border-background absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 bg-green-500" />
+            <span className="border-background bg-success absolute -bottom-0.5 -end-0.5 h-3 w-3 rounded-full border-2" />
           )}
         </div>
 
@@ -1230,6 +1234,7 @@ function DeviceCard({
               <Input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
+                aria-label={t("common:name")}
                 className="h-7 w-full max-w-40 text-sm"
                 maxLength={64}
                 autoFocus
@@ -1249,7 +1254,7 @@ function DeviceCard({
                 disabled={renameDevice.isPending}
               >
                 {renameDevice.isPending ? (
-                  <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+                  <Spinner className="h-3.5 w-3.5" />
                 ) : (
                   <Icons.Check className="h-3.5 w-3.5" />
                 )}
@@ -1277,16 +1282,14 @@ function DeviceCard({
               <div className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
                 {isTrusted && (
                   <>
-                    <Icons.ShieldCheck className="h-3 w-3 text-green-600 dark:text-green-500" />
+                    <Icons.ShieldCheck className="text-success h-3 w-3" />
                     <span>{t("sync:status.connected")}</span>
                   </>
                 )}
                 {isUntrusted && (
                   <>
-                    <Icons.ShieldAlert className="h-3 w-3 text-amber-600 dark:text-amber-500" />
-                    <span className="text-amber-600 dark:text-amber-500">
-                      {t("sync:status.needsSetup")}
-                    </span>
+                    <Icons.ShieldAlert className="text-warning h-3 w-3" />
+                    <span className="text-warning">{t("sync:status.needsSetup")}</span>
                   </>
                 )}
                 {isRevoked && (
@@ -1316,27 +1319,29 @@ function DeviceCard({
             )}
 
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground size-11 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 max-md:opacity-100 sm:size-7"
-                >
-                  <Icons.MoreVertical className="h-4 w-4" />
-                  <span className="sr-only">{t("sync:section.deviceActions")}</span>
-                </Button>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground size-11 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 max-md:opacity-100 sm:size-7"
+                  />
+                }
+              >
+                <Icons.MoreVertical className="h-4 w-4" />
+                <span className="sr-only">{t("sync:section.deviceActions")}</span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={handleStartRename}>
-                  <Icons.Pencil className="mr-2 h-4 w-4" />
+                  <Icons.Pencil className="me-2 h-4 w-4" />
                   {t("sync:connect.rename")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onSelect={() => setShowUnpairAlert(true)}
+                  onClick={() => setShowUnpairAlert(true)}
                   className="text-destructive focus:text-destructive"
                 >
-                  <Icons.LogOut className="mr-2 h-4 w-4" />
+                  <Icons.LogOut className="me-2 h-4 w-4" />
                   {device.isCurrent ? t("sync:connect.unpair") : t("sync:connect.revoke")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -1365,7 +1370,7 @@ function DeviceCard({
             <Button variant="destructive" onClick={handleUnpair} disabled={isUnpairing}>
               {isUnpairing ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {t("sync:unpairDialog.unpairing")}
                 </>
               ) : (

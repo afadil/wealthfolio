@@ -244,6 +244,7 @@
   "table_price_amount": "Prix/Montant",
   "table_fee": "Frais",
   "table_total": "Total",
+  "table_balance": "Solde",
   "table_account": "Compte",
   "table_currency": "Devise",
   "table_comment": "Commentaire",
@@ -304,6 +305,7 @@
     "import_from_csv": "Importer depuis un CSV",
     "transfer_holdings": "Transférer des positions",
     "add_personal_asset": "Ajouter un actif personnel",
+    "connect_account": "Connecter un compte",
     "add_activities": "Ajouter des activités",
     "ask_ai_categorize": "Demander à l'IA de catégoriser",
     "investments": "Investissements",
@@ -610,6 +612,7 @@
     "err_select_source_account": "Veuillez sélectionner un compte source.",
     "err_select_destination_account": "Veuillez sélectionner un compte destinataire.",
     "err_accounts_different": "Les comptes source et destinataire doivent être différents.",
+    "err_same_account_currencies": "Choisissez des devises différentes pour un transfert au sein du même compte.",
     "err_currency_required": "La devise est requise.",
     "err_select_date": "Veuillez sélectionner une date.",
     "err_enter_amount": "Veuillez saisir un montant.",
@@ -711,6 +714,7 @@
     "duplicated_comment": "Dupliqué",
     "edit_transfer_pair": "Utilisez Modifier pour changer les comptes et les devises dans le formulaire de transfert. Enregistrez d’abord les modifications en cours.",
     "save_edits_first": "Enregistrez d'abord les modifications",
+    "duplicate_transfer_failed": "Impossible de dupliquer la paire de transferts. Actualisez et réessayez.",
     "save_before_link": "Enregistrez ou annulez les modifications en attente avant de lier ce transfert.",
     "save_before_unlink": "Enregistrez ou annulez les modifications en attente avant de dissocier ce transfert.",
     "link_reason_save_new": "Enregistrez les nouvelles activités avant de les lier",
@@ -784,7 +788,11 @@
     "clear_filters": "Effacer les filtres",
     "ratio": "Ratio",
     "premium": "Prime",
-    "total_value": "Valeur totale"
+    "total_value": "Valeur totale",
+    "day_count_one": "{{count}} activité",
+    "day_count_other": "{{count}} activités",
+    "day_count_many": "{{count}} activités",
+    "day_end_cash": "Liquidités"
   },
   "mobile_type_category": {
     "trade": "Négociation",
@@ -1164,7 +1172,8 @@
       "total": "Total",
       "importAnother": "Importer un autre",
       "viewHoldings": "Voir les positions",
-      "viewActivities": "Voir les activités"
+      "viewActivities": "Voir les activités",
+      "syncAutomatically": "Vous préférez une synchronisation automatique ?"
     },
     "assets": {
       "noAssetsTitle": "Aucun actif à vérifier",

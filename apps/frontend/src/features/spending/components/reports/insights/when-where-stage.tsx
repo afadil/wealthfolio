@@ -191,7 +191,7 @@ function EmptyEventsCard({ rangeStart, rangeEnd }: { rangeStart: Date; rangeEnd:
         }
       >
         {t("spending:events.createEvent")}
-        <Icons.ArrowRight className="ml-1.5 h-3.5 w-3.5" aria-hidden />
+        <Icons.ArrowRight className="ms-1.5 h-3.5 w-3.5 rtl:rotate-180" aria-hidden />
       </Button>
     </div>
   );

@@ -31,7 +31,8 @@
     "addModels": "添加模型..."
   },
   "provider": {
-    "noProvidersConfigured": "未配置提供商"
+    "noProvidersConfigured": "未配置提供商",
+    "label": "AI 提供商"
   },
   "reasoning": {
     "thinking": "思考中...",
@@ -127,6 +128,7 @@
   "tools": {
     "calling": "正在调用 {{toolName}}...",
     "cancelled": "已取消 {{toolName}}",
+    "notUsed": "未使用工具：{{toolName}}",
     "used": "已使用工具：{{toolName}}"
   },
   "accounts": {

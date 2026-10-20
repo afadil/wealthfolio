@@ -244,6 +244,7 @@
   "table_price_amount": "Precio/Importe",
   "table_fee": "Comisión",
   "table_total": "Total",
+  "table_balance": "Saldo",
   "table_account": "Cuenta",
   "table_currency": "Moneda",
   "table_comment": "Comentario",
@@ -304,6 +305,7 @@
     "import_from_csv": "Importar desde CSV",
     "transfer_holdings": "Transferir posiciones",
     "add_personal_asset": "Añadir activo personal",
+    "connect_account": "Conectar cuenta",
     "add_activities": "Añadir actividades",
     "ask_ai_categorize": "Pedir a la IA que categorice",
     "investments": "Inversiones",
@@ -610,6 +612,7 @@
     "err_select_source_account": "Selecciona una cuenta de origen.",
     "err_select_destination_account": "Selecciona una cuenta de destino.",
     "err_accounts_different": "Las cuentas de origen y destino deben ser diferentes.",
+    "err_same_account_currencies": "Elige monedas diferentes para una transferencia dentro de la misma cuenta.",
     "err_currency_required": "La moneda es obligatoria.",
     "err_select_date": "Selecciona una fecha.",
     "err_enter_amount": "Introduce un importe.",
@@ -711,6 +714,7 @@
     "duplicated_comment": "Duplicada",
     "edit_transfer_pair": "Utilice Editar para cambiar las cuentas y monedas en el formulario de transferencia. Guarde primero los cambios pendientes.",
     "save_edits_first": "Guarda primero las ediciones",
+    "duplicate_transfer_failed": "No se pudo duplicar el par de transferencias. Actualiza e inténtalo de nuevo.",
     "save_before_link": "Guarda o descarta las ediciones pendientes antes de vincular esta transferencia.",
     "save_before_unlink": "Guarda o descarta las ediciones pendientes antes de desvincular esta transferencia.",
     "link_reason_save_new": "Guarda las nuevas actividades antes de vincular",
@@ -784,7 +788,11 @@
     "clear_filters": "Borrar filtros",
     "ratio": "Ratio",
     "premium": "Prima",
-    "total_value": "Valor total"
+    "total_value": "Valor total",
+    "day_count_one": "{{count}} actividad",
+    "day_count_other": "{{count}} actividades",
+    "day_count_many": "{{count}} actividades",
+    "day_end_cash": "Efectivo"
   },
   "mobile_type_category": {
     "trade": "Operación",
@@ -1164,7 +1172,8 @@
       "total": "Total",
       "importAnother": "Importar otro",
       "viewHoldings": "Ver posiciones",
-      "viewActivities": "Ver actividades"
+      "viewActivities": "Ver actividades",
+      "syncAutomatically": "¿Prefieres que se sincronice automáticamente?"
     },
     "assets": {
       "noAssetsTitle": "Ningún activo requiere revisión",

@@ -52,6 +52,10 @@ use crate::activities::activities_constants::{
 };
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
+use crate::activities::cash_balances::{
+    running_cash_balances, shows_cash_balance, shows_running_cash_balance, ActivityCashBalance,
+    CashLedgerActivity,
+};
 use crate::activities::csv_parser::{self, ParseConfig, ParsedCsvResult};
 use crate::activities::idempotency::{compute_activity_idempotency_key, compute_idempotency_key};
 use crate::activities::{
@@ -75,9 +79,12 @@ use crate::fx::currency::{
 };
 use crate::fx::FxServiceTrait;
 use crate::portfolio::economic_events::{ActivityCashInputs, ActivityEconomicsResolver};
+use crate::portfolio::valuation::{DailyCashBalance, ValuationRepositoryTrait, ValuationStatus};
 use crate::quotes::constants::DATA_SOURCE_MANUAL;
 use crate::quotes::{Quote, QuoteServiceTrait};
-use crate::utils::time_utils::{calendar_day_instant, parse_user_timezone_or_default};
+use crate::utils::time_utils::{
+    activity_date_in_tz, calendar_day_instant, parse_user_timezone_or_default,
+};
 use crate::Result;
 use log::warn;
 
@@ -129,6 +136,7 @@ struct ResolvedSymbolInfo {
 /// What an update makes of a transfer leg when it turns it into a securities
 /// transfer: its direction, the security and the quantity moved.
 struct SecuritiesTransferLeg {
+    account_id: String,
     activity_type: String,
     asset: String,
     quantity: Decimal,
@@ -151,6 +159,7 @@ impl SecuritiesTransferLeg {
             .flatten()
             .filter(|quantity| !quantity.is_zero())?;
         Some(Self {
+            account_id: update.account_id.clone(),
             activity_type: update.activity_type.clone(),
             asset: asset.to_uppercase(),
             quantity: quantity.abs(),
@@ -159,7 +168,8 @@ impl SecuritiesTransferLeg {
 
     /// Whether the two legs are the opposite sides of one securities transfer.
     fn pairs_with(&self, other: &Self) -> bool {
-        self.activity_type != other.activity_type
+        self.account_id != other.account_id
+            && self.activity_type != other.activity_type
             && self.asset == other.asset
             && self.quantity == other.quantity
     }
@@ -180,6 +190,7 @@ pub struct ActivityService {
     fx_service: Arc<dyn FxServiceTrait>,
     quote_service: Arc<dyn QuoteServiceTrait>,
     import_run_repository: Option<Arc<dyn ImportRunRepositoryTrait>>,
+    valuation_repository: Option<Arc<dyn ValuationRepositoryTrait>>,
     event_sink: Arc<dyn DomainEventSink>,
     timezone: Arc<RwLock<String>>,
 }
@@ -561,6 +572,20 @@ impl ActivityService {
             Some(subtype) => Some(subtype),
             None => existing.subtype.as_deref(),
         };
+        // Normalize before classifying transfer economics: a cash repair must
+        // preserve its final amount and pass cash validation. An omitted
+        // subtype still carries the stored asset requirement.
+        if let Some(currency) = Self::cash_symbol_currency(
+            activity.asset.as_ref(),
+            &activity.activity_type,
+            effective_subtype,
+        ) {
+            if activity.currency.trim().is_empty() {
+                activity.currency = currency;
+            }
+            // Omission preserves the stored asset; an empty patch clears it.
+            activity.asset = Some(AssetResolutionInput::default());
+        }
         let effective_asset_id = match activity.asset.as_ref() {
             Some(asset) if asset.is_empty() => None,
             _ => activity
@@ -808,11 +833,27 @@ impl ActivityService {
         Ok(())
     }
 
+    /// A create whose asset only names the account's cash books cash: drop the
+    /// asset, keeping the symbol's currency when the row states none.
+    fn drop_cash_symbol_asset(activity: &mut NewActivity) {
+        if let Some(currency) = Self::cash_symbol_currency(
+            activity.asset.as_ref(),
+            &activity.activity_type,
+            activity.subtype.as_deref(),
+        ) {
+            if activity.currency.trim().is_empty() {
+                activity.currency = currency;
+            }
+            activity.asset = None;
+        }
+    }
+
     fn normalize_activity_for_preparation(mut activity: NewActivity) -> NewActivity {
         activity.subtype = NewActivity::canonicalize_subtype_for_activity(
             &activity.activity_type,
             activity.subtype.as_deref(),
         );
+        Self::drop_cash_symbol_asset(&mut activity);
         Self::normalize_new_activity_economic_signs(&mut activity);
         activity
     }
@@ -866,6 +907,33 @@ impl ActivityService {
         } else {
             classify_import_activity(activity_type, symbol, quantity, unit_price)
         }
+    }
+
+    /// Currency of a reserved cash placeholder on a symbol-optional activity.
+    /// A concrete asset id or an asset-backed subtype keeps asset resolution.
+    fn cash_symbol_currency(
+        asset: Option<&AssetResolutionInput>,
+        activity_type: &str,
+        subtype: Option<&str>,
+    ) -> Option<String> {
+        fn non_empty(value: Option<&str>) -> Option<&str> {
+            value.map(str::trim).filter(|v| !v.is_empty())
+        }
+        let asset = asset?;
+        let symbol = non_empty(asset.symbol.as_deref())?;
+        if !is_cash_symbol(symbol)
+            || non_empty(asset.id.as_deref()).is_some_and(|id| !is_cash_symbol(id))
+            || Self::requires_asset_identity(activity_type, subtype)
+        {
+            return None;
+        }
+        // Use the same uppercase spelling as is_cash_symbol and split at the
+        // currency separator, without slicing the original UTF-8 input.
+        symbol
+            .to_uppercase()
+            .rsplit(['-', '_', ':'])
+            .next()
+            .map(str::to_string)
     }
 
     fn requires_asset_identity(activity_type: &str, subtype: Option<&str>) -> bool {
@@ -1138,6 +1206,7 @@ impl ActivityService {
             fx_service,
             quote_service,
             import_run_repository: None,
+            valuation_repository: None,
             event_sink: Arc::new(NoOpDomainEventSink),
             timezone: Arc::new(RwLock::new("UTC".to_string())),
         }
@@ -1159,6 +1228,7 @@ impl ActivityService {
             fx_service,
             quote_service,
             import_run_repository: Some(import_run_repository),
+            valuation_repository: None,
             event_sink: Arc::new(NoOpDomainEventSink),
             timezone: Arc::new(RwLock::new("UTC".to_string())),
         }
@@ -1266,6 +1336,15 @@ impl ActivityService {
 
     pub fn with_timezone(mut self, timezone: Arc<RwLock<String>>) -> Self {
         self.timezone = timezone;
+        self
+    }
+
+    /// Sets the valuations a search's end-of-day cash balances come from.
+    pub fn with_valuation_repository(
+        mut self,
+        valuation_repository: Arc<dyn ValuationRepositoryTrait>,
+    ) -> Self {
+        self.valuation_repository = Some(valuation_repository);
         self
     }
 
@@ -1402,6 +1481,25 @@ impl ActivityService {
 
     fn is_cash_transfer_pair(pair: &TransferPair) -> bool {
         pair.transfer_in.asset_id.is_none() && pair.transfer_out.asset_id.is_none()
+    }
+
+    // Provider records have their own posting dates and descriptions. A
+    // source record on either leg also protects mixed manual/provider pairs;
+    // record IDs need not differ, since providers can scope them by account.
+    fn transfer_pair_has_source_records(pair: &TransferPair) -> bool {
+        [&pair.transfer_out, &pair.transfer_in].iter().any(|leg| {
+            leg.source_record_id
+                .as_deref()
+                .is_some_and(|id| !id.trim().is_empty())
+        })
+    }
+
+    fn transfer_pair_shares_date(pair: &TransferPair) -> bool {
+        !Self::transfer_pair_has_source_records(pair)
+            || crate::activities::is_same_account_cash_fx_conversion(
+                &pair.transfer_in,
+                &pair.transfer_out,
+            )
     }
 
     fn transfer_pair_response(pair: TransferPair) -> InternalTransferPairResponse {
@@ -1775,12 +1873,6 @@ impl ActivityService {
                 "Destination account is required",
             ));
         }
-        if request.from_account_id == request.to_account_id {
-            return Err(Self::invalid_activity_data(
-                "Source and destination accounts must be different",
-            ));
-        }
-
         if request
             .transfer_mode
             .as_deref()
@@ -1818,6 +1910,14 @@ impl ActivityService {
         );
         let source_currency = source_currency.to_uppercase();
         let destination_currency = destination_currency.to_uppercase();
+
+        if request.from_account_id == request.to_account_id
+            && source_currency == destination_currency
+        {
+            return Err(Self::invalid_activity_data(
+                "Same-account cash transfers require different currencies",
+            ));
+        }
 
         let destination_amount = if source_currency == destination_currency {
             source_amount
@@ -1918,6 +2018,17 @@ impl ActivityService {
         pair: &TransferPair,
         values: &InternalPairValues,
     ) -> Result<Vec<ActivityUpdate>> {
+        if request
+            .edited_activity_id
+            .as_deref()
+            .is_some_and(|id| id != pair.transfer_out.id && id != pair.transfer_in.id)
+        {
+            return Err(Self::invalid_activity_data(
+                "Edited activity must belong to the transfer pair",
+            ));
+        }
+        // Validate shared input even when sourced legs retain their own dates.
+        self.validate_and_normalize_activity_date(&request.activity_date)?;
         let metadata = Self::internal_transfer_metadata();
         // Preserve user valuation overrides only while their currency pair is unchanged.
         let valuation_rate_patch = |existing: &Activity, account_id: &str, currency: &str| {
@@ -1928,7 +2039,7 @@ impl ActivityService {
                     .then_some(None),
             )
         };
-        Ok(vec![
+        let mut updates = vec![
             ActivityUpdate {
                 id: pair.transfer_out.id.clone(),
                 account_id: request.from_account_id.clone(),
@@ -1975,7 +2086,25 @@ impl ActivityService {
                 )?,
                 metadata,
             },
-        ])
+        ];
+        // A sourced form edits the selected record's details. Older callers
+        // without a selection preserve both records. FX dates remain shared.
+        if Self::transfer_pair_has_source_records(pair) {
+            for (update, leg) in updates
+                .iter_mut()
+                .zip([&pair.transfer_out, &pair.transfer_in])
+            {
+                if request.edited_activity_id.as_deref() != Some(leg.id.as_str()) {
+                    // Pair edits can move into or out of same-account FX.
+                    // The validated destination pair determines date sharing.
+                    if request.from_account_id != request.to_account_id {
+                        update.activity_date = leg.activity_date.to_rfc3339();
+                    }
+                    update.notes = leg.notes.clone();
+                }
+            }
+        }
+        Ok(updates)
     }
 
     fn validate_internal_cash_pair_currency_update(
@@ -1984,9 +2113,14 @@ impl ActivityService {
         pair: &TransferPair,
     ) -> Result<()> {
         if Self::is_cash_transfer_pair(pair)
-            && pair.transfer_out.account_id != pair.transfer_in.account_id
             && (update.account_id != existing.account_id
-                || (!update.currency.is_empty() && update.currency != existing.currency))
+                || (!update.currency.is_empty() && update.currency != existing.currency)
+                || (pair.transfer_out.account_id == pair.transfer_in.account_id
+                    && (update.activity_type != existing.effective_type()
+                        || is_securities_transfer(
+                            &update.activity_type,
+                            update.get_symbol_id().or(update.get_symbol_code()),
+                        ))))
         {
             return Err(Self::invalid_activity_data(
                 "Use the transfer pair editor to change transfer accounts or currencies",
@@ -2047,6 +2181,13 @@ impl ActivityService {
             metadata: None,
         };
 
+        if Self::transfer_pair_has_source_records(pair) {
+            if !Self::transfer_pair_shares_date(pair) {
+                counterpart_update.activity_date = counterpart.activity_date.to_rfc3339();
+            }
+            counterpart_update.notes = counterpart.notes.clone();
+        }
+
         let Some(Some(amount)) = update.amount else {
             return Ok(Some(counterpart_update));
         };
@@ -2055,7 +2196,12 @@ impl ActivityService {
             return Ok(Some(counterpart_update));
         }
 
-        if pair.transfer_out.account_id != pair.transfer_in.account_id {
+        if pair.transfer_out.account_id != pair.transfer_in.account_id
+            || super::is_contribution_neutral_same_account_cash_fx_conversion(
+                &pair.transfer_in,
+                &pair.transfer_out,
+            )
+        {
             // Grid saves can echo the original amount. A notes/rate-only edit
             // must not recalculate the other leg using a rounded ratio.
             if existing.amount.map(|value| value.abs()) == Some(amount.abs()) {
@@ -2592,7 +2738,9 @@ impl ActivityService {
                 "PRECIOUS_METAL" | "PREC" => return (AssetKind::PreciousMetal, None),
                 "PRIVATE_EQUITY" | "PEQ" => return (AssetKind::PrivateEquity, None),
                 "LIABILITY" | "LIAB" => return (AssetKind::Liability, None),
-                "OTHER" | "ALT" => return (AssetKind::Other, None),
+                // A custom "Other" asset bought in an account is held there: an
+                // investment, not the alternative kind net worth adds on its own.
+                "OTHER" | "ALT" => return (AssetKind::Investment, None),
                 _ => {} // Fall through to inference
             }
         }
@@ -2899,6 +3047,7 @@ impl ActivityService {
             activity.get_symbol_id().or(activity.get_symbol_code()),
             &account,
         )?;
+        Self::drop_cash_symbol_asset(&mut activity);
         let base_ccy = self.account_service.get_base_currency().unwrap_or_default();
         let account_currency = resolve_currency(&[&account.currency, &base_ccy]);
 
@@ -3443,14 +3592,6 @@ impl ActivityService {
         existing: Activity,
     ) -> Result<PreviewedActivityUpdate> {
         let account_currency = self.validate_update_request(&mut activity)?;
-        if activity
-            .get_symbol_code()
-            .is_some_and(|symbol| !symbol.trim().is_empty())
-        {
-            return Err(Self::invalid_activity_data(
-                "An update preview names the asset by its id, not by symbol",
-            ));
-        }
         let asset = match activity
             .get_symbol_id()
             .map(str::trim)
@@ -4917,6 +5058,125 @@ impl ActivityServiceTrait for ActivityService {
         )
     }
 
+    /// Balances come from each account's whole history, not the page: a row's
+    /// balance depends on every earlier row of its account, loaded or not.
+    async fn attach_cash_balances(&self, response: &mut ActivitySearchResponse) -> Result<()> {
+        let account_ids: Vec<String> = response
+            .data
+            .iter()
+            .map(|row| row.account_id.clone())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        if account_ids.is_empty() {
+            return Ok(());
+        }
+        // Each posted row's day as the engine dates it: its instant in the
+        // configured timezone. Only rows stored with a timezone: older rows
+        // without one (a bare date, SQLite's own timestamp shape) are read as
+        // UTC by the engine but as local time by a list, so their closing cash
+        // could belong to another day than the one they show.
+        let timezone = self.configured_timezone();
+        let row_days: Vec<(String, String, NaiveDate)> = response
+            .data
+            .iter()
+            .filter(|row| row.status == ActivityStatus::Posted)
+            .filter_map(|row| {
+                let instant = DateTime::parse_from_rfc3339(&row.date)
+                    .ok()?
+                    .with_timezone(&Utc);
+                Some((
+                    row.id.clone(),
+                    row.account_id.clone(),
+                    activity_date_in_tz(instant, timezone),
+                ))
+            })
+            .collect();
+        let activity_repository = Arc::clone(&self.activity_repository);
+        let account_service = Arc::clone(&self.account_service);
+        let valuation_repository = self.valuation_repository.clone();
+        let mut balances = crate::portfolio::coordinator::blocking(move || {
+            let (running, mut day_end): (Vec<Account>, Vec<Account>) = account_service
+                .get_accounts_by_ids(&account_ids)?
+                .into_iter()
+                .filter(shows_cash_balance)
+                .partition(shows_running_cash_balance);
+            let mut balances: HashMap<String, (ActivityCashBalance, CashBalanceScope)> =
+                HashMap::new();
+
+            // Cash and credit-card accounts: the cash after each row, from one
+            // read of their whole histories.
+            if !running.is_empty() {
+                let ids: Vec<String> = running.iter().map(|account| account.id.clone()).collect();
+                let mut histories: HashMap<String, Vec<CashLedgerActivity>> = HashMap::new();
+                for activity in activity_repository.get_cash_ledger_activities(&ids)? {
+                    histories
+                        .entry(activity.account_id.clone())
+                        .or_default()
+                        .push(activity);
+                }
+                for account in running {
+                    let history = histories.remove(&account.id).unwrap_or_default();
+                    match running_cash_balances(&account, &history) {
+                        Some(rows) => balances.extend(
+                            rows.into_iter()
+                                .map(|(id, balance)| (id, (balance, CashBalanceScope::Row))),
+                        ),
+                        // Its history holds securities, whose cash only the
+                        // engine books: fall back to the engine's day-end cash.
+                        None => day_end.push(account),
+                    }
+                }
+            }
+
+            // Other accounts: the cash at the end of each row's day, read from
+            // the engine's valuations for the days the page spans. A day the
+            // engine could not complete gets none: its cash may leave out a
+            // currency it could not convert.
+            let Some(valuations) = valuation_repository else {
+                return Ok(balances);
+            };
+            for account in &day_end {
+                let days: Vec<(&String, NaiveDate)> = row_days
+                    .iter()
+                    .filter(|(_, account_id, _)| *account_id == account.id)
+                    .map(|(id, _, day)| (id, *day))
+                    .collect();
+                let (Some(first), Some(last)) = (
+                    days.iter().map(|(_, day)| *day).min(),
+                    days.iter().map(|(_, day)| *day).max(),
+                ) else {
+                    continue;
+                };
+                let by_day: HashMap<NaiveDate, DailyCashBalance> = valuations
+                    .get_daily_cash_balances(&account.id, Some(first), Some(last))?
+                    .into_iter()
+                    .filter(|cash| cash.value_status != ValuationStatus::Unavailable)
+                    .map(|cash| (cash.valuation_date, cash))
+                    .collect();
+                for (id, day) in days {
+                    if let Some(cash) = by_day.get(&day) {
+                        let balance = ActivityCashBalance {
+                            currency: cash.account_currency.clone(),
+                            balance: cash.cash_balance,
+                        };
+                        balances.insert(id.clone(), (balance, CashBalanceScope::Day));
+                    }
+                }
+            }
+            Ok(balances)
+        })
+        .await?;
+        for row in &mut response.data {
+            if let Some((balance, scope)) = balances.remove(&row.id) {
+                row.cash_balance = Some(balance.balance.to_string());
+                row.cash_balance_currency = Some(balance.currency);
+                row.cash_balance_scope = Some(scope);
+            }
+        }
+        Ok(())
+    }
+
     /// Creates a new activity
     async fn create_activity(&self, activity: NewActivity) -> Result<Activity> {
         let prepared = self.prepare_new_activity(activity).await?;
@@ -5070,6 +5330,14 @@ impl ActivityServiceTrait for ActivityService {
     ) -> Result<ActivityUpdatePreview> {
         // The same steps as `update_activity`, up to its writes.
         let existing = self.activity_repository.get_activity(&activity.id)?;
+        if activity
+            .get_symbol_code()
+            .is_some_and(|symbol| !symbol.trim().is_empty())
+        {
+            return Err(Self::invalid_activity_data(
+                "An update preview names the asset by its id, not by symbol",
+            ));
+        }
         self.hydrate_and_validate_update_against_existing(&mut activity, &existing)?;
 
         let pair = self.load_internal_transfer_pair_for_activity(&activity.id)?;
@@ -5214,6 +5482,11 @@ impl ActivityServiceTrait for ActivityService {
         let pair_values = self.validate_internal_pair_request(&request)?;
 
         let is_update = request.transfer_out_id.is_some() || request.transfer_in_id.is_some();
+        if !is_update && request.edited_activity_id.is_some() {
+            return Err(Self::invalid_activity_data(
+                "Edited activity requires an existing transfer pair",
+            ));
+        }
         let mut old_account_ids: HashSet<String> = HashSet::new();
         let mut old_asset_ids: HashSet<String> = HashSet::new();
         let mut old_currencies: HashSet<String> = HashSet::new();

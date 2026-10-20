@@ -247,6 +247,7 @@
     "manual": "Manual",
     "manual_hint": "saldo actualizado a mano",
     "debt_free": "Sin deuda en {{date}}",
+    "original_balance": "Saldo original {{date}}",
     "updated": "Actualizado {{date}}",
     "status_paid_off": "Pagado",
     "status_renewal_due": "Renovación pendiente",

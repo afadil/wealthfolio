@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use crate::env::AiEnvironment;
 use crate::error::AiError;
+use crate::model_families::non_catalog_capabilities;
 use crate::provider_model::{
     AiProviderSettings, CapabilityInfo, ConnectionField, ModelCapabilities, ProviderDefaultConfig,
     ProviderTuning, AI_PROVIDER_SETTINGS_KEY,
@@ -303,7 +304,8 @@ impl<E: AiEnvironment> ProviderService<E> {
     }
 
     /// Get model capabilities for a specific provider/model combination.
-    /// Checks user capability overrides first, then falls back to catalog, then defaults.
+    /// Checks user capability overrides first, then falls back to catalog, then
+    /// the provider's defaults for models it doesn't list.
     pub fn get_model_capabilities(&self, provider_id: &str, model_id: &str) -> ModelCapabilities {
         // First, get base capabilities from catalog
         let catalog_capabilities = PROVIDER_CATALOG
@@ -329,11 +331,8 @@ impl<E: AiEnvironment> ProviderService<E> {
             });
 
         // Build final capabilities: start with catalog or defaults, then apply overrides
-        let base = catalog_capabilities.unwrap_or(ModelCapabilities {
-            tools: false,
-            thinking: false,
-            vision: false,
-            streaming: true,
+        let base = catalog_capabilities.unwrap_or_else(|| {
+            non_catalog_capabilities(provider_id, model_id, user_overrides.is_some())
         });
 
         // Apply user overrides if present
@@ -526,6 +525,71 @@ mod tests {
         let catalog = &*PROVIDER_CATALOG;
         assert!(catalog.capabilities.contains_key("tools"));
         assert!(catalog.capabilities.contains_key("thinking"));
+    }
+
+    fn env_with_overrides(
+        overrides: serde_json::Value,
+    ) -> Arc<crate::env::test_env::MockEnvironment> {
+        use crate::env::test_env::{MockEnvironment, MockSettingsService};
+        let settings = serde_json::json!({
+            "schemaVersion": 2,
+            "providers": { "anthropic": { "modelCapabilityOverrides": overrides } }
+        });
+        let mut env = MockEnvironment::new();
+        env.settings_service = Arc::new(MockSettingsService {
+            settings: std::sync::RwLock::new(HashMap::from([(
+                AI_PROVIDER_SETTINGS_KEY.to_string(),
+                settings.to_string(),
+            )])),
+        });
+        Arc::new(env)
+    }
+
+    #[test]
+    fn non_catalog_models_get_provider_defaults_and_overrides_still_win() {
+        let service = ProviderService::new(env_with_overrides(serde_json::json!({
+            "claude-partly-set": { "tools": true },
+            "claude-thinking-off": { "tools": true, "thinking": false, "vision": true },
+            "claude-haiku-4-5-20251001": { "thinking": false }
+        })));
+        let caps = |model: &str| {
+            let c = service.get_model_capabilities("anthropic", model);
+            (c.tools, c.thinking, c.vision)
+        };
+        // Unconfigured: provider defaults.
+        assert_eq!(caps("claude-opus-4-8"), (true, true, true));
+        // Configured before defaults existed: unset keys stay off.
+        assert_eq!(caps("claude-partly-set"), (true, false, false));
+        assert_eq!(caps("claude-thinking-off"), (true, false, true));
+        // Catalog model: catalog values, then the override.
+        assert_eq!(caps("claude-haiku-4-5-20251001"), (true, false, true));
+    }
+
+    #[test]
+    fn models_dropped_from_the_catalog_keep_their_catalog_capabilities() {
+        // Saved before the settings screen wrote every key: only the key the
+        // user changed. Tools and vision came from the catalog entry.
+        let service = ProviderService::new(env_with_overrides(serde_json::json!({
+            "claude-sonnet-4-6": { "thinking": true }
+        })));
+        let caps = |provider: &str, model: &str| {
+            let c = service.get_model_capabilities(provider, model);
+            (c.tools, c.thinking, c.vision)
+        };
+        assert_eq!(
+            [
+                caps("anthropic", "claude-sonnet-4-6"),
+                // Unconfigured: the old entry, where the provider's defaults
+                // would assume more (thinking) or less (Groq's tools).
+                caps("anthropic", "claude-opus-4-7"),
+                caps("groq", "moonshotai/kimi-k2-instruct-0905"),
+            ],
+            [
+                (true, true, true),
+                (true, false, true),
+                (true, false, false)
+            ]
+        );
     }
 
     #[test]

@@ -121,7 +121,7 @@ export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
               tickMargin={6}
               tickFormatter={formatXAxis}
               interval={getTickInterval()}
-              tick={{ fontSize: 10 }}
+              tick={{ fontSize: "0.6875rem" }}
             />
             <YAxis
               tickFormatter={(value: number) => numberFormatting.formatPercent(value)}
@@ -129,7 +129,7 @@ export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
               axisLine={false}
               tickMargin={4}
               domain={["auto", "auto"]}
-              tick={{ fontSize: 10 }}
+              tick={{ fontSize: "0.6875rem" }}
               width={50}
             />
             <ChartTooltip

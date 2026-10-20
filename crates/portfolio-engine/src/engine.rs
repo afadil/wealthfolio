@@ -11,12 +11,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::compile::{compile, CompiledLedger};
 use crate::diagnostics::Diagnostic;
 use crate::error::EngineError;
-use crate::measure::MeasureInputs;
+use crate::measure::{MeasureInputs, MeasureProfile};
 use crate::model::*;
 use crate::normalize::normalize;
 use crate::project::{lot_records, project};
 use crate::resolve::{resolve_surfaces, FxResolver, ResolvedSurfaces};
-use crate::value::{effects, value, Resolved, ValueInputs};
+use crate::value::{effects, measure_inputs, value, Resolved, ValueInputs};
 
 #[derive(Debug, Clone)]
 pub struct Engine {
@@ -132,18 +132,15 @@ impl Engine {
 
     /// The inputs `measure_account` and `measure_scope` read: the priced
     /// events plus valuation series, lots and disposals (computed or stored).
+    /// Use the same profile when measuring; Dashboard skips cash FX pricing.
     pub fn measure_inputs<'a>(
         &self,
         series: &'a BTreeMap<AccountId, ValuationSeries>,
         lots: &'a [LotRecord],
         disposals: &'a [LotDisposal],
         rejected: &BTreeSet<ActivityId>,
+        profile: MeasureProfile,
     ) -> MeasureInputs<'a> {
-        MeasureInputs {
-            effects: self.effects(disposals, lots, rejected),
-            series,
-            lots,
-            disposals,
-        }
+        measure_inputs(&self.resolved(), series, lots, disposals, rejected, profile)
     }
 }

@@ -182,31 +182,33 @@ export function BenchmarkSymbolSelector({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          aria-label={iconOnly ? t("common:component.add_benchmark") : undefined}
-          className={cn(
-            "bg-secondary/30 hover:bg-muted/80 flex items-center gap-1.5 rounded-md border-dashed text-sm font-medium",
-            iconOnly ? "h-9 w-9 p-0" : "h-8 px-3 py-1",
-            className,
-          )}
-          size={iconOnly ? "icon" : "sm"}
-        >
-          <Icons.TrendingUp className="h-4 w-4" />
-          {!iconOnly && t("common:component.add_benchmark")}
-        </Button>
+      <PopoverTrigger
+        render={
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            aria-label={t("common:component.add_benchmark")}
+            className={cn(
+              "bg-secondary/30 hover:bg-muted/80 flex items-center gap-1.5 rounded-md border-dashed text-sm font-medium",
+              iconOnly ? "h-9 w-9 p-0" : "h-8 px-3 py-1",
+              className,
+            )}
+            size={iconOnly ? "icon" : "sm"}
+          />
+        }
+      >
+        <Icons.TrendingUp className="h-4 w-4" />
+        {!iconOnly && t("common:component.add_benchmark")}
       </PopoverTrigger>
-      <PopoverContent className="w-[350px] p-0">
+      <PopoverContent className="w-87.5 p-0">
         <Command shouldFilter={false}>
           <CommandInput
             placeholder={t("common:search_benchmarks")}
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
-          <CommandList className="max-h-[300px] overflow-y-auto">
+          <CommandList className="max-h-75 overflow-y-auto">
             <CommandEmpty>
               {isLoading ? t("common:searching") : t("common:no_benchmarks_found")}
             </CommandEmpty>
@@ -237,7 +239,7 @@ export function BenchmarkSymbolSelector({
                       <div className="flex flex-col">
                         <div className="flex items-center">
                           <span className="font-medium">{benchmark.name}</span>
-                          <span className="text-muted-foreground ml-2 text-xs">
+                          <span className="text-muted-foreground ms-2 text-xs">
                             {benchmark.symbol}
                           </span>
                         </div>
@@ -247,7 +249,7 @@ export function BenchmarkSymbolSelector({
                       </div>
                       <Icons.Check
                         className={cn(
-                          "ml-auto h-4 w-4",
+                          "ms-auto h-4 w-4",
                           value === benchmark.name ? "opacity-100" : "opacity-0",
                         )}
                       />
@@ -300,7 +302,7 @@ export function BenchmarkSymbolSelector({
                       <div className="flex flex-col">
                         <div className="flex items-center">
                           <span className="font-medium">{ticker.longName || ticker.symbol}</span>
-                          <span className="text-muted-foreground ml-2 text-xs">
+                          <span className="text-muted-foreground ms-2 text-xs">
                             {ticker.symbol}
                           </span>
                         </div>
@@ -312,7 +314,7 @@ export function BenchmarkSymbolSelector({
                       </div>
                       <Icons.Check
                         className={cn(
-                          "ml-auto h-4 w-4",
+                          "ms-auto h-4 w-4",
                           value === (ticker.longName || ticker.symbol)
                             ? "opacity-100"
                             : "opacity-0",

@@ -73,5 +73,7 @@
   "previous_period_income": "前期の収入",
   "monthly": "月次",
   "previous": "前期",
-  "cumulative": "累計"
+  "cumulative": "累計",
+  "unconverted_currencies_one": "{{baseCurrency}}への為替レートがないため、{{currencies}}の収入は合計に含まれていません。",
+  "unconverted_currencies_other": "{{baseCurrency}}への為替レートがないため、{{currencies}}の収入は合計に含まれていません。"
 }

@@ -159,11 +159,13 @@ impl IncomeServiceTrait for IncomeService {
                 &activity.currency,
                 &base_currency,
             ) {
-                Ok(amount) => amount,
+                Ok(amount) => Some(amount),
                 Err(e) => {
+                    // Counting the amount as if it were already in the base
+                    // currency would misstate every total, so it is left out
+                    // and the summary names its currency instead.
                     error!("Error converting currency: {:?}", e);
-                    // Consider if returning the original amount is the correct fallback
-                    activity.amount
+                    None
                 }
             };
 
@@ -181,14 +183,18 @@ impl IncomeServiceTrait for IncomeService {
                 account_name: activity.account_name.clone(),
             };
 
-            total_summary.add_income(&activity_copy, converted_amount);
+            let add = |summary: &mut IncomeSummary| match converted_amount {
+                Some(amount) => summary.add_income(&activity_copy, amount),
+                None => summary.add_unconverted_income(&activity_copy),
+            };
+            add(&mut total_summary);
 
             if date.year() == current_year {
-                ytd_summary.add_income(&activity_copy, converted_amount);
+                add(&mut ytd_summary);
             } else if date.year() == last_year {
-                last_year_summary.add_income(&activity_copy, converted_amount);
+                add(&mut last_year_summary);
             } else if date.year() == two_years_ago {
-                two_years_ago_summary.add_income(&activity_copy, converted_amount);
+                add(&mut two_years_ago_summary);
             }
         }
 
@@ -212,6 +218,15 @@ impl IncomeServiceTrait for IncomeService {
 
         // Two years ago YoY growth can't be calculated without activity from three years ago
         two_years_ago_summary.yoy_growth = None;
+
+        // YoY growth and the page's previous-period comparison read the
+        // previous period's totals, so its left-out currencies apply too.
+        ytd_summary
+            .unconverted_currencies
+            .extend(last_year_summary.unconverted_currencies.iter().cloned());
+        last_year_summary
+            .unconverted_currencies
+            .extend(two_years_ago_summary.unconverted_currencies.iter().cloned());
 
         // Round the calculated values before returning
         let summaries = vec![
@@ -241,6 +256,9 @@ impl IncomeServiceTrait for IncomeService {
                     entry.income = entry.income.round_dp(DISPLAY_DECIMAL_PRECISION);
                 }
                 for val in summary.by_currency.values_mut() {
+                    *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
+                }
+                for val in summary.by_currency_base.values_mut() {
                     *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
                 }
                 for entry in summary.by_account.values_mut() {

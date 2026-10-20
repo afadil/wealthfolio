@@ -743,19 +743,29 @@
     "title": "Geldfluss",
     "subtitle": "Woher Ihr Geld kam und wohin es ging für {{period}}.",
     "focusSubtitle": "Alle Kategorien für {{period}}.",
+    "focusSubcategoriesSubtitle": "Alle Unterkategorien für {{period}}.",
     "back": "Alle Flüsse",
+    "backTo": "Zurück zu {{name}}",
     "chartLabel": "Geldflussdiagramm. Mit den Pfeiltasten zwischen den Flüssen wechseln.",
     "nodeAria": "{{name}}, {{amount}}",
+    "nodeActionAria": "{{name}}, {{amount}}. {{action}}",
     "shareOfIncome": "{{pct}} der Einnahmen",
     "shareOfTotal": "{{pct}} der Summe",
     "clickTransactions": "Klicken, um Transaktionen zu sehen",
     "clickCategories": "Klicken, um alle Kategorien zu sehen",
+    "clickSubcategories": "Klicken, um Unterkategorien zu sehen",
+    "action": {
+      "categories": "Alle Kategorien anzeigen",
+      "subcategories": "Unterkategorien anzeigen",
+      "transactions": "Transaktionen anzeigen"
+    },
     "node": {
       "total": "Summe",
       "shortfall": "Fehlbetrag",
       "refunds": "Nettoerstattungen",
       "surplus": "Übrig",
-      "uncategorizedIncome": "Nicht kategorisierte Einnahmen"
+      "uncategorizedIncome": "Nicht kategorisierte Einnahmen",
+      "netSpending": "Nettoausgaben"
     },
     "hint": {
       "total": "Eingänge plus Nettoerstattungen und ein etwaiger Fehlbetrag. Entspricht immer den Ausgängen.",
@@ -764,9 +774,12 @@
       "refunds": "Kategorien, in denen Erstattungen die Ausgaben überstiegen.",
       "saved": "Auf Spar- und Anlagekonten übertragen.",
       "surplus": "Eingegangen, aber weder ausgegeben noch zurückgelegt.",
-      "uncategorized": "Ausgaben, die noch keine Kategorie haben."
+      "uncategorized": "Ausgaben, die noch keine Kategorie haben.",
+      "net": "Was diese Kategorie nach Erstattungen gekostet hat.",
+      "direct": "Der Kategorie selbst zugeordnet, keiner Unterkategorie."
     },
-    "groupRefunds": "Vor Abzug von {{amount}} Nettoerstattungen."
+    "groupRefunds": "Vor Abzug von {{amount}} Nettoerstattungen.",
+    "categoryRefunds": "Vor Abzug von {{refunds}} Nettoerstattungen. Nettoausgaben: {{net}}."
   },
   "budgetChart": {
     "overBudget": "Über Budget",
@@ -1018,6 +1031,7 @@
     "addSource_one": "Quelle hinzufügen ({{count}} verfügbar)",
     "addSource_other": "Quelle hinzufügen ({{count}} verfügbar)",
     "overridesTitle_one": "Anpassung · {{count}}",
-    "overridesTitle_other": "Anpassungen · {{count}}"
+    "overridesTitle_other": "Anpassungen · {{count}}",
+    "sourceMonth": "Quellmonat"
   }
 }

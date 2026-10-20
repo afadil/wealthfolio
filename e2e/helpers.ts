@@ -215,7 +215,7 @@ export async function fillDateField(page: Page, daysAgo: number) {
 
 export async function waitForOverlayClose(page: Page) {
   await page
-    .locator('[data-state="open"][aria-hidden="true"]')
+    .locator('[data-slot$="-overlay"][data-open]')
     .waitFor({ state: "hidden", timeout: 5000 })
     .catch(() => {});
 }
@@ -245,10 +245,32 @@ export async function selectActivityType(page: Page, type: string) {
   await page.waitForTimeout(200);
 }
 
+/**
+ * Toasts stay clickable above dialogs, and a loading toast such as "Calculating
+ * portfolio performance…" can cover a dialog's buttons for a while. Before each
+ * action, wait for a visible loading toast to finish, as a person would.
+ */
+export async function waitOutLoadingToasts(page: Page) {
+  const loadingToasts = page.locator('[data-sonner-toast][data-type="loading"]');
+  await page.addLocatorHandler(
+    loadingToasts.first(),
+    async () => {
+      await expect(loadingToasts).toHaveCount(0, { timeout: 120_000 });
+    },
+    { noWaitAfter: true },
+  );
+}
+
+// A select mounts its options, hidden, once its trigger has had focus, and a
+// select that just closed keeps showing them while it animates out, so options are
+// looked up in the open popup.
+const OPEN_SELECT = '[data-slot="select-content"][data-open]';
+
 export async function selectFirstAccount(page: Page) {
   await page.getByTestId("account-select").click();
-  await expect(page.getByTestId("account-option").first()).toBeAttached({ timeout: 5000 });
-  await page.keyboard.press("Enter");
+  const option = page.locator(OPEN_SELECT).getByTestId("account-option").first();
+  await expect(option).toBeVisible({ timeout: 5000 });
+  await option.click();
   await page.waitForTimeout(200);
 }
 
@@ -264,6 +286,7 @@ export async function selectAccountOption(
 ) {
   await accountSelect.click();
   const option = page
+    .locator(OPEN_SELECT)
     .locator(
       `[data-testid="account-option"][data-account-name="${cssAttributeValue(
         accountName,

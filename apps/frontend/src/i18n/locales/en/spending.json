@@ -743,19 +743,29 @@
     "title": "Money flow",
     "subtitle": "Where your money came from and where it went for {{period}}.",
     "focusSubtitle": "Every category for {{period}}.",
+    "focusSubcategoriesSubtitle": "Every subcategory for {{period}}.",
     "back": "All flows",
+    "backTo": "Back to {{name}}",
     "chartLabel": "Money flow chart. Use the arrow keys to move between flows.",
     "nodeAria": "{{name}}, {{amount}}",
+    "nodeActionAria": "{{name}}, {{amount}}. {{action}}",
     "shareOfIncome": "{{pct}} of income",
     "shareOfTotal": "{{pct}} of total",
     "clickTransactions": "Click to see transactions",
     "clickCategories": "Click to see every category",
+    "clickSubcategories": "Click to see subcategories",
+    "action": {
+      "categories": "Show every category",
+      "subcategories": "Show subcategories",
+      "transactions": "View transactions"
+    },
     "node": {
       "total": "Total",
       "shortfall": "Shortfall",
       "refunds": "Net refunds",
       "surplus": "Left over",
-      "uncategorizedIncome": "Uncategorized income"
+      "uncategorizedIncome": "Uncategorized income",
+      "netSpending": "Net spending"
     },
     "hint": {
       "total": "Money in, plus net refunds and any shortfall. It always equals money out.",
@@ -764,9 +774,12 @@
       "refunds": "Categories where refunds were larger than spending.",
       "saved": "Moved to savings and investment accounts.",
       "surplus": "Came in but wasn't spent or set aside.",
-      "uncategorized": "Spending that doesn't have a category yet."
+      "uncategorized": "Spending that doesn't have a category yet.",
+      "net": "What this category cost after refunds.",
+      "direct": "Assigned to the category itself, not to a subcategory."
     },
-    "groupRefunds": "Before subtracting {{amount}} in net refunds."
+    "groupRefunds": "Before subtracting {{amount}} in net refunds.",
+    "categoryRefunds": "Before subtracting {{refunds}} in net refunds. Net spending: {{net}}."
   },
   "budgetChart": {
     "overBudget": "Over budget",
@@ -1018,6 +1031,7 @@
     "addSource_one": "Add source ({{count}} available)",
     "addSource_other": "Add source ({{count}} available)",
     "overridesTitle_one": "Override · {{count}}",
-    "overridesTitle_other": "Overrides · {{count}}"
+    "overridesTitle_other": "Overrides · {{count}}",
+    "sourceMonth": "Source month"
   }
 }

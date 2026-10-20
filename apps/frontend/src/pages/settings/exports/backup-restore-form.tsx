@@ -1,9 +1,10 @@
 import type { BackupFailure } from "./backup-error";
+import { DatabaseIcon } from "@phosphor-icons/react/dist/csr/Database";
 import { getDatabaseBackupDownloadUrl, isWeb, openDatabaseBackupFolder } from "@/adapters";
 import { usePlatform } from "@/hooks/use-platform";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useDateFormatting } from "@wealthfolio/ui";
+import { useDateFormatting, buttonVariants } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/card";
@@ -61,7 +62,7 @@ export function BackupRestoreForm() {
     <Card className="overflow-hidden rounded-2xl shadow-none">
       <CardHeader className="space-y-4 p-5 sm:p-6">
         <BackupCardHeader
-          icon={<Icons.DatabaseBackup aria-hidden />}
+          icon={<DatabaseIcon weight="duotone" aria-hidden />}
           title={t("settings:backup_title")}
           info={
             <InfoPopover
@@ -290,7 +291,7 @@ export function BackupRestoreForm() {
             className="sm:max-w-md"
             mobileClassName="h-auto max-h-[85dvh] overflow-y-auto"
           >
-            <DialogHeader className="text-left">
+            <DialogHeader className="text-start">
               <DialogTitle>{t("settings:backup_original_advanced")}</DialogTitle>
               <DialogDescription>{t("settings:backup_original_warning")}</DialogDescription>
             </DialogHeader>
@@ -299,15 +300,14 @@ export function BackupRestoreForm() {
                 {t("common:cancel")}
               </Button>
               {original && (
-                <Button asChild>
-                  <a
-                    href={getDatabaseBackupDownloadUrl(original.filename)}
-                    onClick={() => setOriginal(null)}
-                  >
-                    <Icons.Download aria-hidden />
-                    {t("settings:backup_original_save")}
-                  </a>
-                </Button>
+                <a
+                  href={getDatabaseBackupDownloadUrl(original.filename)}
+                  onClick={() => setOriginal(null)}
+                  className={buttonVariants()}
+                >
+                  <Icons.Download aria-hidden />
+                  {t("settings:backup_original_save")}
+                </a>
               )}
             </DialogFooter>
           </DialogContent>

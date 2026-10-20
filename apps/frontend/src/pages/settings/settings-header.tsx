@@ -59,10 +59,10 @@ export function SettingsHeader({
             variant="ghost"
             size="sm"
             onClick={handleBack}
-            className="text-muted-foreground hover:text-foreground -ml-1 h-8 w-8 shrink-0 p-0 lg:hidden"
+            className="text-muted-foreground hover:text-foreground -ms-1 h-8 w-8 shrink-0 p-0 lg:hidden"
             aria-label={t("common:back")}
           >
-            <Icons.ArrowLeft className="h-5 w-5" />
+            <Icons.ArrowLeft className="h-5 w-5 rtl:rotate-180" />
           </Button>
         )}
         <div className="grid min-w-0 gap-1">

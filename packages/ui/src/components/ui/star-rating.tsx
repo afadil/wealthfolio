@@ -73,7 +73,7 @@ export function StarRating({
             {(isFullStar || isPartialStar) && (
               <div className="absolute inset-0 overflow-hidden" style={{ width: `${fillPercentage}%` }}>
                 <Icons.Star
-                  className={cn(sizeClasses[size], hoveredRating ? "text-yellow-400" : "text-yellow-500")}
+                  className={cn(sizeClasses[size], hoveredRating ? "text-warning" : "text-warning")}
                   fill="currentColor"
                 />
               </div>

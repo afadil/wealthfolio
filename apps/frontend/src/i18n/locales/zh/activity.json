@@ -242,6 +242,7 @@
   "table_price_amount": "价格/金额",
   "table_fee": "费用",
   "table_total": "总计",
+  "table_balance": "余额",
   "table_account": "账户",
   "table_currency": "货币",
   "table_comment": "备注",
@@ -302,6 +303,7 @@
     "import_from_csv": "从 CSV 导入",
     "transfer_holdings": "转移持仓",
     "add_personal_asset": "添加个人资产",
+    "connect_account": "连接账户",
     "add_activities": "添加活动",
     "ask_ai_categorize": "让 AI 分类",
     "investments": "投资",
@@ -602,6 +604,7 @@
     "err_select_source_account": "请选择一个来源账户。",
     "err_select_destination_account": "请选择一个目标账户。",
     "err_accounts_different": "来源账户和目标账户必须不同。",
+    "err_same_account_currencies": "同账户转账请选择不同的币种。",
     "err_currency_required": "货币为必填项。",
     "err_select_date": "请选择一个日期。",
     "err_enter_amount": "请输入金额。",
@@ -698,6 +701,7 @@
     "duplicated_comment": "已复制",
     "edit_transfer_pair": "请通过“编辑”在转账表单中修改账户和币种。请先保存尚未提交的更改。",
     "save_edits_first": "请先保存编辑",
+    "duplicate_transfer_failed": "无法复制转账对，请刷新后重试。",
     "save_before_link": "在关联此转账之前，请先保存或放弃待处理的编辑。",
     "save_before_unlink": "在取消关联此转账之前，请先保存或放弃待处理的编辑。",
     "link_reason_save_new": "关联前请先保存新活动",
@@ -763,7 +767,10 @@
     "clear_filters": "清除筛选",
     "ratio": "比例",
     "premium": "权利金",
-    "total_value": "总价值"
+    "total_value": "总价值",
+    "day_count_one": "{{count}} 条活动",
+    "day_count_other": "{{count}} 条活动",
+    "day_end_cash": "现金"
   },
   "mobile_type_category": {
     "trade": "交易",
@@ -1115,7 +1122,8 @@
       "total": "总计",
       "importAnother": "导入另一个",
       "viewHoldings": "查看持仓",
-      "viewActivities": "查看活动"
+      "viewActivities": "查看活动",
+      "syncAutomatically": "想要自动同步吗？"
     },
     "assets": {
       "noAssetsTitle": "没有需要审核的资产",

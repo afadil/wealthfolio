@@ -7,7 +7,7 @@ members = [
 ]
 
 [workspace.package]
-version = "3.9.2"
+version = "3.10.0"
 edition = "2021"
 license = "AGPL-3.0"
 
@@ -58,7 +58,7 @@ r2d2 = "0.8"
 chrono = { version = "0.4", features = ["serde"] }
 
 # HTTP
-reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls", "query", "form", "stream"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls", "query", "form", "stream", "charset", "http2", "system-proxy"] }
 
 # Error handling
 thiserror = "1"

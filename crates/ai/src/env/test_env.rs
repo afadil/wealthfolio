@@ -392,10 +392,31 @@ impl TaxonomyServiceTrait for MockTaxonomyService {
 #[derive(Default)]
 pub struct MockActivityService {
     pub activities: Vec<ActivityDetails>,
+    /// Balance, currency and scope `attach_cash_balances` fills in, by
+    /// activity id.
+    pub cash_balances: std::collections::HashMap<
+        String,
+        (
+            String,
+            String,
+            wealthfolio_core::activities::CashBalanceScope,
+        ),
+    >,
 }
 
 #[async_trait]
 impl ActivityServiceTrait for MockActivityService {
+    async fn attach_cash_balances(&self, response: &mut ActivitySearchResponse) -> CoreResult<()> {
+        for row in &mut response.data {
+            if let Some((balance, currency, scope)) = self.cash_balances.get(&row.id) {
+                row.cash_balance = Some(balance.clone());
+                row.cash_balance_currency = Some(currency.clone());
+                row.cash_balance_scope = Some(*scope);
+            }
+        }
+        Ok(())
+    }
+
     fn get_activity(&self, _activity_id: &str) -> CoreResult<Activity> {
         unimplemented!("MockActivityService::get_activity")
     }
@@ -892,10 +913,6 @@ impl SettingsServiceTrait for MockSettingsService {
 
     fn get_base_currency(&self) -> CoreResult<Option<String>> {
         Ok(Some("USD".to_string()))
-    }
-
-    async fn update_base_currency(&self, _new_base_currency: &str) -> CoreResult<()> {
-        Ok(())
     }
 
     fn is_auto_update_check_enabled(&self) -> CoreResult<bool> {
@@ -1907,7 +1924,7 @@ impl wealthfolio_core::portfolio::net_worth::NetWorthServiceTrait for EmptyNetWo
     {
         Ok(wealthfolio_core::portfolio::net_worth::NetWorthResponse::empty(date, "USD".into()))
     }
-    fn get_net_worth_history(
+    async fn get_net_worth_history(
         &self,
         _: chrono::NaiveDate,
         _: chrono::NaiveDate,

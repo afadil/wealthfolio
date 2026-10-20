@@ -1,8 +1,13 @@
 import { useHealthStatus } from "@/hooks/use-health";
 import { cn } from "@/lib/utils";
-import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@wealthfolio/ui";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+  buttonVariants,
+} from "@wealthfolio/ui";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { HealthSeverity } from "@/lib/types";
@@ -10,7 +15,7 @@ import type { HealthSeverity } from "@/lib/types";
 const SEVERITY_COLORS: Record<HealthSeverity, string> = {
   CRITICAL: "text-destructive",
   ERROR: "text-destructive",
-  WARNING: "text-yellow-500",
+  WARNING: "text-warning",
   INFO: "text-muted-foreground",
 };
 
@@ -63,23 +68,26 @@ export function HealthStatusIndicator() {
 
   return (
     <TooltipProvider>
-      <Tooltip delayDuration={300}>
-        <TooltipTrigger asChild>
-          <Button
-            variant="secondary"
-            size="icon-xs"
-            className="bg-secondary/50 rounded-full"
-            asChild
-          >
-            <Link to="/health" title={t("common:component.data_status")}>
-              <Icons.AlertTriangle className={cn("size-5", severityColor)} />
-            </Link>
-          </Button>
+      <Tooltip>
+        <TooltipTrigger
+          delay={300}
+          render={
+            <Link
+              to="/health"
+              title={t("common:component.data_status")}
+              className={cn(
+                buttonVariants({ variant: "secondary", size: "icon-xs" }),
+                "bg-secondary/50 rounded-full",
+              )}
+            />
+          }
+        >
+          <Icons.AlertTriangle className={cn("size-5", severityColor)} />
         </TooltipTrigger>
         <TooltipContent side="bottom">
           <div className="space-y-1">
             <p className="font-medium">{t("common:component.health_issues")}</p>
-            <p className="text-muted-foreground text-xs">{summaryText}</p>
+            <p className="text-background/70 text-xs">{summaryText}</p>
           </div>
         </TooltipContent>
       </Tooltip>

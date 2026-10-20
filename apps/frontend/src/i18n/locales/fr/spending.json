@@ -785,19 +785,29 @@
     "title": "Flux d'argent",
     "subtitle": "D'où vient votre argent et où il est allé pour {{period}}.",
     "focusSubtitle": "Toutes les catégories pour {{period}}.",
+    "focusSubcategoriesSubtitle": "Toutes les sous-catégories pour {{period}}.",
     "back": "Tous les flux",
+    "backTo": "Retour à {{name}}",
     "chartLabel": "Diagramme des flux d'argent. Utilisez les flèches pour passer d'un flux à l'autre.",
     "nodeAria": "{{name}}, {{amount}}",
+    "nodeActionAria": "{{name}}, {{amount}}. {{action}}",
     "shareOfIncome": "{{pct}} des revenus",
     "shareOfTotal": "{{pct}} du total",
     "clickTransactions": "Cliquez pour voir les transactions",
     "clickCategories": "Cliquez pour voir toutes les catégories",
+    "clickSubcategories": "Cliquez pour voir les sous-catégories",
+    "action": {
+      "categories": "Voir toutes les catégories",
+      "subcategories": "Voir les sous-catégories",
+      "transactions": "Voir les transactions"
+    },
     "node": {
       "total": "Total",
       "shortfall": "Déficit",
       "refunds": "Remboursements nets",
       "surplus": "Reste",
-      "uncategorizedIncome": "Revenus non catégorisés"
+      "uncategorizedIncome": "Revenus non catégorisés",
+      "netSpending": "Dépenses nettes"
     },
     "hint": {
       "total": "Les entrées, plus les remboursements nets et un éventuel déficit. Toujours égal aux sorties.",
@@ -806,9 +816,12 @@
       "refunds": "Catégories où les remboursements ont dépassé les dépenses.",
       "saved": "Transféré vers des comptes d'épargne et d'investissement.",
       "surplus": "Entré, mais ni dépensé ni mis de côté.",
-      "uncategorized": "Dépenses qui n'ont pas encore de catégorie."
+      "uncategorized": "Dépenses qui n'ont pas encore de catégorie.",
+      "net": "Ce que cette catégorie a coûté après remboursements.",
+      "direct": "Attribué à la catégorie elle-même, pas à une sous-catégorie."
     },
-    "groupRefunds": "Avant déduction de {{amount}} de remboursements nets."
+    "groupRefunds": "Avant déduction de {{amount}} de remboursements nets.",
+    "categoryRefunds": "Avant déduction de {{refunds}} de remboursements nets. Dépenses nettes : {{net}}."
   },
   "budgetChart": {
     "overBudget": "Budget dépassé",
@@ -1075,6 +1088,7 @@
     "addSource_many": "Ajouter une source ({{count}} disponibles)",
     "overridesTitle_one": "Ajustement · {{count}}",
     "overridesTitle_other": "Ajustements · {{count}}",
-    "overridesTitle_many": "Ajustements · {{count}}"
+    "overridesTitle_many": "Ajustements · {{count}}",
+    "sourceMonth": "Mois source"
   }
 }

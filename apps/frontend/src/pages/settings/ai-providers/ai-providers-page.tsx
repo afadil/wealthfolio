@@ -14,7 +14,12 @@ import {
   useAiProviderApiKey,
   useListAiModels,
 } from "@/features/ai-assistant";
-import type { ModelCapabilityOverrides, ProviderTuningOverrides } from "@/lib/types";
+import type {
+  ModelCapabilityOverrides,
+  ModelCapabilityOverrideUpdate,
+  ProviderTuningOverrides,
+} from "@/lib/types";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 
 /**
  * AI Providers settings page - configure AI provider API keys and preferences.
@@ -35,8 +40,12 @@ export default function AiProvidersPage() {
     updateSettings({ providerId, selectedModel: modelId });
   };
 
-  const handleSetFavoriteModels = (providerId: string, modelIds: string[]) => {
-    updateSettings({ providerId, favoriteModels: modelIds });
+  const handleSetFavoriteModels = (
+    providerId: string,
+    modelIds: string[],
+    modelCapabilityOverride?: ModelCapabilityOverrideUpdate,
+  ) => {
+    updateSettings({ providerId, favoriteModels: modelIds, modelCapabilityOverride });
   };
 
   const handleSetCapabilityOverride = (
@@ -102,21 +111,26 @@ export default function AiProvidersPage() {
           text={t("settings:ai_providers_description")}
         />
         <Separator />
-        <div className="border-destructive/20 bg-destructive/5 rounded-lg border p-6">
-          <div className="flex items-start gap-3">
-            <Icons.XCircle className="text-destructive mt-0.5 h-5 w-5 shrink-0" />
-            <div className="space-y-2">
-              <h3 className="text-destructive font-medium">
-                {t("settings:ai_providers_load_error")}
-              </h3>
-              <p className="text-muted-foreground text-sm">{error.message}</p>
-              <Button variant="outline" size="sm" onClick={() => refetch()} className="mt-2">
-                <Icons.Refresh className="mr-2 h-4 w-4" />
+        <Alert variant="destructive" className="p-6">
+          <Icons.XCircle className="size-5" />
+          <AlertTitle role="heading" aria-level={3}>
+            {t("settings:ai_providers_load_error")}
+          </AlertTitle>
+          <AlertDescription>
+            {error.message}
+            <div className="mt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetch()}
+                className="text-foreground"
+              >
+                <Icons.Refresh className="me-2 h-4 w-4" />
                 {t("common:retry")}
               </Button>
             </div>
-          </div>
-        </div>
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -150,7 +164,9 @@ export default function AiProvidersPage() {
                 onSetDefault={() => setDefault({ providerId: provider.id })}
                 onCustomUrlChange={(url) => handleCustomUrlChange(provider.id, url)}
                 onSelectModel={(modelId) => handleSelectModel(provider.id, modelId)}
-                onSetFavoriteModels={(modelIds) => handleSetFavoriteModels(provider.id, modelIds)}
+                onSetFavoriteModels={(modelIds, capabilityOverride) =>
+                  handleSetFavoriteModels(provider.id, modelIds, capabilityOverride)
+                }
                 onSetCapabilityOverride={(modelId, overrides) =>
                   handleSetCapabilityOverride(provider.id, modelId, overrides)
                 }
@@ -188,7 +204,10 @@ function ProviderSettingsCardWrapper({
   onSetDefault: () => void;
   onCustomUrlChange: (url: string) => void;
   onSelectModel: (modelId: string) => void;
-  onSetFavoriteModels: (modelIds: string[]) => void;
+  onSetFavoriteModels: (
+    modelIds: string[],
+    capabilityOverride?: ModelCapabilityOverrideUpdate,
+  ) => void;
   onSetCapabilityOverride: (modelId: string, overrides: ModelCapabilityOverrides | null) => void;
   onToolsAllowlistChange: (tools: string[] | null) => void;
   onTuningOverridesChange: (overrides: ProviderTuningOverrides | null) => void;

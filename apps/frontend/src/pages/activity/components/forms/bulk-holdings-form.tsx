@@ -18,6 +18,7 @@ import {
   FormMessage,
   MoneyInput,
   QuantityInput,
+  useAmountFormatting,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { memo, useCallback, useMemo, useState } from "react";
@@ -76,6 +77,9 @@ const HoldingRow = memo(
   }) => {
     const { t } = useTranslation(["activity"]);
     const { control, setValue, getValues } = useFormContext<BulkHoldingsFormValues>();
+    const amountFormatting = useAmountFormatting();
+    // The holdings are recorded in the form's currency.
+    const currency = useWatch({ control, name: "currency" });
 
     // Use useWatch for specific fields instead of watch() in parent
     const ticker = useWatch({
@@ -221,13 +225,13 @@ const HoldingRow = memo(
     return (
       <div
         className={cn(
-          "border-border/50 hover:bg-muted/50 grid grid-cols-3 gap-x-2 gap-y-2 rounded-lg border-b px-3 py-3 transition-colors last:border-b-0 sm:grid-cols-12 sm:gap-3",
+          "border-border/50 hover:bg-muted/50 grid grid-cols-2 gap-x-2 gap-y-2 rounded-lg border-b px-3 py-3 transition-colors last:border-b-0 sm:grid-cols-12 sm:gap-3",
           isSelected && "bg-muted",
         )}
         onClick={handleRowClick}
       >
         {/* Ticker Input */}
-        <div className="col-span-3 sm:col-span-6">
+        <div className="col-span-2 sm:col-span-5">
           <div className="flex min-w-0 items-center gap-2">
             <TickerAvatar
               symbol={canonicalSymbol || ticker}
@@ -262,7 +266,8 @@ const HoldingRow = memo(
                 variant="ghost"
                 size="sm"
                 onClick={handleRemoveClick}
-                className="hover:bg-destructive/20 hover:text-destructive h-6 w-6 shrink-0 p-0 sm:hidden"
+                aria-label={t("common:remove")}
+                className="hover:bg-destructive-subtle hover:text-destructive-subtle-foreground h-6 w-6 shrink-0 p-0 sm:hidden"
               >
                 <Icons.Trash className="h-3 w-3" />
               </Button>
@@ -305,14 +310,14 @@ const HoldingRow = memo(
         </div>
 
         {/* Total Value */}
-        <div className="flex items-center justify-end sm:col-span-2">
+        <div className="col-span-2 flex items-center justify-end sm:col-span-3">
           <span
             className={cn(
               "text-sm font-medium",
               totalValue > 0 ? "text-foreground" : "text-muted-foreground",
             )}
           >
-            ${totalValue.toFixed(2)}
+            {amountFormatting.formatAmount(totalValue, currency)}
           </span>
         </div>
 
@@ -324,7 +329,8 @@ const HoldingRow = memo(
               variant="ghost"
               size="sm"
               onClick={handleRemoveClick}
-              className="hover:bg-destructive/20 hover:text-destructive h-6 w-6 p-0"
+              aria-label={t("common:remove")}
+              className="hover:bg-destructive-subtle hover:text-destructive-subtle-foreground h-6 w-6 p-0"
             >
               <Icons.Trash className="h-3 w-3" />
             </Button>
@@ -461,13 +467,11 @@ export const BulkHoldingsForm = ({ onAccountChange, defaultAccount }: BulkHoldin
 
           {/* Table Header */}
           <div className="text-muted-foreground hidden gap-3 border-b pb-3 text-sm sm:grid sm:grid-cols-12">
-            <div className="col-span-6">{t("activity:tickers")}</div>
-            <div className="col-span-1 text-right">{t("activity:form.bulk_col_shares")}</div>
-            <div className="col-span-2 text-right">{t("activity:form.bulk_col_average_cost")}</div>
-            <div className="col-span-2 whitespace-nowrap text-right">
-              {t("activity:total_value")}
-            </div>
-            <div className="col-span-1 text-right"></div>
+            <div className="col-span-5">{t("activity:tickers")}</div>
+            <div className="col-span-1 text-end">{t("activity:form.bulk_col_shares")}</div>
+            <div className="col-span-2 text-end">{t("activity:form.bulk_col_average_cost")}</div>
+            <div className="col-span-3 whitespace-nowrap text-end">{t("activity:total_value")}</div>
+            <div className="col-span-1 text-end"></div>
           </div>
 
           {/* Table Rows - Virtualization candidate for large lists */}
@@ -498,7 +502,7 @@ export const BulkHoldingsForm = ({ onAccountChange, defaultAccount }: BulkHoldin
               className="border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground h-10 w-full border border-dashed"
               data-testid="bulk-holdings-add-row"
             >
-              <Icons.PlusCircle className="mr-2 h-4 w-4" />
+              <Icons.PlusCircle className="me-2 h-4 w-4" />
               {t("activity:add_another_holding")}
             </Button>
           </div>

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@/test/render";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { TransferForm } from "../transfer-form";
+import { TransferForm, transferFormSchema } from "../transfer-form";
 
 vi.mock("@/hooks/use-settings", () => ({
   useSettings: () => ({ data: { baseCurrency: "USD" } }),
@@ -14,6 +14,9 @@ const accounts = [
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
+  Element.prototype.hasPointerCapture = vi.fn(() => false);
+  Element.prototype.setPointerCapture = vi.fn();
+  Element.prototype.releasePointerCapture = vi.fn();
   vi.stubGlobal(
     "ResizeObserver",
     class {
@@ -25,6 +28,96 @@ beforeAll(() => {
 });
 
 describe("internal transfer currencies (real form)", () => {
+  it("edits an existing same-account FX conversion without rejecting its account", async () => {
+    const onSubmit = vi.fn();
+    const { container } = render(
+      <TransferForm
+        accounts={accounts}
+        isEditing
+        onSubmit={onSubmit}
+        defaultValues={{
+          fromAccountId: "a",
+          toAccountId: "a",
+          activityDate: new Date("2026-02-01T10:00:00Z"),
+          transferMode: "cash",
+          currency: "USD",
+          sourceCurrency: "USD",
+          destinationCurrency: "EUR",
+          sourceAmount: 100,
+          destinationAmount: 90,
+          comment: "Corrected record",
+        }}
+      />,
+    );
+    expect(screen.getByRole("combobox", { name: "To Account" })).toHaveTextContent("Account A");
+    fireEvent.submit(container.querySelector("form")!);
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({
+      fromAccountId: "a",
+      toAccountId: "a",
+      activityDate: new Date("2026-02-01T10:00:00Z"),
+      sourceAmount: 100,
+      destinationAmount: 90,
+      comment: "Corrected record",
+    });
+  });
+
+  it("offers the same destination account and exposes currencies without opening advanced options", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    const { container } = render(
+      <TransferForm
+        accounts={accounts}
+        onSubmit={onSubmit}
+        defaultValues={{ fromAccountId: "a" }}
+      />,
+    );
+    await user.click(screen.getByRole("combobox", { name: "To Account" }));
+    await user.click(screen.getByRole("option", { name: /Account A/ }));
+    expect(screen.getByRole("combobox", { name: "Source currency" })).toBeVisible();
+    await user.click(screen.getByRole("combobox", { name: "Destination currency" }));
+    await user.type(screen.getByPlaceholderText("Search currency..."), "EUR");
+    await user.click(screen.getByRole("option", { name: /EUR/ }));
+    fireEvent.change(screen.getByTestId("sent-amount-input"), { target: { value: "100" } });
+    fireEvent.change(screen.getByTestId("received-amount-input"), { target: { value: "92" } });
+    fireEvent.submit(container.querySelector("form")!);
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({
+      fromAccountId: "a",
+      toAccountId: "a",
+      sourceCurrency: "USD",
+      destinationCurrency: "EUR",
+      sourceAmount: 100,
+      destinationAmount: 92,
+    });
+  }, 15_000);
+
+  it("accepts same-account cash FX but rejects same-currency and securities self-transfers", () => {
+    const values = {
+      fromAccountId: "a",
+      toAccountId: "a",
+      activityDate: new Date(),
+      currency: "USD",
+      sourceCurrency: "USD",
+      destinationCurrency: "EUR",
+      sourceAmount: 100,
+      destinationAmount: 92,
+    };
+    expect(transferFormSchema.safeParse(values).success).toBe(true);
+    expect(transferFormSchema.safeParse({ ...values, destinationCurrency: "USD" }).success).toBe(
+      false,
+    );
+    expect(
+      transferFormSchema.safeParse({
+        ...values,
+        transferMode: "securities",
+        assetId: "AAPL",
+        quantity: 1,
+      }).success,
+    ).toBe(false);
+  });
+
+  // Both real currency pickers can exceed the default 5s on shared CI runners.
   it("offers both cash currencies in advanced options", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
@@ -41,7 +134,7 @@ describe("internal transfer currencies (real form)", () => {
     for (const name of ["Source currency", "Destination currency"]) {
       await user.click(screen.getByRole("combobox", { name }));
       await user.type(screen.getByPlaceholderText("Search currency..."), "HKD");
-      await user.click(screen.getByRole("option", { name: /HKD/ }));
+      await user.click(await screen.findByRole("option", { name: /HKD/ }));
     }
     fireEvent.change(screen.getByTestId("input-amount"), { target: { value: "1000" } });
     fireEvent.submit(container.querySelector("form")!);
@@ -52,7 +145,7 @@ describe("internal transfer currencies (real form)", () => {
       sourceAmount: 1000,
       destinationAmount: 1000,
     });
-  });
+  }, 15_000);
 
   it.each([
     [780, 100],

@@ -7,6 +7,8 @@ import { ContributionLimit, DepositsCalculation } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { PrivacyAmount } from "@wealthfolio/ui";
 import { Trans, useTranslation } from "react-i18next";
+import { statusSurfaceVariants } from "@wealthfolio/ui/components/ui/status-surface";
+import { cn } from "@/lib/utils";
 
 interface AccountContributionLimitProps {
   accountId: string;
@@ -80,9 +82,12 @@ function AccountContributionLimitItem({
 
   return (
     <Card
-      className={`border-none shadow-sm ${
-        isOverLimit ? "border-destructive/20 bg-destructive/10" : isAtLimit ? "bg-success/10" : ""
-      }`}
+      className={cn(
+        "border-none shadow-sm",
+        isOverLimit
+          ? statusSurfaceVariants({ status: "destructive" })
+          : isAtLimit && statusSurfaceVariants({ status: "success" }),
+      )}
     >
       <CardContent className="space-y-3 p-4">
         <div className="flex items-start justify-between gap-4">
@@ -103,7 +108,7 @@ function AccountContributionLimitItem({
               />
             </p>
           </div>
-          <div className={`shrink-0 text-right text-xs font-semibold ${statusClassName}`}>
+          <div className={`shrink-0 text-end text-xs font-semibold ${statusClassName}`}>
             {isOverLimit ? (
               <Trans
                 i18nKey="account:contribution.over_by"

@@ -391,11 +391,16 @@ impl PortfolioCoordinator {
         if markers.is_empty() && !day_moved {
             return Ok((Vec::new(), Vec::new(), Vec::new()));
         }
+        let base_currency = self.base_currency();
+        // A new profile has no accounts and no base currency until onboarding:
+        // nothing to value yet. The markers wait for the first run with accounts.
+        if scope.is_empty() && base_currency.trim().is_empty() {
+            return Ok((Vec::new(), Vec::new(), Vec::new()));
+        }
 
         // Loading every activity, then normalising and compiling it, grows
         // with history: keep both off the async workers, like the folds below.
         let sources = self.deps.sources.clone();
-        let base_currency = self.base_currency();
         let timezone = self.timezone();
         let (loaded, resolved) = blocking(move || {
             let loaded = facts::load(&sources, &scope, &base_currency, &timezone, today)?;

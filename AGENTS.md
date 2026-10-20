@@ -73,6 +73,12 @@ guarantees from unverified assumptions.
   service, through `blocking` in `crates/core/src/portfolio/coordinator/mod.rs`,
   so callers await them directly rather than wrapping them in `spawn_blocking`.
   Give new history-sized reads the same treatment.
+- Classifications of core records, such as which asset kinds are alternative,
+  belong to `crates/core`. The portfolio engine receives them as facts that
+  `crates/core/src/portfolio/coordinator/facts.rs` derives, as it does
+  `Asset::contract_multiplier`; the engine must not keep its own copy of such a
+  rule. Core models may call the engine only to ask about the engine's own
+  capabilities, such as which cost basis methods it computes.
 
 When adding or changing a backend call, trace both runtime paths: the frontend
 adapter/export, Tauri command registration in `apps/tauri/src/lib.rs`, web
@@ -89,6 +95,12 @@ enums. For Rust domain errors, follow the existing `Result`/`Option` and
 `thiserror` patterns. Clippy rejects `unwrap()` and `panic!` outside tests:
 return an error with `?`, or use `expect("why it cannot fail")` for a proven
 invariant.
+
+UI must work right-to-left: logical classes and inline styles (`ms-`, `start-`,
+`text-end`, `insetInlineStart`), physical only where the side is literal;
+`rtl:rotate-180` on forward/back icons; `inline-start`/`inline-end` popup sides;
+`useDirection()` for key or scroll handling; values via the formatting hooks.
+Details in `apps/frontend/src/i18n/README.md`.
 
 ## Persisted identifiers and security
 
@@ -152,7 +164,7 @@ check.
   packages in the command above. CI runs Clippy across `--workspace`.
 - **UI text/translations:** update affected keys and plural forms in every
   supported locale; run `pnpm --filter frontend i18n:check`.
-- **UI behavior/layout:** exercise the changed flow. Run
+- **UI behavior/layout:** exercise the changed flow, also with `?dir=rtl`. Run
   `pnpm test:e2e:net-worth` for relevant net-worth layout changes and
   `pnpm test:e2e:addon-sandbox` for addon sandbox changes. For application
   flows, use `pnpm test:e2e` or focused specs. Before running E2E tests, consult

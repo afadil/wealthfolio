@@ -5,7 +5,12 @@ import type { Account, SnapshotInfo } from "@/lib/types";
 import { cn, formatDate } from "@/lib/utils";
 import { HoldingsEditMode } from "@/pages/holdings/components/holdings-edit-mode";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAmountFormatting, type FormattingApi, useDateFormatting } from "@wealthfolio/ui";
+import {
+  useAmountFormatting,
+  type FormattingApi,
+  useDateFormatting,
+  Spinner,
+} from "@wealthfolio/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +43,7 @@ import type { TFunction } from "i18next";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 
 interface AccountSnapshotHistoryProps {
   account: Account;
@@ -148,7 +154,7 @@ export function AccountSnapshotHistory({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Icons.Spinner className="text-muted-foreground size-5 animate-spin" />
+        <Spinner className="text-muted-foreground size-5" />
       </div>
     );
   }
@@ -163,15 +169,17 @@ export function AccountSnapshotHistory({
         {canEditSnapshots && onAddSnapshot && (
           <TooltipProvider>
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onAddSnapshot}
-                  aria-label={t("account:snapshot.add")}
-                >
-                  <Icons.Plus className="size-4" />
-                </Button>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onAddSnapshot}
+                    aria-label={t("account:snapshot.add")}
+                  />
+                }
+              >
+                <Icons.Plus className="size-4" />
               </TooltipTrigger>
               <TooltipContent>
                 <p>{t("account:snapshot.add")}</p>
@@ -182,10 +190,11 @@ export function AccountSnapshotHistory({
       </div>
 
       {hasHighlightedInvalidSnapshot && (
-        <div className="border-destructive/40 bg-destructive/5 rounded-md border px-4 py-3 text-sm">
-          <p className="font-medium">{t("account:snapshot.invalid_date_title")}</p>
-          <p className="text-muted-foreground mt-1">{t("account:snapshot.invalid_date_desc")}</p>
-        </div>
+        <Alert variant="destructive" className="rounded-md">
+          <Icons.AlertCircle />
+          <AlertTitle>{t("account:snapshot.invalid_date_title")}</AlertTitle>
+          <AlertDescription>{t("account:snapshot.invalid_date_desc")}</AlertDescription>
+        </Alert>
       )}
 
       {orderedSnapshots.length === 0 ? (
@@ -218,7 +227,7 @@ export function AccountSnapshotHistory({
                   <p className="truncate text-sm font-medium">
                     {formatDate(snapshot.snapshotDate, dateFormatting)}
                   </p>
-                  <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[10px]">
+                  <Badge variant="outline" className="text-2xs shrink-0 px-1.5 py-0">
                     {formatSnapshotSource(snapshot.source, t)}
                   </Badge>
                 </div>
@@ -266,10 +275,8 @@ export function AccountSnapshotHistory({
               <TableRow>
                 <TableHead>{t("common:date")}</TableHead>
                 <TableHead>{t("account:snapshot.header_source")}</TableHead>
-                <TableHead className="text-right">
-                  {t("account:snapshot.header_positions")}
-                </TableHead>
-                <TableHead className="text-right">{t("account:snapshot.header_cash")}</TableHead>
+                <TableHead className="text-end">{t("account:snapshot.header_positions")}</TableHead>
+                <TableHead className="text-end">{t("account:snapshot.header_cash")}</TableHead>
                 <TableHead className="w-24" />
               </TableRow>
             </TableHeader>
@@ -288,15 +295,15 @@ export function AccountSnapshotHistory({
                     {formatDate(snapshot.snapshotDate, dateFormatting)}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                    <Badge variant="outline" className="text-2xs px-1.5 py-0">
                       {formatSnapshotSource(snapshot.source, t)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">{snapshot.positionCount}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-end">{snapshot.positionCount}</TableCell>
+                  <TableCell className="text-end">
                     {formatting.formatAmount(snapshot.cashTotalAccountCurrency, account.currency)}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-end">
                     {(canEditSnapshot(snapshot) || canDeleteSnapshot(snapshot)) && (
                       <div className="flex items-center justify-end gap-1">
                         {canEditSnapshot(snapshot) && (
@@ -337,7 +344,7 @@ export function AccountSnapshotHistory({
 
       {editingDate && (
         <Sheet open={!!editingDate} onOpenChange={() => handleEditClose()}>
-          <SheetContent side="right" className="flex h-full w-full flex-col p-0 sm:max-w-2xl">
+          <SheetContent side="inline-end" className="flex h-full w-full flex-col p-0 sm:max-w-2xl">
             <SheetHeader className="border-b px-6 py-4">
               <SheetTitle>{t("account:snapshot.update_title")}</SheetTitle>
             </SheetHeader>
@@ -371,7 +378,7 @@ export function AccountSnapshotHistory({
             <AlertDialogAction
               onClick={handleDeleteSnapshot}
               disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
             >
               {isDeleting ? t("account:snapshot.deleting") : t("common:delete")}
             </AlertDialogAction>

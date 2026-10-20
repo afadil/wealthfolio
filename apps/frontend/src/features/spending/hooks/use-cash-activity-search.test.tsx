@@ -45,4 +45,21 @@ describe("useCashActivitySearch", () => {
     expect(result.current.totalCount).toBe(100);
     expect(result.current.hasNextPage).toBe(true);
   });
+
+  it("asks for cash balances and keeps them on the rows", async () => {
+    adapterMocks.searchCashActivities.mockResolvedValueOnce({
+      items: [{ id: "coffee", cashBalance: "50", cashBalanceCurrency: "USD" }],
+      totalCount: 1,
+    });
+
+    const { result } = renderHook(() => useCashActivitySearch({ includeCashBalances: true }), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.items).toHaveLength(1));
+    expect(adapterMocks.searchCashActivities).toHaveBeenCalledWith(
+      expect.objectContaining({ includeCashBalances: true }),
+    );
+    expect(result.current.items[0]?.cashBalance).toBe("50");
+  });
 });

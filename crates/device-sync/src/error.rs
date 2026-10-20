@@ -54,7 +54,10 @@ pub enum DeviceSyncError {
         status: u16,
         code: String,
         message: String,
-        details: Option<serde_json::Value>,
+        // Boxed: with serde_json's `preserve_order`, which the app and server
+        // builds enable, a `Value` takes 72 bytes, and every `Result` that
+        // carries this error grows with it.
+        details: Option<Box<serde_json::Value>>,
     },
 
     /// Invalid request (missing required data, etc.)
@@ -92,7 +95,7 @@ impl DeviceSyncError {
             status,
             code: code.into(),
             message: message.into(),
-            details,
+            details: details.map(Box::new),
         }
     }
 

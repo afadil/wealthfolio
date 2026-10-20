@@ -13,7 +13,6 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { buildClientConfig, STANDARD_PRESET_ID } from "../mcp-client-config";
 import {
   applyScopeDependencies,
   READ_SCOPES,
@@ -22,6 +21,7 @@ import {
   SCOPES,
   type ScopeKey,
 } from "../scopes";
+import { ClientSetup } from "./client-setup";
 
 const EXPIRY_OPTIONS = [
   {
@@ -140,9 +140,6 @@ export function PatCreateDialog({
     }
   };
 
-  const configJson =
-    newToken && serverUrl ? buildClientConfig(STANDARD_PRESET_ID, serverUrl, newToken) : "";
-
   const renderScope = (scope: (typeof SCOPES)[number]) => {
     const checked = selectedScopes.includes(scope.key);
     const label = scopeLabel(t, scope.key);
@@ -167,7 +164,7 @@ export function PatCreateDialog({
         title={locked ? lockedTitle : description}
         onClick={() => toggleScope(scope.key)}
         className={cn(
-          "flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors",
+          "flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-start text-sm transition-colors",
           "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
           checked
             ? "border-success/50 bg-success/10"
@@ -180,7 +177,7 @@ export function PatCreateDialog({
           className={cn(
             "grid h-4 w-4 shrink-0 place-items-center transition-colors",
             checked
-              ? "bg-success rounded-[5px] text-white"
+              ? "bg-success rounded-[0.3125rem] text-white"
               : "border-muted-foreground/30 rounded-full border-2",
           )}
           aria-hidden
@@ -262,9 +259,9 @@ export function PatCreateDialog({
             </div>
 
             {/* Right: live capability summary + action */}
-            <aside className="bg-muted/30 flex flex-col border-t md:max-h-[85vh] md:border-l md:border-t-0">
+            <aside className="bg-muted/30 flex flex-col border-t md:max-h-[85vh] md:border-s md:border-t-0">
               <div className="flex-1 space-y-3 overflow-y-auto px-5 py-6">
-                <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wider">
+                <p className="text-muted-foreground text-2xs font-medium uppercase tracking-wider">
                   {t("settings:agentAccess.dialog_capabilities_title")}
                 </p>
                 {selectedScopes.length === 0 ? (
@@ -340,29 +337,9 @@ export function PatCreateDialog({
             </div>
 
             {serverUrl && (
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <Label>{t("settings:agentAccess.dialog_client_config")}</Label>
-                <p className="text-muted-foreground text-sm">
-                  {t("settings:agentAccess.dialog_client_config_desc")}
-                </p>
-                <div className="flex items-start gap-2">
-                  <pre className="bg-muted text-muted-foreground max-h-64 min-w-0 flex-1 overflow-auto whitespace-pre-wrap break-all rounded-md px-3 py-2 font-mono text-xs leading-relaxed">
-                    {configJson}
-                  </pre>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="shrink-0"
-                    onClick={() =>
-                      void handleCopy(configJson, t("settings:agentAccess.dialog_client_config"))
-                    }
-                  >
-                    <Icons.Copy className="h-4 w-4" />
-                    <span className="sr-only">
-                      {t("settings:agentAccess.dialog_copy_config_aria")}
-                    </span>
-                  </Button>
-                </div>
+                <ClientSetup serverUrl={serverUrl} token={newToken} />
               </div>
             )}
             <div className="flex justify-end">

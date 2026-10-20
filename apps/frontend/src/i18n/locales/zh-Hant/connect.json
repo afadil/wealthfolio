@@ -14,7 +14,10 @@
     "noDevicesSyncing": "尚無裝置在同步",
     "noDevicesDescription": "請在設定中啟用裝置同步，讓各裝置的資料保持一致。",
     "noActivity": "尚無活動",
-    "noActivityDescription": "開始同步資料後，更新會顯示在這裡。"
+    "noActivityDescription": "開始同步資料後，更新會顯示在這裡。",
+    "showMore_one": "再顯示 {{count}} 個",
+    "showMore_other": "再顯示 {{count}} 個",
+    "showLess": "收合"
   },
   "emptyState": {
     "optional": "選填",
@@ -71,7 +74,8 @@
     "noDataYet": "尚無資料",
     "dataAsOf": "資料截至 {{date}}",
     "emptyTitle": "尚未同步任何帳戶",
-    "emptyDescription": "連線券商後，即可開始同步帳戶。"
+    "emptyDescription": "連線券商後，即可開始同步帳戶。",
+    "needsSetup": "需要設定"
   },
   "connections": {
     "title": "券商連線",
@@ -88,7 +92,11 @@
     "accountsSyncing_one": "{{count}} 個帳戶正在同步",
     "accountsSyncing_other": "{{count}} 個帳戶正在同步",
     "partialSyncing_one": "{{total}} 個帳戶中有 {{syncing}} 個正在同步 · {{excluded}} 個帳戶已排除",
-    "partialSyncing_other": "{{total}} 個帳戶中有 {{syncing}} 個正在同步 · {{excluded}} 個帳戶已排除"
+    "partialSyncing_other": "{{total}} 個帳戶中有 {{syncing}} 個正在同步 · {{excluded}} 個帳戶已排除",
+    "accountCount_one": "{{count}} 個帳戶",
+    "accountCount_other": "{{count}} 個帳戶",
+    "excludedCount_one": "已排除 {{count}} 個",
+    "excludedCount_other": "已排除 {{count}} 個"
   },
   "sync": {
     "syncNow": "立即同步",
@@ -182,20 +190,33 @@
   "attention": {
     "title": "券商同步需要處理",
     "description_one": "{{count}} 個帳戶需要重試或由券商檢查。",
-    "description_other": "{{count}} 個帳戶需要重試或由券商檢查。"
+    "description_other": "{{count}} 個帳戶需要重試或由券商檢查。",
+    "heading": "需要處理",
+    "connectionLost": "連線已中斷",
+    "accountsNotSyncing_one": "{{count}} 個帳戶未同步",
+    "accountsNotSyncing_other": "{{count}} 個帳戶未同步",
+    "syncFailed": "上次同步失敗"
   },
   "setup": {
     "newAccountsTitle": "新帳戶需要設定",
     "newAccountsDescription_one": "{{count}} 個帳戶在開始同步前需要快速設定。",
     "newAccountsDescription_other": "{{count}} 個帳戶在開始同步前需要快速設定。",
-    "reviewAccounts": "檢查帳戶"
+    "reviewAccounts": "檢查帳戶",
+    "setUp": "設定"
   },
   "devices": {
     "thisDevice": "此裝置",
     "activeNow": "目前在線上",
     "lastSeen": "上次在線時間：{{time}}",
     "online": "在線上",
-    "never": "從未"
+    "never": "從未",
+    "showInactive_one": "顯示 {{count}} 台不活躍的裝置",
+    "showInactive_other": "顯示 {{count}} 台不活躍的裝置",
+    "hideInactive": "隱藏不活躍的裝置",
+    "platforms": {
+      "server": "伺服器",
+      "web": "網頁"
+    }
   },
   "deviceStatus": {
     "syncError": "同步錯誤",

@@ -19,15 +19,17 @@ use wealthfolio_core::activities::{
     Activity, ActivityBulkIdentifierMapping, ActivityBulkMutationResult, ActivityDetails,
     ActivityFinalCashMigrationUpdate, ActivityFinalCashMigrationWriteResult,
     ActivityRepositoryTrait, ActivitySearchResponse, ActivitySearchResponseMeta, ActivityUpdate,
-    ActivityUpsert, BulkUpsertResult, ImportMapping, ImportTemplate, IncomeData, NewActivity, Sort,
-    ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT, INCOME_ACTIVITY_TYPES,
-    TRADING_ACTIVITY_TYPES,
+    ActivityUpsert, BulkUpsertResult, CashLedgerActivity, ImportMapping, ImportTemplate,
+    IncomeData, NewActivity, Sort, ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT,
+    INCOME_ACTIVITY_TYPES, TRADING_ACTIVITY_TYPES,
 };
 use wealthfolio_core::assets::{contract_multiplier_from_asset_metadata, InstrumentType};
 use wealthfolio_core::limits::ContributionActivity;
 use wealthfolio_core::{Error, Result};
 
-use super::model::{ActivityDB, ActivityDetailsDB, ImportAccountTemplateDB, ImportTemplateDB};
+use super::model::{
+    ActivityDB, ActivityDetailsDB, CashLedgerActivityDB, ImportAccountTemplateDB, ImportTemplateDB,
+};
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use crate::schema::{
@@ -484,15 +486,21 @@ impl ActivityRepository {
             if let Some(ref sort) = sort {
                 match sort.id.as_str() {
                     "date" => {
+                        // Same-instant rows (date-only imports) follow the
+                        // engine's application order (created_at, then id),
+                        // reversed for newest-first, so a row never appears
+                        // above one the engine applied after it.
                         if sort.desc {
                             query = query.order((
                                 activities::activity_date.desc(),
-                                activities::created_at.asc(),
+                                activities::created_at.desc(),
+                                activities::id.desc(),
                             ));
                         } else {
                             query = query.order((
                                 activities::activity_date.asc(),
                                 activities::created_at.asc(),
+                                activities::id.asc(),
                             ));
                         }
                     }
@@ -522,14 +530,16 @@ impl ActivityRepository {
                     _ => {
                         query = query.order((
                             activities::activity_date.desc(),
-                            activities::created_at.asc(),
+                            activities::created_at.desc(),
+                            activities::id.desc(),
                         ))
                     }
                 }
             } else {
                 query = query.order((
                     activities::activity_date.desc(),
-                    activities::created_at.asc(),
+                    activities::created_at.desc(),
+                    activities::id.desc(),
                 ));
             }
 
@@ -578,15 +588,16 @@ impl ActivityRepository {
                     activities::metadata,
                 ),
                 assets::metadata.nullable(),
+                assets::quote_ccy.nullable(),
             ))
             .limit(page_size)
             .offset(offset)
-            .load::<(ActivityDetailsDB, Option<String>)>(&mut conn)
+            .load::<(ActivityDetailsDB, Option<String>, Option<String>)>(&mut conn)
             .map_err(StorageError::from)?;
 
         let results: Vec<ActivityDetails> = results_db
             .into_iter()
-            .map(|(db, asset_metadata)| {
+            .map(|(db, asset_metadata, asset_quote_ccy)| {
                 let has_asset = db.asset_id.is_some();
                 let instrument_type = db
                     .instrument_type
@@ -596,6 +607,7 @@ impl ActivityRepository {
                     .as_deref()
                     .and_then(|value| serde_json::from_str(value).ok());
                 let mut activity = ActivityDetails::from(db);
+                activity.asset_quote_ccy = asset_quote_ccy;
                 activity.asset_contract_multiplier = has_asset.then(|| {
                     contract_multiplier_from_asset_metadata(
                         instrument_type.as_ref(),
@@ -1468,6 +1480,24 @@ impl ActivityRepositoryTrait for ActivityRepository {
         Ok(activities_db.into_iter().map(Activity::from).collect())
     }
 
+    fn get_cash_ledger_activities(
+        &self,
+        account_ids: &[String],
+    ) -> Result<Vec<CashLedgerActivity>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let rows = activities::table
+            .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
+            .filter(accounts::is_archived.eq(false))
+            .filter(activities::account_id.eq_any(account_ids))
+            .select(CashLedgerActivityDB::as_select())
+            .order(activities::activity_date.asc())
+            .load::<CashLedgerActivityDB>(&mut conn)
+            .map_err(StorageError::from)?;
+
+        Ok(rows.into_iter().map(CashLedgerActivity::from).collect())
+    }
+
     fn get_activities_by_ids(&self, activity_ids: &[String]) -> Result<Vec<Activity>> {
         if activity_ids.is_empty() {
             return Ok(Vec::new());
@@ -1754,7 +1784,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 } else {
                     format!("acct_{}", mapping.account_id)
                 };
-                let template_id = if let Some(link) =
+                let (template_id, template_existed) = if let Some(link) =
                     existing_link.filter(|l| l.template_id == account_local_id)
                 {
                     // Update the existing account-local template in place
@@ -1768,10 +1798,18 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     ))
                     .execute(tx.conn())
                     .map_err(StorageError::from)?;
-                    link.template_id
+                    (link.template_id, true)
                 } else {
                     // Linked template is shared/system or no link — create a new account-local one
                     let new_id = account_local_id;
+                    // The account may have been linked elsewhere after its template was created.
+                    let template_existed = import_templates::table
+                        .find(&new_id)
+                        .select(import_templates::id)
+                        .first::<String>(tx.conn())
+                        .optional()
+                        .map_err(StorageError::from)?
+                        .is_some();
                     let template_db = ImportTemplateDB {
                         id: new_id.clone(),
                         name: mapping.name.clone(),
@@ -1790,8 +1828,20 @@ impl ActivityRepositoryTrait for ActivityRepository {
                         .set(&template_db)
                         .execute(tx.conn())
                         .map_err(StorageError::from)?;
-                    new_id
+                    (new_id, template_existed)
                 };
+
+                // Sync the stored template ahead of the link: the link's template_id is a
+                // foreign key, so the template has to exist on the receiving device first.
+                let template_db = import_templates::table
+                    .find(&template_id)
+                    .first::<ImportTemplateDB>(tx.conn())
+                    .map_err(StorageError::from)?;
+                if template_existed {
+                    tx.update(&template_db)?;
+                } else {
+                    tx.insert(&template_db)?;
+                }
 
                 // Upsert the account → template link
                 let link_db = ImportAccountTemplateDB {
@@ -3146,11 +3196,13 @@ mod tests {
     use crate::fx::FxRepository;
     use crate::limits::ContributionLimitRepository;
     use crate::schema::{spending_activity_splits, sync_outbox};
+    use crate::sync::app_sync::AppSyncRepository;
     use rust_decimal::Decimal;
     use tempfile::tempdir;
     use wealthfolio_core::activities::{import_type, ActivityStatus, ActivityUpsert};
     use wealthfolio_core::fx::FxService;
     use wealthfolio_core::limits::{ContributionLimitService, ContributionLimitServiceTrait};
+    use wealthfolio_core::sync::{SyncEntity, SyncOperation};
 
     fn setup_db() -> (Arc<Pool<ConnectionManager<SqliteConnection>>>, WriteHandle) {
         std::env::set_var("CONNECT_API_URL", "http://test.local");
@@ -3475,6 +3527,55 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn cash_ledger_activities_read_as_whole_activities_do() {
+        let (pool, writer) = setup_db();
+        let repo = ActivityRepository::new(pool.clone(), writer);
+        {
+            let mut conn = get_connection(&pool).expect("conn");
+            insert_account(&mut conn, "checking");
+            insert_account_with_archived(&mut conn, "closed", true);
+            // Every column the ledger reads, in each stored shape it parses:
+            // RFC 3339 and SQLite timestamps, a bare date, an override, a
+            // subtype, a draft, charges and a quantity.
+            diesel::sql_query(
+                "INSERT INTO activities (id, account_id, activity_type, activity_type_override, \
+                 subtype, status, activity_date, quantity, unit_price, amount, fee, tax, currency, \
+                 notes, metadata, is_user_modified, needs_review, created_at, updated_at) VALUES \
+                 ('deposit', 'checking', 'DEPOSIT', NULL, NULL, 'POSTED', \
+                  '2026-04-01T09:30:00.123456Z', NULL, NULL, '100.25', NULL, NULL, 'USD', 'a note', \
+                  '{\"source\":\"csv\"}', 0, 0, '2026-04-01T09:30:00Z', '2026-04-01T09:30:00Z'), \
+                 ('fee', 'checking', 'FEE', NULL, NULL, 'POSTED', '2026-04-02', NULL, NULL, '4', \
+                  '0.5', '0.1', 'USD', NULL, NULL, 0, 0, '2026-04-02 10:00:00', '2026-04-02 10:00:00'), \
+                 ('refund', 'checking', 'WITHDRAWAL', 'CREDIT', 'REFUND', 'POSTED', \
+                  '2026-04-03T00:00:00+00:00', NULL, NULL, '12', NULL, NULL, 'USD', NULL, NULL, 0, 0, \
+                  '2026-04-03 10:00:00.250', '2026-04-03 10:00:00.250'), \
+                 ('draft', 'checking', 'DEPOSIT', NULL, NULL, 'DRAFT', '2026-04-04T00:00:00Z', '3', \
+                  '2', NULL, NULL, NULL, 'USD', NULL, NULL, 0, 0, '2026-04-04T00:00:00Z', \
+                  '2026-04-04T00:00:00Z'), \
+                 ('archived', 'closed', 'DEPOSIT', NULL, NULL, 'POSTED', '2026-04-01T00:00:00Z', \
+                  NULL, NULL, '9', NULL, NULL, 'USD', NULL, NULL, 0, 0, '2026-04-01T00:00:00Z', \
+                  '2026-04-01T00:00:00Z')",
+            )
+            .execute(&mut conn)
+            .expect("insert activities");
+        }
+        let accounts = vec!["checking".to_string(), "closed".to_string()];
+
+        let ledger = repo
+            .get_cash_ledger_activities(&accounts)
+            .expect("ledger read");
+        let whole: Vec<CashLedgerActivity> = repo
+            .get_activities_by_account_ids(&accounts)
+            .expect("full read")
+            .iter()
+            .map(CashLedgerActivity::from)
+            .collect();
+
+        assert_eq!(ledger.len(), 4, "the archived account's row is left out");
+        assert_eq!(ledger, whole);
+    }
+
+    #[tokio::test]
     async fn update_broker_activity_queues_user_patch_outbox() {
         let (pool, writer) = setup_db();
         let repo = ActivityRepository::new(pool.clone(), writer);
@@ -3739,6 +3840,73 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn search_activities_orders_same_instant_rows_in_application_order() {
+        let (pool, writer) = setup_db();
+        let repo = ActivityRepository::new(pool.clone(), writer);
+
+        {
+            let mut conn = get_connection(&pool).expect("conn");
+            insert_account(&mut conn, "cash-account");
+            // Three date-only rows share an instant: the engine applies them by
+            // created_at, then id. A later row anchors the newest-first order.
+            diesel::sql_query(
+                "INSERT INTO activities
+                 (id, account_id, activity_type, status, activity_date, amount, currency,
+                  is_user_modified, needs_review, created_at, updated_at)
+                 VALUES
+                 ('first', 'cash-account', 'DEPOSIT', 'POSTED', '2026-03-02T00:00:00+00:00',
+                  '10', 'USD', 0, 0, '2026-03-05T10:00:00.100+00:00', '2026-03-05T10:00:00+00:00'),
+                 ('second-b', 'cash-account', 'WITHDRAWAL', 'POSTED', '2026-03-02T00:00:00+00:00',
+                  '3', 'USD', 0, 0, '2026-03-05T10:00:00.200+00:00', '2026-03-05T10:00:00+00:00'),
+                 ('second-a', 'cash-account', 'WITHDRAWAL', 'POSTED', '2026-03-02T00:00:00+00:00',
+                  '2', 'USD', 0, 0, '2026-03-05T10:00:00.200+00:00', '2026-03-05T10:00:00+00:00'),
+                 ('later', 'cash-account', 'DEPOSIT', 'POSTED', '2026-03-03T00:00:00+00:00',
+                  '1', 'USD', 0, 0, '2026-03-05T09:00:00+00:00', '2026-03-05T09:00:00+00:00')",
+            )
+            .execute(&mut conn)
+            .expect("insert same-instant activities");
+        }
+
+        let ids_for = |sort: Option<Sort>| -> Vec<String> {
+            repo.search_activities(
+                0,
+                10,
+                Some(vec!["cash-account".to_string()]),
+                None,
+                None,
+                sort,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("search activities")
+            .data
+            .into_iter()
+            .map(|activity| activity.id)
+            .collect()
+        };
+
+        let newest_first = vec!["later", "second-b", "second-a", "first"];
+        assert_eq!(
+            ids_for(Some(Sort {
+                id: "date".to_string(),
+                desc: true,
+            })),
+            newest_first
+        );
+        assert_eq!(ids_for(None), newest_first);
+        assert_eq!(
+            ids_for(Some(Sort {
+                id: "date".to_string(),
+                desc: false,
+            })),
+            vec!["first", "second-a", "second-b", "later"]
+        );
+    }
+
+    #[tokio::test]
     async fn search_activities_returns_the_asset_contract_multiplier() {
         let (pool, writer) = setup_db();
         let repo = ActivityRepository::new(pool.clone(), writer);
@@ -3801,6 +3969,63 @@ mod tests {
             .collect();
         assert_eq!(multipliers.get("mini-buy"), Some(&Some("10")));
         assert_eq!(multipliers.get("standard-buy"), Some(&Some("100")));
+    }
+
+    #[tokio::test]
+    async fn search_activities_returns_the_asset_quote_currency() {
+        let (pool, writer) = setup_db();
+        let repo = ActivityRepository::new(pool.clone(), writer);
+
+        {
+            let mut conn = get_connection(&pool).expect("conn");
+            insert_account(&mut conn, "quote-account");
+            diesel::sql_query(
+                "INSERT INTO assets
+                 (id, kind, name, display_code, is_active, quote_mode, quote_ccy,
+                  instrument_type, instrument_symbol, created_at, updated_at)
+                 VALUES
+                 ('option-usd', 'INVESTMENT', 'USD option', 'AAPL', 1, 'MARKET', 'USD',
+                  'OPTION', 'AAPL 261218C00150000', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            )
+            .execute(&mut conn)
+            .expect("insert option asset");
+            diesel::sql_query(
+                "INSERT INTO activities
+                 (id, account_id, asset_id, activity_type, status, activity_date, quantity,
+                  unit_price, amount, currency, is_user_modified, needs_review, created_at, updated_at)
+                 VALUES
+                 ('cad-option-buy', 'quote-account', 'option-usd', 'BUY', 'POSTED',
+                  '2026-01-01T00:00:00Z', '1', '7', '700', 'CAD', 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                 ('assetless-deposit', 'quote-account', NULL, 'DEPOSIT', 'POSTED',
+                  '2026-01-02T00:00:00Z', NULL, NULL, '100', 'CAD', 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            )
+            .execute(&mut conn)
+            .expect("insert activities");
+        }
+
+        let results = repo
+            .search_activities(
+                0,
+                10,
+                Some(vec!["quote-account".to_string()]),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("search activities");
+
+        let quote_ccys: HashMap<&str, Option<&str>> = results
+            .data
+            .iter()
+            .map(|activity| (activity.id.as_str(), activity.asset_quote_ccy.as_deref()))
+            .collect();
+        assert_eq!(quote_ccys.get("cad-option-buy"), Some(&Some("USD")));
+        assert_eq!(quote_ccys.get("assetless-deposit"), Some(&None));
     }
 
     #[tokio::test]
@@ -5069,6 +5294,332 @@ mod tests {
             .first(&mut conn)
             .expect("template_id after relink");
         assert_eq!(template_id_after, "tmpl-b");
+    }
+
+    fn csv_import_mapping(account_id: &str, name: &str, config: &str) -> ImportMapping {
+        let now = Utc::now().naive_utc();
+        ImportMapping {
+            account_id: account_id.to_string(),
+            context_kind: import_type::ACTIVITY.to_string(),
+            source_system: String::new(),
+            template_id: None,
+            name: name.to_string(),
+            config: config.to_string(),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    fn pending_outbox_ops(
+        pool: &Arc<Pool<ConnectionManager<SqliteConnection>>>,
+        writer: &WriteHandle,
+    ) -> Vec<(SyncEntity, String, SyncOperation)> {
+        AppSyncRepository::new(pool.clone(), writer.clone())
+            .list_pending_outbox(100)
+            .expect("list outbox")
+            .into_iter()
+            .map(|event| (event.entity, event.entity_id, event.op))
+            .collect()
+    }
+
+    type RemoteEvent = (
+        SyncEntity,
+        String,
+        SyncOperation,
+        String,
+        String,
+        i64,
+        serde_json::Value,
+    );
+
+    /// A device's pending outbox as another device pulls it, in push order.
+    fn outbox_as_remote_events(
+        pool: &Arc<Pool<ConnectionManager<SqliteConnection>>>,
+        writer: &WriteHandle,
+    ) -> Vec<RemoteEvent> {
+        AppSyncRepository::new(pool.clone(), writer.clone())
+            .list_pending_outbox(100)
+            .expect("list outbox")
+            .into_iter()
+            .zip(1_i64..)
+            .map(|(event, seq)| {
+                (
+                    event.entity,
+                    event.entity_id,
+                    event.op,
+                    event.event_id,
+                    event.client_timestamp,
+                    seq,
+                    serde_json::from_str(&event.payload).expect("outbox payload json"),
+                )
+            })
+            .collect()
+    }
+
+    fn link_row_id(conn: &mut SqliteConnection, account_id: &str) -> String {
+        import_account_templates::table
+            .filter(import_account_templates::account_id.eq(account_id))
+            .filter(import_account_templates::context_kind.eq(import_type::ACTIVITY))
+            .select(import_account_templates::id)
+            .first(conn)
+            .expect("link row")
+    }
+
+    /// The account-local template must travel with its link: the link's template_id is a
+    /// foreign key, so a link that arrives without its template fails on the other device.
+    #[tokio::test]
+    async fn save_import_mapping_syncs_template_before_link() {
+        let (pool, writer) = setup_db();
+        let repo = ActivityRepository::new(pool.clone(), writer.clone());
+        let mut conn = get_connection(&pool).expect("conn");
+        insert_account(&mut conn, "acc-map");
+
+        repo.save_import_mapping(&csv_import_mapping(
+            "acc-map",
+            "Broker CSV",
+            r#"{"fieldMappings":{"date":"Trade Date"}}"#,
+        ))
+        .await
+        .expect("save mapping");
+
+        let link_id = link_row_id(&mut conn, "acc-map");
+        assert_eq!(
+            pending_outbox_ops(&pool, &writer),
+            vec![
+                (
+                    SyncEntity::ImportTemplate,
+                    "acct_acc-map".to_string(),
+                    SyncOperation::Create
+                ),
+                (
+                    SyncEntity::ActivityImportProfile,
+                    link_id,
+                    SyncOperation::Update
+                ),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn saved_import_mapping_arrives_on_another_device() {
+        let (pool_a, writer_a) = setup_db();
+        let repo_a = ActivityRepository::new(pool_a.clone(), writer_a.clone());
+        insert_account(&mut get_connection(&pool_a).expect("conn"), "acc-map");
+        repo_a
+            .save_import_mapping(&csv_import_mapping(
+                "acc-map",
+                "Broker CSV",
+                r#"{"fieldMappings":{"date":"Trade Date"}}"#,
+            ))
+            .await
+            .expect("save mapping");
+
+        let events = outbox_as_remote_events(&pool_a, &writer_a);
+
+        // A pull page applies as one batch.
+        let (pool_b, writer_b) = setup_db();
+        insert_account(&mut get_connection(&pool_b).expect("conn"), "acc-map");
+        let applied = AppSyncRepository::new(pool_b.clone(), writer_b.clone())
+            .apply_remote_events_lww_batch(events.clone())
+            .await
+            .expect("apply batch");
+        assert_eq!(applied, 2);
+
+        // When a batch fails, events apply one at a time in pull order, with foreign keys
+        // checked per event, so the template has to come before the link.
+        let (pool_c, writer_c) = setup_db();
+        insert_account(&mut get_connection(&pool_c).expect("conn"), "acc-map");
+        let sync_c = AppSyncRepository::new(pool_c.clone(), writer_c.clone());
+        for (entity, entity_id, op, event_id, client_timestamp, seq, payload) in events {
+            let applied = sync_c
+                .apply_remote_event_lww(
+                    entity,
+                    entity_id,
+                    op,
+                    event_id,
+                    client_timestamp,
+                    seq,
+                    payload,
+                )
+                .await
+                .expect("apply event");
+            assert!(applied);
+        }
+
+        for (pool, writer) in [(pool_b, writer_b), (pool_c, writer_c)] {
+            let mapping = ActivityRepository::new(pool, writer)
+                .get_import_mapping("acc-map", import_type::ACTIVITY)
+                .expect("read mapping")
+                .expect("mapping arrived");
+            assert_eq!(mapping.template_id.as_deref(), Some("acct_acc-map"));
+            assert_eq!(mapping.name, "Broker CSV");
+            assert_eq!(mapping.config, r#"{"fieldMappings":{"date":"Trade Date"}}"#);
+        }
+    }
+
+    /// Editing a mapping must update the same template row. A delete plus re-create would be
+    /// rejected on other devices, which ignore writes to an entity they saw deleted.
+    #[tokio::test]
+    async fn updating_import_mapping_keeps_template_id() {
+        let (pool_a, writer_a) = setup_db();
+        let repo_a = ActivityRepository::new(pool_a.clone(), writer_a.clone());
+        let mut conn = get_connection(&pool_a).expect("conn");
+        insert_account(&mut conn, "acc-map");
+        insert_template(&mut conn, "tmpl-shared");
+
+        repo_a
+            .save_import_mapping(&csv_import_mapping("acc-map", "First", r#"{"v":1}"#))
+            .await
+            .expect("first save");
+        repo_a
+            .save_import_mapping(&csv_import_mapping("acc-map", "Second", r#"{"v":2}"#))
+            .await
+            .expect("second save");
+        // Pointing the account at a shared template and saving again reuses the
+        // account-local template instead of creating another one.
+        repo_a
+            .link_account_template("acc-map", "tmpl-shared", import_type::ACTIVITY)
+            .await
+            .expect("link shared template");
+        repo_a
+            .save_import_mapping(&csv_import_mapping("acc-map", "Third", r#"{"v":3}"#))
+            .await
+            .expect("third save");
+
+        let link_id = link_row_id(&mut conn, "acc-map");
+        let template = |op| (SyncEntity::ImportTemplate, "acct_acc-map".to_string(), op);
+        let link = || {
+            (
+                SyncEntity::ActivityImportProfile,
+                link_id.clone(),
+                SyncOperation::Update,
+            )
+        };
+        assert_eq!(
+            pending_outbox_ops(&pool_a, &writer_a),
+            vec![
+                template(SyncOperation::Create),
+                link(),
+                template(SyncOperation::Update),
+                link(),
+                link(),
+                template(SyncOperation::Update),
+                link(),
+            ]
+        );
+        let account_templates: i64 = import_templates::table
+            .filter(import_templates::id.like("acct_acc-map%"))
+            .count()
+            .get_result(&mut conn)
+            .expect("count account templates");
+        assert_eq!(account_templates, 1);
+
+        let (pool_b, writer_b) = setup_db();
+        let mut conn_b = get_connection(&pool_b).expect("conn");
+        insert_account(&mut conn_b, "acc-map");
+        insert_template(&mut conn_b, "tmpl-shared");
+        AppSyncRepository::new(pool_b.clone(), writer_b.clone())
+            .apply_remote_events_lww_batch(outbox_as_remote_events(&pool_a, &writer_a))
+            .await
+            .expect("apply batch");
+
+        let mapping = ActivityRepository::new(pool_b.clone(), writer_b)
+            .get_import_mapping("acc-map", import_type::ACTIVITY)
+            .expect("read mapping")
+            .expect("mapping arrived");
+        assert_eq!(mapping.template_id.as_deref(), Some("acct_acc-map"));
+        assert_eq!(mapping.name, "Third");
+        assert_eq!(mapping.config, r#"{"v":3}"#);
+    }
+
+    #[tokio::test]
+    async fn linking_sourced_transfer_legs_preserves_identity_through_broker_refresh() {
+        let (pool, writer) = setup_db();
+        let repo = ActivityRepository::new(pool.clone(), writer);
+        let mut conn = get_connection(&pool).expect("conn");
+        insert_account(&mut conn, "checking");
+        insert_account(&mut conn, "card");
+        let rows: Vec<_> = [
+            (
+                "checking-leg",
+                "checking",
+                "TRANSFER_OUT",
+                "2026-01-18",
+                "TRN-test-1",
+            ),
+            (
+                "card-leg",
+                "card",
+                "TRANSFER_IN",
+                "2026-01-15",
+                "TRN-test-2",
+            ),
+        ]
+        .into_iter()
+        .map(|(id, account, kind, date, record)| ActivityUpsert {
+            id: id.into(),
+            account_id: account.into(),
+            asset_id: None,
+            activity_type: kind.into(),
+            subtype: None,
+            activity_date: format!("{date}T00:00:00Z"),
+            quantity: None,
+            unit_price: None,
+            currency: "USD".into(),
+            fee: None,
+            tax: None,
+            amount: Some(Decimal::new(10000, 2)),
+            status: None,
+            notes: Some(format!("Payment · {record}")),
+            fx_rate: None,
+            metadata: Some(r#"{"flow":{"is_external":true}}"#.into()),
+            needs_review: None,
+            source_system: Some("SIMPLEFIN".into()),
+            source_record_id: Some(record.into()),
+            source_group_id: None,
+            idempotency_key: Some(format!("key-{record}")),
+            import_run_id: None,
+        })
+        .collect();
+        assert_eq!(repo.bulk_upsert(rows.clone()).await.unwrap().created, 2);
+        let before = repo.get_activities().unwrap();
+        repo.link_transfer_activities("checking-leg".into(), "card-leg".into())
+            .await
+            .unwrap();
+        // Linking the same pair again repairs metadata without merging records.
+        repo.link_transfer_activities("card-leg".into(), "checking-leg".into())
+            .await
+            .unwrap();
+        let linked = repo.get_activities().unwrap();
+        assert_eq!(linked.len(), 2);
+        assert!(linked[0].source_group_id.is_some());
+        assert_eq!(linked[0].source_group_id, linked[1].source_group_id);
+        for after in &linked {
+            let original = before.iter().find(|row| row.id == after.id).unwrap();
+            assert_eq!(after.activity_date, original.activity_date);
+            assert_eq!(after.notes, original.notes);
+            assert_eq!(after.source_system, original.source_system);
+            assert_eq!(after.source_record_id, original.source_record_id);
+            assert_eq!(after.idempotency_key, original.idempotency_key);
+            assert!(after.is_user_modified);
+        }
+        // A subsequent provider refresh must respect the user's link even
+        // if the provider still calls the outgoing record a withdrawal.
+        let mut refreshed = rows;
+        for row in &mut refreshed {
+            row.id = format!("refreshed-{}", row.id);
+            row.idempotency_key = Some(format!("refreshed-{}", row.id));
+            row.notes = Some("Provider refresh".into());
+        }
+        refreshed[0].activity_type = "WITHDRAWAL".into();
+        let result = repo.bulk_upsert(refreshed).await.unwrap();
+        assert_eq!(result.skipped, 2);
+        assert_eq!(result.upserted, 0);
+        let after = repo.get_activities().unwrap();
+        assert_eq!(
+            serde_json::to_value(after).unwrap(),
+            serde_json::to_value(linked).unwrap()
+        );
     }
 
     #[tokio::test]

@@ -5,7 +5,9 @@
   },
   "currency": {
     "selectTitle": "Währung auswählen",
-    "selectDescription": "Wählen Sie die Währung Ihrer Aktivität",
+    "selectDescription": "Wählen Sie eine Währung aus",
+    "placeholder": "Währung auswählen",
+    "popular": "Beliebt",
     "more": "Mehr",
     "search": "Währung suchen...",
     "searchAll": "Alle Währungen durchsuchen...",
@@ -191,5 +193,9 @@
   },
   "sheet": {
     "close": "Schließen"
-  }
+  },
+  "page": {
+    "back": "Zurück"
+  },
+  "remove": "{{label}} entfernen"
 }

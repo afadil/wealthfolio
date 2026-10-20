@@ -1,7 +1,13 @@
+import type { CurrencyFormattingRegions, TextDirection } from "@wealthfolio/ui";
+
 export interface AddonLocalizationSnapshot {
   locale: string;
   uiLocale?: string;
+  /** The host document's reading direction, so addon surfaces mirror with it. */
+  direction?: TextDirection;
   timezone?: string;
+  /** Formatting regions for amounts in specific currencies, keyed by currency code. */
+  currencyFormattingRegions?: CurrencyFormattingRegions;
 }
 
 type AddonLocalizationListener = (snapshot: AddonLocalizationSnapshot) => void;
@@ -20,12 +26,24 @@ export function collectAddonLocalizationSnapshot(): AddonLocalizationSnapshot {
   return currentSnapshot;
 }
 
+export function isSameAddonLocalization(
+  left: AddonLocalizationSnapshot,
+  right: AddonLocalizationSnapshot,
+): boolean {
+  const leftRegions = left.currencyFormattingRegions ?? {};
+  const rightRegions = right.currencyFormattingRegions ?? {};
+  return (
+    left.locale === right.locale &&
+    left.uiLocale === right.uiLocale &&
+    left.direction === right.direction &&
+    left.timezone === right.timezone &&
+    Object.keys(leftRegions).length === Object.keys(rightRegions).length &&
+    Object.entries(leftRegions).every(([currency, region]) => rightRegions[currency] === region)
+  );
+}
+
 export function setAddonLocalizationSnapshot(snapshot: AddonLocalizationSnapshot): void {
-  if (
-    currentSnapshot.locale === snapshot.locale &&
-    currentSnapshot.uiLocale === snapshot.uiLocale &&
-    currentSnapshot.timezone === snapshot.timezone
-  ) {
+  if (isSameAddonLocalization(currentSnapshot, snapshot)) {
     return;
   }
 
