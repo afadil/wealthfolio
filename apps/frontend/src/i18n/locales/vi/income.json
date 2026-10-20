@@ -77,4 +77,3 @@
   "unconverted_currencies_one": "Thu nhập bằng {{currencies}} không được tính vào tổng số vì không có tỷ giá quy đổi sang {{baseCurrency}}.",
   "unconverted_currencies_other": "Thu nhập bằng {{currencies}} không được tính vào tổng số vì không có tỷ giá quy đổi sang {{baseCurrency}}."
 }
-

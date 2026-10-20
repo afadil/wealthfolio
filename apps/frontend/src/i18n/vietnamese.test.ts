@@ -69,9 +69,7 @@ describe("Vietnamese translations", () => {
       expect([...vietnameseFile.keys()].sort()).toEqual([...englishFile.keys()].sort());
 
       for (const [key, source] of englishFile) {
-        expect(interpolations(vietnameseFile.get(key) ?? "")).toEqual(
-          interpolations(source),
-        );
+        expect(interpolations(vietnameseFile.get(key) ?? "")).toEqual(interpolations(source));
       }
     }
   });
