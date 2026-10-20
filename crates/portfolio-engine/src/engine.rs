@@ -16,7 +16,7 @@ use crate::model::*;
 use crate::normalize::normalize;
 use crate::project::{lot_records, project};
 use crate::resolve::{resolve_surfaces, FxResolver, ResolvedSurfaces};
-use crate::value::{effects, value, Resolved, ValueInputs};
+use crate::value::{cash_fx_effects, effects, value, Resolved, ValueInputs};
 
 #[derive(Debug, Clone)]
 pub struct Engine {
@@ -139,8 +139,10 @@ impl Engine {
         disposals: &'a [LotDisposal],
         rejected: &BTreeSet<ActivityId>,
     ) -> MeasureInputs<'a> {
+        let mut effects = self.effects(disposals, lots, rejected);
+        effects.cash_fx = cash_fx_effects(&self.resolved(), series, rejected);
         MeasureInputs {
-            effects: self.effects(disposals, lots, rejected),
+            effects,
             series,
             lots,
             disposals,

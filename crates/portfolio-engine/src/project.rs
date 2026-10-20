@@ -947,14 +947,10 @@ impl Projector<'_> {
         event: &EconomicEvent,
         cash: &CashEffect,
     ) -> Result<(), String> {
-        let (currency, amount) = match cash.booking {
-            Booking::ActivityCurrency => (event.currency.clone(), cash.amount),
-            Booking::AccountCurrency { rate } => (
-                state.currency.clone(),
-                checked(arith::mul(cash.amount, rate), "cash at the supplied rate")?,
-            ),
-        };
-        *state.cash.entry(currency).or_insert(Decimal::ZERO) += amount;
+        let (currency, amount) = cash
+            .booked(&event.currency, &state.currency)
+            .ok_or_else(|| "cash at the supplied rate is outside the kernel range".to_string())?;
+        *state.cash.entry(currency.clone()).or_insert(Decimal::ZERO) += amount;
         Ok(())
     }
 
