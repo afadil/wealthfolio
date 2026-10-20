@@ -6,7 +6,7 @@ function noop() {
 
 // Treemap heatmap palette, from the theme's --heatmap-* roles: gains lerp from
 // --heatmap-positive-low to -high, losses from --heatmap-negative-low to -high,
-// and labels use --heatmap-label-dark or -light. The fallback is Classic's.
+// and labels use --heatmap-label-dark or -light. The fallback is Classic's (classic.css).
 export interface TreemapPalette {
   positiveLow: number[];
   positiveHigh: number[];
@@ -27,12 +27,12 @@ const paletteTokens = {
 } as const;
 
 export const fallbackPalette: TreemapPalette = {
-  positiveLow: [205, 217, 191], // #cdd9bf
-  positiveHigh: [53, 92, 76], // #355c4c
-  negativeLow: [233, 179, 168], // #e9b3a8
-  negativeHigh: [209, 78, 66], // #d14e42
-  labelDark: [28, 42, 36], // #1c2a24
-  labelLight: [245, 243, 236], // #f5f3ec
+  positiveLow: [205, 217, 191],
+  positiveHigh: [53, 92, 76],
+  negativeLow: [233, 179, 168],
+  negativeHigh: [209, 78, 66],
+  labelDark: [28, 42, 36],
+  labelLight: [245, 243, 236],
   isDark: false,
 };
 
