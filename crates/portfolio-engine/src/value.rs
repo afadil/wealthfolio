@@ -18,6 +18,7 @@ use crate::arith;
 use crate::compile::CompiledLedger;
 use crate::diagnostics::{Diagnostic, DiagnosticCode};
 use crate::error::EngineError;
+use crate::measure::{MeasureInputs, MeasureProfile};
 use crate::model::*;
 use crate::project::{in_position_currency, lot_records, position_book_cost, QUANTITY_THRESHOLD};
 use crate::resolve::{FxResolver, ResolvedSurfaces};
@@ -1333,6 +1334,28 @@ pub fn effects(
 ) -> Effects {
     let transfers = transfer_records(resolved.ledger, lots, disposals);
     priced_events(resolved, disposals, &transfers, rejected, None).0
+}
+
+/// Prepare the priced inputs for a stored-row performance read. Use the same
+/// profile when measuring: Dashboard needs flows but no cash FX attribution.
+pub fn measure_inputs<'a>(
+    resolved: &Resolved<'_>,
+    series: &'a BTreeMap<AccountId, ValuationSeries>,
+    lots: &'a [LotRecord],
+    disposals: &'a [LotDisposal],
+    rejected: &BTreeSet<ActivityId>,
+    profile: MeasureProfile,
+) -> MeasureInputs<'a> {
+    let mut effects = effects(resolved, disposals, lots, rejected);
+    if profile != MeasureProfile::Dashboard {
+        effects.cash_fx = cash_fx_effects(resolved, series, rejected);
+    }
+    MeasureInputs {
+        effects,
+        series,
+        lots,
+        disposals,
+    }
 }
 
 /// Price actual cash exposure before account/scope totals collapse its
