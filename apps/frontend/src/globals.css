@@ -34,6 +34,13 @@
     U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
 }
 
+/* Arabic letters join, and letter-spacing pulls them apart, so the tracking of small-caps
+   labels and theme headings is dropped when the app is in Arabic. Unlayered and important to
+   win over tracking utilities and theme rules. */
+:root:lang(ar) * {
+  letter-spacing: normal !important;
+}
+
 /* Enable class-based dark mode across the subtree (Tailwind v4 pattern) */
 @custom-variant dark (&:where(.dark, .dark *));
 
