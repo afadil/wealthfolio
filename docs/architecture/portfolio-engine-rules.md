@@ -163,10 +163,10 @@ first day carries no flow.
 
 **R4.2** Units in transit between the legs of a transfer spread over several
 days belong to neither account. A window starting between the legs reads their
-return as gain; a window spanning both legs is unaffected (§8).
-A cash pair's execution FX difference is attributed only when both legs are
-inside the period. A cut pair's principal stays unreconciled, subject to the
-existing diagnostic tolerance, rather than being labelled as FX.
+return as gain; a window spanning both legs is unaffected (§8). A cash pair's
+execution FX difference is attributed only when both legs are inside the period.
+A cut pair's principal stays unreconciled, subject to the existing diagnostic
+tolerance, rather than being labelled as FX.
 
 ## 5. What invalidates what
 
