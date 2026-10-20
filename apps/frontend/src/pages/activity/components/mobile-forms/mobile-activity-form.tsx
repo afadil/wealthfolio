@@ -437,6 +437,8 @@ export function MobileActivityForm({
       quoteMode:
         activity?.assetQuoteMode === QuoteMode.MANUAL ? QuoteMode.MANUAL : QuoteMode.MARKET,
       exchangeMic: activity?.exchangeMic,
+      symbolInstrumentType: activity?.instrumentType ?? undefined,
+      symbolQuoteCcy: activity?.assetQuoteCcy ?? activity?.currency ?? undefined,
       showCurrencySelect: false,
       ...(isTransferType && {
         transferMode: initialTransferMode,
@@ -452,7 +454,6 @@ export function MobileActivityForm({
       ...(isOptionActivity && {
         assetType: "option" as const,
         assetKind: "OPTION",
-        symbolQuoteCcy: activity?.assetQuoteCcy ?? activity?.currency ?? undefined,
         underlyingSymbol: parsedOcc?.underlying ?? "",
         strikePrice: parsedOcc?.strikePrice,
         expirationDate: parsedOcc?.expiration,
@@ -463,7 +464,6 @@ export function MobileActivityForm({
       ...(isBondActivity && {
         assetType: "bond" as const,
         assetKind: "BOND",
-        symbolQuoteCcy: activity?.currency ?? undefined,
       }),
     };
   }, [activity]);
