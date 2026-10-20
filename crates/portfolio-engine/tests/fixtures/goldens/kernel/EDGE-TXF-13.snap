@@ -1,6 +1,5 @@
 ---
 source: crates/portfolio-engine/tests/goldens.rs
-assertion_line: 34
 ---
 as_of: 2025-01-06
 base_currency: USD
@@ -384,7 +383,7 @@ baseline:
         contributions: "1151.2"
         distributions: "0"
         fees: "0"
-        fx_effect: "1.2"
+        fx_effect: "0"
         income: "0"
         realized_pnl: "0"
         residual: "0"
@@ -423,7 +422,7 @@ baseline:
         - date: 2025-01-06
           value: "0"
       summary:
-        amount: "1.2"
+        amount: "0"
         amount_status: complete
         basis: marketValue
         basis_status: notApplicable

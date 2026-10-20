@@ -100,8 +100,7 @@ expected_notes: >
   1.38): proceeds 620, basis 552.5, P&L 67.5; base 855.6 / 729.3 / 126.3.
   Realized total 305 USD / 513.75 CAD. Valuation cash_balance is the USD
   bucket at the day's rate (01-05: 3995 x 1.31 = 5233.45). TWR = 7427/6500
-  - 1 = 14.261538% (no external flows). LEGACY BEHAVIOR (attribution):
-  realized_pnl is grossed up by the trade charges to 540.5 with fees 26.75
-  attributed separately (6.5 + 6.6 + 6.75 + 6.9); the FX gain on the USD
-  cash balance (413.25 CAD) is not attributed (fx_effect 0), so the
-  diagnostics report "attribution incomplete, difference 413.25".
+  - 1 = 14.261538% (no external flows). Attribution: realized_pnl is
+  grossed up by the trade charges to 540.5 with fees 26.75 attributed
+  separately (6.5 + 6.6 + 6.75 + 6.9). The USD cash balance contributes
+  413.25 CAD of fx_effect, so the total gain reconciles to 927 CAD.

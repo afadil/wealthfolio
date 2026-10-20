@@ -1335,6 +1335,106 @@ pub fn effects(
     priced_events(resolved, disposals, &transfers, rejected, None).0
 }
 
+/// Price actual cash exposure before account/scope totals collapse its
+/// currencies. Under the daily end-of-day convention, only the previous
+/// day's closing units earn today's FX movement. Postings on the day change
+/// the exposure for the next day, regardless of whether they are external
+/// flows, trades, income, fees or the legs of a conversion.
+pub(crate) fn cash_fx_effects(
+    resolved: &Resolved<'_>,
+    series: &BTreeMap<AccountId, ValuationSeries>,
+    rejected: &BTreeSet<ActivityId>,
+) -> BTreeMap<AccountId, Vec<CashFxEffect>> {
+    let mut postings: BTreeMap<&AccountId, Vec<&EconomicEvent>> = BTreeMap::new();
+    for event in &resolved.ledger.events {
+        if event.cash.is_some() && !rejected.contains(&event.source) {
+            postings.entry(&event.account).or_default().push(event);
+        }
+    }
+    let fx = resolved.fx();
+    let policy = &resolved.facts.policy;
+    let base = policy.major_currency(policy.base_currency.as_str());
+    let mut effects = BTreeMap::new();
+    for (id, history) in series {
+        let Some(account) = resolved.facts.accounts.get(id) else {
+            continue;
+        };
+        if account.archived || account.tracking == TrackingMode::Holdings {
+            continue;
+        }
+        let (Some(first), Some(last)) = (history.days.first(), history.days.last()) else {
+            continue;
+        };
+        let events = postings.get(id).map_or(&[][..], Vec::as_slice);
+        let mut next_event = 0;
+        let mut cash: BTreeMap<&Currency, Decimal> = BTreeMap::new();
+        let mut known = true;
+        let mut daily = Vec::new();
+        let account_currency = policy.major_currency(account.currency.as_str());
+        // Use the same bucket -> account -> base path as value_day, also
+        // when a direct bucket -> base observation would choose another path.
+        let cash_value = |currency: &Currency, units: Decimal, date| {
+            let (major, factor) = policy.normalize_currency(currency.as_str());
+            arith::product(&[
+                units,
+                factor,
+                fx.rate(major, account_currency, date)?,
+                fx.rate(account_currency, base, date)?,
+            ])
+        };
+        for date in first.date.iter_days().take_while(|day| *day <= last.date) {
+            if date > first.date {
+                let previous = date
+                    .pred_opt()
+                    .expect("a day after the first has a predecessor");
+                let amount = known
+                    .then(|| {
+                        cash.iter()
+                            .try_fold(Decimal::ZERO, |total, (currency, units)| {
+                                if units.is_zero() {
+                                    return Some(total);
+                                }
+                                // Multiply units first, as valuation does: a
+                                // combined rate can exceed the range even when
+                                // the value of a small exposure is representable.
+                                let change = cash_value(currency, *units, date)?
+                                    - cash_value(currency, *units, previous)?;
+                                total.checked_add(change)
+                            })
+                            .and_then(arith::bounded)
+                    })
+                    .flatten();
+                if amount != Some(Decimal::ZERO) {
+                    daily.push(CashFxEffect { date, amount });
+                }
+            }
+            while let Some(event) = events.get(next_event).filter(|e| e.date <= date) {
+                let booked = event
+                    .cash
+                    .as_ref()
+                    .and_then(|cash| cash.booked(&event.currency, &account.currency));
+                match booked {
+                    Some((currency, amount)) => {
+                        let balance = cash.entry(currency).or_default();
+                        // Projection permits a transient balance above the
+                        // valuation bound; only Decimal overflow loses the
+                        // exposure. A later posting can bring it back in range.
+                        if let Some(total) = balance.checked_add(amount) {
+                            *balance = total;
+                        } else {
+                            known = false;
+                        }
+                    }
+                    None => known = false,
+                }
+                next_event += 1;
+            }
+        }
+        effects.insert(id.clone(), daily);
+    }
+    effects
+}
+
 /// What each security transfer leg's own account recorded, so no path needs
 /// the partner's records (a window, a revalue and a read each have only
 /// their own accounts').
@@ -1653,6 +1753,7 @@ fn priced_events(
             })
             .collect(),
         events,
+        cash_fx: BTreeMap::new(),
         pairs: facts
             .transfer_pairs
             .iter()
@@ -1666,6 +1767,7 @@ fn priced_events(
                 in_account: pair.in_account.clone(),
                 out_account: pair.out_account.clone(),
                 security: pair.security,
+                contribution_neutral: pair.contribution_neutral,
             })
             .collect(),
     };

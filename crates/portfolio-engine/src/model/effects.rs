@@ -27,6 +27,19 @@ pub struct Effects {
     pub events: Vec<EventEffect>,
     /// Resolved transfer pairs, in group order.
     pub pairs: Vec<PairEffect>,
+    /// Daily revaluation of transaction accounts' opening cash buckets,
+    /// prepared for the stored-row read. These are independent of investment
+    /// movement and of transfer/conversion execution differences.
+    #[serde(default)]
+    pub cash_fx: BTreeMap<AccountId, Vec<CashFxEffect>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CashFxEffect {
+    pub date: NaiveDate,
+    /// None means exposure or its valuation rate could not be determined.
+    #[serde(default, with = "crate::model::decimal_serde::option")]
+    pub amount: Option<Decimal>,
 }
 
 impl Effects {
@@ -123,4 +136,7 @@ pub struct PairEffect {
     /// A pair of security legs (not cash).
     #[serde(default)]
     pub security: bool,
+    /// Recognized same-account FX conversions leave contribution unchanged.
+    #[serde(default)]
+    pub contribution_neutral: bool,
 }
