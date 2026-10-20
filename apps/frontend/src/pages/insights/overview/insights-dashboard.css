@@ -11,6 +11,14 @@ body:has(.insights-dashboard .react-grid-item:is(.resizing, .react-draggable-dra
   user-select: none;
 }
 
+/* The grid places items with translate(x) from the left edge but leaves `left` unset, so in a
+   right-to-left page each absolute item started at the right edge and the second column
+   overflowed. The grid keeps its physical layout, like the charts; card content still follows
+   the page direction. */
+.insights-dashboard .react-grid-item {
+  left: 0;
+}
+
 .insights-widget-content > * {
   min-height: inherit;
 }
