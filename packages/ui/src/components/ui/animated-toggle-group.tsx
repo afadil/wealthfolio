@@ -63,6 +63,8 @@ interface ToggleGroupItem<T extends string = string> {
   value: T;
   label: ReactNode;
   title?: string;
+  /** Accessible name when the visible label needs more context. */
+  "aria-label"?: string;
   "data-testid"?: string;
 }
 
@@ -122,6 +124,7 @@ export function AnimatedToggleGroup<T extends string = string>(props: AnimatedTo
           key={item.value}
           onClick={() => handleSelect(item.value)}
           title={item.title}
+          aria-label={item["aria-label"]}
           data-testid={item["data-testid"]}
           aria-pressed={selected === item.value}
           className={cn(
