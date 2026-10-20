@@ -235,6 +235,7 @@
     "mtdShort": "MTD",
     "lastMonth": "Mes pasado",
     "prevShort": "Ant.",
+    "lastYear": "Año pasado",
     "viewingMonth": "Viendo {{label}}, haz clic para cambiar",
     "pickMonth": "Elegir un mes concreto",
     "selectMonth": "Seleccionar mes",

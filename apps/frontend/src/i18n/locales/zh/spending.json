@@ -226,6 +226,7 @@
     "mtdShort": "MTD",
     "lastMonth": "上月",
     "prevShort": "上一",
+    "lastYear": "去年",
     "viewingMonth": "正在查看 {{label}}，点击可更改",
     "pickMonth": "选择特定月份",
     "selectMonth": "选择月份",
