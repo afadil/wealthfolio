@@ -26,6 +26,53 @@
   /* Segmented controls (AnimatedToggleGroup) and their thumb. */
   --segmented-radius: 9999px;
 
+  /* Component surfaces the shared components read (packages/ui). Themes change a
+     component's look here, never with rules, so a call site's own classes still
+     win (tailwind-merge drops the token class). Each value is what the class it
+     replaced drew. */
+  /* Buttons: the default (primary) variant's light layer and shadow, the label
+     weight of filled buttons, and the outline and secondary surfaces. */
+  --button-image: none;
+  --button-shadow: 0 0 #0000;
+  --button-weight: 500;
+  --button-outline-bg: var(--input-bg);
+  --button-outline-border: var(--input);
+  --button-outline-image: none;
+  --button-outline-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --button-outline-hover-bg: var(--accent);
+  --button-secondary-bg: var(--secondary);
+  --button-secondary-border: transparent;
+  --button-secondary-image: none;
+  --button-secondary-shadow: 0 0 #0000;
+  --button-secondary-hover-bg: color-mix(in oklab, var(--secondary) 80%, transparent);
+  /* Fields: border, the text input's resting shadow, and a glow the select
+     trigger and textarea add (none in Classic). */
+  --field-border: var(--input);
+  --field-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --field-glow: 0 0 #0000;
+  /* Switches (default size): track colours, size and thumb. */
+  --switch-on: var(--primary);
+  --switch-off: var(--input);
+  --switch-width: 2.75rem;
+  --switch-height: 1.5rem;
+  --switch-thumb: var(--background);
+  --switch-thumb-size: 1.25rem;
+  --switch-thumb-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  /* The segmented control's thumb. */
+  --segmented-thumb: var(--background);
+  --segmented-thumb-image: none;
+  --segmented-thumb-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  /* Overlays: dialogs, alert dialogs and sheets; popups (lists, menus, popovers,
+     hover cards). */
+  --overlay-border: var(--border);
+  --overlay-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --sheet-bg: var(--background);
+  --popup-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  /* Card titles. */
+  --card-title-size: 1.25rem;
+  --card-title-tracking: -0.025em;
+  --card-title-case: none;
+
   /* Flexoki Light Theme (HSL numeric components). Classic darkens tx-2, gr
      and ye from Flexoki so text in them reaches 4.5:1 on every surface
      (e2e/design-system/colors.spec.ts). */
@@ -95,8 +142,20 @@
   --sidebar-border: hsl(var(--flexoki-ui));
   --sidebar-ring: hsl(var(--flexoki-tx-2));
 
+  /* Liquid glass (the floating navigation): fill, rim, blur, depth, sheen. */
   --liquid-glass-bg: rgba(255, 255, 255, 0.05);
   --liquid-glass-border: rgba(255, 255, 255, 0.1);
+  --liquid-glass-blur: blur(5px);
+  --liquid-glass-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.15), 0 0 2px rgba(255, 255, 255, 0.1);
+  --liquid-glass-sheen: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.2) 0.6%,
+    rgba(255, 255, 255, 0.05) 20.56%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  --liquid-glass-rim: none;
 
   /* Status surfaces: a pale background with text and border of the same hue,
      for callouts, banners and pills (bg-warning-subtle
@@ -179,6 +238,8 @@
   --flexoki-bl: 210 47% 50%;
 
   --input: hsl(var(--flexoki-ui-2));
+  --button-outline-bg: color-mix(in oklab, var(--input) 30%, transparent);
+  --button-outline-hover-bg: color-mix(in oklab, var(--input) 50%, transparent);
 
   /* Dark chart palette — same semantic hues as light (forest / sage / sand /
      clay / plum + stone), tuned for the dark surface: forest is lifted for

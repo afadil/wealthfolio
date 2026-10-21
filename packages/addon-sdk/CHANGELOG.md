@@ -8,15 +8,17 @@ and this project adheres to
 
 ### Added
 
-- Theme geometry: `Button`, `Input`, `Textarea`, `Select`, `Toggle`, `Card`,
-  `Badge`, `Dialog`, `AlertDialog`, the popups (select, menu, popover, hover
-  card, command, combobox) and `AnimatedToggleGroup` take their corners, field
-  height and card shadow from CSS variables (`--button-radius`,
-  `--control-radius`, `--control-height`, `--card-radius`, `--card-border`,
-  `--card-shadow`, `--popup-radius`, `--dialog-radius`, `--badge-radius`,
-  `--segmented-radius`), so they follow the host's theme. Classic keeps the
-  previous values. `Button` also sets `data-variant` and `data-size`, as
-  shadcn's does.
+- Theme tokens for components: `Button`, `Input`, `Textarea`, `Select`,
+  `Toggle`, `Switch`, `Card`, `CardTitle`, `Badge`, `Dialog`, `AlertDialog`,
+  `Sheet`, the popups (select, menu, popover, hover card, command, combobox) and
+  `AnimatedToggleGroup` read their corners, field height, surfaces, borders and
+  shadows from CSS variables (`--button-*`, `--control-*`, `--field-*`,
+  `--switch-*`, `--card-*`, `--popup-*`, `--overlay-*`, `--dialog-radius`,
+  `--sheet-bg`, `--badge-radius`, `--segmented-*`). The host's Classic theme
+  sets them to the previous look. Classes an addon passes still win, in dark
+  mode too: an outline `Button`'s own background or border is no longer replaced
+  by the variant's dark colours. `Button` also sets `data-variant` and
+  `data-size`, as shadcn's does.
 - `NetworkRequest.timeoutSecs` for longer-running addon HTTP requests. Defaults
   to 10 seconds; positive integer values are capped server-side at 120 seconds.
 
