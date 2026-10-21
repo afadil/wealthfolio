@@ -60,6 +60,7 @@ import type { AmountRange } from "./amount-range-filter";
 import { DeleteTransactionsDialog, type DeletePreview } from "./delete-transactions-dialog";
 import { TransactionCard } from "./transaction-card";
 import { SelectionToolbar } from "./selection-toolbar";
+import { flattenDayGroups } from "@/lib/day-groups";
 import { TransactionDayHeader, TransactionDayHeading } from "./transaction-day-header";
 import { TransactionRow } from "./transaction-row";
 import { SplitTransactionSheet } from "./split-transaction-sheet";
@@ -78,7 +79,6 @@ import {
   stableArr,
   toRowVM,
   groupRowsByDay,
-  flattenDayGroups,
   netSummary,
   type TransactionDayGroup,
   type TransactionRowVM,
@@ -860,9 +860,9 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
 
     const daySelectionState = useCallback(
       (group: TransactionDayGroup): boolean | "indeterminate" => {
-        const selected = group.rows.filter((r) => selectedRowIds.has(r.activity.id)).length;
+        const selected = group.items.filter((r) => selectedRowIds.has(r.activity.id)).length;
         if (selected === 0) return false;
-        return selected === group.rows.length ? true : "indeterminate";
+        return selected === group.items.length ? true : "indeterminate";
       },
       [selectedRowIds],
     );
@@ -870,8 +870,8 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
     const handleToggleDay = useCallback((group: TransactionDayGroup) => {
       setSelectedRowIds((prev) => {
         const next = new Set(prev);
-        const allSelected = group.rows.every((r) => next.has(r.activity.id));
-        group.rows.forEach((r) =>
+        const allSelected = group.items.every((r) => next.has(r.activity.id));
+        group.items.forEach((r) =>
           allSelected ? next.delete(r.activity.id) : next.add(r.activity.id),
         );
         return next;
@@ -956,7 +956,10 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
      * Both layouts render the same day-grouped sequence, so they share one flat
      * item list and one virtualizer; only one of them is ever mounted.
      */
-    const listItems = useMemo(() => flattenDayGroups(dayGroups), [dayGroups]);
+    const listItems = useMemo(
+      () => flattenDayGroups(dayGroups, (row) => row.activity.id),
+      [dayGroups],
+    );
 
     // Neither layout owns its scroll box — the table scrolls with the page, the
     // card list scrolls inside its swipeable pane — so both sit below a filter
@@ -1064,7 +1067,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
               />
             ) : (
               <TransactionCard
-                {...sharedRowProps(item.row)}
+                {...sharedRowProps(item.item)}
                 showAccount={showAccount}
                 selectionMode={selectionMode}
               />
@@ -1113,7 +1116,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
               key={virtualItem.key}
               ref={virtualizer.measureElement}
               data-index={virtualItem.index}
-              {...sharedRowProps(item.row)}
+              {...sharedRowProps(item.item)}
               showAccount={showAccount}
               showBalance={showBalance}
             />
