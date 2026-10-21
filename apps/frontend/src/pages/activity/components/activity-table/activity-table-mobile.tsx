@@ -17,7 +17,7 @@ import { ActivityType } from "@/lib/constants";
 import { formatOptionSubtitle, parseOccSymbol } from "@/lib/occ-symbol";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { ActivityDetails } from "@/lib/types";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, cn } from "@/lib/utils";
 import {
   AmountDisplay,
   Button,
@@ -47,6 +47,11 @@ import { ActivityTypeBadge } from "../activity-type-badge";
 import { flattenDayGroups } from "@/lib/day-groups";
 import { groupActivitiesByDay } from "./activity-day-groups";
 import { ActivityDayHeading } from "./activity-day-header";
+import {
+  NEEDS_REVIEW_CARD_CLASS,
+  NeedsReviewMark,
+  NeedsReviewStripe,
+} from "@/components/needs-review";
 
 /**
  * Starting heights for virtualized cards. The detailed card grows with the
@@ -268,7 +273,14 @@ export const ActivityTableMobile = ({
     if (isCompactView) {
       const activityTypeLabel = localizeActivityTypeName(t, activity.activityType);
       return (
-        <Card key={activity.id} className="p-3">
+        <Card
+          key={activity.id}
+          className={cn(
+            "p-3",
+            activity.needsReview && ["relative overflow-hidden", NEEDS_REVIEW_CARD_CLASS],
+          )}
+        >
+          {activity.needsReview && <NeedsReviewStripe />}
           <div className="flex items-center gap-3">
             {(() => {
               const inner = (
@@ -282,7 +294,12 @@ export const ActivityTableMobile = ({
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
-                      <p className="truncate font-semibold">{displaySymbol}</p>
+                      <p className="flex min-w-0 items-center gap-1.5 font-semibold">
+                        {activity.needsReview && (
+                          <NeedsReviewMark label={t("activity:detail.needs_review")} />
+                        )}
+                        <span className="truncate">{displaySymbol}</span>
+                      </p>
                       {activity.activityType !== "SPLIT" && (
                         <AmountDisplay
                           value={displayValue}
@@ -355,7 +372,14 @@ export const ActivityTableMobile = ({
 
     // Detailed View
     return (
-      <Card key={activity.id} className="p-3">
+      <Card
+        key={activity.id}
+        className={cn(
+          "p-3",
+          activity.needsReview && ["relative overflow-hidden", NEEDS_REVIEW_CARD_CLASS],
+        )}
+      >
+        {activity.needsReview && <NeedsReviewStripe />}
         <div className="space-y-2">
           {/* Header: Symbol and Date */}
           <div className="flex items-start justify-between">
@@ -370,7 +394,12 @@ export const ActivityTableMobile = ({
                     className="h-10 w-10"
                   />
                   <div>
-                    <p className="font-semibold">{displaySymbol}</p>
+                    <p className="flex items-center gap-1.5 font-semibold">
+                      {activity.needsReview && (
+                        <NeedsReviewMark label={t("activity:detail.needs_review")} />
+                      )}
+                      {displaySymbol}
+                    </p>
                     <p className="text-muted-foreground text-xs">
                       {isCash ? activity.currency : (optionSubtitle ?? activity.assetName)}
                     </p>

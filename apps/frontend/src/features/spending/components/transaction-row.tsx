@@ -30,6 +30,11 @@ import {
 } from "../lib/transactions-helpers";
 import { QuickCategorizePopover } from "./quick-categorize-popover";
 import { QuickEventPopover } from "./quick-event-popover";
+import {
+  NEEDS_REVIEW_ROW_CLASS,
+  NeedsReviewIcon,
+  NeedsReviewStripe,
+} from "@/components/needs-review";
 
 interface TransactionRowProps {
   row: TransactionRowVM;
@@ -120,13 +125,11 @@ function TransactionRowImpl({
       ref={ref}
       data-index={dataIndex}
       data-state={isSelected ? "selected" : undefined}
-      className={cn("group/row cursor-pointer", row.needsReview && "bg-warning/5")}
+      className={cn("group/row cursor-pointer", row.needsReview && NEEDS_REVIEW_ROW_CLASS)}
       onClick={(e) => isRowBodyClick(e) && onEdit(row)}
     >
       <TableCell className="relative w-10 px-3 py-2" data-row-click-ignore>
-        {row.needsReview && (
-          <span className="bg-warning absolute inset-y-0 start-0 w-[3px]" aria-hidden="true" />
-        )}
+        {row.needsReview && <NeedsReviewStripe />}
         <Checkbox
           checked={isSelected}
           onCheckedChange={() => onToggleSelect(a.id)}
@@ -144,16 +147,7 @@ function TransactionRowImpl({
           plain utility and would let the note run to the viewport edge. */}
       <TableCell className="max-w-0! px-3 py-2">
         <div className="flex items-center gap-2">
-          {/* The stripe beside the checkbox carries this too, but colour alone
-              cannot be the only signal — it says nothing to a screen reader and
-              nothing to a reader who cannot separate amber from the row behind
-              it. An icon costs a line of width and says it in both registers. */}
-          {row.needsReview && (
-            <span className="text-warning shrink-0">
-              <Icons.AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
-              <span className="sr-only">{t("spending:transactions.review")}</span>
-            </span>
-          )}
+          {row.needsReview && <NeedsReviewIcon label={t("spending:transactions.review")} />}
           {a.notes != null ? (
             <TruncatedText text={a.notes} className="text-sm" />
           ) : (
