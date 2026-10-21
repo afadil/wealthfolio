@@ -718,9 +718,12 @@ function AttributionDetailMetric({
   if (!result || result.mode === "symbolPriceBased") return null;
   const periodPnl = performancePeriodPnl(result);
   if (periodPnl == null) return null;
-  // Return inapplicability alone can make overall quality partial; the P&L
-  // indicator requires a data warning, with IRR-only warnings filtered out.
-  const isPartial = result.summary?.quality === "partial" && warnings.length > 0;
+  // A missing mixed-scope return series does not make attributed P&L incomplete.
+  // Keep that warning with the return metric, alongside the existing IRR filter.
+  const attributionWarnings = warnings.filter(
+    (warning) => !warning.startsWith("Return series unavailable for all-time mixed scopes"),
+  );
+  const isPartial = result.summary?.quality === "partial" && attributionWarnings.length > 0;
 
   const currency = result.scope.currency;
   const driverRows: AttributionRow[] = [
@@ -895,7 +898,7 @@ function AttributionDetailMetric({
             >
               <MetricInfoPopoverBody
                 infoText={t("performance:metric.gain_loss_info")}
-                warningItems={metricWarningItems(warnings)}
+                warningItems={metricWarningItems(attributionWarnings)}
                 boldTerms={warningTerms}
               />
             </div>
