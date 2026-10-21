@@ -37,6 +37,7 @@ import {
   useAmountFormatting,
   useDateFormatting,
   buttonVariants,
+  Card,
   Empty,
   EmptyHeader,
   EmptyMedia,
@@ -951,13 +952,10 @@ export const ActivityTable = ({
           nothing between them is a scroll container. A box that scrolls
           sideways is one, so the box scrolls only while the table is wider
           than it, and `Table`'s own wrapper never does. */}
-      <div
+      <Card
         ref={setTableBox}
         data-virtual-scroll-parent
-        className={cn(
-          "min-h-0 flex-1 rounded-md border",
-          scrollsSideways ? "overflow-auto" : "overflow-clip",
-        )}
+        className={cn("min-h-0 flex-1", scrollsSideways ? "overflow-auto" : "overflow-clip")}
         style={{ overflowAnchor: "none" }}
       >
         <Table
@@ -976,12 +974,12 @@ export const ActivityTable = ({
               offset would push it down over the rows. */}
           <TableHeader
             className={cn(
-              "bg-background sticky top-0 z-10 [&_th]:shadow-[inset_0_-1px_0_var(--color-border)] [&_tr]:border-b-0",
+              "bg-card sticky top-0 z-10 [&_th]:shadow-[inset_0_-1px_0_var(--color-border)] [&_tr]:border-b-0",
               !scrollsSideways && "[@media(width>1024px)]:top-[var(--page-header-height,0px)]",
             )}
           >
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="bg-muted-foreground/5">
+              <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   const width = COLUMN_WIDTHS[header.column.id];
                   return (
@@ -1072,7 +1070,7 @@ export const ActivityTable = ({
             hasLoadMoreError={hasLoadMoreError}
           />
         )}
-      </div>
+      </Card>
     </div>
   );
 };

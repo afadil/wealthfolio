@@ -74,6 +74,7 @@ import {
   isSpendingAccountType,
 } from "../lib/constants";
 import { cashActivityFlowMetadata } from "../lib/cash-activity-form-utils";
+import { Card } from "@wealthfolio/ui/components/ui/card";
 import {
   isTransferCashActivity,
   stableArr,
@@ -1270,13 +1271,13 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
         ) : (
           // Row checkboxes show on hover or focus until something is selected,
           // then on every row; `data-selecting` is what switches them on.
-          <div
-            className="group/list rounded-md border"
+          <Card
+            className="group/list overflow-clip"
             data-selecting={selectedRowIds.size > 0 || undefined}
             style={{ overflowAnchor: "none" }}
           >
             <Table>
-              <TableHeader className="bg-muted-foreground/5">
+              <TableHeader>
                 <TableRow>
                   {/* Select-all stays visible: with the row boxes hidden at
                       rest, it is what shows the list can be selected. */}
@@ -1318,7 +1319,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
                 {loadMoreTrigger}
               </div>
             )}
-          </div>
+          </Card>
         )}
 
         <CashActivityForm
