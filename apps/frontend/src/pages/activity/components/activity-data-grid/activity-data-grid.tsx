@@ -962,7 +962,7 @@ export function ActivityDataGrid({
         isUnlinking={unlinkTransferActivitiesMutation.isPending}
       />
 
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <div className="min-h-0 flex-1">
         <DataGrid {...dataGrid} stretchColumns height="calc(100vh - 260px)" />
       </div>
 

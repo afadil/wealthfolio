@@ -15,6 +15,7 @@ import {
 import * as React from "react";
 
 import { cn } from "../../../lib/utils";
+import { Card } from "../card";
 import { Icons } from "../icons";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../table";
 import { usePersistentState } from "../../../hooks/use-persistent-state";
@@ -43,6 +44,8 @@ interface DataTableProps<TData, TValue> {
   toolbarFilters?: React.ReactNode;
   toolbarActions?: React.ReactNode;
   pinRowsToTop?: (row: TData) => boolean;
+  /** Draw the table on a Card. Pass false for a table already inside a card or dialog. */
+  card?: boolean;
 }
 
 /**
@@ -85,7 +88,9 @@ export function DataTable<TData, TValue>({
   toolbarFilters,
   toolbarActions,
   pinRowsToTop,
+  card = true,
 }: DataTableProps<TData, TValue>) {
+  const Frame = card ? Card : "div";
   const [rowSelection, setRowSelection] = React.useState({});
   const [storedColumnVisibility, setColumnVisibility] = storageKey
     ? usePersistentState<VisibilityState>(
@@ -188,23 +193,29 @@ export function DataTable<TData, TValue>({
           `isolate` stops WebKitGTK painting the sticky header over this scrollbar, and
           top scroll padding as tall as the header cells (h-12) plus the 4px a button's
           focus outline reaches out stops keyboard focus scrolling a control, or its
-          outline, in under the header. */}
-      <div
+          outline, in under the header.
+          Otherwise overflow-clip rounds the header row into the frame without making the
+          frame a scroll container, so a sticky header still follows the page. */}
+      <Frame
         className={cn(
-          "min-h-0 flex-1 rounded-md border",
-          scrollable && "scroll-pt-13 isolate max-h-[calc(100dvh-9rem)] overflow-auto",
+          "min-h-0 flex-1",
+          !card && "rounded-md border",
+          scrollable ? "scroll-pt-13 isolate max-h-[calc(100dvh-9rem)] overflow-auto" : "overflow-clip",
         )}
       >
         <Table containerClassName={scrollable ? "overflow-visible" : undefined}>
-          {/* Rows pass under a pinned header: give it the opaque look of bg-muted/50 on
-              the page, and draw its bottom line on the cells, since the collapsed row
-              border scrolls away with the table. */}
+          {/* Rows pass under a pinned header: give it an opaque surface (the card's, or
+              the look of bg-muted/50 on the page), and draw its bottom line on the
+              cells, since the collapsed row border scrolls away with the table. */}
           <TableHeader
             className={cn(
               "sticky top-0 z-10",
-              scrollable
-                ? "bg-[color-mix(in_srgb,var(--muted)_50%,var(--background))] [&_th]:shadow-[inset_0_-1px_0_var(--border)] [&_tr]:border-b-0"
-                : "bg-muted/50",
+              card
+                ? "bg-card"
+                : scrollable
+                  ? "bg-[color-mix(in_srgb,var(--muted)_50%,var(--background))]"
+                  : "bg-muted/50",
+              scrollable && "[&_th]:shadow-[inset_0_-1px_0_var(--border)] [&_tr]:border-b-0",
             )}
           >
             {table.getHeaderGroups().map((headerGroup) => (
@@ -240,7 +251,7 @@ export function DataTable<TData, TValue>({
             )}
           </TableBody>
         </Table>
-      </div>
+      </Frame>
     </div>
   );
 }
