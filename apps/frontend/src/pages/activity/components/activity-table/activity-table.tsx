@@ -74,6 +74,13 @@ import { ActivityTypeBadge } from "../activity-type-badge";
 import { flattenDayGroups } from "@/lib/day-groups";
 import { groupActivitiesByDay } from "./activity-day-groups";
 import { ActivityDayHeaderRow } from "./activity-day-header";
+import { useReviewExplanation } from "../activity-data-grid/status-indicator";
+import { getProviderMappingReasons } from "../activity-data-grid/types";
+import {
+  NEEDS_REVIEW_ROW_CLASS,
+  NeedsReviewIcon,
+  NeedsReviewStripe,
+} from "@/components/needs-review";
 
 /**
  * Starting heights for virtualized rows. Rows report their real height once
@@ -157,6 +164,7 @@ export const ActivityTable = ({
   const dateFormatting = useDateFormatting();
   const { isBalanceHidden } = useBalancePrivacy();
   const { t } = useTranslation();
+  const reviewExplanation = useReviewExplanation();
   const { duplicateActivityMutation } = useActivityMutations();
   // mutateAsync is stable; the mutation object is not, and `columns` depends on this handler.
   const { mutateAsync: duplicateActivity } = duplicateActivityMutation;
@@ -293,13 +301,26 @@ export const ActivityTable = ({
             </div>
           );
 
-          if (isCash || !hasAsset) {
-            return content;
-          }
+          const body =
+            isCash || !hasAsset ? (
+              content
+            ) : (
+              <Link to={`/holdings/${encodeURIComponent(assetId)}`} className="-m-1 block p-1">
+                {content}
+              </Link>
+            );
+          if (!row.original.needsReview) return body;
+          // The review icon is a button with its own tooltip, so it sits beside
+          // the asset link rather than inside it.
           return (
-            <Link to={`/holdings/${encodeURIComponent(assetId)}`} className="-m-1 block p-1">
-              {content}
-            </Link>
+            <div className="flex items-center gap-2">
+              <NeedsReviewIcon
+                label={t("activity:detail.needs_review")}
+                reasons={getProviderMappingReasons(row.original)}
+                explanation={reviewExplanation}
+              />
+              {body}
+            </div>
           );
         },
         enableHiding: false,
@@ -764,6 +785,7 @@ export const ActivityTable = ({
       amountFormatting,
       showsCashBalance,
       symbolExchangeCountMap,
+      reviewExplanation,
       t,
     ],
   );
@@ -1011,15 +1033,19 @@ export const ActivityTable = ({
                   key={virtualItem.key}
                   ref={virtualizer.measureElement}
                   data-index={virtualItem.index}
-                  className="group/row cursor-pointer"
+                  className={cn(
+                    "group/row cursor-pointer",
+                    row.original.needsReview && NEEDS_REVIEW_ROW_CLASS,
+                  )}
                   onClick={(e) => isRowBodyClick(e) && handleEdit(row.original)}
                 >
-                  {row.getVisibleCells().map((cell) => (
+                  {row.getVisibleCells().map((cell, cellIndex) => (
                     <TableCell
                       key={cell.id}
-                      className="px-3 py-2"
+                      className={cn("px-3 py-2", cellIndex === 0 && "relative")}
                       data-row-click-ignore={cell.column.id === "actions" || undefined}
                     >
+                      {cellIndex === 0 && row.original.needsReview && <NeedsReviewStripe />}
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
