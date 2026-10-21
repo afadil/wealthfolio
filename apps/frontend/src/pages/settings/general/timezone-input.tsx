@@ -50,12 +50,12 @@ export function TimezoneInput({ value, onChange, timezones, placeholder }: Timez
         render={
           <Button
             type="button"
-            variant="outline"
+            variant="field"
             role="combobox"
             aria-expanded={open}
             aria-label={t("settings:timezone_title")}
             className={cn(
-              "h-input-height w-full justify-between rounded-md",
+              "h-input-height w-full justify-between",
               !value && "text-muted-foreground",
             )}
           />

@@ -175,11 +175,11 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
             render={
               <Button
                 ref={ref}
-                variant="outline"
+                variant="field"
                 role="combobox"
                 size="lg"
                 className={cn(
-                  "w-full justify-between truncate rounded-md font-normal",
+                  "w-full justify-between truncate",
                   !value && "text-muted-foreground",
                   className,
                 )}

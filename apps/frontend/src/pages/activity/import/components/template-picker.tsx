@@ -42,7 +42,7 @@ export function TemplatePicker({
       <PopoverTrigger
         render={
           <Button
-            variant="outline"
+            variant="field"
             role="combobox"
             aria-expanded={open}
             aria-label={t("activity:import.template.label")}

@@ -21,6 +21,9 @@ and this project adheres to
   `data-size`, as shadcn's does.
 - `AnimatedToggleGroup` items take an optional `aria-label`, for options whose
   visible label needs more context.
+- `Button` variant `field`, for a button that opens a picker in a form: it takes
+  `SelectTrigger`'s surface, border, radius, label weight and hover, so a picker
+  matches the selects beside it.
 - `NetworkRequest.timeoutSecs` for longer-running addon HTTP requests. Defaults
   to 10 seconds; positive integer values are capped server-side at 120 seconds.
 
