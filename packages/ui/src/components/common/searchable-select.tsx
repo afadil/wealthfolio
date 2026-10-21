@@ -59,13 +59,7 @@ export function SearchableSelect({
       disabled={disabled}
     >
       <ComboboxTrigger
-        render={
-          <Button
-            variant="outline"
-            className={cn("w-full justify-between rounded-md font-normal", className)}
-            disabled={disabled}
-          />
-        }
+        render={<Button variant="field" className={cn("w-full justify-between", className)} disabled={disabled} />}
       >
         <span className={cn("truncate", !selectedOption && "text-muted-foreground")}>
           <ComboboxValue placeholder={placeholder} />

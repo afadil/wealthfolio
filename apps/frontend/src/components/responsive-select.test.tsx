@@ -43,8 +43,7 @@ describe("ResponsiveSelect on a phone", () => {
         "border-(color:--field-border)",
         "bg-input-bg",
         "dark:bg-input/30",
-        "shadow-(--field-shadow)",
-        "bg-none",
+        "shadow-(--field-glow)",
       ]),
     );
     expect(classes).not.toContain("bg-(--button-outline-bg)");

@@ -15,6 +15,11 @@ export const buttonVariants = cva(
           "border border-(color:--button-outline-border) bg-(--button-outline-bg) bg-(image:--button-outline-image) shadow-(--button-outline-shadow) hover:bg-(--button-outline-hover-bg) hover:text-accent-foreground aria-[haspopup]:aria-expanded:bg-accent aria-[haspopup]:aria-expanded:text-accent-foreground dark:aria-[haspopup]:aria-expanded:bg-input/50",
         secondary:
           "border-(color:--button-secondary-border) bg-(--button-secondary-bg) bg-(image:--button-secondary-image) shadow-(--button-secondary-shadow) font-(weight:--button-weight) text-secondary-foreground hover:bg-(--button-secondary-hover-bg)",
+        // A button that opens a picker in a form: it wears SelectTrigger's
+        // surface, border, radius, label weight and hover, so pickers and
+        // selects match in every theme.
+        field:
+          "border-(color:--field-border) bg-input-bg dark:bg-input/30 dark:hover:bg-input/50 shadow-(--field-glow) rounded-(--control-radius) font-normal",
         ghost:
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 aria-[haspopup]:aria-expanded:bg-accent aria-[haspopup]:aria-expanded:text-accent-foreground dark:aria-[haspopup]:aria-expanded:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",

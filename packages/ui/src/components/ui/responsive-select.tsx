@@ -73,12 +73,10 @@ export function ResponsiveSelect({
           role="combobox"
           aria-expanded={open}
           aria-haspopup="dialog"
-          variant="outline"
+          variant="field"
           disabled={disabled}
           className={cn(
-            // A field, like the desktop SelectTrigger and Input: the field's own
-            // surface, border and shadow replace the outline button's.
-            "border-(color:--field-border) bg-input-bg dark:bg-input/30 shadow-(--field-shadow) w-full justify-between truncate rounded-md bg-none font-normal",
+            "w-full justify-between truncate",
             !selectedOption && "text-muted-foreground",
             triggerClassName,
           )}

@@ -706,10 +706,10 @@ export function MobileDetailsStep({
                   </FormLabel>
                   <FormControl>
                     <Button
-                      variant="outline"
+                      variant="field"
                       role="combobox"
                       size="lg"
-                      className="w-full justify-between rounded-md font-normal"
+                      className="w-full justify-between"
                       onClick={() => setAccountSheetOpen(true)}
                       type="button"
                     >
@@ -741,10 +741,10 @@ export function MobileDetailsStep({
                       </FormLabel>
                       <FormControl>
                         <Button
-                          variant="outline"
+                          variant="field"
                           role="combobox"
                           size="lg"
-                          className="w-full justify-between rounded-md font-normal"
+                          className="w-full justify-between"
                           onClick={() => setToAccountSheetOpen(true)}
                           type="button"
                         >
