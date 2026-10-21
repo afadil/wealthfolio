@@ -9,6 +9,7 @@ import {
   createFormatter,
   CurrencyInput,
   resolveFormattingLocale,
+  SearchableSelect,
 } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -338,36 +339,23 @@ export function LanguageRegionSettings() {
               )}
             </p>
           </div>
-          <Select
+          {/* Searchable: the regions are too many to scan. */}
+          <SearchableSelect
             value={formattingRegion}
-            items={FORMATTING_REGION_OPTIONS.map(([value, labelKey]) => ({
+            options={FORMATTING_REGION_OPTIONS.map(([value, labelKey]) => ({
               value,
               label:
                 value === "system"
                   ? `${t(`settings:formattingRegion.options.${labelKey}`)} (${resolveFormattingLocale(value)})`
                   : t(`settings:formattingRegion.options.${labelKey}`),
             }))}
-            onValueChange={(value) => {
-              if (value !== null) updateSettings({ formattingRegion: value });
-            }}
-          >
-            <SelectTrigger
-              className="max-w-90 w-full"
-              aria-label={t("settings:formattingRegion.title", "Region & formats")}
-              data-testid="formatting-locale-select"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {FORMATTING_REGION_OPTIONS.map(([value, labelKey]) => (
-                <SelectItem key={value} value={value}>
-                  {value === "system"
-                    ? `${t(`settings:formattingRegion.options.${labelKey}`)} (${resolveFormattingLocale(value)})`
-                    : t(`settings:formattingRegion.options.${labelKey}`)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onValueChange={(value) => updateSettings({ formattingRegion: value })}
+            searchPlaceholder={t("common:search_placeholder")}
+            emptyMessage={t("common:no_results_found")}
+            className="max-w-90 h-input-height"
+            data-testid="formatting-locale-select"
+            aria-label={t("settings:formattingRegion.title", "Region & formats")}
+          />
           <p
             className="text-muted-foreground text-sm tabular-nums"
             data-testid="formatting-locale-preview"
