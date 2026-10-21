@@ -42,6 +42,8 @@ const roles = [
   "input-bg",
   "ring",
   ...Array.from({ length: 9 }, (_, index) => `chart-${index + 1}`),
+  "allocation-over",
+  "allocation-under",
   "sidebar",
   "sidebar-foreground",
   "sidebar-primary",
@@ -73,6 +75,9 @@ const textPairs = [
   ...["destructive", "success", "warning"].flatMap((text) =>
     ["background", "card"].map((surface) => [text, surface]),
   ),
+  // Target allocation drift, as text on cards.
+  ["allocation-over", "card"],
+  ["allocation-under", "card"],
   ...statuses.map((status) => [`${status}-subtle-foreground`, `${status}-subtle`]),
   ["sidebar-foreground", "sidebar"],
   ["sidebar-primary-foreground", "sidebar-primary"],

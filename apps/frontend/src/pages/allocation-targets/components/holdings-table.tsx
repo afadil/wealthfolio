@@ -26,8 +26,8 @@ interface HoldingsTableProps {
 const EMPTY_DRIFT_ROWS: DriftHoldingRow[] = [];
 
 function driftColor(driftBps: number): string {
-  if (driftBps > 0) return "text-destructive";
-  if (driftBps < 0) return "text-info";
+  if (driftBps > 0) return "text-allocation-over";
+  if (driftBps < 0) return "text-allocation-under";
   return "text-muted-foreground";
 }
 
