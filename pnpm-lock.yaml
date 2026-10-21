@@ -289,6 +289,9 @@ importers:
       jsdom:
         specifier: ^28.0.0
         version: 28.1.0(@noble/hashes@1.8.0)
+      postcss:
+        specifier: 8.5.26
+        version: 8.5.26
       tailwindcss:
         specifier: ^4.1.18
         version: 4.2.1
