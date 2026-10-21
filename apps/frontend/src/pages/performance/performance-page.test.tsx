@@ -490,6 +490,76 @@ describe("PerformancePage shared scope", () => {
     expect(within(await screen.findByRole("dialog")).queryByRole("note")).toBeNull();
   });
 
+  it.each([
+    [false, false],
+    [true, false],
+    [false, true],
+    [true, true],
+  ])(
+    "separates mixed-scope return limitations from P&L warnings (mobile=%s, incomplete cash FX=%s)",
+    async (mobile, incompleteCashFx) => {
+      mocks.mobile = mobile;
+      const mixedScopeWarning =
+        "This scope mixes transaction-mode and holdings-mode accounts, so TWR and IRR are unavailable. The return is a value return over account-level components.";
+      const seriesWarning =
+        "Return series unavailable for all-time mixed scopes because transaction and holdings components use different baselines.";
+      const cashFxWarning =
+        "Cash FX attribution is incomplete for account a on 2026-02-01 because its exposure or valuation rate is unavailable.";
+      const warnings = [
+        mixedScopeWarning,
+        seriesWarning,
+        ...(incompleteCashFx ? [cashFxWarning] : []),
+      ];
+      const reasons = [
+        "TWR unavailable for mixed transaction and holdings scopes.",
+        "IRR unavailable for mixed transaction and holdings scopes.",
+      ];
+      mocks.performance.mockReturnValue({
+        data: [
+          {
+            ...resultWithWarning,
+            mode: "valueReturn",
+            isMixedTrackingMode: true,
+            series: [],
+            dataQuality: { status: "partial", warnings, notApplicableReasons: reasons },
+            summary: {
+              amount: 0,
+              amountStatus: "complete",
+              percent: 0,
+              percentStatus: "complete",
+              quality: "partial",
+              reasons: [...warnings, ...reasons],
+            },
+          },
+        ],
+        isLoading: false,
+        hasErrors: false,
+        errorMessages: [],
+        displayDateRange: "All Time",
+      });
+      renderPage();
+      const trigger = await screen.findByRole("button", { name: /Gain\s*\/\s*loss/i });
+      expect(trigger).toHaveTextContent("0.00");
+      if (!incompleteCashFx) expect(screen.queryByText("Partial data")).toBeNull();
+      await userEvent.click(trigger);
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).queryByText(seriesWarning)).toBeNull();
+      if (incompleteCashFx) {
+        expect(within(dialog).getByRole("note", { name: "Partial data" })).toHaveTextContent(
+          cashFxWarning,
+        );
+      } else {
+        expect(within(dialog).queryByRole("note")).toBeNull();
+        expect(within(dialog).queryByText("Partial data")).toBeNull();
+      }
+      await userEvent.click(within(dialog).getByRole("button", { name: "Close attribution" }));
+      await userEvent.click(
+        screen.getByRole("button", { name: /calculation notes? for value(?: return)?$/i }),
+      );
+      expect(await screen.findByText(seriesWarning)).toBeVisible();
+    },
+  );
+
   it("does not present an unavailable P&L as a partial subtotal", async () => {
     mocks.performance.mockReturnValue({
       data: [
