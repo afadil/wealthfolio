@@ -11,6 +11,39 @@
   --dialog-radius: var(--radius);
   --badge-radius: 9999px;
   --segmented-radius: 9999px;
+  --button-image: none;
+  --button-shadow: 0 0 #0000;
+  --button-weight: 500;
+  --button-outline-bg: var(--input-bg);
+  --button-outline-border: var(--input);
+  --button-outline-image: none;
+  --button-outline-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --button-outline-hover-bg: var(--accent);
+  --button-secondary-bg: var(--secondary);
+  --button-secondary-border: transparent;
+  --button-secondary-image: none;
+  --button-secondary-shadow: 0 0 #0000;
+  --button-secondary-hover-bg: color-mix(in oklab, var(--secondary) 80%, transparent);
+  --field-border: var(--input);
+  --field-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --field-glow: 0 0 #0000;
+  --switch-on: var(--primary);
+  --switch-off: var(--input);
+  --switch-width: 2.75rem;
+  --switch-height: 1.5rem;
+  --switch-thumb: var(--background);
+  --switch-thumb-size: 1.25rem;
+  --switch-thumb-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --segmented-thumb: var(--background);
+  --segmented-thumb-image: none;
+  --segmented-thumb-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --overlay-border: var(--border);
+  --overlay-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --sheet-bg: var(--background);
+  --popup-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --card-title-size: 1.25rem;
+  --card-title-tracking: -0.025em;
+  --card-title-case: none;
   --flexoki-bg: 48 100% 97%;
   --flexoki-bg-2: 51 59% 95%;
   --flexoki-ui: 51 21% 88%;
@@ -69,6 +102,17 @@
   --sidebar-ring: hsl(var(--flexoki-tx-2));
   --liquid-glass-bg: rgba(255, 255, 255, 0.05);
   --liquid-glass-border: rgba(255, 255, 255, 0.1);
+  --liquid-glass-blur: blur(5px);
+  --liquid-glass-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.15), 0 0 2px rgba(255, 255, 255, 0.1);
+  --liquid-glass-sheen: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.2) 0.6%,
+    rgba(255, 255, 255, 0.05) 20.56%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  --liquid-glass-rim: none;
   --success-subtle: var(--color-green-50);
   --success-subtle-foreground: var(--color-green-700);
   --success-subtle-border: var(--color-green-200);
@@ -124,6 +168,8 @@
   --flexoki-ye: 45 82% 45%;
   --flexoki-bl: 210 47% 50%;
   --input: hsl(var(--flexoki-ui-2));
+  --button-outline-bg: color-mix(in oklab, var(--input) 30%, transparent);
+  --button-outline-hover-bg: color-mix(in oklab, var(--input) 50%, transparent);
   --chart-1: hsl(156 28% 44%);
   --chart-2: #7e9f8c;
   --chart-3: #cbba8c;

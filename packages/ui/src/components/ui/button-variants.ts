@@ -7,12 +7,14 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default:
+          "bg-primary bg-(image:--button-image) shadow-(--button-shadow) font-(weight:--button-weight) text-primary-foreground hover:bg-primary/90 disabled:bg-none disabled:shadow-none data-disabled:bg-none data-disabled:shadow-none",
         destructive:
-          "bg-destructive-subtle text-destructive-subtle-foreground hover:bg-destructive-subtle-border/50",
+          "bg-destructive-subtle font-(weight:--button-weight) text-destructive-subtle-foreground hover:bg-destructive-subtle-border/50",
         outline:
-          "border border-input bg-input-bg shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 aria-[haspopup]:aria-expanded:bg-accent aria-[haspopup]:aria-expanded:text-accent-foreground dark:aria-[haspopup]:aria-expanded:bg-input/50",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "border border-(color:--button-outline-border) bg-(--button-outline-bg) bg-(image:--button-outline-image) shadow-(--button-outline-shadow) hover:bg-(--button-outline-hover-bg) hover:text-accent-foreground aria-[haspopup]:aria-expanded:bg-accent aria-[haspopup]:aria-expanded:text-accent-foreground dark:aria-[haspopup]:aria-expanded:bg-input/50",
+        secondary:
+          "border-(color:--button-secondary-border) bg-(--button-secondary-bg) bg-(image:--button-secondary-image) shadow-(--button-secondary-shadow) font-(weight:--button-weight) text-secondary-foreground hover:bg-(--button-secondary-hover-bg)",
         ghost:
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 aria-[haspopup]:aria-expanded:bg-accent aria-[haspopup]:aria-expanded:text-accent-foreground dark:aria-[haspopup]:aria-expanded:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",

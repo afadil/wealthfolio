@@ -134,7 +134,10 @@ export function AnimatedToggleGroup<T extends string = string>(props: AnimatedTo
             <motion.div
               data-slot="segmented-thumb"
               layoutId={`toggle-indicator-${uniqueId}`}
-              className={cn("bg-background absolute inset-0 -z-10 shadow-sm", roundedClass)}
+              className={cn(
+                "bg-(--segmented-thumb) bg-(image:--segmented-thumb-image) shadow-(--segmented-thumb-shadow) absolute inset-0 -z-10",
+                roundedClass,
+              )}
               initial={false}
               transition={{
                 type: "spring",

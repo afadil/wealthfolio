@@ -24,7 +24,7 @@ function SelectTrigger({ className, children, ...props }: SelectTriggerProps) {
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        "border-input bg-input-bg dark:bg-input/30 focus-visible:outline-solid focus-visible:outline-ring data-placeholder:text-muted-foreground h-input-height aria-invalid:outline-destructive aria-invalid:border-destructive dark:hover:bg-input/50 rounded-(--control-radius) flex w-full items-center justify-between gap-2 whitespace-nowrap border px-3 py-2 text-sm outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "border-(color:--field-border) shadow-(--field-glow) bg-input-bg dark:bg-input/30 focus-visible:outline-solid focus-visible:outline-ring data-placeholder:text-muted-foreground h-input-height aria-invalid:outline-destructive aria-invalid:border-destructive dark:hover:bg-input/50 rounded-(--control-radius) flex w-full items-center justify-between gap-2 whitespace-nowrap border px-3 py-2 text-sm outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         className,
       )}
       {...props}
@@ -96,7 +96,7 @@ function SelectContent({
           data-slot="select-content"
           data-align-trigger={alignItemWithTrigger}
           className={cn(
-            "bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-start-2 data-[side=inline-start]:slide-in-from-end-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 max-h-(--available-height) origin-(--transform-origin) ring-foreground/5 dark:ring-foreground/10 rounded-(--popup-radius) relative z-50 min-w-[max(8rem,var(--anchor-width))] overflow-y-auto overflow-x-hidden shadow-2xl ring-1 duration-100 data-[align-trigger=true]:animate-none",
+            "bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-start-2 data-[side=inline-start]:slide-in-from-end-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 max-h-(--available-height) origin-(--transform-origin) ring-foreground/5 dark:ring-foreground/10 rounded-(--popup-radius) shadow-(--popup-shadow) relative z-50 min-w-[max(8rem,var(--anchor-width))] overflow-y-auto overflow-x-hidden ring-1 duration-100 data-[align-trigger=true]:animate-none",
             className,
           )}
           {...props}

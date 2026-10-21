@@ -926,14 +926,11 @@ summary {
 }
 
 .liquid-glass {
+  /* Theme tokens (src/themes/definitions/classic.css). */
   background: var(--liquid-glass-bg);
-  backdrop-filter: blur(5px);
+  backdrop-filter: var(--liquid-glass-blur);
   border: 1px solid var(--liquid-glass-border);
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.15),
-    0 0 2px rgba(255, 255, 255, 0.1);
+  box-shadow: var(--liquid-glass-shadow);
   transition: all var(--liquid-flow-duration) cubic-bezier(0.23, 1, 0.32, 1);
   position: relative;
   transform-origin: center center;
@@ -947,12 +944,8 @@ summary {
   right: 0;
   bottom: 0;
   border-radius: inherit;
-  background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.2) 0.6%,
-    rgba(255, 255, 255, 0.05) 20.56%,
-    rgba(255, 255, 255, 0) 100%
-  );
+  background: var(--liquid-glass-sheen);
+  box-shadow: var(--liquid-glass-rim);
   pointer-events: none;
   z-index: 1;
 }
