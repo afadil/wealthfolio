@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { Badge, useAmountFormatting, useDateFormatting } from "@wealthfolio/ui";
+import { Card } from "@wealthfolio/ui/components/ui/card";
 import { DataTable } from "@wealthfolio/ui/components/ui/data-table";
 import { DataTableColumnHeader } from "@wealthfolio/ui/components/ui/data-table/data-table-column-header";
 import { DataTableFacetedFilterProps } from "@wealthfolio/ui/components/ui/data-table/data-table-faceted-filter";
@@ -419,9 +420,9 @@ export function AssetsTable({
         <div className="mb-2 shrink-0">
           <Skeleton className="h-10 w-full" />
         </div>
-        <div className="min-h-0 flex-1 overflow-auto rounded-md border">
+        <Card className="min-h-0 flex-1 overflow-auto">
           <Table>
-            <TableHeader className="bg-muted/50 sticky top-0 z-10">
+            <TableHeader className="bg-card sticky top-0 z-10">
               <TableRow>
                 <TableHead>{t("asset:table.security")}</TableHead>
                 <TableHead>{t("asset:table.market")}</TableHead>
@@ -462,7 +463,7 @@ export function AssetsTable({
               ))}
             </TableBody>
           </Table>
-        </div>
+        </Card>
       </div>
     );
   }

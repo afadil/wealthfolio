@@ -44,6 +44,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
+import { Card } from "@wealthfolio/ui/components/ui/card";
 
 interface AccountSnapshotHistoryProps {
   account: Account;
@@ -269,9 +270,9 @@ export function AccountSnapshotHistory({
           ))}
         </div>
       ) : (
-        <div className="rounded-md border">
+        <Card className="overflow-clip">
           <Table>
-            <TableHeader className="bg-muted/50">
+            <TableHeader>
               <TableRow>
                 <TableHead>{t("common:date")}</TableHead>
                 <TableHead>{t("account:snapshot.header_source")}</TableHead>
@@ -339,7 +340,7 @@ export function AccountSnapshotHistory({
               ))}
             </TableBody>
           </Table>
-        </div>
+        </Card>
       )}
 
       {editingDate && (

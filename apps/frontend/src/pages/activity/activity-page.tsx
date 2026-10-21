@@ -720,9 +720,10 @@ const ActivityPage = () => {
   );
 
   const investmentContent = (
-    // `overflow-clip` rather than `hidden`: it clips the same, but isn't a
-    // scroll container, so the table's sticky header can pin to the page.
-    <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-clip">
+    // No clipping here: the table's card scrolls sideways itself when it is
+    // too wide, a clip would cut off the card's edge and shadow, and a scroll
+    // container would stop the table's sticky header pinning to the page.
+    <div className="flex min-h-0 flex-1 flex-col space-y-4">
       {statusFilter !== "pending" && (
         <NeedsReviewBanner
           accountIds={effectiveInvestmentAccountIds}
