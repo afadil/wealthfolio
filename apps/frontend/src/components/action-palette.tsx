@@ -76,13 +76,7 @@ export function ActionPalette({
         side={side}
         sideOffset={8}
         aria-label={title ?? t("common:actions")}
-        className={cn(
-          "min-w-65 w-auto max-w-80 p-0",
-          "rounded-2xl",
-          "border-border/50 border dark:border-white/10",
-          "bg-card backdrop-blur-xl",
-          "shadow-lg",
-        )}
+        className="min-w-65 w-auto max-w-80 p-0"
       >
         {/* Header - only show if title provided */}
         {title && (
