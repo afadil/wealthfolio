@@ -211,6 +211,11 @@ and this project adheres to
 - `PopoverContent` is at most as tall as the space beside its trigger
   (`--available-height`) and scrolls beyond it, as menus and select lists do, so
   a tall popover no longer runs off the screen.
+- `DataTable` and `DataGrid` are drawn on a `Card` (its surface, border, radius
+  and shadow). Their sticky header, footer and pinned cells paint the card
+  surface, and the table's header row loses its muted tint. Pass `card={false}`
+  to `DataTable` for a table already inside a card or dialog to keep the
+  previous bordered frame.
 - `Spinner`, shadcn's spinner on the Loader2 icon. It is decorative
   (`aria-hidden`) unless you pass a translated `aria-label`, which makes it a
   `status`. `ProgressIndicator` uses it and is now built on `DialogContent` (no

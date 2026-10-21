@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useTranslation } from "react-i18next";
+import { Card } from "../ui/card";
 import { Icons } from "../ui/icons";
 import { cn } from "../../lib/utils";
 import { DataGridColumnHeader } from "./data-grid-column-header";
@@ -83,7 +84,9 @@ export function DataGrid<TData>({
       {searchState && <DataGridSearch {...searchState} />}
       <DataGridContextMenu tableMeta={tableMeta} columns={columns} contextMenu={contextMenu} />
       <DataGridPasteDialog tableMeta={tableMeta} pasteDialog={pasteDialog} />
-      <div
+      {/* The grid is drawn on a Card; its sticky header, footer and cells paint
+          the card surface so they read as one piece. */}
+      <Card
         role="grid"
         aria-label={t("ui:dataGrid.label", "Data grid")}
         aria-rowcount={rows.length + (onRowAdd ? 1 : 0)}
@@ -94,10 +97,7 @@ export function DataGrid<TData>({
         // Rows are `group/row` and the grid `group/list`, with `data-selecting` while
         // any row is selected, so a row control can stay hidden until it is needed.
         data-selecting={table.getIsSomeRowsSelected() || table.getIsAllRowsSelected() || undefined}
-        className={cn(
-          "group/list relative grid select-none overflow-auto rounded-md border focus:outline-none",
-          className,
-        )}
+        className={cn("group/list relative grid select-none overflow-auto focus:outline-none", className)}
         style={{
           ...columnSizeVars,
           ...(height !== undefined && {
@@ -110,7 +110,7 @@ export function DataGrid<TData>({
           role="rowgroup"
           data-slot="grid-header"
           ref={headerRef}
-          className="bg-background sticky top-0 z-10 grid border-b"
+          className="bg-card sticky top-0 z-10 grid border-b"
         >
           {table.getHeaderGroups().map((headerGroup, rowIndex) => (
             <div
@@ -211,7 +211,7 @@ export function DataGrid<TData>({
             role="rowgroup"
             data-slot="grid-footer"
             ref={footerRef}
-            className="bg-background sticky bottom-0 z-10 grid border-t"
+            className="bg-card sticky bottom-0 z-10 grid border-t"
           >
             <div
               role="row"
@@ -239,7 +239,7 @@ export function DataGrid<TData>({
             </div>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }
