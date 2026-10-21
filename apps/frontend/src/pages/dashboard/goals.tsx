@@ -94,7 +94,7 @@ export function SavingGoals() {
 
   if (isLoading) {
     return (
-      <DashboardCard title={t("common:goals")} elevated>
+      <DashboardCard title={t("common:goals")}>
         <div className="space-y-6">
           {[0, 1, 2].map((i) => (
             <div key={i} className="space-y-2">
@@ -116,7 +116,7 @@ export function SavingGoals() {
 
   if (activeGoals.length === 0) {
     return (
-      <DashboardCard title={t("common:goals")} elevated action={<ViewAllLink />}>
+      <DashboardCard title={t("common:goals")} action={<ViewAllLink />}>
         <div className="py-2 text-center">
           <p className="text-sm">{t("dashboard:goals.no_goals_set")}</p>
           <Link
@@ -132,7 +132,7 @@ export function SavingGoals() {
   }
 
   return (
-    <DashboardCard title={t("common:goals")} elevated action={<ViewAllLink />}>
+    <DashboardCard title={t("common:goals")} action={<ViewAllLink />}>
       {visibleGoals.map((goal) => {
         const progress = goal.summaryProgress ?? 0;
         const pct = Math.max(0, Math.min(1, progress));

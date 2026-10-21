@@ -186,7 +186,7 @@ function StackedAvatars({ holdings, totalRemaining, onClick }: StackedAvatarsPro
 function TopHoldingsSkeleton() {
   const { t } = useTranslation();
   return (
-    <DashboardCard title={t("dashboard:holdings.title")} elevated>
+    <DashboardCard title={t("dashboard:holdings.title")}>
       {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className="border-border border-b py-3 last:border-0">
           <div className="flex items-center justify-between">
@@ -214,7 +214,7 @@ function TopHoldingsSkeleton() {
 function TopHoldingsEmptyState() {
   const { t } = useTranslation();
   return (
-    <DashboardCard title={t("dashboard:holdings.title")} elevated>
+    <DashboardCard title={t("dashboard:holdings.title")}>
       <div className="py-2 text-center">
         <p className="text-sm">{t("dashboard:holdings.no_holdings")}</p>
         <Link
@@ -301,7 +301,6 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
   return (
     <DashboardCard
       title={t("dashboard:holdings.title")}
-      elevated
       action={
         <div className="flex items-center gap-1">
           <Popover>

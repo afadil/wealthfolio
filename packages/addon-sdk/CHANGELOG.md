@@ -24,6 +24,9 @@ and this project adheres to
 - `Button` variant `field`, for a button that opens a picker in a form: it takes
   `SelectTrigger`'s surface, border, radius, label weight and hover, so a picker
   matches the selects beside it.
+- `cardSurfaceClassName`, exported with `Card`: the card's surface, border,
+  radius and shadow as classes, for an element that must stay something else (a
+  link, say) but look like a card.
 - `NetworkRequest.timeoutSecs` for longer-running addon HTTP requests. Defaults
   to 10 seconds; positive integer values are capped server-side at 120 seconds.
 
