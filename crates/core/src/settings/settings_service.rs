@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 const SUPPORTED_FORMATTING_REGIONS: &[&str] = &[
     "system", "CA", "US", "GB", "IN", "FR", "DE", "AT", "CH", "ES", "MX", "BR", "PT", "CN", "TW",
-    "JP", "KR", "IT", "RO", "BG",
+    "JP", "KR", "IT", "RO", "BG", "VN",
 ];
 const SUPPORTED_UI_LANGUAGES: &[&str] = &[
     "en", "fr", "de", "es", "pt", "zh", "zh-Hant", "ja", "ko", "it", "ar", "vi",
@@ -386,6 +386,7 @@ mod tests {
     #[test]
     fn rejects_unknown_ui_language_updates() {
         assert_eq!(validate_ui_language("ja-JP").unwrap(), "ja");
+        assert_eq!(validate_ui_language("vi-VN").unwrap(), "vi");
         assert!(validate_ui_language("foo_bar").is_err());
     }
 
@@ -395,6 +396,7 @@ mod tests {
         // Swiss German shares its language with Germany but formats differently.
         assert_eq!(normalize_formatting_region("de", "de-CH"), "CH");
         assert_eq!(normalize_formatting_region("en", "en-IN"), "IN");
+        assert_eq!(normalize_formatting_region("vi", "vi-VN"), "VN");
     }
 
     #[test]
@@ -414,6 +416,7 @@ mod tests {
         assert!(validate_formatting_region("AT").is_ok());
         assert!(validate_formatting_region("RO").is_ok());
         assert!(validate_formatting_region("BG").is_ok());
+        assert!(validate_formatting_region("VN").is_ok());
         assert!(validate_formatting_region("de-DE").is_err());
     }
 

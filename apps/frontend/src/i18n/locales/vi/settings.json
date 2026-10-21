@@ -1004,7 +1004,9 @@
     "imported_count_one": "Đã nhập {{count}}",
     "imported_count_other": "Đã nhập {{count}}",
     "failed_count_one": "Thất bại {{count}}",
-    "failed_count_other": "Thất bại {{count}}"
+    "failed_count_other": "Thất bại {{count}}",
+    "priority_decrease": "Giảm mức ưu tiên",
+    "priority_increase": "Tăng mức ưu tiên"
   },
   "addon_permission_none_detected": "Không phát hiện quyền truy cập dữ liệu nào. Tiện ích này có quyền truy cập hệ thống tối thiểu.",
   "addon_permission_list_title": "Quyền truy cập",
@@ -1490,7 +1492,8 @@
       "italy": "Ý",
       "austria": "Áo",
       "romania": "Romania",
-      "bulgaria": "Bulgaria"
+      "bulgaria": "Bulgaria",
+      "vietnam": "Việt Nam"
     }
   },
   "currencyFormats": {

@@ -97,6 +97,7 @@ const formattingRegions = [
   ["IT", "italy"],
   ["RO", "romania"],
   ["BG", "bulgaria"],
+  ["VN", "vietnam"],
 ] as const;
 
 const popularFormattingRegions = ["system", "US", "CA", "GB"];
