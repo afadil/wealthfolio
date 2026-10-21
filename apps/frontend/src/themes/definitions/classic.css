@@ -1,0 +1,206 @@
+/* @name Classic */
+/* @font font-mono */
+/* Flexoki. Classic is the base theme: every other theme inherits its value for
+   any role it leaves out, so the roles it sets here are the whole contract. */
+:root {
+  /* Base radius - desktop default */
+  --radius: 0.625rem;
+
+  /* Flexoki Light Theme (HSL numeric components). Classic darkens tx-2, gr
+     and ye from Flexoki so text in them reaches 4.5:1 on every surface
+     (e2e/design-system/colors.spec.ts). */
+  --flexoki-bg: 48 100% 97%;
+  --flexoki-bg-2: 51 59% 95%;
+  --flexoki-ui: 51 21% 88%;
+  --flexoki-ui-2: 50 14% 83%;
+  --flexoki-ui-3: 55 10% 79%;
+  --flexoki-tx: 0 3% 6%;
+  --flexoki-tx-2: 50 3% 36%;
+  --flexoki-tx-3: 49 7% 70%;
+  --flexoki-re: 3 62% 42%;
+  --flexoki-gr: 73 84% 26%;
+  --flexoki-ye: 45 99% 28%;
+  --flexoki-bl: 214 67% 39%;
+
+  /* Shadcn tokens as full HSL colors */
+  --background: hsl(var(--flexoki-bg));
+  --foreground: hsl(var(--flexoki-tx));
+  --card: hsl(var(--flexoki-bg-2));
+  --card-foreground: hsl(var(--flexoki-tx));
+  --popover: hsl(var(--flexoki-bg-2));
+  --popover-foreground: hsl(var(--flexoki-tx));
+  --primary: hsl(var(--flexoki-tx));
+  --primary-foreground: hsl(var(--flexoki-bg));
+  --secondary: hsl(var(--flexoki-ui-2));
+  --secondary-foreground: hsl(var(--flexoki-tx-2));
+  --muted: hsl(var(--flexoki-ui));
+  --muted-foreground: hsl(var(--flexoki-tx-2));
+  --accent: hsl(var(--flexoki-ui));
+  --accent-foreground: hsl(var(--flexoki-tx-2));
+  --destructive: hsl(var(--flexoki-re));
+  --destructive-foreground: hsl(var(--flexoki-bg));
+  --success: hsl(var(--flexoki-gr));
+  --success-foreground: hsl(var(--flexoki-bg));
+  --warning: hsl(var(--flexoki-ye));
+  --warning-foreground: hsl(var(--flexoki-bg));
+  --info: hsl(var(--flexoki-bl));
+  --info-foreground: hsl(var(--flexoki-bg));
+  --border: hsl(var(--flexoki-ui));
+  --input: hsl(var(--flexoki-ui));
+  --input-bg: var(--background);
+  /* Focus indicator colour. Controls draw it as a 2px outline 2px out
+     (focus-visible:outline-solid outline-2 outline-offset-2 outline-ring),
+     which forced-colors mode keeps; it needs 3:1 against the page and cards. */
+  --ring: hsl(var(--flexoki-tx-2));
+
+  /* Charts (allocation palette: forest / sage / sand / clay / plum + stone) */
+  --chart-1: #355c4c;
+  --chart-2: #7e9f8c;
+  --chart-3: #cbba8c;
+  --chart-4: #c08a5f;
+  --chart-5: #9a7e92;
+  --chart-6: hsl(49 7% 70%);
+  --chart-7: hsl(55 10% 79%);
+  --chart-8: hsl(50 14% 83%);
+  --chart-9: hsl(51 21% 88%);
+  --chart-stone: #b1aa9a;
+
+  /* Sidebar (full hsl colors) */
+  --sidebar: hsl(var(--flexoki-bg));
+  --sidebar-foreground: hsl(var(--flexoki-tx));
+  --sidebar-primary: hsl(var(--flexoki-tx));
+  --sidebar-primary-foreground: hsl(var(--flexoki-bg));
+  --sidebar-accent: hsl(var(--flexoki-ui));
+  --sidebar-accent-foreground: hsl(var(--flexoki-tx-2));
+  --sidebar-border: hsl(var(--flexoki-ui));
+  --sidebar-ring: hsl(var(--flexoki-tx-2));
+
+  --liquid-glass-bg: rgba(255, 255, 255, 0.05);
+  --liquid-glass-border: rgba(255, 255, 255, 0.1);
+
+  /* Status surfaces: a pale background with text and border of the same hue,
+     for callouts, banners and pills (bg-warning-subtle
+     text-warning-subtle-foreground border-warning-subtle-border). Status text
+     on a tint of itself (text-warning on bg-warning/10) can't reach 4.5:1. */
+  --success-subtle: var(--color-green-50);
+  --success-subtle-foreground: var(--color-green-700);
+  --success-subtle-border: var(--color-green-200);
+  --warning-subtle: var(--color-yellow-50);
+  --warning-subtle-foreground: var(--color-yellow-800);
+  --warning-subtle-border: var(--color-yellow-200);
+  --destructive-subtle: var(--color-red-50);
+  --destructive-subtle-foreground: var(--color-red-700);
+  --destructive-subtle-border: var(--color-red-200);
+  --info-subtle: var(--color-blue-50);
+  --info-subtle-foreground: var(--color-blue-700);
+  --info-subtle-border: var(--color-blue-200);
+  /* Light caught by the top edge of glass surfaces (status alerts); a theme
+     can set it to transparent. */
+  --surface-highlight: rgb(255 255 255 / 0.35);
+
+  /* Sonner toasts - solid backgrounds for better readability */
+  --toast-bg: var(--popover);
+  --toast-fg: var(--popover-foreground);
+  --toast-border: var(--secondary);
+  --toast-success-bg: var(--success-subtle);
+  --toast-success-fg: var(--success-subtle-foreground);
+  --toast-success-border: var(--success-subtle-border);
+  --toast-error-bg: var(--destructive-subtle);
+  --toast-error-fg: var(--destructive-subtle-foreground);
+  --toast-error-border: var(--destructive-subtle-border);
+  --toast-warning-bg: var(--color-orange-50);
+  --toast-warning-fg: var(--color-orange-700);
+  --toast-warning-border: var(--color-orange-200);
+  --toast-info-bg: var(--info-subtle);
+  --toast-info-fg: var(--info-subtle-foreground);
+  --toast-info-border: var(--info-subtle-border);
+
+  /* Olive palette for retirement-planner income streams.
+     All hues live in the olive / green-yellow band (95–140) so nothing reads as brown.
+     Differentiation comes from L and hue-shifts inside that band.
+     Light mode uses darker L for contrast on cream cards; .dark lifts L for dark cards. */
+  --fi-stream-1: oklch(0.52 0.1 100); /* warm yellow-olive */
+  --fi-stream-2: oklch(0.46 0.09 125); /* mid olive */
+  --fi-stream-3: oklch(0.6 0.07 140); /* sage */
+  --fi-stream-4: oklch(0.56 0.09 110); /* standard olive */
+  --fi-stream-5: oklch(0.5 0.08 135); /* deep cool olive */
+
+  /* When-you-spend heatmap (apps/frontend/src/features/spending). Forest accent
+     in light mode, bright leaf in dark. */
+  --heatmap-accent: oklch(0.4 0.07 150);
+
+  /* Spending-module shared chart tokens. --status-warn is the "approaching
+     budget" amber (was #C28B47); --bar-stripe is the diagonal-stripe overlay on
+     budget meters; --chart-cursor is the Recharts hover-cursor tint. */
+  --status-warn: oklch(0.66 0.11 60);
+  --bar-stripe: rgba(255, 255, 255, 0.25);
+  --chart-cursor: rgba(0, 0, 0, 0.04);
+
+  /* Events timeline — fallback tag color when an event type has no user-picked
+     color, plus the "today" marker color. */
+  --event-default: oklch(0.4 0.07 150);
+  --event-today: oklch(0.78 0.13 90);
+}
+
+.dark {
+  /* Flexoki Dark Theme (HSL numeric components). Classic lightens tx-2 and
+     re from Flexoki so text in them reaches 4.5:1 on every surface. */
+  --flexoki-bg: 0 3% 6%;
+  --flexoki-bg-2: 30 4% 11%;
+  --flexoki-ui: 30 3% 15%;
+  --flexoki-ui-2: 40 3% 20%;
+  --flexoki-ui-3: 30 3% 24%;
+  --flexoki-tx: 55 10% 79%;
+  --flexoki-tx-2: 43 3% 60.5%;
+  --flexoki-tx-3: 45 2% 33%;
+  --flexoki-re: 5 61% 58.5%;
+  --flexoki-gr: 72 46% 41%;
+  --flexoki-ye: 45 82% 45%;
+  --flexoki-bl: 210 47% 50%;
+
+  --input: hsl(var(--flexoki-ui-2));
+
+  /* Dark chart palette — same semantic hues as light (forest / sage / sand /
+     clay / plum + stone), tuned for the dark surface: forest is lifted for
+     contrast, the stones are pulled down so they stay calm instead of glaring. */
+  --chart-1: hsl(156 28% 44%);
+  --chart-2: #7e9f8c;
+  --chart-3: #cbba8c;
+  --chart-4: #c08a5f;
+  --chart-5: #9a7e92;
+  --chart-6: hsl(49 8% 60%);
+  --chart-7: hsl(55 10% 67%);
+  --chart-8: hsl(50 13% 72%);
+  --chart-9: hsl(51 18% 77%);
+  --chart-stone: hsl(49 8% 60%);
+
+  --success-subtle: var(--color-green-950);
+  --success-subtle-foreground: var(--color-green-200);
+  --success-subtle-border: var(--color-green-800);
+  --warning-subtle: var(--color-yellow-950);
+  --warning-subtle-foreground: var(--color-yellow-200);
+  --warning-subtle-border: var(--color-yellow-800);
+  --destructive-subtle: var(--color-red-950);
+  --destructive-subtle-foreground: var(--color-red-200);
+  --destructive-subtle-border: var(--color-red-800);
+  --info-subtle: var(--color-blue-950);
+  --info-subtle-foreground: var(--color-blue-200);
+  --info-subtle-border: var(--color-blue-800);
+  --surface-highlight: rgb(255 255 255 / 0.03);
+
+  --toast-warning-bg: var(--color-orange-950);
+  --toast-warning-fg: var(--color-orange-200);
+  --toast-warning-border: var(--color-orange-800);
+
+  --fi-stream-1: oklch(0.78 0.11 100);
+  --fi-stream-2: oklch(0.72 0.1 125);
+  --fi-stream-3: oklch(0.82 0.07 140);
+  --fi-stream-4: oklch(0.75 0.09 110);
+  --fi-stream-5: oklch(0.7 0.09 135);
+  --heatmap-accent: oklch(0.78 0.13 150);
+  --status-warn: oklch(0.78 0.13 70);
+  --bar-stripe: rgba(0, 0, 0, 0.25);
+  --chart-cursor: rgba(255, 255, 255, 0.06);
+  --event-default: oklch(0.78 0.13 150);
+  --event-today: oklch(0.85 0.16 90);
+}
