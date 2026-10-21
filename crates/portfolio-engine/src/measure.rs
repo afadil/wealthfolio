@@ -28,9 +28,22 @@ const RESIDUAL_TOLERANCE_RATE: Decimal = dec!(0.002);
 /// stored. Measuring reads no raw facts and resolves no rates.
 pub struct MeasureInputs<'a> {
     pub effects: Effects,
+    /// Prepared daily cash FX by account. None means preparation was skipped
+    /// for Dashboard; Some with empty daily entries means known zero FX.
+    /// Attribution reads require an entry for each transaction account used.
+    pub cash_fx: Option<BTreeMap<AccountId, Vec<CashFxEffect>>>,
     pub series: &'a BTreeMap<AccountId, ValuationSeries>,
     pub lots: &'a [LotRecord],
     pub disposals: &'a [LotDisposal],
+}
+
+/// Revaluation of opening cash exposure, priced before measurement. These
+/// transient inputs are independent of investment and conversion execution.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CashFxEffect {
+    pub date: NaiveDate,
+    /// None means exposure or its valuation rate could not be determined.
+    pub amount: Option<Decimal>,
 }
 
 impl MeasureInputs<'_> {
@@ -198,6 +211,42 @@ fn check_not_archived(inputs: &MeasureInputs<'_>, scope: &[AccountId]) -> Result
     }
 }
 
+fn check_cash_fx_prepared(
+    inputs: &MeasureInputs<'_>,
+    scope: &[AccountId],
+    window: Window,
+    profile: MeasureProfile,
+) -> Result<(), EngineError> {
+    if profile == MeasureProfile::Dashboard {
+        return Ok(());
+    }
+    for account in scope {
+        if inputs.tracking(account) == TrackingMode::Holdings {
+            continue;
+        }
+        let points = inputs.series.get(account).map_or(0, |series| {
+            series
+                .days
+                .iter()
+                .filter(|day| window.contains(day.date))
+                .take(2)
+                .count()
+        });
+        if points == 2
+            && inputs
+                .cash_fx
+                .as_ref()
+                .and_then(|fx| fx.get(account))
+                .is_none()
+        {
+            return Err(EngineError::CashFxNotPrepared {
+                account: account.as_str().to_string(),
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Performance of one account (legacy `calculate_account_performance`).
 /// `include_series` adds the daily return series (history responses only).
 pub fn measure_account(
@@ -209,6 +258,7 @@ pub fn measure_account(
 ) -> Result<PerformanceResult, EngineError> {
     check_window(window)?;
     check_not_archived(inputs, std::slice::from_ref(account))?;
+    check_cash_fx_prepared(inputs, std::slice::from_ref(account), window, profile)?;
     let history = inputs.history(account, window);
     if history.len() < 2 {
         return Ok(empty_response(
@@ -276,6 +326,7 @@ pub fn measure_scope(
         .cloned()
         .collect();
     let scope = started.as_slice();
+    check_cash_fx_prepared(inputs, scope, window, profile)?;
     let has_holdings = scope
         .iter()
         .any(|a| inputs.tracking(a) == TrackingMode::Holdings);
@@ -1558,9 +1609,9 @@ fn cash_fx_attribution(
     for account in scope {
         let mut warned = false;
         for day in inputs
-            .effects
             .cash_fx
-            .get(account)
+            .as_ref()
+            .and_then(|fx| fx.get(account))
             .into_iter()
             .flatten()
             .filter(|day| day.date > start && day.date <= end)

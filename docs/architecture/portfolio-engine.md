@@ -490,8 +490,11 @@ pub fn aggregate_scope(
 ///    value return, holdings-mode book-basis returns, attribution with a
 ///    residual term, risk, annualisation behind a minimum-window gate.
 ///    Arithmetic over plain data: MeasureInputs holds the priced events
-///    (Effects), the series, lots and disposals, and no facts, ledger or FX
-///    surface, so measuring stored rows resolves nothing.
+///    (Effects), optional prepared daily cash FX, the series, lots and disposals,
+///    and no facts, ledger or FX surface, so measuring stored rows resolves
+///    nothing. Dashboard preparation skips cash FX. Full/Summary reads reject
+///    missing preparation for transaction accounts with a measurable window;
+///    a prepared account with no daily effects means known zero cash FX.
 pub fn measure_account(
     inputs: &MeasureInputs<'_>,
     account: &AccountId,

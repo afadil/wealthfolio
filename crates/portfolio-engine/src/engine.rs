@@ -132,7 +132,7 @@ impl Engine {
 
     /// The inputs `measure_account` and `measure_scope` read: the priced
     /// events plus valuation series, lots and disposals (computed or stored).
-    /// Use the same profile when measuring; Dashboard skips cash FX pricing.
+    /// Dashboard skips cash FX pricing and cannot serve attribution reads.
     pub fn measure_inputs<'a>(
         &self,
         series: &'a BTreeMap<AccountId, ValuationSeries>,

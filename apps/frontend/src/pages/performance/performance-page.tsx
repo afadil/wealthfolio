@@ -695,6 +695,8 @@ function AttributionDetailMetric({
   labelClassName,
   valueClassName,
   align = "center",
+  warnings,
+  warningTerms,
 }: {
   result: PerformanceResult | null;
   itemName?: string;
@@ -707,6 +709,8 @@ function AttributionDetailMetric({
   labelClassName?: string;
   valueClassName?: string;
   align?: "left" | "center" | "right";
+  warnings: string[];
+  warningTerms: string[];
 }) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
@@ -714,6 +718,9 @@ function AttributionDetailMetric({
   if (!result || result.mode === "symbolPriceBased") return null;
   const periodPnl = performancePeriodPnl(result);
   if (periodPnl == null) return null;
+  // Return inapplicability alone can make overall quality partial; the P&L
+  // indicator requires a data warning, with IRR-only warnings filtered out.
+  const isPartial = result.summary?.quality === "partial" && warnings.length > 0;
 
   const currency = result.scope.currency;
   const driverRows: AttributionRow[] = [
@@ -779,7 +786,7 @@ function AttributionDetailMetric({
   const amountNode = (
     <div
       className={cn(
-        "flex items-center gap-1",
+        "flex flex-wrap items-center gap-1",
         align === "left" && "justify-start",
         align === "center" && "justify-center",
         align === "right" && "justify-end",
@@ -790,6 +797,11 @@ function AttributionDetailMetric({
         currency={currency}
         className={cn("text-base font-semibold", sectionTitle && STRIP_VALUE_CLASS, valueClassName)}
       />
+      {isPartial && (
+        <Badge variant="warning-subtle" className="text-2xs">
+          {t("performance:attribution.partial_data")}
+        </Badge>
+      )}
       <Icons.ChevronRight className="text-muted-foreground/60 group-hover:text-muted-foreground h-3.5 w-3.5 shrink-0 transition-all group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
     </div>
   );
@@ -862,14 +874,32 @@ function AttributionDetailMetric({
             <div className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
               {t("performance:attribution.period_gain_loss_lower")}
             </div>
-            <AttributionAmount
-              value={periodPnl}
-              currency={currency}
-              className="mt-2 block text-xl font-semibold leading-tight"
-            />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <AttributionAmount
+                value={periodPnl}
+                currency={currency}
+                className="text-xl font-semibold leading-tight"
+              />
+              {isPartial && (
+                <Badge variant="warning-subtle">{t("performance:attribution.partial_data")}</Badge>
+              )}
+            </div>
           </div>
         </SheetHeader>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-2">
+          {isPartial && (
+            <div
+              role="note"
+              aria-label={t("performance:attribution.partial_data")}
+              className="py-3.5"
+            >
+              <MetricInfoPopoverBody
+                infoText={t("performance:metric.gain_loss_info")}
+                warningItems={metricWarningItems(warnings)}
+                boldTerms={warningTerms}
+              />
+            </div>
+          )}
           <div className="py-3.5">
             <div className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wide">
               {t("performance:attribution.performance_drivers")}
@@ -1768,6 +1798,8 @@ export default function PerformancePage() {
                             <CarouselItem className="basis-[52%] ps-2">
                               <AttributionDetailMetric
                                 result={selectedItemData.result}
+                                warnings={selectedItemData.warnings}
+                                warningTerms={selectedItemData.warningTerms}
                                 itemName={selectedItemData.name}
                                 dateRangeLabel={displayDateRange}
                                 isMobile={isMobile}
@@ -1851,6 +1883,8 @@ export default function PerformancePage() {
                           {selectedItemData?.periodPnl != null && (
                             <AttributionDetailMetric
                               result={selectedItemData.result}
+                              warnings={selectedItemData.warnings}
+                              warningTerms={selectedItemData.warningTerms}
                               itemName={selectedItemData.name}
                               dateRangeLabel={displayDateRange}
                               isMobile={isMobile}

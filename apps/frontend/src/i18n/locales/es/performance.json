@@ -111,6 +111,7 @@
     "description": "Selecciona cuentas para comparar su rendimiento a lo largo del tiempo."
   },
   "attribution": {
+    "partial_data": "Datos parciales",
     "title": "Atribución",
     "close": "Cerrar atribución",
     "period_gain_loss": "Ganancia/pérdida del periodo",

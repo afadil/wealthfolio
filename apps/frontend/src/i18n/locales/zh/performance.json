@@ -110,6 +110,7 @@
     "description": "选择账户以比较它们在一段时间内的表现。"
   },
   "attribution": {
+    "partial_data": "数据不完整",
     "title": "归因",
     "close": "关闭归因",
     "period_gain_loss": "期间盈亏",

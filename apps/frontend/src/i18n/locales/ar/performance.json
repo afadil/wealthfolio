@@ -5,6 +5,7 @@
   "all_portfolio": "كل المحفظة",
   "annualized_return": "العائد المحسوب على أساس سنوي",
   "attribution": {
+    "partial_data": "بيانات غير مكتملة",
     "cash_flows": "التدفقات النقدية",
     "close": "إغلاق التحليل",
     "contributions": "المساهمات",
