@@ -22,6 +22,8 @@ pub enum EngineError {
     },
     #[error("account {0:?} is archived; archived accounts are neither projected nor valued")]
     ArchivedAccountInScope(String),
+    #[error("cash FX attribution was not prepared for account {account:?}; prepare measurement inputs for Full or Summary")]
+    CashFxNotPrepared { account: String },
     #[error("scoped valuation history count mismatch: expected {expected} histories, got {found}")]
     ScopeHistoryCount { expected: usize, found: usize },
     #[error("incomplete scoped valuation history for account {account:?}: missing {missing}")]
