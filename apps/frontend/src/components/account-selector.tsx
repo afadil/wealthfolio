@@ -219,7 +219,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
 
         case "dropdown":
           return (
-            <Button variant="outline" className="w-[240px] justify-between" disabled>
+            <Button variant="outline" className="w-60 justify-between" disabled>
               <div className="flex w-full items-center gap-2">
                 <Skeleton className="h-4 w-4 rounded-full" />
                 <Skeleton className="h-4 w-36" />
@@ -272,15 +272,13 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                       initial="initial"
                       animate="animate"
                       exit="exit"
-                      className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 shadow-sm dark:bg-green-900/20"
+                      className="bg-success-subtle flex h-8 w-8 items-center justify-center rounded-full shadow-sm"
                     >
                       <motion.div variants={iconVariants} initial="initial" animate="animate">
                         {(() => {
                           const IconComponent =
                             accountTypeIcons[selectedAccount.accountType] ?? Icons.CreditCard;
-                          return (
-                            <IconComponent className="h-4 w-4 text-green-600 dark:text-green-400" />
-                          );
+                          return <IconComponent className="text-success h-4 w-4" />;
                         })()}
                       </motion.div>
                     </motion.div>
@@ -344,7 +342,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
               variant="outline"
               role="combobox"
               aria-expanded={open}
-              aria-label={iconOnly ? t("common:component.select_account") : undefined}
+              aria-label={t("common:component.select_account")}
               size={iconOnly ? "icon" : "sm"}
               className={cn(
                 "bg-secondary/30 hover:bg-muted/80 flex items-center rounded-full border-none",
@@ -379,7 +377,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                       </span>
                     )}
                   </div>
-                  <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  <Icons.ChevronsUpDown className="ms-2 h-4 w-4 shrink-0 opacity-50" />
                 </>
               )}
             </Button>
@@ -423,7 +421,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
               variant="outline"
               role="combobox"
               aria-expanded={open}
-              aria-label={iconOnly ? t("common:component.add_account") : undefined}
+              aria-label={t("common:component.add_account")}
               className={cn(
                 "bg-secondary/30 hover:bg-muted/80 flex items-center gap-1.5 rounded-md border-dashed text-sm font-medium",
                 iconOnly ? "h-9 w-9 p-0" : "h-8 px-3 py-1",
@@ -441,15 +439,18 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
       }
     };
 
+    // A loading selector shows its skeleton (none for the form variant) instead of a trigger.
+    const trigger = renderTrigger();
+
     return (
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>{renderTrigger()}</PopoverTrigger>
+        {isLoading ? trigger : trigger && <PopoverTrigger render={trigger} />}
         <PopoverContent
           className="p-0"
           align="start"
           sideOffset={8}
           style={{
-            minWidth: variant === "card" ? "var(--radix-popover-trigger-width)" : "240px",
+            minWidth: variant === "card" ? "var(--anchor-width)" : "240px",
           }}
         >
           <Command className="w-full">
@@ -489,7 +490,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                             className="flex items-center py-1.5"
                           >
                             <div className="flex flex-1 items-center">
-                              <Icons.Folder className="mr-2 h-4 w-4" />
+                              <Icons.Folder className="me-2 h-4 w-4" />
                               <span>{p.name}</span>
                             </div>
                           </CommandItem>
@@ -517,14 +518,14 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                                     className="flex items-center py-1.5"
                                   >
                                     <div className="flex flex-1 items-center">
-                                      <IconComponent className="mr-2 h-4 w-4" />
+                                      <IconComponent className="me-2 h-4 w-4" />
                                       <span>
                                         {account.name} ({account.currency})
                                       </span>
                                     </div>
                                     <Icons.Check
                                       className={cn(
-                                        "ml-auto h-4 w-4",
+                                        "ms-auto h-4 w-4",
                                         selectedAccount?.id === account.id
                                           ? "opacity-100"
                                           : "opacity-0",

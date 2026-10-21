@@ -1,6 +1,6 @@
 import type { Account, Platform } from "@/lib/types";
 import { formatDistanceToNow } from "@/lib/utils";
-import { useLocalizationSettings } from "@wealthfolio/ui";
+import { useLocalizationSettings, Spinner } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -28,22 +28,22 @@ function buildStatusConfig(t: TFunction): Record<
     IDLE: {
       label: t("connect:status.upToDate"),
       variant: "default",
-      icon: <Icons.CheckCircle className="h-4 w-4 text-green-500" />,
+      icon: <Icons.CheckCircle className="text-success h-4 w-4" />,
     },
     RUNNING: {
       label: t("connect:status.syncing"),
       variant: "outline",
-      icon: <Icons.Spinner className="h-4 w-4 animate-spin text-blue-500" />,
+      icon: <Spinner className="text-info h-4 w-4" />,
     },
     NEEDS_REVIEW: {
       label: t("connect:status.needsReview"),
       variant: "destructive",
-      icon: <Icons.AlertTriangle className="h-4 w-4 text-yellow-500" />,
+      icon: <Icons.AlertTriangle className="text-warning h-4 w-4" />,
     },
     FAILED: {
       label: t("connect:status.failed"),
       variant: "destructive",
-      icon: <Icons.AlertCircle className="h-4 w-4 text-red-500" />,
+      icon: <Icons.AlertCircle className="text-destructive h-4 w-4" />,
     },
   };
 }
@@ -105,7 +105,7 @@ export function BrokerSyncStateCard({ syncState, account, platform }: BrokerSync
       {/* Show error message if failed */}
       {syncState.syncStatus === "FAILED" && syncState.lastError && (
         <div className="border-t px-4 py-3">
-          <p className="text-sm text-red-600 dark:text-red-400">
+          <p className="text-destructive text-sm">
             {getBrokerSyncIssueMessage(syncState.syncStatus, syncState.lastError)}
           </p>
         </div>

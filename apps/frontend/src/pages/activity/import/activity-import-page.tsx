@@ -689,7 +689,7 @@ function ImportWizardContent() {
                 onClick={handleCancelClick}
                 className="hidden sm:flex"
               >
-                <Icons.X className="mr-2 h-4 w-4" />
+                <Icons.X className="me-2 h-4 w-4" />
                 {t("activity:import.toolbar.cancel")}
               </Button>
             )}

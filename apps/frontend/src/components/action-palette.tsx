@@ -25,7 +25,7 @@ interface ActionPaletteProps {
   onOpenChange: (open: boolean) => void;
   title?: string;
   groups: ActionPaletteGroup[];
-  trigger?: React.ReactNode;
+  trigger?: React.ReactElement;
   align?: "start" | "center" | "end";
   side?: "top" | "bottom" | "left" | "right";
 }
@@ -57,19 +57,27 @@ export function ActionPalette({
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>
-        {trigger ?? (
-          <Button variant="outline" size="icon" className="h-9 w-9">
-            <Icons.DotsThreeVertical className="h-5 w-5" weight="fill" />
-          </Button>
-        )}
-      </PopoverTrigger>
+      <PopoverTrigger
+        render={
+          trigger ?? (
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9"
+              aria-label={t("common:layout.more_options")}
+            >
+              <Icons.DotsThreeVertical className="h-5 w-5" weight="fill" />
+            </Button>
+          )
+        }
+      />
       <PopoverContent
         align={align}
         side={side}
         sideOffset={8}
+        aria-label={title ?? t("common:actions")}
         className={cn(
-          "w-auto min-w-[260px] max-w-[320px] p-0",
+          "min-w-65 w-auto max-w-80 p-0",
           "rounded-2xl",
           "border-border/50 border dark:border-white/10",
           "bg-card backdrop-blur-xl",
@@ -121,7 +129,7 @@ export function ActionPalette({
                           "flex w-full items-center gap-4 rounded-xl px-3 py-3",
                           "transition-colors duration-150",
                           isDestructive
-                            ? "text-destructive hover:bg-destructive/10 active:bg-destructive/15"
+                            ? "text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground active:bg-destructive-subtle/70"
                             : "text-foreground hover:bg-accent active:bg-accent/80",
                           "focus-visible:ring-ring focus:outline-none focus-visible:ring-2 focus-visible:ring-inset",
                         )}
@@ -132,7 +140,7 @@ export function ActionPalette({
                             isDestructive ? "text-destructive" : "text-muted-foreground",
                           )}
                         />
-                        <span className="text-[15px] font-medium">{item.label}</span>
+                        <span className="text-base font-medium">{item.label}</span>
                       </button>
                     </React.Fragment>
                   );

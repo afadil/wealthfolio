@@ -11,6 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Icons,
+  Spinner,
 } from "@wealthfolio/ui";
 import { cn } from "@/lib/utils";
 
@@ -100,11 +101,11 @@ export function RulePresetPicker({ compact = false }: RulePresetPickerProps) {
                       })
                 }
                 className={cn(
-                  "border-input bg-card hover:bg-muted/50 group flex w-full items-center gap-3 rounded-lg border py-2.5 pl-3 text-left transition-colors sm:w-auto sm:min-w-[160px]",
+                  "border-input bg-card hover:bg-muted/50 group flex w-full items-center gap-3 rounded-lg border py-2.5 ps-3 text-start transition-colors sm:w-auto sm:min-w-40",
                   "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
                   "disabled:cursor-not-allowed disabled:opacity-60",
                   preset.installed && "border-success/40 bg-success/5",
-                  preset.installed ? "pr-9" : "pr-3",
+                  preset.installed ? "pe-9" : "pe-3",
                 )}
               >
                 <span className="text-xl leading-none" aria-hidden="true">
@@ -114,20 +115,17 @@ export function RulePresetPicker({ compact = false }: RulePresetPickerProps) {
                   <span className="text-foreground text-sm font-medium leading-tight">
                     {preset.name}
                   </span>
-                  <span className="text-muted-foreground text-[11px] leading-tight">
+                  <span className="text-muted-foreground text-2xs leading-tight">
                     {t("spending:presets.rulesCount", { count: preset.ruleCount })}
                   </span>
                 </div>
                 {isImporting || isRemoving ? (
-                  <Icons.Spinner
-                    className="text-muted-foreground h-4 w-4 shrink-0 animate-spin"
-                    aria-hidden="true"
-                  />
+                  <Spinner className="text-muted-foreground h-4 w-4 shrink-0" aria-hidden="true" />
                 ) : preset.installed ? (
                   <Icons.Check className="text-success h-4 w-4 shrink-0" aria-hidden="true" />
                 ) : (
                   <Icons.ArrowRight
-                    className="text-muted-foreground h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                    className="text-muted-foreground h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 rtl:rotate-180"
                     aria-hidden="true"
                   />
                 )}
@@ -140,7 +138,7 @@ export function RulePresetPicker({ compact = false }: RulePresetPickerProps) {
                   aria-label={t("spending:presets.removeLabel", { name: preset.name })}
                   title={t("spending:presets.removeLabel", { name: preset.name })}
                   className={cn(
-                    "text-muted-foreground hover:bg-destructive/10 hover:text-destructive absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-md transition-all",
+                    "text-muted-foreground hover:bg-destructive-subtle hover:text-destructive-subtle-foreground absolute end-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-md transition-all",
                     "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2",
                     "opacity-0 focus-visible:opacity-100 group-hover:opacity-100",
                     "disabled:cursor-not-allowed disabled:opacity-40",
@@ -192,7 +190,7 @@ export function RulePresetPicker({ compact = false }: RulePresetPickerProps) {
                 }
                 setPendingRemove(null);
               }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
             >
               {t("spending:presets.remove")}
             </AlertDialogAction>

@@ -92,10 +92,10 @@ export function SavingsMilestonesCard({
             Above y=32: % label.
             Below y=32: amount + date.
           */}
-          <div className="relative mx-16 h-[108px]">
-            <div className="bg-muted absolute left-0 right-0 top-8 h-[3px] -translate-y-1/2 rounded-full" />
+          <div className="h-27 relative mx-16">
+            <div className="bg-muted absolute end-0 start-0 top-8 h-[3px] -translate-y-1/2 rounded-full" />
             <div
-              className="bg-success absolute left-0 top-8 h-[3px] -translate-y-1/2 rounded-full transition-[width] duration-500 ease-out"
+              className="bg-success absolute start-0 top-8 h-[3px] -translate-y-1/2 rounded-full transition-[width] duration-500 ease-out"
               style={{ width: `${railFillPct}%` }}
             />
             {milestones.map((m, i) => {
@@ -103,22 +103,22 @@ export function SavingsMilestonesCard({
               return (
                 <div key={m.ratio}>
                   <div
-                    className={`absolute top-0 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold uppercase tracking-wider ${
+                    className={`text-2xs absolute top-0 -translate-x-1/2 whitespace-nowrap font-semibold uppercase tracking-wider rtl:translate-x-1/2 ${
                       m.reached ? "text-foreground" : "text-muted-foreground"
                     }`}
-                    style={{ left }}
+                    style={{ insetInlineStart: left }}
                   >
                     {m.label}
                   </div>
                   <div
-                    className="absolute top-8 -translate-x-1/2 -translate-y-1/2"
-                    style={{ left }}
+                    className="absolute top-8 -translate-x-1/2 -translate-y-1/2 rtl:translate-x-1/2"
+                    style={{ insetInlineStart: left }}
                   >
                     <MilestoneDot milestone={m} />
                   </div>
                   <div
-                    className="absolute top-[52px] flex -translate-x-1/2 flex-col items-center whitespace-nowrap"
-                    style={{ left }}
+                    className="top-13 absolute flex -translate-x-1/2 flex-col items-center whitespace-nowrap rtl:translate-x-1/2"
+                    style={{ insetInlineStart: left }}
                   >
                     <span className="text-sm font-semibold tabular-nums">
                       <AmountDisplay value={m.amount} currency={currency} isHidden={isHidden} />
@@ -140,9 +140,9 @@ export function SavingsMilestonesCard({
         {/* ── Mobile: vertical timeline ── */}
         <div className="md:hidden">
           <ol className="relative space-y-4">
-            <span className="bg-muted absolute bottom-2 left-[15px] top-2 w-[2px] -translate-x-1/2 rounded-full" />
+            <span className="bg-muted absolute bottom-2 start-[0.9375rem] top-2 w-[2px] -translate-x-1/2 rounded-full rtl:translate-x-1/2" />
             <span
-              className="bg-success absolute left-[15px] top-2 w-[2px] -translate-x-1/2 rounded-full transition-[height] duration-500 ease-out"
+              className="bg-success absolute start-[0.9375rem] top-2 w-[2px] -translate-x-1/2 rounded-full transition-[height] duration-500 ease-out rtl:translate-x-1/2"
               style={{ height: `calc((100% - 1rem) * ${railFillPct / 100})` }}
             />
             {milestones.map((m) => (

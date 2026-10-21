@@ -1225,6 +1225,77 @@ mod tests {
     }
 
     #[test]
+    fn credential_calls_waiting_on_a_prompt_leave_async_workers_free() {
+        // A keyring read that waits until the unlock prompt is answered.
+        struct PromptingSecrets {
+            prompted: std::sync::mpsc::Sender<()>,
+            answered: (Mutex<bool>, std::sync::Condvar),
+        }
+        impl SecretStore for PromptingSecrets {
+            fn get_secret(&self, key: &str) -> crate::Result<Option<String>> {
+                if key.ends_with(crate::secrets::CLOUD_REFRESH_TOKEN_KEY) {
+                    self.prompted.send(()).unwrap();
+                    let (answered, answer) = &self.answered;
+                    drop(answer.wait_while(answered.lock().unwrap(), |answered| !*answered));
+                }
+                Ok(None)
+            }
+            fn set_secret(&self, _: &str, _: &str) -> crate::Result<()> {
+                Ok(())
+            }
+            fn delete_secret(&self, _: &str) -> crate::Result<()> {
+                Ok(())
+            }
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let (prompted, prompts) = std::sync::mpsc::channel();
+        let secrets = Arc::new(PromptingSecrets {
+            prompted,
+            answered: Default::default(),
+        });
+        let registry = ProfileRegistry::open(
+            dir.path().into(),
+            dir.path().join("app.db"),
+            secrets.clone(),
+        )
+        .unwrap();
+        let store =
+            registry.secret_store(&registry.profile(registry.default_id().unwrap()).unwrap());
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .build()
+            .unwrap();
+        let wait = std::time::Duration::from_secs(5);
+        // Answer before any assertion, or dropping the runtime waits on the prompt.
+        let answer = || {
+            *secrets.answered.0.lock().unwrap() = true;
+            secrets.answered.1.notify_all();
+        };
+        // One read waits on the prompt while holding the shared gate, and the
+        // next waits on the gate. Each would otherwise hold one of the workers.
+        let first = runtime.spawn({
+            let store = store.clone();
+            async move { store.get_secret(crate::secrets::CLOUD_REFRESH_TOKEN_KEY) }
+        });
+        let prompted = prompts.recv_timeout(wait);
+        if prompted.is_err() {
+            answer();
+        }
+        assert!(prompted.is_ok(), "the first read did not reach the store");
+        let (done, finished) = std::sync::mpsc::channel();
+        let second = runtime.spawn(async move {
+            // Queued on this worker just before the read blocks it.
+            tokio::spawn(async move { done.send(()).unwrap() });
+            store.get_secret(crate::secrets::CLOUD_REFRESH_TOKEN_KEY)
+        });
+        let unrelated = finished.recv_timeout(wait);
+        answer();
+        assert!(unrelated.is_ok(), "unrelated work waited for the prompt");
+        assert_eq!(runtime.block_on(first).unwrap().unwrap(), None);
+        assert_eq!(runtime.block_on(second).unwrap().unwrap(), None);
+    }
+
+    #[test]
     fn deletion_preserves_other_profiles_and_survives_registry_backup_recovery() {
         let dir = tempfile::tempdir().unwrap();
         let db = dir.path().join("app.db");

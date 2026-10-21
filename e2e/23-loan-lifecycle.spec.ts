@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
-import { BASE_URL, completeOnboardingIfNeeded } from "./helpers";
+import { BASE_URL, completeOnboardingIfNeeded, waitOutLoadingToasts } from "./helpers";
 import fixtures from "../crates/core/src/assets/loan/fixtures.json" with { type: "json" };
+
+test.beforeEach(async ({ page }) => {
+  await waitOutLoadingToasts(page);
+});
 
 const fixture = fixtures.lifecycle;
 
@@ -571,7 +575,9 @@ test("mortgage presentation stays separate from other assets and manual liabilit
   const todayMarker = terms.getByTestId("loan-term-today");
   await expect(todayMarker).toContainText("Today");
   await expect(terms).toContainText("Current term");
-  const markerPosition = await todayMarker.evaluate((element) => parseFloat(element.style.left));
+  const markerPosition = await todayMarker.evaluate((element) =>
+    parseFloat(element.style.insetInlineStart),
+  );
   expect(markerPosition).toBeGreaterThan(0);
   expect(markerPosition).toBeLessThan(100);
   await terms.screenshot({ path: test.info().outputPath("car-term-desktop.png") });

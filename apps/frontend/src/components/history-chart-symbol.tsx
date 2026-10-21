@@ -157,7 +157,7 @@ export default function HistoryChart({
                   value: amountFormatting.formatPrice(averageCost, data[0]?.currency ?? "", false),
                   position: "insideBottomLeft",
                   fill: "var(--foreground)",
-                  fontSize: 11,
+                  fontSize: "0.6875rem",
                 }}
               />
             )}

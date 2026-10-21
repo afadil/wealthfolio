@@ -106,13 +106,13 @@ function TransactionCardImpl({
       data-state={isSelected ? "selected" : undefined}
       className={cn(
         "relative overflow-hidden p-2.5",
-        row.needsReview && "border-amber-500/40 bg-amber-500/5",
+        row.needsReview && "border-warning/40 bg-warning/5",
       )}
     >
       {/* Same leading marker the table row uses, so review state costs no width
           in the name and no height in the card. */}
       {row.needsReview && (
-        <span className="absolute inset-y-0 left-0 w-[3px] bg-amber-500" aria-hidden="true" />
+        <span className="bg-warning absolute inset-y-0 start-0 w-[3px]" aria-hidden="true" />
       )}
       {/* Centred rather than top-aligned: on a two-line card the selection
           control and the row menu read as belonging to the whole row, which is
@@ -134,7 +134,7 @@ function TransactionCardImpl({
                 needs a form that survives both a screen reader and a reader who
                 cannot separate the colours. */}
             {row.needsReview && (
-              <span className="shrink-0 text-amber-600 dark:text-amber-500">
+              <span className="text-warning shrink-0">
                 <Icons.AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
                 <span className="sr-only">{t("spending:transactions.review")}</span>
               </span>
@@ -162,7 +162,7 @@ function TransactionCardImpl({
           {/* Everything secondary shares one line: the day heading above owns
               the date, and the category sits inline the way the table row shows
               it rather than in a chip row of its own. */}
-          <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-[11px]">
+          <div className="text-muted-foreground text-2xs mt-0.5 flex items-center gap-1.5">
             <span className="shrink-0">{time}</span>
             <span aria-hidden="true">·</span>
             {isNeutral ? (
@@ -341,7 +341,7 @@ function TransactionCardImpl({
           trigger={
             <button
               type="button"
-              className="hover:bg-muted -mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors"
+              className="hover:bg-muted -me-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors"
               aria-label={t("spending:transactions.rowActions")}
             >
               <Icons.MoreVertical className="h-4 w-4" aria-hidden="true" />

@@ -53,6 +53,7 @@ import {
   ResponsiveSelect,
   type ResponsiveSelectOption,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 
@@ -235,7 +236,7 @@ export function AssetDetailsSheet({
                   {kindDisplayName}
                 </Badge>
               </SheetTitle>
-              <SheetDescription className="text-left">
+              <SheetDescription className="text-start">
                 {asset.kind === AlternativeAssetKind.LIABILITY
                   ? t("asset:detailsSheet.liability_description")
                   : t("asset:detailsSheet.asset_description")}
@@ -402,7 +403,7 @@ export function AssetDetailsSheet({
                               ? "asset:detailsSheet.notes_placeholder_liability"
                               : "asset:detailsSheet.notes_placeholder",
                           )}
-                          className="min-h-[100px] resize-none"
+                          className="min-h-25 resize-none"
                           value={field.value ?? ""}
                           onChange={(e) => field.onChange(e.target.value || null)}
                         />
@@ -424,9 +425,9 @@ export function AssetDetailsSheet({
               </Button>
               <Button type="submit" disabled={isSaving}>
                 {isSaving ? (
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="me-2 h-4 w-4" />
                 ) : (
-                  <Icons.Check className="mr-2 h-4 w-4" />
+                  <Icons.Check className="me-2 h-4 w-4" />
                 )}
                 {t("asset:detailsSheet.save_details")}
               </Button>
@@ -932,11 +933,11 @@ function LiabilityFields({
                       value={field.value}
                       onValueChange={(value) => field.onChange(value ?? null)}
                       maxDecimalPlaces={2}
-                      className="pr-8"
+                      className="pe-8"
                       {...describedBy("interestRate", "interestRate")}
                     />
                   </FormControl>
-                  <span className="text-muted-foreground pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm">
+                  <span className="text-muted-foreground pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-sm">
                     %
                   </span>
                 </div>
@@ -969,7 +970,7 @@ function LiabilityFields({
           control={form.control}
           name="automaticLoan"
           render={({ field }) => (
-            <FormItem className="flex flex-row items-center justify-between gap-4 space-y-0 rounded-lg border p-3">
+            <FormItem className="flex flex-row items-center justify-between gap-4 rounded-lg border p-3">
               <div className="space-y-1">
                 <FormLabel>{t("asset:loanActions.automatic_schedule")}</FormLabel>
                 <FormDescription className="text-xs">
@@ -1286,10 +1287,11 @@ function PropertyMortgageSection({
                       size="sm"
                       onClick={() => handleUnlink(liability.id)}
                       disabled={unlinkingId === liability.id}
+                      aria-label={t("asset:loanPayments.unlink")}
                       className="h-7 px-2"
                     >
                       {unlinkingId === liability.id ? (
-                        <Icons.Spinner className="h-3 w-3 animate-spin" />
+                        <Spinner className="h-3 w-3" />
                       ) : (
                         <Icons.X className="h-3 w-3" />
                       )}
@@ -1312,7 +1314,7 @@ function PropertyMortgageSection({
                 onClick={() => setShowLinkSelect(true)}
                 className="w-full"
               >
-                <Icons.Link className="mr-2 h-4 w-4" />
+                <Icons.Link className="me-2 h-4 w-4" />
                 {t("asset:detailsSheet.link_existing_mortgage")}
               </Button>
             ) : (
@@ -1349,9 +1351,9 @@ function PropertyMortgageSection({
                     className="flex-1"
                   >
                     {isLinking ? (
-                      <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                      <Spinner className="me-2 h-4 w-4" />
                     ) : (
-                      <Icons.Check className="mr-2 h-4 w-4" />
+                      <Icons.Check className="me-2 h-4 w-4" />
                     )}
                     {t("asset:detailsSheet.link")}
                   </Button>

@@ -19,9 +19,10 @@ use wealthfolio_core::portfolio::snapshot::Position;
 
 use crate::db::{get_connection, DbPool, WriteHandle};
 use crate::errors::StorageError;
-use crate::lots::{filter_and_normalize_lots, LotDisposalDB, LotRecordDB};
+use crate::lots::{existing_activity_ids, filter_and_normalize_lots, LotDisposalDB, LotRecordDB};
 use crate::portfolio::snapshot::{AccountStateSnapshotDB, SnapshotRepository};
 use crate::portfolio::valuation::DailyAccountValuationDB;
+use crate::utils::chunk_for_sqlite;
 
 pub struct ProjectionStore {
     pool: Arc<DbPool>,
@@ -72,7 +73,6 @@ fn referentially_valid_disposals(
     disposals: Vec<LotDisposalDB>,
     account: &str,
 ) -> Result<Vec<LotDisposalDB>> {
-    use crate::schema::activities::dsl as a;
     use crate::schema::lots::dsl as l;
     let lot_ids: HashSet<String> = l::lots
         .filter(l::account_id.eq(account))
@@ -81,17 +81,10 @@ fn referentially_valid_disposals(
         .map_err(StorageError::from)?
         .into_iter()
         .collect();
-    let wanted: Vec<String> = disposals
-        .iter()
-        .map(|d| d.disposal_activity_id.clone())
-        .collect();
-    let activity_ids: HashSet<String> = a::activities
-        .filter(a::id.eq_any(&wanted))
-        .select(a::id)
-        .load::<String>(conn)
-        .map_err(StorageError::from)?
-        .into_iter()
-        .collect();
+    let activity_ids = existing_activity_ids(
+        conn,
+        disposals.iter().map(|d| d.disposal_activity_id.as_str()),
+    )?;
     Ok(disposals
         .into_iter()
         .filter(|d| {
@@ -308,16 +301,10 @@ impl ProjectionStoreTrait for ProjectionStore {
                         // cascade away its disposals, including the ones dated
                         // before `since` that the run does not re-emit.
                         let normalized = filter_and_normalize_lots(conn, lots, &account)?;
-                        let kept: Vec<&str> = normalized.iter().map(|lot| lot.id()).collect();
-                        diesel::delete(
-                            l::lots
-                                .filter(l::account_id.eq(&account))
-                                .filter(l::is_closed.eq(0).or(l::close_date.ge(since.clone())))
-                                .filter(l::id.ne_all(&kept)),
-                        )
-                        .execute(conn)
-                        .map_err(StorageError::from)?;
-                        // A lot the book re-emits unchanged is left as stored.
+                        let kept: HashSet<&str> = normalized.iter().map(|lot| lot.id()).collect();
+                        // Reuse the stored rows for both obsolete-ID selection and
+                        // leaving unchanged lots as stored. Chunking NOT IN instead
+                        // would delete lots retained by other chunks.
                         let stored: HashMap<String, LotRecordDB> = l::lots
                             .filter(l::account_id.eq(&account))
                             .filter(l::is_closed.eq(0).or(l::close_date.ge(since.clone())))
@@ -327,6 +314,20 @@ impl ProjectionStoreTrait for ProjectionStore {
                             .into_iter()
                             .map(|lot| (lot.id().to_string(), lot))
                             .collect();
+                        let obsolete: Vec<&str> = stored
+                            .keys()
+                            .map(String::as_str)
+                            .filter(|id| !kept.contains(id))
+                            .collect();
+                        for chunk in chunk_for_sqlite(&obsolete) {
+                            diesel::delete(
+                                l::lots
+                                    .filter(l::account_id.eq(&account))
+                                    .filter(l::id.eq_any(chunk)),
+                            )
+                            .execute(conn)
+                            .map_err(StorageError::from)?;
+                        }
                         for lot in &normalized {
                             if stored.get(lot.id()).is_some_and(|row| row.same_lot(lot)) {
                                 continue;
@@ -1164,6 +1165,191 @@ mod tests {
             .await
             .unwrap()
             .is_empty());
+    }
+
+    #[tokio::test]
+    async fn large_lot_books_validate_repeated_disposal_activities() {
+        let db = setup();
+        let store = ProjectionStore::new(db.pool.clone(), db.writer.clone());
+        let repo = LotsRepository::new(db.pool.clone(), db.writer.clone());
+        let activity_ids: Vec<String> = (0..900).map(|i| format!("sell-{i:04}")).collect();
+        {
+            let mut conn = get_connection(&db.pool).unwrap();
+            for id in &activity_ids {
+                diesel::sql_query(
+                    "INSERT INTO activities (id, account_id, activity_type, status, activity_date, \
+                     currency, is_user_modified, needs_review, created_at, updated_at) \
+                     VALUES (?, 'acc1', 'SELL', 'POSTED', '2025-01-05T00:00:00Z', 'USD', \
+                     0, 0, datetime('now'), datetime('now'))",
+                )
+                .bind::<Text, _>(id)
+                .execute(&mut conn)
+                .unwrap();
+            }
+        }
+        let mut lots = Vec::new();
+        let mut disposals = Vec::new();
+        // WAC may retain transferred lots separately and relieve each for every sale.
+        // 37 lots x 900 sales exceeds SQLite's default 32,766-variable limit.
+        for i in 0..37 {
+            let mut retained = lot(&format!("lot-{i}"));
+            retained.cost_basis_method = "WAC".to_string();
+            retained.remaining_quantity = "9.1".to_string();
+            retained.remaining_cost_basis = "910".to_string();
+            retained.remaining_cost_basis_base = "910".to_string();
+            for activity in &activity_ids {
+                let mut row = disposal(&format!("{activity}:{}", retained.id));
+                row.lot_id.clone_from(&retained.id);
+                row.disposal_activity_id.clone_from(activity);
+                row.cost_basis_method = "WAC".to_string();
+                row.quantity = "0.001".to_string();
+                row.cost_basis = "0.1".to_string();
+                row.cost_basis_base = "0.1".to_string();
+                row.proceeds = "0.12".to_string();
+                row.proceeds_base = "0.12".to_string();
+                row.realized_pnl = "0.02".to_string();
+                row.realized_pnl_base = "0.02".to_string();
+                disposals.push(row);
+            }
+            lots.push(retained);
+        }
+        let expected = disposals.len();
+        store
+            .complete_run(RunCompletion {
+                lot_books: vec![LotBook {
+                    account_id: "acc1".to_string(),
+                    since: GENESIS,
+                    lots,
+                    disposals,
+                }],
+                consumed: store.pending_markers().unwrap(),
+                ..RunCompletion::default()
+            })
+            .await
+            .unwrap();
+
+        let stored = repo.get_lot_disposals_for_account("acc1").await.unwrap();
+        assert_eq!(stored.len(), expected);
+        assert_eq!(
+            repo.get_all_lots_for_account("acc1").await.unwrap().len(),
+            37
+        );
+        assert_eq!(
+            stored
+                .iter()
+                .map(|row| row.disposal_activity_id.as_str())
+                .collect::<HashSet<_>>()
+                .len(),
+            activity_ids.len()
+        );
+        assert!(store.pending_markers().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn large_retained_lot_sets_preserve_history_and_delete_only_obsolete_lots() {
+        let db = setup();
+        let store = ProjectionStore::new(db.pool.clone(), db.writer.clone());
+        let repo = LotsRepository::new(db.pool.clone(), db.writer.clone());
+        let mut historical = lot("historical");
+        historical.is_closed = true;
+        historical.close_date = Some("2025-01-03".to_string());
+        historical.remaining_quantity = "0".to_string();
+        let mut earlier = disposal("earlier");
+        earlier.lot_id = "keep-0".to_string();
+        earlier.disposal_date = "2025-01-03".to_string();
+        let mut initial = vec![lot("keep-0"), historical];
+        initial.extend((0..600).map(|i| lot(&format!("obsolete-{i}"))));
+        store
+            .complete_run(RunCompletion {
+                lot_books: vec![LotBook {
+                    account_id: "acc1".to_string(),
+                    since: GENESIS,
+                    lots: initial,
+                    disposals: vec![earlier],
+                }],
+                ..RunCompletion::default()
+            })
+            .await
+            .unwrap();
+
+        // The retained IDs plus the account/date filters exceeded SQLite's limit.
+        let retained_count = 32_764;
+        store
+            .complete_run(RunCompletion {
+                lot_books: vec![LotBook {
+                    account_id: "acc1".to_string(),
+                    since: date(4),
+                    lots: (0..retained_count)
+                        .map(|i| lot(&format!("keep-{i}")))
+                        .collect(),
+                    disposals: Vec::new(),
+                }],
+                ..RunCompletion::default()
+            })
+            .await
+            .unwrap();
+
+        let stored = repo.get_all_lots_for_account("acc1").await.unwrap();
+        assert_eq!(stored.len(), retained_count + 1);
+        assert!(stored.iter().any(|row| row.id == "historical"));
+        assert!(stored.iter().all(|row| !row.id.starts_with("obsolete-")));
+        let disposals = repo.get_lot_disposals_for_account("acc1").await.unwrap();
+        assert_eq!(disposals.len(), 1);
+        assert_eq!(disposals[0].id, "earlier");
+    }
+
+    #[tokio::test]
+    async fn lot_book_failure_rolls_back_replacement_and_keeps_dirty_markers() {
+        let db = setup();
+        let store = ProjectionStore::new(db.pool.clone(), db.writer.clone());
+        let repo = LotsRepository::new(db.pool.clone(), db.writer.clone());
+        store
+            .complete_run(RunCompletion {
+                lot_books: vec![LotBook {
+                    account_id: "acc1".to_string(),
+                    since: GENESIS,
+                    lots: vec![lot("lot-1")],
+                    disposals: vec![disposal("original")],
+                }],
+                consumed: store.pending_markers().unwrap(),
+                ..RunCompletion::default()
+            })
+            .await
+            .unwrap();
+        store
+            .invalidate(MarkerScope::Account("acc1".to_string()), GENESIS)
+            .await
+            .unwrap();
+        let mut changed = lot("lot-1");
+        changed.remaining_quantity = "7".to_string();
+        let mut disposals: Vec<_> = (0..1000)
+            .map(|i| disposal(&format!("replacement-{i}")))
+            .collect();
+        disposals.push(disposal("replacement-0"));
+        let result = store
+            .complete_run(RunCompletion {
+                lot_books: vec![LotBook {
+                    account_id: "acc1".to_string(),
+                    since: GENESIS,
+                    lots: vec![changed],
+                    disposals,
+                }],
+                consumed: store.pending_markers().unwrap(),
+                ..RunCompletion::default()
+            })
+            .await;
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("UNIQUE constraint failed"));
+        assert_eq!(
+            repo.get_all_lots_for_account("acc1").await.unwrap()[0].remaining_quantity,
+            "10"
+        );
+        let stored = repo.get_lot_disposals_for_account("acc1").await.unwrap();
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0].id, "original");
+        assert!(!store.pending_markers().unwrap().is_empty());
     }
 
     #[tokio::test]

@@ -112,7 +112,7 @@ export function AssetAccountHoldings({ assetId, baseCurrency }: AssetAccountHold
                 <div className="flex items-center gap-2">
                   <p className="truncate text-sm font-medium">{account?.name ?? h.accountId}</p>
                   {account?.trackingMode === "HOLDINGS" && (
-                    <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px]">
+                    <Badge variant="outline" className="text-2xs shrink-0 px-1 py-0">
                       {t("asset:accountHoldings.manual")}
                     </Badge>
                   )}
@@ -122,7 +122,7 @@ export function AssetAccountHoldings({ assetId, baseCurrency }: AssetAccountHold
                   {t("asset:accountHoldings.shares_suffix")}
                 </p>
               </div>
-              <div className="shrink-0 text-right">
+              <div className="shrink-0 text-end">
                 <AmountDisplay
                   value={h.marketValue.local}
                   currency={currency}
@@ -152,10 +152,10 @@ export function AssetAccountHoldings({ assetId, baseCurrency }: AssetAccountHold
         <TableHeader className="bg-muted/50">
           <TableRow>
             <TableHead>{t("asset:accountHoldings.account")}</TableHead>
-            <TableHead className="text-right">{t("asset:accountHoldings.shares")}</TableHead>
-            <TableHead className="text-right">{t("asset:accountHoldings.market_value")}</TableHead>
-            <TableHead className="text-right">{t("asset:accountHoldings.cost_basis")}</TableHead>
-            <TableHead className="text-right">{t("asset:accountHoldings.total_pnl")}</TableHead>
+            <TableHead className="text-end">{t("asset:accountHoldings.shares")}</TableHead>
+            <TableHead className="text-end">{t("asset:accountHoldings.market_value")}</TableHead>
+            <TableHead className="text-end">{t("asset:accountHoldings.cost_basis")}</TableHead>
+            <TableHead className="text-end">{t("asset:accountHoldings.total_pnl")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -169,30 +169,30 @@ export function AssetAccountHoldings({ assetId, baseCurrency }: AssetAccountHold
                   <div className="flex items-center gap-2">
                     {account?.name ?? h.accountId}
                     {account?.trackingMode === "HOLDINGS" && (
-                      <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                      <Badge variant="outline" className="text-2xs px-1.5 py-0">
                         {t("asset:accountHoldings.manual")}
                       </Badge>
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-end">
                   <QuantityDisplay value={h.quantity} isHidden={isBalanceHidden} />
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-end">
                   <AmountDisplay
                     value={h.marketValue.local}
                     currency={h.localCurrency ?? baseCurrency}
                     isHidden={isBalanceHidden}
                   />
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-end">
                   <AmountDisplay
                     value={h.costBasis?.local ?? 0}
                     currency={h.localCurrency ?? baseCurrency}
                     isHidden={isBalanceHidden}
                   />
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-end">
                   <div className="flex items-center justify-end gap-2">
                     <GainAmount
                       value={gainAmount}
@@ -413,12 +413,12 @@ export function AssetSnapshotHistory({
                 </p>
                 <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
                   <span className="truncate">{snap.accountName}</span>
-                  <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px]">
+                  <Badge variant="outline" className="text-2xs shrink-0 px-1 py-0">
                     {formatSource(snap.source, t)}
                   </Badge>
                 </div>
               </div>
-              <div className="shrink-0 text-right">
+              <div className="shrink-0 text-end">
                 {snap.isDetailLoading ? (
                   <div className="text-muted-foreground text-xs">...</div>
                 ) : snap.quantity > 0 ? (
@@ -444,6 +444,9 @@ export function AssetSnapshotHistory({
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7"
+                  aria-label={t("account:snapshot.edit_aria", {
+                    date: formatDate(snap.snapshotDate, dateFormatting),
+                  })}
                   onClick={() => handleEditSnapshot(snap.accountId, snap.snapshotDate)}
                 >
                   <Icons.Pencil className="h-3.5 w-3.5" />
@@ -452,6 +455,9 @@ export function AssetSnapshotHistory({
                   variant="ghost"
                   size="icon"
                   className="text-destructive h-7 w-7"
+                  aria-label={t("account:snapshot.delete_aria", {
+                    date: formatDate(snap.snapshotDate, dateFormatting),
+                  })}
                   onClick={() =>
                     setDeletingSnapshot({
                       accountId: snap.accountId,
@@ -474,10 +480,10 @@ export function AssetSnapshotHistory({
               <TableRow>
                 <TableHead>{t("asset:accountHoldings.date")}</TableHead>
                 <TableHead>{t("asset:accountHoldings.account")}</TableHead>
-                <TableHead className="text-right">{t("asset:accountHoldings.shares")}</TableHead>
-                <TableHead className="text-right">{t("asset:accountHoldings.avg_cost")}</TableHead>
+                <TableHead className="text-end">{t("asset:accountHoldings.shares")}</TableHead>
+                <TableHead className="text-end">{t("asset:accountHoldings.avg_cost")}</TableHead>
                 <TableHead>{t("asset:accountHoldings.source")}</TableHead>
-                <TableHead className="w-[80px]" />
+                <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -487,7 +493,7 @@ export function AssetSnapshotHistory({
                     {formatDate(snap.snapshotDate, dateFormatting)}
                   </TableCell>
                   <TableCell>{snap.accountName}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-end">
                     {snap.isDetailLoading ? (
                       <span className="text-muted-foreground">...</span>
                     ) : snap.quantity > 0 ? (
@@ -496,7 +502,7 @@ export function AssetSnapshotHistory({
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-end">
                     {snap.isDetailLoading ? (
                       <span className="text-muted-foreground">...</span>
                     ) : snap.avgCost > 0 ? (
@@ -510,16 +516,19 @@ export function AssetSnapshotHistory({
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                    <Badge variant="outline" className="text-2xs px-1.5 py-0">
                       {formatSource(snap.source, t)}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-end">
                     <div className="flex items-center justify-end gap-1">
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7"
+                        aria-label={t("account:snapshot.edit_aria", {
+                          date: formatDate(snap.snapshotDate, dateFormatting),
+                        })}
                         onClick={() => handleEditSnapshot(snap.accountId, snap.snapshotDate)}
                       >
                         <Icons.Pencil className="h-3.5 w-3.5" />
@@ -528,6 +537,9 @@ export function AssetSnapshotHistory({
                         variant="ghost"
                         size="icon"
                         className="text-destructive h-7 w-7"
+                        aria-label={t("account:snapshot.delete_aria", {
+                          date: formatDate(snap.snapshotDate, dateFormatting),
+                        })}
                         onClick={() =>
                           setDeletingSnapshot({
                             accountId: snap.accountId,
@@ -550,7 +562,7 @@ export function AssetSnapshotHistory({
 
       {editingSnapshot && (
         <Sheet open={!!editingSnapshot} onOpenChange={() => handleEditClose()}>
-          <SheetContent side="right" className="flex h-full w-full flex-col p-0 sm:max-w-2xl">
+          <SheetContent side="inline-end" className="flex h-full w-full flex-col p-0 sm:max-w-2xl">
             <SheetHeader className="border-b px-6 py-4">
               <SheetTitle>{t("asset:accountHoldings.update_holdings")}</SheetTitle>
             </SheetHeader>
@@ -585,7 +597,7 @@ export function AssetSnapshotHistory({
             <AlertDialogAction
               onClick={handleRemovePosition}
               disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
             >
               {isDeleting ? t("asset:accountHoldings.removing") : t("asset:accountHoldings.remove")}
             </AlertDialogAction>

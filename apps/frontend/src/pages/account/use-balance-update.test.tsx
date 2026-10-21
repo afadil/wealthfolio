@@ -1,5 +1,4 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { AccountValuation } from "@/lib/types";
 import { act, renderHook, waitFor } from "@/test/render";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,38 +21,8 @@ function createWrapper() {
   };
 }
 
-function createValuation(accountCurrency: string, cashBalance: number): AccountValuation {
-  return {
-    id: "valuation-1",
-    accountId: "account-1",
-    valuationDate: "2026-06-01",
-    accountCurrency,
-    baseCurrency: accountCurrency,
-    fxRateToBase: 1,
-    cashBalance,
-    investmentMarketValue: 0,
-    totalValue: cashBalance,
-    costBasis: 0,
-    bookBasis: 0,
-    netContribution: 0,
-    cashBalanceBase: cashBalance,
-    investmentMarketValueBase: 0,
-    totalValueBase: cashBalance,
-    costBasisBase: 0,
-    bookBasisBase: 0,
-    netContributionBase: 0,
-    externalInflowBase: 0,
-    externalOutflowBase: 0,
-    externalFlowSource: "UNKNOWN",
-    performanceEligibleValueBase: 0,
-    valueStatus: "complete",
-    basisStatus: "notApplicable",
-    calculatedAt: "2026-06-01T00:00:00Z",
-  };
-}
-
-function renderBalanceUpdate(accountCurrency: string, cashBalance: number) {
-  return renderHook(() => useBalanceUpdate(createValuation(accountCurrency, cashBalance)), {
+function renderBalanceUpdate(accountId = "account-1") {
+  return renderHook(() => useBalanceUpdate(accountId), {
     wrapper: createWrapper(),
   });
 }
@@ -76,14 +45,18 @@ describe("useBalanceUpdate", () => {
     ["JPY", 1000, 1000.4, "DEPOSIT", 0.4],
     ["USD", 10.00000001, 10, "WITHDRAWAL", 0.00000001],
     ["USD", 0, 100_000_000.12345679, "DEPOSIT", 100_000_000.12345679],
+    ["USD", 100, 0, "WITHDRAWAL", 100],
+    ["USD", -5, 0, "DEPOSIT", 5],
   ])(
     "records a %s balance change from %d to %d as a %s of %d",
     async (currency, currentBalance, newBalance, activityType, amount) => {
-      const { result } = renderBalanceUpdate(currency, currentBalance);
+      const { result } = renderBalanceUpdate();
 
-      act(() => result.current.updateBalance(newBalance));
+      await act(() =>
+        result.current.updateBalance({ currency, currentBalance, targetBalance: newBalance }),
+      );
 
-      await waitFor(() => expect(adapterMocks.createActivity).toHaveBeenCalledTimes(1));
+      expect(adapterMocks.createActivity).toHaveBeenCalledTimes(1);
       expect(adapterMocks.createActivity.mock.calls[0][0]).toMatchObject({
         accountId: "account-1",
         activityType,
@@ -99,12 +72,52 @@ describe("useBalanceUpdate", () => {
   ])(
     "records nothing when a %s change from %d to %d rounds to zero",
     async (currency, currentBalance, newBalance) => {
-      const { result } = renderBalanceUpdate(currency, currentBalance);
+      const { result } = renderBalanceUpdate();
 
-      act(() => result.current.updateBalance(newBalance));
-      await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+      await act(() =>
+        result.current.updateBalance({ currency, currentBalance, targetBalance: newBalance }),
+      );
 
       expect(adapterMocks.createActivity).not.toHaveBeenCalled();
     },
   );
+
+  it.each([
+    ["", "USD", 100, 110],
+    ["account-1", " ", 100, 110],
+    ["account-1", "USD", NaN, 110],
+    ["account-1", "USD", Infinity, 110],
+    ["account-1", "USD", 100, NaN],
+    ["account-1", "USD", 100, Infinity],
+    ["account-1", "USD", 100, -1],
+    ["account-1", "USD", -Number.MAX_VALUE, Number.MAX_VALUE],
+  ])(
+    "rejects invalid input (%s, %s, %d, %d) before persistence",
+    async (accountId, currency, currentBalance, targetBalance) => {
+      const { result } = renderBalanceUpdate(accountId);
+
+      await act(async () => {
+        await expect(
+          result.current.updateBalance({ currency, currentBalance, targetBalance }),
+        ).rejects.toThrow();
+      });
+
+      expect(adapterMocks.createActivity).not.toHaveBeenCalled();
+    },
+  );
+
+  it("propagates a create failure without automatically retrying", async () => {
+    const error = new Error("Create failed");
+    adapterMocks.createActivity.mockRejectedValue(error);
+    const { result } = renderBalanceUpdate();
+
+    await act(async () => {
+      await expect(
+        result.current.updateBalance({ currency: "USD", currentBalance: 100, targetBalance: 110 }),
+      ).rejects.toBe(error);
+    });
+
+    expect(adapterMocks.createActivity).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
 });

@@ -791,6 +791,7 @@
     "balance_at_renewal": "Balance at renewal",
     "duration_year_one": "{{count}} year",
     "duration_year_other": "{{count}} years",
+    "duration_years_months": "{{years}} {{months}}",
     "duration_month_one": "{{count}} month",
     "duration_month_other": "{{count}} months",
     "confirm_balance": "Confirm balance",

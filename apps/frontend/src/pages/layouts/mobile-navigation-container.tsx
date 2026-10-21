@@ -1,7 +1,7 @@
 import { syncTriggerCycle, updatePortfolio } from "@/adapters";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useQueryClient } from "@tanstack/react-query";
-import { Icons, PageScrollContainer } from "@wealthfolio/ui";
+import { Icons, PageScrollContainer, Spinner } from "@wealthfolio/ui";
 import { AnimatePresence } from "motion/react";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
@@ -50,7 +50,7 @@ export function MobileNavigationContainer() {
       {(isRefreshing || ptr.isActivated) && (
         <div className="pointer-events-none absolute left-1/2 top-[calc(env(safe-area-inset-top,0px)+2rem)] z-50 -translate-x-1/2">
           <div className="bg-background/80 text-muted-foreground flex items-center gap-2 rounded-full px-3 py-1 text-xs backdrop-blur-sm">
-            <Icons.Loader className="size-4 animate-spin" />
+            <Spinner className="size-4" />
 
             <span>{t("common:layout.refreshing")}</span>
           </div>

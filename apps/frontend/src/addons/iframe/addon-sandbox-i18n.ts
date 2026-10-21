@@ -2,13 +2,16 @@ import i18next from "i18next";
 import { useMemo } from "react";
 import { initReactI18next, useTranslation } from "react-i18next";
 import type { AddonTranslationApi, AddonTranslationResources } from "@wealthfolio/addon-sdk";
+import type { TextDirection } from "@wealthfolio/ui";
 
+import { reactInterpolation } from "@/i18n/interpolation";
 import {
   DEFAULT_LOCALE,
   SUPPORTED_LOCALE_CODES,
   normalizeLocaleCode,
   type LocaleCode,
 } from "@/i18n/locales";
+import arUi from "@/i18n/locales/ar/ui.json";
 import deUi from "@/i18n/locales/de/ui.json";
 import enUi from "@/i18n/locales/en/ui.json";
 import esUi from "@/i18n/locales/es/ui.json";
@@ -34,6 +37,7 @@ import zhHantUi from "@/i18n/locales/zh-Hant/ui.json";
 // SUPPORTED_LOCALES without adding it here is a type error, not a silent
 // fallback to English.
 const resources: Record<LocaleCode, { ui: Record<string, unknown> }> = {
+  ar: { ui: arUi },
   de: { ui: deUi },
   en: { ui: enUi },
   es: { ui: esUi },
@@ -50,6 +54,26 @@ function applyDocumentLanguage(language: string) {
   // Han unification: ja/ko/zh share codepoints that render with different
   // preferred glyphs, so the iframe document needs its own lang attribute.
   document.documentElement.setAttribute("lang", language);
+}
+
+/**
+ * The direction the host reports, so addons mirror with the host even when it
+ * forces one in development; the UI language's direction otherwise.
+ */
+export function resolveSandboxDirection(localization: {
+  direction?: string;
+  uiLocale?: string;
+}): TextDirection {
+  if (localization.direction === "rtl" || localization.direction === "ltr") {
+    return localization.direction;
+  }
+  return sandboxI18n.dir(
+    localization.uiLocale ? normalizeLocaleCode(localization.uiLocale) : DEFAULT_LOCALE,
+  );
+}
+
+export function applySandboxDirection(direction: TextDirection) {
+  document.documentElement.setAttribute("dir", direction);
 }
 
 // A dedicated instance rather than the shared i18next default: the sandbox owns
@@ -75,10 +99,8 @@ export function initSandboxI18n(language?: string) {
     ns: ["ui"],
     defaultNS: "ui",
     resources,
-    interpolation: {
-      // React already escapes values.
-      escapeValue: false,
-    },
+    // Same as the host, so `ui` strings read the same inside an add-on.
+    interpolation: reactInterpolation(sandboxI18n),
     react: {
       // Resources are bundled synchronously, so there is nothing to suspend on
       // — and suspending here would land outside the route Suspense boundary.

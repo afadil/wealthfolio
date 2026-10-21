@@ -123,6 +123,19 @@ describe("AccountHoldings", () => {
     );
   });
 
+  it("names the icon-only update holdings button", () => {
+    mocks.useAccounts.mockReturnValue({ accounts: [{ ...account, trackingMode: "HOLDINGS" }] });
+    mocks.useHoldingsWithClosedProbe.mockReturnValue({
+      holdings: [{ id: "cash-usd", holdingType: "cash" } as Holding],
+      isLoading: false,
+      hasHiddenClosedPositions: false,
+    });
+
+    render(<AccountHoldings accountId={account.id} onAddHoldings={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Update holdings" })).toBeInTheDocument();
+  });
+
   it("shows cash-only results under the default open status", () => {
     const cashHolding = {
       id: "cash-usd",

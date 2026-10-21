@@ -10,7 +10,7 @@ it("keeps one frame size on desktop and fills the sheet on phones", () => {
       <p>step</p>
     </FlowFrame>,
   );
-  expect(container.firstElementChild).toHaveClass("min-h-[544px]");
+  expect(container.firstElementChild).toHaveClass("min-h-136");
 
   rerender(
     <FlowFrame fill>
@@ -18,7 +18,7 @@ it("keeps one frame size on desktop and fills the sheet on phones", () => {
     </FlowFrame>,
   );
   expect(container.firstElementChild).toHaveClass("flex-1");
-  expect(container.firstElementChild).not.toHaveClass("min-h-[544px]");
+  expect(container.firstElementChild).not.toHaveClass("min-h-136");
 });
 
 it("pins actions and the footnote to the bottom of the frame", () => {

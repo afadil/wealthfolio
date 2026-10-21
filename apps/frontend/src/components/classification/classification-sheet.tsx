@@ -71,7 +71,7 @@ export function ClassificationSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex h-full w-full flex-col sm:max-w-lg">
+      <SheetContent side="inline-end" className="flex h-full w-full flex-col sm:max-w-lg">
         <SheetHeader className="shrink-0 pb-4">
           <div className="flex items-center gap-3">
             {assetSymbol && (
@@ -92,7 +92,7 @@ export function ClassificationSheet({
           </div>
         </SheetHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="min-h-0 flex-1 overflow-y-auto pe-1">
           <div className="space-y-8 pb-8 pt-4">
             {/* Loading State */}
             {isLoading && <ClassificationSkeleton />}

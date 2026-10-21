@@ -835,6 +835,7 @@
     "balance_at_renewal": "續期時餘額",
     "duration_year_one": "{{count}}年",
     "duration_year_other": "{{count}}年",
+    "duration_years_months": "{{years}} {{months}}",
     "duration_month_one": "{{count}}個月",
     "duration_month_other": "{{count}}個月",
     "confirm_balance": "確認餘額",

@@ -70,6 +70,30 @@ so pick it deliberately before shipping. Five places have to agree:
    plus any alias normalization (`fr-CA` -> `fr`).
 5. `addon-sandbox-i18n.ts`, if the locale should reach addon iframes.
 
+### Right-to-left languages
+
+Direction follows the UI language and nothing else: `i18n/direction.tsx` sets
+`<html dir>` from `i18n.dir(language)`, and `AppDirectionProvider` (around
+`App`) hands the same value to Base UI, so keyboard navigation, popup sides,
+sliders and the data grid mirror with it. The formatting region never changes
+direction. Add-on iframes receive it with the localization snapshot.
+
+Styles use logical classes (`ms-*`, `pe-*`, `start-*`, `text-end`, `border-s`,
+`rounded-e-*`) and `rtl:rotate-180` on icons that point forward or back. Keep a
+physical class only where the side is meant literally: safe-area insets, chart
+plot coordinates, centring with `left-1/2 -translate-x-1/2`.
+
+Values and names keep their own direction inside right-to-left text. The
+formatters wrap their output in Unicode isolates in a right-to-left document, so
+`-$1,234.56` and `9:30 AM` stay intact; parsers drop the marks. Provider and
+user text that can be clipped (asset names, symbols, notes) gets `dir="auto"` on
+the clipping element with `rtl:text-right`; unclipped names are wrapped in
+`<bdi>`. Chart plots stay left-to-right (`.recharts-surface` in `globals.css`).
+
+To try right-to-left without shipping a language, development builds read
+`?dir=rtl` on load and expose `__wealthfolioSetDirection("rtl" | "ltr" | null)`
+in the console; neither exists in production builds and nothing is stored.
+
 ### Naming
 
 Bare language codes (`fr`, `ja`) unless the language is written in more than one
@@ -89,6 +113,15 @@ Each locale should carry a glossary test (see `traditional-chinese.test.ts`)
 asserting the term the catalog standardises on and rejecting its alternates. Key
 parity and a green suite do not catch a catalog that says "Return" three
 different ways — only a glossary does.
+
+Arabic plural messages may omit `{{count}}` in `_zero`, `_one`, and `_two` forms
+when the wording already expresses the exact count. The translation checker
+permits this only for English plural families, and still requires all other
+placeholders and counts in `_few`, `_many`, and `_other`. Reusable fragments
+such as loan durations use the nominative CLDR forms (`سنتان`, `شهران`), so
+sentences that embed them place them as a subject or predicate, never after a
+preposition. `arabic.test.ts` covers rendered counts, independent
+interpolations, embedded durations, and financial terminology.
 
 ## Provenance of current translations
 

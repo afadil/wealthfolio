@@ -146,6 +146,7 @@ impl AgentTool for GetNetWorth {
             Some(start) => {
                 let points = net_worth_service
                     .get_net_worth_history(start, as_of)
+                    .await
                     .map_err(|e| AgentToolError::ExecutionFailed(e.to_string()))?;
                 let original = points.len();
                 let dto: Vec<NetWorthHistoryPointDto> = points

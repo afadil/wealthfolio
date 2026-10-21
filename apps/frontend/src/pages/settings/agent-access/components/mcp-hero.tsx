@@ -34,13 +34,13 @@ export function McpHero({
               <span
                 className={cn(
                   "absolute inline-flex h-full w-full rounded-full opacity-60",
-                  active ? "animate-ping bg-green-300" : "bg-background/40",
+                  active ? "bg-success animate-ping" : "bg-background/40",
                 )}
               />
               <span
                 className={cn(
                   "relative inline-flex h-2 w-2 rounded-full",
-                  active ? "bg-green-300" : "bg-background/40",
+                  active ? "bg-success" : "bg-background/40",
                 )}
               />
             </span>

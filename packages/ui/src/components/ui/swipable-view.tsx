@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "../../lib/utils";
+import { useDirection } from "./direction";
 import useEmblaCarousel, { type UseEmblaCarouselType } from "embla-carousel-react";
 import * as React from "react";
 
@@ -54,7 +55,9 @@ export function SwipableView({
   initialIndex = 0,
   selectedIndex: controlledIndex,
 }: SwipableViewProps) {
+  const direction = useDirection();
   const [emblaRef, emblaApi] = useEmblaCarousel({
+    direction,
     loop: false,
     align: "start",
     skipSnaps: false,
@@ -152,7 +155,7 @@ export function SwipableView({
                   onClick={() => scrollTo(index)}
                   className={cn(
                     "size-2 rounded-full transition-all duration-300",
-                    "focus-visible:ring-ring hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                    "focus-visible:outline-solid focus-visible:outline-ring hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2",
                     "bg-foreground/20 hover:bg-foreground/40",
                     dotClassName,
                   )}

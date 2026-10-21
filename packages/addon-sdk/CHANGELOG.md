@@ -37,9 +37,182 @@ and this project adheres to
 - `IncomeSummary.unconvertedCurrencies`, the currencies whose income has no
   exchange rate to the summary's currency. Requires a Wealthfolio release that
   ships it (unreleased at the time of writing).
+- Status surface colours for callouts, banners and pills: `--success-subtle`,
+  `--warning-subtle`, `--destructive-subtle` and `--info-subtle`, each with
+  `-foreground` (text) and `-border`. Text on a tint of a status colour
+  (`--warning` at 10%) does not reach 4.5:1 contrast; these pairs do, in light
+  and dark. `Alert`'s `destructive`, `warning` and `success` variants show them
+  as a translucent surface with a hairline border; `error` is now the same as
+  `destructive`. `statusSurfaceVariants({ status })` gives that surface (fill,
+  hairline and top highlight, no text colour) for panels and cards that carry a
+  status but hold other content.
+- `Badge` variants `success-subtle`, `warning-subtle`, `destructive-subtle` and
+  `info-subtle`: pale pills on the status surfaces, for confidences, changes and
+  states.
+- `DirectionProvider` and `useDirection` from `@wealthfolio/ui`. The addon
+  sandbox now sets `<html dir>` and provides the host's reading direction, so
+  `@wealthfolio/ui` menus, selects, tabs and sliders follow it. Read it with
+  `useDirection()` to mirror an addon's own layout.
+- `SheetContent` takes `side="inline-start"` and `side="inline-end"`, which
+  follow the reading direction; `inline-end` is the new default. `left` and
+  `right` stay physical, as in shadcn.
+- `stripBidiControls(text)` from `@wealthfolio/ui` removes the invisible bidi
+  marks formatted values carry in right-to-left pages, for code that measures or
+  cuts them.
 
 ### Changed
 
+- **Breaking:** `@wealthfolio/ui` components move from Radix to
+  [Base UI](https://base-ui.com) and follow its API.
+  - `asChild` is replaced by `render` on `Button`, `Badge`, `Item`,
+    `DropdownMenuItem` and every trigger and close part:
+    `<Badge render={<a href="…" />}>Docs</Badge>`. A link that looks like a
+    button is the link itself with `buttonVariants()`, not a `Button`, which
+    gives what it renders button semantics. `Button` renders `type="button"`;
+    submit buttons need `type="submit"`.
+  - State attributes are Base UI's instead of Radix's `data-state`:
+    `data-checked`/`data-unchecked` (`Switch`, `Checkbox`, `RadioGroupItem`),
+    `data-active` (`TabsTrigger`), `aria-pressed` (`Toggle`, `ToggleGroupItem`),
+    `data-panel-open` (collapsible and accordion triggers), `data-popup-open`
+    (popover, menu and select triggers), `data-open`/`data-closed` (panels,
+    popups and overlays, with `--collapsible-panel-height` and
+    `--accordion-panel-height`), and `data-disabled`. Popups use
+    `--anchor-width`, `--available-height` and `--transform-origin` instead of
+    the Radix variables, and keep 5px from the viewport edge.
+  - `Checkbox` takes `indeterminate` instead of `checked="indeterminate"`;
+    `ToggleGroup` takes `multiple` and array values instead of `type` and a
+    string (the old form still works, deprecated), and `Accordion` likewise (no
+    `collapsible`; single items always close); `AvatarFallback` takes `delay`
+    instead of `delayMs`; `Tabs`, `RadioGroup` and `ToggleGroup` change
+    callbacks receive `(value, eventDetails)`. Tabs still activate as arrow keys
+    move focus; for manual activation, `<Tabs activationMode="manual">` becomes
+    `<TabsList activateOnFocus={false}>`.
+  - Single-select `ToggleGroup` items are toggle buttons (`aria-pressed`)
+    instead of radios, and `Separator` is announced as a separator.
+  - Tooltip and hover card delays are set on the trigger (`delay`, `closeDelay`)
+    or, for tooltips, on `TooltipProvider` (`delay` instead of `delayDuration`);
+    `HoverCard` no longer takes `openDelay`/`closeDelay`. Their content takes
+    `side`, `align`, `sideOffset` and `alignOffset` (`TooltipContent` also
+    `collisionPadding`), renders in a portal, and uses `--transform-origin`.
+    `TooltipPortal` is removed.
+  - Tooltips are visual labels: the content no longer has `role="tooltip"` and
+    is not announced as the trigger's description, so give the trigger an
+    accessible name.
+  - Content focus and dismiss callbacks move: `onOpenAutoFocus` and
+    `onCloseAutoFocus` become `initialFocus` and `finalFocus` on the content;
+    `onEscapeKeyDown` and `onInteractOutside` become checks of
+    `eventDetails.reason` in the root's `onOpenChange(open, eventDetails)`,
+    calling `eventDetails.cancel()` to stay open, and `Dialog` and `Sheet` take
+    `disablePointerDismissal`. `PopoverAnchor` is replaced by `anchor` on
+    `PopoverContent`.
+  - `DropdownMenuItem` takes `onClick` instead of `onSelect`, and
+    `closeOnClick={false}` instead of `event.preventDefault()` to stay open
+    (`onSelect` still works, deprecated). `DropdownMenuLabel` and `SelectLabel`
+    must sit inside a group.
+  - `Select` shows the selected item's label only when given `items` (an array
+    of `{ value, label }` or a value-to-label record); `onValueChange` can
+    receive `null`; `SelectContent` takes `alignItemWithTrigger` instead of
+    `position`.
+  - `ScrollArea` wraps its children in Base UI's scroll content; `ScrollBar`
+    takes Base UI's scrollbar props and shows while the area is hovered or
+    scrolled.
+  - `AlertDialogAction` still closes the dialog; call
+    `event.preventBaseUIHandler()` in `onClick` to keep it open. `ActionConfirm`
+    and `DeleteConfirm` take a single element as `button`.
+- `Alert` lays out as a grid: an icon placed first sits in a tinted circle,
+  centred on the title and description at any padding or font size (set a
+  compact alert's size on `Alert`, e.g. `text-xs`). With an `AlertTitle`, the
+  title takes the status colour and `AlertDescription` the page's text colour;
+  without one, the sentence keeps the status colour. `AlertAction` is a column
+  after the text, so a text button never covers it. `AlertTitle` renders a `div`
+  instead of an `h5`. The icon is no longer absolutely positioned, so
+  `[&>svg]:absolute`-style overrides are not needed.
+- `@wealthfolio/ui` controls show keyboard focus as a 2px outline in the
+  `--ring` colour instead of a box-shadow ring, so it stays visible in
+  forced-colors mode. To hide it on a control placed inside another focus
+  indicator, pass `focus-visible:outline-none`; `focus-visible:ring-0` no longer
+  hides it. `SelectTrigger` and the dialog and sheet close buttons show it on
+  keyboard focus only (`:focus-visible`), not after a click.
+- `Button`'s `destructive` variant is a pale red button (red text on
+  `--destructive-subtle`, a deeper tint on hover) instead of solid red with
+  white text. `AlertDialogAction` takes `variant`, so a dialog's destructive
+  confirm is `<AlertDialogAction variant="destructive">` rather than
+  `bg-destructive` overrides.
+- Dialog, AlertDialog and Sheet backdrops are shadcn's light overlay: 10% black
+  with a light blur instead of 50–80% black. `AlertDialogAction` and
+  `AlertDialogCancel` take `size` as well as `variant`; `AlertDialogAction`
+  still closes the dialog (shadcn's does not).
+- `SelectContent` opens its list over the field (`alignItemWithTrigger` defaults
+  to `true`, as in shadcn), with the selected tick on the right so the texts
+  line up; pass `alignItemWithTrigger={false}` to open below it.
+  `DropdownMenuItem variant="destructive"` highlights on the pale red status
+  surface. `PopoverHeader`, `PopoverTitle` and `PopoverDescription` are added.
+- `TooltipContent` is shadcn's dark bubble: `--foreground` fill, `--background`
+  text, 12 px text, an arrow and a 20rem maximum width. Muted text inside a
+  tooltip needs `text-background/70` rather than `text-muted-foreground`, which
+  is unreadable on the dark fill. The arrow takes the bubble's colour, so a
+  `bg-destructive` override keeps a matching arrow. The bubble's last child is
+  now the arrow: use `flex flex-col gap-*` instead of `space-y-*` on
+  `TooltipContent`, or the last line gains a bottom margin.
+- `CommandDialog` takes `title` and `description`, rendered for screen readers
+  only (defaults "Command Palette" and "Search for a command to run..."), and
+  `showCloseButton` (default `true`). Pass your own title through `title` rather
+  than rendering a `DialogTitle` inside it. Icons in a `CommandItem` keep a
+  `size-*` class they set; others are still 16 px.
+- Controls follow shadcn's Base UI sources on Wealthfolio's look. `Button` has a
+  transparent 1 px border (outline and filled buttons share one box, so buttons
+  are 2 px wider), nudges down 1 px while pressed, and keeps its hover fill
+  while the menu, select or popover it opens is open (`aria-haspopup` and
+  `aria-expanded`); a collapsible or accordion trigger stays unfilled.
+  `Checkbox`, `RadioGroupItem` and `Switch` have a larger invisible hit area,
+  and a label with `peer-data-disabled:` now dims next to a disabled radio.
+  `Input` is Base UI's `Input`, so it works inside a Base UI `Field`. `Textarea`
+  is a function component with `data-slot="textarea"`. `Switch` exposes `size`
+  as a `data-size` attribute. `ToggleGroup` takes `spacing` (gap in spacing
+  steps, default 1; 0 joins the items) and `orientation`. `TabsList` takes
+  `variant="line"` (an underline instead of the pill), tabs support
+  `orientation="vertical"`, and `tabsListVariants` is exported. Fields, select
+  triggers, toggles and switches show `aria-invalid`.
+- The remaining primitives carry shadcn's data-slots and parts. Added:
+  `CardAction` (a header holding it becomes two columns with the action on the
+  right), `AvatarBadge`, `AvatarGroup`, `AvatarGroupCount`, `Badge` variants
+  `ghost` and `link`, and `Item` size `xs`. A `TableRow` keeps its hover fill
+  while a menu or popover inside it is open. `Card`, `Table`, `Skeleton` and the
+  `InputOTP` parts are function components (refs still pass through).
+  `data-horizontal:` and `data-vertical:` variants match `data-orientation`, as
+  in shadcn. A size set by a variant class overrides a call site's plain size
+  class, so components keep sizes callers may override as plain classes.
+- `DropdownMenuContent` and `DropdownMenuSubContent` take shadcn's rounded menu
+  look: 16 px corners, a hairline ring and a large soft shadow instead of a
+  border. Items, checkbox and radio items and sub-triggers have 12 px corners
+  and roomier padding (`px-3 py-2`); `inset` indents to `pl-9.5`. Check and
+  radio indicators stay on the left.
+- `SelectContent`, `PopoverContent`, `HoverCardContent` and `Command` take the
+  same rounded look as menus: 16 px corners, a hairline ring and a soft shadow
+  instead of a border. Select and command rows have 12 px corners and `py-2`
+  (command rows `px-3`); select rows keep `pl-2` so their text lines up with the
+  field when the list opens over it.
+- `PopoverContent` is at most as tall as the space beside its trigger
+  (`--available-height`) and scrolls beyond it, as menus and select lists do, so
+  a tall popover no longer runs off the screen.
+- `Spinner`, shadcn's spinner on the Loader2 icon. It is decorative
+  (`aria-hidden`) unless you pass a translated `aria-label`, which makes it a
+  `status`. `ProgressIndicator` uses it and is now built on `DialogContent` (no
+  close button), with a primary progress bar instead of a red-to-yellow
+  gradient.
+- `EmptyPlaceholder` is deprecated in favour of shadcn's `Empty` (it still
+  renders, as a wrapper over `Empty`): `Empty` > `EmptyHeader` >
+  `EmptyMedia variant="icon"` (the muted icon circle), `EmptyTitle`,
+  `EmptyDescription`, then `EmptyContent` for actions.
+  `<EmptyPlaceholder.Icon name="Wallet" />` becomes
+  `<EmptyMedia variant="icon"><Icons.Wallet /></EmptyMedia>`.
+- `Combobox` and its parts (`ComboboxInput`, `ComboboxContent`, `ComboboxList`,
+  `ComboboxItem`, `ComboboxChips` and the rest) from shadcn, on Base UI's
+  combobox. `SearchableSelect` keeps its props and is built on it: typing
+  filters on the option labels, and arrow keys and Enter pick an option.
+- **Breaking:** `Autocomplete` is removed; use `Combobox`.
+- In dark mode `--success-subtle-foreground` is green-200, the step the other
+  status text colours use, so success text reads green rather than near-white.
 - `ActivityUpdate.asset` now has explicit patch semantics: omit it to preserve
   the current asset, or pass an empty object to clear the asset association.
 - Host-provided `@wealthfolio/addon-sdk` and `@wealthfolio/ui` dependency ranges
@@ -47,6 +220,20 @@ and this project adheres to
 - `IncomeSummary` totals and breakdowns leave out income that has no exchange
   rate to the summary's currency, instead of counting it as if it were already
   in that currency. `byCurrency` still includes it.
+- `IncomeSummary.yoyGrowth` is `null` for `YTD` and `LAST_YEAR` when the year
+  before has no income to compare with, instead of `0`.
+
+### Deprecated
+
+These keep addons built against earlier SDKs working on the Base UI components.
+The app does not use them; they are removed in the next major SDK version.
+
+- `EmptyPlaceholder` (props and compound forms), rendered with `Empty`. Without
+  it, an addon that imports it fails to load.
+- `DropdownMenuItem` `onSelect`: called on click; calling `preventDefault()` on
+  its event keeps the menu open, as with Radix.
+- `ToggleGroup` `type`: `type="single"` takes and returns a string (`""` when
+  nothing is pressed) and `type="multiple"` maps to `multiple`.
 
 ## [3.7.0] - 2026-08-10
 

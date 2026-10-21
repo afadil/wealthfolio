@@ -1,5 +1,5 @@
 import { formatDistanceToNow } from "@/lib/utils";
-import { useDateFormatting, useLocalizationSettings } from "@wealthfolio/ui";
+import { useDateFormatting, useLocalizationSettings, Spinner } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
@@ -120,12 +120,12 @@ export function SyncHistory({ pageSize = 10 }: SyncHistoryProps) {
           >
             {isFetchingNextPage ? (
               <>
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="me-2 h-4 w-4" />
                 {t("common:loading")}
               </>
             ) : (
               <>
-                <Icons.ChevronDown className="mr-2 h-4 w-4" />
+                <Icons.ChevronDown className="me-2 h-4 w-4" />
                 {t("connect:syncHistory.loadMore")}
               </>
             )}
@@ -164,13 +164,13 @@ function SyncRunItem({ run }: { run: ImportRun }) {
           <div
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
               run.status === "APPLIED"
-                ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                ? "bg-success-subtle text-success-subtle-foreground"
                 : run.status === "RUNNING"
-                  ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                  ? "bg-info-subtle text-info-subtle-foreground"
                   : run.status === "NEEDS_REVIEW"
-                    ? "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400"
+                    ? "bg-warning-subtle text-warning-subtle-foreground"
                     : run.status === "FAILED"
-                      ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+                      ? "bg-destructive-subtle text-destructive-subtle-foreground"
                       : "bg-muted text-muted-foreground"
             }`}
           >
@@ -184,7 +184,7 @@ function SyncRunItem({ run }: { run: ImportRun }) {
                 {config.label}
               </Badge>
               {hasWarnings && (
-                <span className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-400">
+                <span className="text-warning flex items-center gap-1 text-xs">
                   <Icons.AlertTriangle className="h-3 w-3" />
                   {run.warnings?.length}
                 </span>
@@ -209,15 +209,11 @@ function SyncRunItem({ run }: { run: ImportRun }) {
         {run.summary && (
           <div className="flex shrink-0 items-center gap-3 text-xs">
             <div className="text-center">
-              <p className="font-semibold text-green-600 dark:text-green-400">
-                +{run.summary.inserted}
-              </p>
+              <p className="text-success font-semibold">+{run.summary.inserted}</p>
               <p className="text-muted-foreground">{t("connect:syncHistory.new")}</p>
             </div>
             <div className="text-center">
-              <p className="font-semibold text-blue-600 dark:text-blue-400">
-                {run.summary.updated}
-              </p>
+              <p className="text-info font-semibold">{run.summary.updated}</p>
               <p className="text-muted-foreground">{t("connect:syncHistory.updated")}</p>
             </div>
             {run.summary.skipped > 0 && (
@@ -232,8 +228,8 @@ function SyncRunItem({ run }: { run: ImportRun }) {
 
       {/* Error message */}
       {run.error && (
-        <div className="mt-2 rounded-md bg-red-50 p-2 dark:bg-red-900/20">
-          <p className="text-xs text-red-600 dark:text-red-400">{BROKER_SYNC_RUN_FAILED_MESSAGE}</p>
+        <div className="bg-destructive-subtle mt-2 rounded-md p-2">
+          <p className="text-destructive text-xs">{BROKER_SYNC_RUN_FAILED_MESSAGE}</p>
         </div>
       )}
 
@@ -241,7 +237,7 @@ function SyncRunItem({ run }: { run: ImportRun }) {
       {hasWarnings && (
         <div className="mt-2 space-y-1">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-yellow-600 dark:text-yellow-400">
+            <p className="text-warning text-xs font-medium">
               {t("connect:syncHistory.warningsCount", { count: run.warnings?.length ?? 0 })}
             </p>
             <Link
@@ -249,7 +245,7 @@ function SyncRunItem({ run }: { run: ImportRun }) {
               className="text-primary flex items-center gap-1 text-xs hover:underline"
             >
               {t("connect:syncHistory.review")}
-              <Icons.ArrowRight className="h-3 w-3" />
+              <Icons.ArrowRight className="h-3 w-3 rtl:rotate-180" />
             </Link>
           </div>
           <ul className="text-muted-foreground space-y-0.5 text-xs">

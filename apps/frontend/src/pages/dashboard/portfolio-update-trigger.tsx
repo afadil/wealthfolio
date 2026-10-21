@@ -3,7 +3,7 @@ import {
   useUpdatePortfolioMutation,
 } from "@/hooks/use-calculate-portfolio";
 import { formatDateTime } from "@/lib/utils";
-import { useDateFormatting } from "@wealthfolio/ui";
+import { useDateFormatting, Spinner } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
@@ -56,8 +56,8 @@ export function PortfolioUpdateTrigger({
       <HoverCardContent align="start" className="w-80 shadow-none">
         <div className="flex flex-col space-y-4">
           {notices.length > 0 && (
-            <div className="flex gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
-              <Icons.AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500" />
+            <div className="border-warning/20 bg-warning/10 flex gap-2.5 rounded-lg border p-3">
+              <Icons.AlertTriangle className="text-warning mt-0.5 h-4 w-4 shrink-0" />
               <div className="space-y-1.5">
                 {notices.map((notice) => (
                   <p key={notice} className="text-foreground/80 text-xs font-light leading-relaxed">
@@ -69,9 +69,9 @@ export function PortfolioUpdateTrigger({
           )}
           <div className="space-y-2">
             <h4 className="flex text-sm font-light">
-              <Icons.Calendar className="mr-2 h-4 w-4" />
+              <Icons.Calendar className="me-2 h-4 w-4" />
               {t("dashboard:update.as_of")}{" "}
-              <Badge className="ml-1 font-medium" variant="secondary">
+              <Badge className="ms-1 font-medium" variant="secondary">
                 {/* Use lastCalculatedAt prop */}
                 {formattedLastCalculatedAt
                   ? `${formattedLastCalculatedAt.date} ${formattedLastCalculatedAt.time}`
@@ -87,9 +87,9 @@ export function PortfolioUpdateTrigger({
             disabled={updatePortfolioMutation.isPending} // Use internal mutation state
           >
             {updatePortfolioMutation.isPending ? (
-              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+              <Spinner className="me-2 h-4 w-4" />
             ) : (
-              <Icons.Refresh className="mr-2 h-4 w-4" />
+              <Icons.Refresh className="me-2 h-4 w-4" />
             )}
             {updatePortfolioMutation.isPending
               ? t("dashboard:update.updating_quotes")
@@ -103,9 +103,9 @@ export function PortfolioUpdateTrigger({
             disabled={recalculatePortfolioMutation.isPending}
           >
             {recalculatePortfolioMutation.isPending ? (
-              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+              <Spinner className="me-2 h-4 w-4" />
             ) : (
-              <Icons.Clock className="mr-2 h-4 w-4" />
+              <Icons.Clock className="me-2 h-4 w-4" />
             )}
             {recalculatePortfolioMutation.isPending
               ? t("dashboard:update.rebuilding_history")

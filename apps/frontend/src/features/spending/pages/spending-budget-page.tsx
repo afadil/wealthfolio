@@ -1,8 +1,9 @@
+import { cn } from "@/lib/utils";
 import { useCallback } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import { Button, Icons, Page, PageContent, PageHeader } from "@wealthfolio/ui";
+import { Button, Icons, Page, PageContent, PageHeader, buttonVariants } from "@wealthfolio/ui";
 
 import { BudgetEditor } from "../components/budget-editor";
 import { useSpendingSettings } from "../hooks/use-spending-settings";
@@ -48,12 +49,13 @@ export default function SpendingBudgetPage() {
   const headerActions = (
     <div className="flex items-center gap-2">
       <MonthSwitcher monthKey={monthKey} onChange={setMonthKey} />
-      <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
-        <Link to="/settings/spending/setup">
-          <Icons.Settings className="mr-1.5 h-3.5 w-3.5" />
-          {t("spending:budgetPage.defaults")}
-        </Link>
-      </Button>
+      <Link
+        to="/settings/spending/setup"
+        className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-muted-foreground")}
+      >
+        <Icons.Settings className="me-1.5 h-3.5 w-3.5" />
+        {t("spending:budgetPage.defaults")}
+      </Link>
     </div>
   );
 
@@ -101,15 +103,16 @@ function MonthSwitcher({
         aria-label={t("spending:calendar.previousMonth")}
         onClick={() => shift(-1)}
       >
-        <Icons.ChevronLeft className="h-4 w-4" />
+        <Icons.ChevronLeft className="h-4 w-4 rtl:rotate-180" />
       </Button>
       <label className="hover:bg-muted/40 flex cursor-pointer items-center gap-1 rounded-full px-2 transition-colors">
         <Icons.Calendar className="text-muted-foreground h-3.5 w-3.5" />
         <input
           type="month"
           value={monthKey}
+          aria-label={t("spending:period.selectMonth")}
           onChange={(event) => onChange(event.target.value || current)}
-          className="text-foreground h-7 w-[110px] cursor-pointer bg-transparent text-xs outline-none"
+          className="text-foreground w-27.5 h-7 cursor-pointer bg-transparent text-xs outline-none"
         />
       </label>
       <Button
@@ -120,7 +123,7 @@ function MonthSwitcher({
         aria-label={t("spending:calendar.nextMonth")}
         onClick={() => shift(1)}
       >
-        <Icons.ChevronRight className="h-4 w-4" />
+        <Icons.ChevronRight className="h-4 w-4 rtl:rotate-180" />
       </Button>
       {monthKey !== current && (
         <Button

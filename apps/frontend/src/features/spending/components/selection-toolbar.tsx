@@ -41,7 +41,8 @@ export function SelectionToolbar({
       {selectionMode ? (
         <>
           <SelectionCheckbox
-            checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+            checked={allVisibleSelected}
+            indeterminate={!allVisibleSelected && someVisibleSelected}
             onCheckedChange={onToggleSelectAllVisible}
             aria-label={
               allVisibleSelected
@@ -55,7 +56,7 @@ export function SelectionToolbar({
           <Button
             variant="ghost"
             size="sm"
-            className="ml-auto h-7 px-2 text-xs"
+            className="ms-auto h-7 px-2 text-xs"
             onClick={onExitSelectionMode}
           >
             {t("common:cancel")}
@@ -65,7 +66,7 @@ export function SelectionToolbar({
         <Button
           variant="ghost"
           size="sm"
-          className="ml-auto h-7 px-2 text-xs"
+          className="ms-auto h-7 px-2 text-xs"
           onClick={onEnterSelectionMode}
         >
           {t("common:select")}

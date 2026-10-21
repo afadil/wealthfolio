@@ -68,7 +68,7 @@ export function NavigationStyleSelector({
           <span className="text-sm font-medium">{t("common:navStyle.sidebar")}</span>
         </div>
         {value === "sidebar" && (
-          <div className="bg-primary absolute right-2 top-2 rounded-full p-0.5">
+          <div className="bg-primary absolute end-2 top-2 rounded-full p-0.5">
             <Icons.Check className="h-3 w-3 text-white" />
           </div>
         )}
@@ -118,7 +118,7 @@ export function NavigationStyleSelector({
           <span className="text-sm font-medium">{t("common:navStyle.floating")}</span>
         </div>
         {value === "launchbar" && (
-          <div className="bg-primary absolute right-2 top-2 rounded-full p-0.5">
+          <div className="bg-primary absolute end-2 top-2 rounded-full p-0.5">
             <Icons.Check className="h-3 w-3 text-white" />
           </div>
         )}

@@ -28,14 +28,13 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  DialogDescription,
-  DialogTitle,
   Icons,
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   type Icon,
+  Spinner,
 } from "@wealthfolio/ui";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -101,8 +100,8 @@ export function AppLauncher() {
   } = useNavigationMode();
   const isMobileViewport = useIsMobileViewport();
   const iconClassName = isMobileViewport
-    ? "text-muted-foreground mr-3 h-5 w-5"
-    : "text-muted-foreground mr-2 h-4 w-4";
+    ? "text-muted-foreground me-3 h-5 w-5"
+    : "text-muted-foreground me-2 h-4 w-4";
 
   // Recent items state
   const [recentItems, setRecentItems] = usePersistentState<RecentItem[]>(RECENT_ITEMS_KEY, []);
@@ -274,7 +273,7 @@ export function AppLauncher() {
         title: t("common:component.update_quotes"),
         href: "#update-portfolio",
         icon: isUpdatingPortfolio ? (
-          <Icons.Spinner className="size-6 animate-spin" />
+          <Spinner className="size-6" />
         ) : (
           <Icons.Refresh className="size-6" />
         ),
@@ -288,7 +287,7 @@ export function AppLauncher() {
         title: t("common:component.rebuild_full_history"),
         href: "#recalculate-portfolio",
         icon: isRecalculatingPortfolio ? (
-          <Icons.Spinner className="size-6 animate-spin" />
+          <Spinner className="size-6" />
         ) : (
           <Icons.Clock className="size-6" />
         ),
@@ -633,8 +632,8 @@ export function AppLauncher() {
         className={cn(
           "flex-1",
           isMobileViewport
-            ? "max-h-[calc(80vh-160px)] px-2 pb-8"
-            : "h-[min(420px,calc(100dvh_-_6rem))] max-h-none flex-none",
+            ? "max-h-[calc(80vh-10rem)] px-2 pb-8"
+            : "h-[min(26.25rem,calc(100dvh_-_6rem))] max-h-none flex-none",
         )}
       >
         {!hasResults && <CommandEmpty>{t("common:component.no_matches_found")}</CommandEmpty>}
@@ -663,7 +662,7 @@ export function AppLauncher() {
                 >
                   {getRecentIcon()}
                   <span className="font-medium">{item.label}</span>
-                  <span className="text-muted-foreground ml-auto text-xs capitalize">
+                  <span className="text-muted-foreground ms-auto text-xs capitalize">
                     {item.type}
                   </span>
                 </CommandItem>
@@ -717,7 +716,7 @@ export function AppLauncher() {
                   <Icons.TrendingUp className={iconClassName} />
                   <span className="font-medium">{holding.symbol}</span>
                   {holding.name ? (
-                    <span className="text-muted-foreground ml-2 truncate">{holding.name}</span>
+                    <span className="text-muted-foreground ms-2 truncate">{holding.name}</span>
                   ) : null}
                 </CommandItem>
               ))
@@ -786,12 +785,10 @@ export function AppLauncher() {
     <CommandDialog
       open={open}
       onOpenChange={setOpen}
-      contentClassName="w-[calc(100%_-_2rem)] max-w-[720px] rounded-[28px] [&>button]:top-6 [&_[cmdk-item]]:rounded-xl [&_[data-cmdk-input-wrapper]]:h-16 [&_[data-cmdk-input-wrapper]]:px-5"
+      title={t("common:component.command_palette")}
+      description={t("common:component.command_palette_description")}
+      contentClassName="w-[calc(100%_-_2rem)] max-w-180 rounded-[1.75rem] [&>button]:top-6 [&_[cmdk-item]]:rounded-xl [&_[data-cmdk-input-wrapper]]:h-16 [&_[data-cmdk-input-wrapper]]:px-5"
     >
-      <DialogTitle className="sr-only">{t("common:component.command_palette")}</DialogTitle>
-      <DialogDescription className="sr-only">
-        {t("common:component.command_palette_description")}
-      </DialogDescription>
       {commandContent}
     </CommandDialog>
   );

@@ -161,6 +161,9 @@ function createSandboxBootstrapParams(
   if (localization.uiLocale) {
     params.set("uiLocale", localization.uiLocale);
   }
+  if (localization.direction) {
+    params.set("direction", localization.direction);
+  }
   return params.toString();
 }
 

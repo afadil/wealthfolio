@@ -129,7 +129,7 @@ describe("RebalanceTab eligible holdings production flow", () => {
 
     const trigger = () => screen.getByRole("button", { name: /Eligible holdings/ });
     await user.click(trigger());
-    await user.click(screen.getByRole("option", { name: /AAA.*selected/i }));
+    await user.click(await screen.findByRole("option", { name: /AAA.*selected/i }));
     expect(trigger()).toHaveTextContent("2 of 3 selected");
 
     await user.click(screen.getByRole("button", { name: /Sell.*rebalance/i }));
@@ -152,7 +152,7 @@ describe("RebalanceTab eligible holdings production flow", () => {
     await waitFor(() => expect(refetchMock).toHaveBeenCalledTimes(1));
 
     await user.click(screen.getByRole("button", { name: /Eligible holdings/ }));
-    await user.click(screen.getByRole("option", { name: /AAA.*selected/i }));
+    await user.click(await screen.findByRole("option", { name: /AAA.*selected/i }));
     const partialParams = useRebalancePlanMock.mock.lastCall?.[0] as {
       eligibleAssetIds?: string[];
     };
@@ -172,5 +172,75 @@ describe("RebalanceTab eligible holdings production flow", () => {
 
     expect(screen.getByRole("button", { name: /Calculate plan/ })).toBeDisabled();
     expect(refetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("RebalanceTab exports", () => {
+  const FSI = "\u2068";
+  const PDI = "\u2069";
+  // In a right-to-left language, translated and formatted text carries bidi
+  // isolation marks; a trade name stands in for them here.
+  const plan = {
+    targetId: profile.id,
+    availableCash: 100,
+    cashUsed: 100,
+    cashRemaining: 0,
+    maxDriftBpsBefore: 1000,
+    maxDriftBpsAfter: 0,
+    trades: [
+      {
+        action: "BUY",
+        categoryId: "equity",
+        categoryName: "Equity",
+        assetId: "asset-z",
+        symbol: `${FSI}AAA${PDI}`,
+        name: `${FSI}Alpha fund!${PDI}`,
+        quantity: 1,
+        estimatedPrice: 100,
+        estimatedAmount: 100,
+        reason: "underweight",
+      },
+    ],
+    warnings: [],
+    afterBpsByCategory: { equity: 10000 },
+  };
+
+  beforeEach(() => {
+    // A plan calculated for the current inputs.
+    useRebalancePlanMock.mockImplementation((params: { sourceKey: string }) => ({
+      data: { plan, sourceKey: params.sourceKey },
+      isFetching: false,
+      refetch: refetchMock,
+    }));
+  });
+
+  it("copies text without bidi isolation marks", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    renderRebalance();
+    fireEvent.click(await screen.findByRole("button", { name: "Copy as text" }));
+    const text = writeText.mock.lastCall?.[0] as string;
+    expect(text).toContain("BUY  AAA  ");
+    expect(text).not.toMatch(/[\u2066-\u2069]/);
+    vi.unstubAllGlobals();
+  });
+
+  it("exports a CSV without bidi isolation marks", async () => {
+    let csv: Blob | undefined;
+    const createObjectURL = vi.fn((blob: Blob) => {
+      csv = blob;
+      return "blob:csv";
+    });
+    vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL: vi.fn() });
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
+    renderRebalance();
+    fireEvent.click(await screen.findByRole("button", { name: "Export CSV" }));
+    const text = await csv!.text();
+    expect(text).toContain('"Alpha fund!"');
+    expect(text).not.toMatch(/[\u2066-\u2069]/);
+    click.mockRestore();
+    vi.unstubAllGlobals();
   });
 });

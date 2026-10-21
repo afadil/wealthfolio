@@ -603,9 +603,9 @@ function getSaveUpStatus(
       headlinePrefix: t("goals:save_up.headline_at_risk_prefix", { title: goalTitle }),
       headlineEmphasis: t("goals:save_up.headline_at_risk_emphasis"),
       headlineSuffix: t("goals:save_up.headline_at_risk_suffix", { date: dateLabel }),
-      badgeClass: "bg-yellow-100 text-yellow-800",
-      textClass: "text-yellow-700",
-      progressClass: "bg-yellow-600",
+      badgeClass: "bg-warning-subtle text-warning-subtle-foreground",
+      textClass: "text-warning-subtle-foreground",
+      progressClass: "bg-warning",
     };
   }
 
@@ -617,7 +617,7 @@ function getSaveUpStatus(
       title: goalTitle,
       date: dateLabel,
     }),
-    badgeClass: "bg-destructive text-destructive-foreground",
+    badgeClass: "bg-destructive-subtle text-destructive-subtle-foreground",
     textClass: "text-destructive",
     progressClass: "bg-destructive",
   };
@@ -642,7 +642,7 @@ function formatGoalDate(
 function HeroMetric({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0 px-5 py-4">
-      <div className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">
+      <div className="text-muted-foreground text-2xs font-semibold uppercase tracking-wider">
         {label}
       </div>
       <div className="mt-2 truncate text-lg font-semibold tabular-nums">{children}</div>
@@ -721,7 +721,7 @@ function MonthlyPlanCallout({
 function CalloutMetric({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="border-border/70 bg-muted/20 rounded-lg border px-3 py-2.5">
-      <div className="text-muted-foreground text-[11px]">{label}</div>
+      <div className="text-muted-foreground text-2xs">{label}</div>
       <div className="mt-1 text-sm font-semibold tabular-nums">{children}</div>
     </div>
   );
@@ -832,6 +832,7 @@ function DateRow({
         </div>
       </div>
       <DatePickerInput
+        aria-label={label}
         value={value || undefined}
         onChange={(date) => onChange(date ? formatDateISO(date) : "")}
       />

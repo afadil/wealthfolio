@@ -835,6 +835,7 @@
     "balance_at_renewal": "更新時の残高",
     "duration_year_one": "{{count}}年",
     "duration_year_other": "{{count}}年",
+    "duration_years_months": "{{years}} {{months}}",
     "duration_month_one": "{{count}}か月",
     "duration_month_other": "{{count}}か月",
     "confirm_balance": "残高を確認",

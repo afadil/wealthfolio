@@ -111,6 +111,7 @@
     "description": "Sélectionnez des comptes pour comparer leur performance dans le temps."
   },
   "attribution": {
+    "partial_data": "Données partielles",
     "title": "Attribution",
     "close": "Fermer l'attribution",
     "period_gain_loss": "Gain/perte de la période",

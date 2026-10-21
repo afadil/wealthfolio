@@ -266,7 +266,8 @@ const HoldingRow = memo(
                 variant="ghost"
                 size="sm"
                 onClick={handleRemoveClick}
-                className="hover:bg-destructive/20 hover:text-destructive h-6 w-6 shrink-0 p-0 sm:hidden"
+                aria-label={t("common:remove")}
+                className="hover:bg-destructive-subtle hover:text-destructive-subtle-foreground h-6 w-6 shrink-0 p-0 sm:hidden"
               >
                 <Icons.Trash className="h-3 w-3" />
               </Button>
@@ -328,7 +329,8 @@ const HoldingRow = memo(
               variant="ghost"
               size="sm"
               onClick={handleRemoveClick}
-              className="hover:bg-destructive/20 hover:text-destructive h-6 w-6 p-0"
+              aria-label={t("common:remove")}
+              className="hover:bg-destructive-subtle hover:text-destructive-subtle-foreground h-6 w-6 p-0"
             >
               <Icons.Trash className="h-3 w-3" />
             </Button>
@@ -466,12 +468,10 @@ export const BulkHoldingsForm = ({ onAccountChange, defaultAccount }: BulkHoldin
           {/* Table Header */}
           <div className="text-muted-foreground hidden gap-3 border-b pb-3 text-sm sm:grid sm:grid-cols-12">
             <div className="col-span-5">{t("activity:tickers")}</div>
-            <div className="col-span-1 text-right">{t("activity:form.bulk_col_shares")}</div>
-            <div className="col-span-2 text-right">{t("activity:form.bulk_col_average_cost")}</div>
-            <div className="col-span-3 whitespace-nowrap text-right">
-              {t("activity:total_value")}
-            </div>
-            <div className="col-span-1 text-right"></div>
+            <div className="col-span-1 text-end">{t("activity:form.bulk_col_shares")}</div>
+            <div className="col-span-2 text-end">{t("activity:form.bulk_col_average_cost")}</div>
+            <div className="col-span-3 whitespace-nowrap text-end">{t("activity:total_value")}</div>
+            <div className="col-span-1 text-end"></div>
           </div>
 
           {/* Table Rows - Virtualization candidate for large lists */}
@@ -502,7 +502,7 @@ export const BulkHoldingsForm = ({ onAccountChange, defaultAccount }: BulkHoldin
               className="border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground h-10 w-full border border-dashed"
               data-testid="bulk-holdings-add-row"
             >
-              <Icons.PlusCircle className="mr-2 h-4 w-4" />
+              <Icons.PlusCircle className="me-2 h-4 w-4" />
               {t("activity:add_another_holding")}
             </Button>
           </div>

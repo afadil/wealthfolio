@@ -1,10 +1,10 @@
 import type { ActivityDetails } from "@/lib/types";
 import type { CashAuditReviewTarget } from "@/pages/account/cash-audit";
 import {
-  Icons,
   calendarDateFromLocalDate,
   useDateFormatting,
   type FormattingApi,
+  Spinner,
 } from "@wealthfolio/ui";
 import {
   Sheet,
@@ -44,7 +44,7 @@ export function ActivityDateSheet({
   const formatting = useDateFormatting();
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex h-full w-full flex-col p-0 sm:max-w-xl">
+      <SheetContent side="inline-end" className="flex h-full w-full flex-col p-0 sm:max-w-xl">
         <SheetHeader className="border-b px-6 py-4">
           <SheetTitle>
             {t("activity:date_sheet.title", {
@@ -58,7 +58,7 @@ export function ActivityDateSheet({
         <div className="flex-1 overflow-auto px-4 py-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Icons.Spinner className="size-6 animate-spin" />
+              <Spinner className="size-6" />
             </div>
           ) : (
             <ActivityDateList

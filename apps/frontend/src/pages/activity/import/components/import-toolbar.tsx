@@ -92,7 +92,7 @@ export function ImportToolbar({
           title={t("activity:import.reviewToolbar.skipTooltip")}
           className="h-8"
         >
-          <Icons.MinusCircle className="mr-1.5 h-3.5 w-3.5" />
+          <Icons.MinusCircle className="me-1.5 h-3.5 w-3.5" />
           {t("activity:import.reviewToolbar.skip")}
         </Button>
 
@@ -104,7 +104,7 @@ export function ImportToolbar({
           title={t("activity:import.reviewToolbar.unskipTooltip")}
           className="h-8"
         >
-          <Icons.PlusCircle className="mr-1.5 h-3.5 w-3.5" />
+          <Icons.PlusCircle className="me-1.5 h-3.5 w-3.5" />
           {t("activity:import.reviewToolbar.unskip")}
         </Button>
 
@@ -115,9 +115,9 @@ export function ImportToolbar({
             size="sm"
             onClick={onForceImport}
             title={t("activity:import.reviewToolbar.importAnywayTooltip")}
-            className="h-8 border-amber-500/50 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
+            className="border-warning/50 text-warning-subtle-foreground hover:bg-warning-subtle h-8"
           >
-            <Icons.ShieldAlert className="mr-1.5 h-3.5 w-3.5" />
+            <Icons.ShieldAlert className="me-1.5 h-3.5 w-3.5" />
             {t("activity:import.reviewToolbar.importAnyway")}
           </Button>
         )}
@@ -126,17 +126,19 @@ export function ImportToolbar({
 
         {/* Currency dropdown */}
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              title={t("activity:import.reviewToolbar.setCurrencyTooltip")}
-              className="h-8"
-            >
-              <Icons.DollarSign className="mr-1.5 h-3.5 w-3.5" />
-              {t("activity:import.reviewToolbar.currency")}
-              <Icons.ChevronDown className="ml-1 h-3 w-3" />
-            </Button>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="outline"
+                size="sm"
+                title={t("activity:import.reviewToolbar.setCurrencyTooltip")}
+                className="h-8"
+              />
+            }
+          >
+            <Icons.DollarSign className="me-1.5 h-3.5 w-3.5" />
+            {t("activity:import.reviewToolbar.currency")}
+            <Icons.ChevronDown className="ms-1 h-3 w-3" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             {/* Search input */}
@@ -160,7 +162,7 @@ export function ImportToolbar({
                 {COMMON_CURRENCIES.map((code) => (
                   <DropdownMenuItem
                     key={code}
-                    onSelect={() => {
+                    onClick={() => {
                       onSetCurrency(code);
                       setCurrencySearch("");
                     }}
@@ -175,13 +177,13 @@ export function ImportToolbar({
                 {quoteUnitCurrencies.map((currency) => (
                   <DropdownMenuItem
                     key={currency.value}
-                    onSelect={() => {
+                    onClick={() => {
                       onSetCurrency(currency.value);
                       setCurrencySearch("");
                     }}
                   >
                     <span className="font-mono">{currency.value}</span>
-                    <span className="text-muted-foreground ml-2 truncate text-xs">
+                    <span className="text-muted-foreground ms-2 truncate text-xs">
                       {currency.label.replace(` (${currency.value})`, "")}
                     </span>
                   </DropdownMenuItem>
@@ -197,13 +199,13 @@ export function ImportToolbar({
               {filteredCurrencies.slice(0, 20).map((currency) => (
                 <DropdownMenuItem
                   key={currency.value}
-                  onSelect={() => {
+                  onClick={() => {
                     onSetCurrency(currency.value);
                     setCurrencySearch("");
                   }}
                 >
                   <span className="font-mono">{currency.value}</span>
-                  <span className="text-muted-foreground ml-2 truncate text-xs">
+                  <span className="text-muted-foreground ms-2 truncate text-xs">
                     {currency.label.replace(` (${currency.value})`, "")}
                   </span>
                 </DropdownMenuItem>
@@ -224,17 +226,19 @@ export function ImportToolbar({
 
         {/* Account dropdown */}
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              title={t("activity:import.reviewToolbar.setAccountTooltip")}
-              className="h-8"
-            >
-              <Icons.Briefcase className="mr-1.5 h-3.5 w-3.5" />
-              {t("activity:import.reviewToolbar.account")}
-              <Icons.ChevronDown className="ml-1 h-3 w-3" />
-            </Button>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="outline"
+                size="sm"
+                title={t("activity:import.reviewToolbar.setAccountTooltip")}
+                className="h-8"
+              />
+            }
+          >
+            <Icons.Briefcase className="me-1.5 h-3.5 w-3.5" />
+            {t("activity:import.reviewToolbar.account")}
+            <Icons.ChevronDown className="ms-1 h-3 w-3" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             {accounts.length === 0 ? (
@@ -243,10 +247,10 @@ export function ImportToolbar({
               </div>
             ) : (
               accounts.map((account) => (
-                <DropdownMenuItem key={account.id} onSelect={() => onSetAccount(account.id)}>
-                  <Icons.Briefcase className="mr-2 h-3.5 w-3.5" />
+                <DropdownMenuItem key={account.id} onClick={() => onSetAccount(account.id)}>
+                  <Icons.Briefcase className="me-2 h-3.5 w-3.5" />
                   <span className="truncate">{account.name}</span>
-                  <span className="text-muted-foreground ml-auto text-xs">{account.currency}</span>
+                  <span className="text-muted-foreground ms-auto text-xs">{account.currency}</span>
                 </DropdownMenuItem>
               ))
             )}
@@ -326,17 +330,17 @@ export function ImportContextMenu({
         <DropdownMenuSeparator />
 
         {/* Skip/Unskip actions */}
-        <DropdownMenuItem onSelect={onSkip}>
-          <Icons.MinusCircle className="mr-2 h-4 w-4" />
+        <DropdownMenuItem onClick={onSkip}>
+          <Icons.MinusCircle className="me-2 h-4 w-4" />
           {t("activity:import.reviewToolbar.skipSelected")}
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={onUnskip}>
-          <Icons.PlusCircle className="mr-2 h-4 w-4" />
+        <DropdownMenuItem onClick={onUnskip}>
+          <Icons.PlusCircle className="me-2 h-4 w-4" />
           {t("activity:import.reviewToolbar.unskipSelected")}
         </DropdownMenuItem>
         {onForceImport && (
-          <DropdownMenuItem onSelect={onForceImport} className="text-amber-700 dark:text-amber-400">
-            <Icons.ShieldAlert className="mr-2 h-4 w-4" />
+          <DropdownMenuItem onClick={onForceImport} className="text-warning-subtle-foreground">
+            <Icons.ShieldAlert className="me-2 h-4 w-4" />
             {t("activity:import.reviewToolbar.importAnywayMenu")}
           </DropdownMenuItem>
         )}
@@ -346,12 +350,12 @@ export function ImportContextMenu({
         {/* Currency submenu */}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
-            <Icons.DollarSign className="mr-2 h-4 w-4" />
+            <Icons.DollarSign className="me-2 h-4 w-4" />
             {t("activity:import.reviewToolbar.setCurrency")}
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="w-40">
             {COMMON_CURRENCIES.map((code) => (
-              <DropdownMenuItem key={code} onSelect={() => onSetCurrency(code)}>
+              <DropdownMenuItem key={code} onClick={() => onSetCurrency(code)}>
                 <span className="font-mono">{code}</span>
               </DropdownMenuItem>
             ))}
@@ -361,7 +365,7 @@ export function ImportContextMenu({
         {/* Account submenu */}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
-            <Icons.Briefcase className="mr-2 h-4 w-4" />
+            <Icons.Briefcase className="me-2 h-4 w-4" />
             {t("activity:import.reviewToolbar.setAccount")}
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="w-48">
@@ -371,9 +375,9 @@ export function ImportContextMenu({
               </div>
             ) : (
               accounts.map((account) => (
-                <DropdownMenuItem key={account.id} onSelect={() => onSetAccount(account.id)}>
+                <DropdownMenuItem key={account.id} onClick={() => onSetAccount(account.id)}>
                   <span className="truncate">{account.name}</span>
-                  <span className="text-muted-foreground ml-auto text-xs">{account.currency}</span>
+                  <span className="text-muted-foreground ms-auto text-xs">{account.currency}</span>
                 </DropdownMenuItem>
               ))
             )}

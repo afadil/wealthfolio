@@ -18,6 +18,7 @@ import {
   useToggleThreadPin,
 } from "../hooks/use-threads";
 import type { ChatThread } from "../types";
+import { Spinner } from "@wealthfolio/ui";
 
 /** Debounce delay for search input (ms) */
 const SEARCH_DEBOUNCE_MS = 300;
@@ -92,20 +93,20 @@ const ThreadSearchInput: FC<ThreadSearchInputProps> = ({ value, onChange }) => {
   const { t } = useTranslation();
   return (
     <div className="relative">
-      <Icons.Search className="text-muted-foreground pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 opacity-50" />
+      <Icons.Search className="text-muted-foreground pointer-events-none absolute start-2 top-1/2 size-4 -translate-y-1/2 opacity-50" />
       <Input
         type="search"
         placeholder={t("ai:threadList.searchThreads")}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-label={t("ai:threadList.searchThreadsLabel")}
-        className="bg-background h-8 pl-8 pr-8 text-sm shadow-none"
+        className="bg-background h-8 pe-8 ps-8 text-sm shadow-none"
       />
       {value && (
         <button
           type="button"
           onClick={() => onChange("")}
-          className="text-muted-foreground hover:text-foreground absolute right-2 top-1/2 -translate-y-1/2"
+          className="text-muted-foreground hover:text-foreground absolute end-2 top-1/2 -translate-y-1/2"
           aria-label={t("ai:threadList.clearSearch")}
         >
           <Icons.Close className="size-4" />
@@ -267,14 +268,14 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({
       {/* Loading indicator for next page */}
       {isFetchingNextPage && (
         <div className="flex items-center justify-center py-2">
-          <Icons.Spinner className="text-muted-foreground size-4 animate-spin" />
+          <Spinner className="text-muted-foreground size-4" />
         </div>
       )}
 
       {/* Show subtle loading indicator while refetching */}
       {isFetching && !isFetchingNextPage && !isLoading && (
         <div className="flex items-center justify-center py-1">
-          <Icons.Spinner className="text-muted-foreground size-3 animate-spin" />
+          <Spinner className="text-muted-foreground size-3" />
         </div>
       )}
     </div>
@@ -293,7 +294,7 @@ const ThreadListSkeleton: FC = () => {
           aria-live="polite"
           className="aui-thread-list-skeleton-wrapper flex items-center gap-2 rounded-md px-3 py-2"
         >
-          <Skeleton className="aui-thread-list-skeleton h-[22px] grow" />
+          <Skeleton className="aui-thread-list-skeleton h-5.5 grow" />
         </div>
       ))}
     </>
@@ -334,7 +335,7 @@ const ThreadListItemCustom: FC<ThreadListItemCustomProps> = ({
     >
       <button
         type="button"
-        className="aui-thread-list-item-trigger flex h-full w-full items-center overflow-hidden px-2.5 py-0 text-start transition-[padding] group-focus-within:pr-14 group-hover:pr-14"
+        className="aui-thread-list-item-trigger flex h-full w-full items-center overflow-hidden px-2.5 py-0 text-start transition-[padding] group-focus-within:pe-14 group-hover:pe-14"
         onClick={() => onSelect(thread.id)}
         disabled={isLoading || isDeleting}
       >
@@ -343,15 +344,15 @@ const ThreadListItemCustom: FC<ThreadListItemCustomProps> = ({
         </span>
       </button>
       {isLoading ? (
-        <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center">
-          <Icons.Spinner className="text-muted-foreground size-4 animate-spin" />
+        <div className="absolute end-2 top-1/2 flex -translate-y-1/2 items-center">
+          <Spinner className="text-muted-foreground size-4" />
         </div>
       ) : (
-        <div className="pointer-events-none absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
+        <div className="pointer-events-none absolute end-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
           <Button
             variant="ghost"
             size="sm"
-            className="size-6 p-0 text-blue-500 hover:text-blue-600"
+            className="text-info size-6 p-0"
             onClick={(e) => {
               e.stopPropagation();
               onTogglePin(thread.id, thread.isPinned);
@@ -374,12 +375,13 @@ const ThreadListItemCustom: FC<ThreadListItemCustomProps> = ({
             isPending={isDeleting ?? false}
             pendingText={t("ai:threadList.deleting")}
             handleConfirm={() => onDelete(thread.id)}
-            side="right"
+            side="inline-end"
             button={
               <Button
                 variant="ghost"
                 size="sm"
                 className="text-destructive hover:text-destructive/80 size-6 p-0"
+                aria-label={t("ai:threadList.deleteButton")}
                 onClick={(e) => e.stopPropagation()}
               >
                 <Icons.Trash2 className="size-3.5" />

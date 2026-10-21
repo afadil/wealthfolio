@@ -159,6 +159,7 @@ fn run_pipeline(raw: RawFacts) -> usize {
         &lots,
         &bundle.disposals,
         &bundle.rejected_activities(),
+        MeasureProfile::Full,
     );
     let scope: Vec<AccountId> = engine.facts().accounts().keys().cloned().collect();
     let result = measure_scope(

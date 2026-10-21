@@ -1924,7 +1924,7 @@ impl wealthfolio_core::portfolio::net_worth::NetWorthServiceTrait for EmptyNetWo
     {
         Ok(wealthfolio_core::portfolio::net_worth::NetWorthResponse::empty(date, "USD".into()))
     }
-    fn get_net_worth_history(
+    async fn get_net_worth_history(
         &self,
         _: chrono::NaiveDate,
         _: chrono::NaiveDate,

@@ -31,7 +31,8 @@
     "addModels": "モデルを追加..."
   },
   "provider": {
-    "noProvidersConfigured": "設定済みのプロバイダーがありません"
+    "noProvidersConfigured": "設定済みのプロバイダーがありません",
+    "label": "AIプロバイダー"
   },
   "reasoning": {
     "thinking": "思考中...",
@@ -127,6 +128,7 @@
   "tools": {
     "calling": "{{toolName}}を実行中...",
     "cancelled": "{{toolName}}をキャンセルしました",
+    "notUsed": "使用されなかったツール: {{toolName}}",
     "used": "使用したツール: {{toolName}}"
   },
   "accounts": {

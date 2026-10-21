@@ -21,6 +21,7 @@ import {
 import { isCreditCardAccountType, isSpendingAccountType } from "@/features/spending/lib/constants";
 import { AccountType } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 
 export function AccountsCard() {
   const { t } = useTranslation();
@@ -118,7 +119,7 @@ export function AccountsCard() {
                     <div className="flex min-w-0 items-center gap-2">
                       <span className="truncate text-sm font-medium">{account.name}</span>
                       {!account.isActive && (
-                        <span className="bg-muted text-muted-foreground shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider">
+                        <span className="bg-muted text-muted-foreground text-2xs shrink-0 rounded px-1.5 py-0.5 font-medium uppercase tracking-wider">
                           {t("settings:spending.accounts.inactive_badge")}
                         </span>
                       )}
@@ -139,17 +140,19 @@ export function AccountsCard() {
                         ? t("settings:spending.accounts.stop_tracking_aria", { name: account.name })
                         : t("settings:spending.accounts.track_aria", { name: account.name })
                     }
-                    className="data-[state=checked]:bg-success data-[state=unchecked]:bg-muted-foreground/40"
+                    className="data-checked:bg-success data-unchecked:bg-muted-foreground/40"
                   />
                 </div>
               );
             })}
 
             {hasMixedCashAndCredit && (
-              <div className="text-warning border-warning/30 bg-warning/10 mt-3 flex gap-2 rounded-md border p-2.5 text-xs leading-relaxed">
-                <Icons.AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <p>{t("settings:spending.accounts.mixed_warning")}</p>
-              </div>
+              <Alert variant="warning" className="mt-3 p-2.5 text-xs">
+                <Icons.AlertTriangle className="size-3.5" />
+                <AlertDescription className="leading-relaxed">
+                  {t("settings:spending.accounts.mixed_warning")}
+                </AlertDescription>
+              </Alert>
             )}
           </div>
         )}

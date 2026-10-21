@@ -835,6 +835,7 @@
     "balance_at_renewal": "갱신 시 잔액",
     "duration_year_one": "{{count}}년",
     "duration_year_other": "{{count}}년",
+    "duration_years_months": "{{years}} {{months}}",
     "duration_month_one": "{{count}}개월",
     "duration_month_other": "{{count}}개월",
     "confirm_balance": "잔액 확인",

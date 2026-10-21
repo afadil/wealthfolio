@@ -45,7 +45,7 @@ export function AssetLogoPreview({
     >
       <div className="flex items-center justify-between">
         <p className="text-muted-foreground text-xs">{t("logo.preview_title")}</p>
-        <Badge variant={isNew ? "default" : "secondary"} className="h-5 px-1.5 text-[10px]">
+        <Badge variant={isNew ? "default" : "secondary"} className="text-2xs h-5 px-1.5">
           {isNew ? t("logo.preview_new") : t("logo.preview_current")}
         </Badge>
       </div>
@@ -53,7 +53,7 @@ export function AssetLogoPreview({
       <div className="bg-background divide-y rounded-lg border">
         {/* Holding card (mobile) — h-10 avatar */}
         <div className="space-y-1.5 p-3">
-          <p className="text-muted-foreground text-[10px] uppercase tracking-wide">
+          <p className="text-muted-foreground text-2xs uppercase tracking-wide">
             {t("logo.preview_card")}
           </p>
           <div className="flex items-center justify-between gap-3">
@@ -73,12 +73,12 @@ export function AssetLogoPreview({
 
         {/* Holdings table row — h-8 avatar */}
         <div className="space-y-1.5 p-3">
-          <p className="text-muted-foreground text-[10px] uppercase tracking-wide">
+          <p className="text-muted-foreground text-2xs uppercase tracking-wide">
             {t("logo.preview_table")}
           </p>
           <div className="flex items-center gap-4">
             <div className="flex min-w-0 flex-1 items-center">
-              <TickerAvatar {...avatar} className="mr-2 h-8 w-8 shrink-0" />
+              <TickerAvatar {...avatar} className="me-2 h-8 w-8 shrink-0" />
               <div className="flex min-w-0 flex-col">
                 <span className="truncate text-sm font-medium">{symbol}</span>
                 <span className="text-muted-foreground truncate text-xs">{subtitle}</span>
@@ -92,13 +92,13 @@ export function AssetLogoPreview({
 
         {/* Activity / compact list row — h-8 avatar, denser text */}
         <div className="space-y-1.5 p-3">
-          <p className="text-muted-foreground text-[10px] uppercase tracking-wide">
+          <p className="text-muted-foreground text-2xs uppercase tracking-wide">
             {t("logo.preview_list")}
           </p>
           <div className="flex items-center gap-3">
             <TickerAvatar {...avatar} className="h-8 w-8 shrink-0" />
             <span className="truncate text-sm font-medium">{symbol}</span>
-            <Bar className="ml-auto w-14" />
+            <Bar className="ms-auto w-14" />
           </div>
         </div>
       </div>

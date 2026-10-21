@@ -39,6 +39,7 @@ import { showValidationToast, type AccountSelectOption } from "../forms/fields";
 import { newActivitySchema, type NewActivityFormValues } from "../forms/schemas";
 import { MobileActivitySteps } from "./mobile-activity-steps";
 import { getMobileActivityAssetId, hasStoredCustomTradeAmount } from "./mobile-activity-utils";
+import { Spinner } from "@wealthfolio/ui";
 
 interface MobileActivityFormProps {
   accounts: AccountSelectOption[];
@@ -436,6 +437,8 @@ export function MobileActivityForm({
       quoteMode:
         activity?.assetQuoteMode === QuoteMode.MANUAL ? QuoteMode.MANUAL : QuoteMode.MARKET,
       exchangeMic: activity?.exchangeMic,
+      symbolInstrumentType: activity?.instrumentType ?? undefined,
+      symbolQuoteCcy: activity?.assetQuoteCcy ?? activity?.currency ?? undefined,
       showCurrencySelect: false,
       ...(isTransferType && {
         transferMode: initialTransferMode,
@@ -451,7 +454,6 @@ export function MobileActivityForm({
       ...(isOptionActivity && {
         assetType: "option" as const,
         assetKind: "OPTION",
-        symbolQuoteCcy: activity?.currency ?? undefined,
         underlyingSymbol: parsedOcc?.underlying ?? "",
         strikePrice: parsedOcc?.strikePrice,
         expirationDate: parsedOcc?.expiration,
@@ -462,7 +464,6 @@ export function MobileActivityForm({
       ...(isBondActivity && {
         assetType: "bond" as const,
         assetKind: "BOND",
-        symbolQuoteCcy: activity?.currency ?? undefined,
       }),
     };
   }, [activity]);
@@ -650,6 +651,7 @@ export function MobileActivityForm({
           }
 
           await saveInternalTransferPairMutation.mutateAsync({
+            editedActivityId: id,
             transferOutId: id ? transferOutId : undefined,
             transferInId: id ? transferInId : undefined,
             fromAccountId: submitData.accountId,
@@ -1019,7 +1021,7 @@ export function MobileActivityForm({
                 onClick={handleBack}
                 className="flex-1"
               >
-                <Icons.ArrowLeft className="mr-2 h-4 w-4" />
+                <Icons.ArrowLeft className="me-2 h-4 w-4 rtl:rotate-180" />
                 {t("activity:mobile_back")}
               </Button>
             )}
@@ -1033,7 +1035,7 @@ export function MobileActivityForm({
                 disabled={!form.watch("activityType") && currentStep === 1}
               >
                 {t("activity:mobile_next")}
-                <Icons.ArrowRight className="ml-2 h-4 w-4" />
+                <Icons.ArrowRight className="ms-2 h-4 w-4 rtl:rotate-180" />
               </Button>
             ) : (
               <Button
@@ -1044,9 +1046,9 @@ export function MobileActivityForm({
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="me-2 h-4 w-4" />
                 ) : (
-                  <Icons.Check className="mr-2 h-4 w-4" />
+                  <Icons.Check className="me-2 h-4 w-4" />
                 )}
                 {activity?.id
                   ? t("activity:mobile_update_activity")

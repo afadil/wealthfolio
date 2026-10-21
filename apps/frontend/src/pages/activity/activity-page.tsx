@@ -21,7 +21,7 @@ import { formatDateISO } from "@/lib/utils";
 import { AlternativeAssetQuickAddModal } from "@/pages/asset/alternative-assets";
 import { useQuery } from "@tanstack/react-query";
 import type { SortingState } from "@tanstack/react-table";
-import { Button, Icons, Page, PageContent, PageHeader } from "@wealthfolio/ui";
+import { Button, Icons, Page, PageContent, PageHeader, buttonVariants } from "@wealthfolio/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { useTranslation } from "react-i18next";
@@ -463,6 +463,14 @@ const ActivityPage = () => {
     ? [activityUrlFilters.activityId]
     : undefined;
 
+  // The table and cards head each day with its date while the list runs in
+  // date order; any other sort shows the plain list.
+  const isDateOrder = (sorting[0]?.id ?? "date") === "date";
+  // A list of one account in date order can show that account's cash: after
+  // each row for a cash or credit-card account, at the end of each day for
+  // the others. Several accounts have no single cash figure.
+  const showsCashBalances = isDateOrder && effectiveInvestmentAccountIds?.length === 1;
+
   // Infinite scroll search for table view
   const infiniteSearch = useActivitySearch({
     mode: "infinite",
@@ -477,6 +485,7 @@ const ActivityPage = () => {
     },
     searchQuery: effectiveSearchQuery,
     sorting,
+    includeCashBalances: showsCashBalances,
   });
 
   // Paginated search for datagrid view
@@ -617,7 +626,7 @@ const ActivityPage = () => {
           groups={actionPaletteGroups}
           trigger={
             <Button data-testid="add-activities-button" size="sm">
-              <Icons.Plus className="mr-2 h-4 w-4" />
+              <Icons.Plus className="me-2 h-4 w-4" />
               {t("activity:page.add_activities")}
             </Button>
           }
@@ -626,11 +635,13 @@ const ActivityPage = () => {
 
       {/* Mobile add button */}
       <div className="flex items-center gap-2 sm:hidden">
-        <Button size="icon" title={t("common:import")} variant="outline" asChild>
-          <Link to={"/import"}>
-            <Icons.Import className="size-4" />
-          </Link>
-        </Button>
+        <Link
+          to={"/import"}
+          title={t("common:import")}
+          className={buttonVariants({ variant: "outline", size: "icon" })}
+        >
+          <Icons.Import className="size-4" />
+        </Link>
         <Button size="icon" title={t("common:add")} onClick={() => handleEdit(undefined)}>
           <Icons.Plus className="size-4" />
         </Button>
@@ -664,20 +675,15 @@ const ActivityPage = () => {
     <div className="flex flex-wrap items-center gap-2">
       <SyncButton />
       {/* Ask AI to categorize uncategorized transactions */}
-      <Button
-        asChild
-        size="icon"
-        variant="outline"
+      <Link
+        to="/assistant"
+        state={{ aiPrompt: "Help me categorize all my uncategorized transactions." }}
         title={t("activity:page.ask_ai_categorize")}
         aria-label={t("activity:page.ask_ai_categorize")}
+        className={buttonVariants({ variant: "outline", size: "icon" })}
       >
-        <Link
-          to="/assistant"
-          state={{ aiPrompt: "Help me categorize all my uncategorized transactions." }}
-        >
-          <Icons.Sparkles className="size-4" />
-        </Link>
-      </Button>
+        <Icons.Sparkles className="size-4" />
+      </Link>
       {/* Desktop action palette */}
       <div className="hidden sm:flex">
         <ActionPalette
@@ -686,7 +692,7 @@ const ActivityPage = () => {
           groups={spendingActionPaletteGroups}
           trigger={
             <Button data-testid="add-activities-button" size="sm">
-              <Icons.Plus className="mr-2 h-4 w-4" />
+              <Icons.Plus className="me-2 h-4 w-4" />
               {t("activity:page.add_activities")}
             </Button>
           }
@@ -695,11 +701,13 @@ const ActivityPage = () => {
 
       {/* Mobile add button */}
       <div className="flex items-center gap-2 sm:hidden">
-        <Button size="icon" title={t("common:import")} variant="outline" asChild>
-          <Link to={"/import"}>
-            <Icons.Import className="size-4" />
-          </Link>
-        </Button>
+        <Link
+          to={"/import"}
+          title={t("common:import")}
+          className={buttonVariants({ variant: "outline", size: "icon" })}
+        >
+          <Icons.Import className="size-4" />
+        </Link>
         <Button
           size="icon"
           title={t("common:add")}
@@ -712,7 +720,9 @@ const ActivityPage = () => {
   );
 
   const investmentContent = (
-    <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden">
+    // `overflow-clip` rather than `hidden`: it clips the same, but isn't a
+    // scroll container, so the table's sticky header can pin to the page.
+    <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-clip">
       {statusFilter !== "pending" && (
         <NeedsReviewBanner
           accountIds={effectiveInvestmentAccountIds}
@@ -782,6 +792,7 @@ const ActivityPage = () => {
         <ActivityTableMobile
           activities={tableActivities}
           isCompactView={isCompactView}
+          groupByDay={isDateOrder}
           handleEdit={handleEdit}
           handleDelete={handleDelete}
           onDuplicate={handleDuplicate}
@@ -820,6 +831,7 @@ const ActivityPage = () => {
           isLoading={infiniteSearch.isLoading}
           sorting={sorting}
           onSortingChange={setSorting}
+          groupByDay={isDateOrder}
           handleEdit={handleEdit}
           handleDelete={handleDelete}
           onLinkTransfer={handleLinkTransfer}

@@ -5,6 +5,7 @@ import {
   useAmountFormatting,
   type FormattingApi,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
@@ -114,7 +115,7 @@ export function UpdateValuationModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[450px]">
+      <DialogContent className="sm:max-w-112.5">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <DialogHeader>
@@ -200,9 +201,9 @@ export function UpdateValuationModal({
               </Button>
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? (
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="me-2 h-4 w-4" />
                 ) : (
-                  <Icons.Check className="mr-2 h-4 w-4" />
+                  <Icons.Check className="me-2 h-4 w-4" />
                 )}
                 {t("asset:updateValuation.update_value")}
               </Button>

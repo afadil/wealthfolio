@@ -19,7 +19,7 @@ import { useEventTypes, useSpendingEvents } from "../hooks/use-spending-events";
 import { useEventDialog } from "./event-dialog-provider";
 
 export interface QuickEventPopoverProps {
-  trigger: React.ReactNode;
+  trigger: React.ReactElement;
   selectedEventId?: string | null;
   onSelect: (eventId: string) => void;
   onClear?: () => void;
@@ -91,11 +91,11 @@ export function QuickEventPopover({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-      <PopoverContent className="w-[280px] p-0" align={align}>
+      <PopoverTrigger render={trigger} />
+      <PopoverContent className="w-70 p-0" align={align}>
         <Command>
           {loadErrored && (
-            <div className="flex items-center justify-between gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-700 dark:text-amber-300">
+            <div className="text-2xs border-warning-subtle-border bg-warning-subtle text-warning-subtle-foreground flex items-center justify-between gap-2 border-b px-3 py-1.5">
               <span>{tr("spending:events.loadError")}</span>
               <button type="button" onClick={retryLoad} className="text-foreground hover:underline">
                 {tr("common:retry")}
@@ -137,7 +137,7 @@ export function QuickEventPopover({
                           style={{ backgroundColor: t?.color ?? "var(--muted-foreground)" }}
                         />
                         <span className="min-w-0 flex-1 truncate">{ev.name}</span>
-                        <span className="text-muted-foreground/70 shrink-0 text-[10px]">
+                        <span className="text-muted-foreground/70 text-2xs shrink-0">
                           {ev.startDate.slice(5)}
                         </span>
                         {isSelected && (
@@ -165,9 +165,9 @@ export function QuickEventPopover({
                 <CommandItem
                   value="clear-event"
                   onSelect={handleClear}
-                  className="text-destructive hover:bg-destructive/10"
+                  className="text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"
                 >
-                  <Icons.X className="mr-2 h-3.5 w-3.5" />
+                  <Icons.X className="me-2 h-3.5 w-3.5" />
                   {tr("spending:events.clearEvent")}
                 </CommandItem>
               )}

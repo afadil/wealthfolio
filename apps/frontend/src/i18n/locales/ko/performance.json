@@ -110,6 +110,7 @@
     "description": "계좌를 선택해 시간 경과에 따른 수익률을 비교해 보세요."
   },
   "attribution": {
+    "partial_data": "일부 데이터 누락",
     "title": "손익 기여도",
     "close": "손익 기여도 닫기",
     "period_gain_loss": "기간 손익",

@@ -31,7 +31,7 @@ import { InfoIcon } from "@phosphor-icons/react/dist/csr/Info";
 import { WarningIcon } from "@phosphor-icons/react/dist/csr/Warning";
 import { XCircleIcon } from "@phosphor-icons/react/dist/csr/XCircle";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocalizationSettings } from "@wealthfolio/ui";
+import { useLocalizationSettings, buttonVariants, Spinner } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -265,24 +265,31 @@ export default function ConnectPage() {
             >
               {isSyncRunning ? (
                 <>
-                  <Icons.Spinner className="h-4 w-4 animate-spin sm:mr-2" />
+                  <Spinner className="h-4 w-4 sm:me-2" />
                   <span className="hidden sm:inline">{t("connect:sync.syncingShort")}</span>
                 </>
               ) : (
                 <>
-                  <Icons.RefreshCw className="h-4 w-4 sm:mr-2" />
+                  <Icons.RefreshCw className="h-4 w-4 sm:me-2" />
                   <span className="hidden sm:inline">{t("connect:sync.syncNow")}</span>
                 </>
               )}
             </Button>
-            <TooltipProvider delayDuration={300}>
+            <TooltipProvider delay={300}>
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" className="size-11 sm:size-9" asChild>
-                    <Link to="/settings/connect" aria-label={t("common:settings")}>
-                      <Icons.Settings className="size-4" />
-                    </Link>
-                  </Button>
+                <TooltipTrigger
+                  render={
+                    <Link
+                      to="/settings/connect"
+                      aria-label={t("common:settings")}
+                      className={cn(
+                        buttonVariants({ variant: "outline", size: "icon" }),
+                        "size-11 sm:size-9",
+                      )}
+                    />
+                  }
+                >
+                  <Icons.Settings className="size-4" />
                 </TooltipTrigger>
                 <TooltipContent>{t("common:settings")}</TooltipContent>
               </Tooltip>
@@ -373,7 +380,7 @@ export default function ConnectPage() {
                         }
                       >
                         {t("connect:upgrade.button")}
-                        <Icons.ExternalLink className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
+                        <Icons.ExternalLink className="ms-1 h-3.5 w-3.5" aria-hidden="true" />
                       </Button>
                     </div>
                   </Card>
@@ -578,11 +585,12 @@ function AttentionRow({
       ];
       action =
         item.reviewCount > 0 ? (
-          <Button size="sm" variant="outline" className={buttonClass} asChild>
-            <Link to={`/activities?account=${item.accountId}&needsReview=true`}>
-              {t("connect:syncHistory.review")}
-            </Link>
-          </Button>
+          <Link
+            to={`/activities?account=${item.accountId}&needsReview=true`}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), buttonClass)}
+          >
+            {t("connect:syncHistory.review")}
+          </Link>
         ) : (
           retry
         );
@@ -698,7 +706,7 @@ function BrokeragesCard({
             <button
               type="button"
               onClick={() => setShowAll((value) => !value)}
-              className="text-muted-foreground hover:bg-muted/40 hover:text-foreground flex min-h-11 w-full items-center border-t px-4 text-left text-sm"
+              className="text-muted-foreground hover:bg-muted/40 hover:text-foreground flex min-h-11 w-full items-center border-t px-4 text-start text-sm"
             >
               {showAll
                 ? t("connect:page.showLess")
@@ -770,7 +778,7 @@ function BrokerageItem({
         type="button"
         aria-expanded={expanded}
         onClick={onToggle}
-        className="hover:bg-muted/40 flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left"
+        className="hover:bg-muted/40 flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-start"
       >
         <BrokerageLogo
           brokerage={row.connection.brokerage}
@@ -789,13 +797,13 @@ function BrokerageItem({
         <Icons.ChevronRight
           className={cn(
             "text-muted-foreground size-4 shrink-0 transition-transform",
-            expanded && "rotate-90",
+            expanded ? "rotate-90" : "rtl:rotate-180",
           )}
           aria-hidden="true"
         />
       </button>
       {expanded && (
-        <ul className="bg-muted/30 border-t py-1 pl-16 pr-4">
+        <ul className="bg-muted/30 border-t py-1 pe-4 ps-16">
           {row.accounts.length === 0 ? (
             <li className="text-muted-foreground py-2 text-xs">
               {t("connect:connections.noAccountsFound")}
@@ -846,7 +854,7 @@ function DevicesCard({
   const active = sorted.filter((device) => !isDeviceInactive(device));
   const inactive = sorted.filter(isDeviceInactive);
   const footerClass =
-    "text-muted-foreground hover:bg-muted/40 hover:text-foreground flex min-h-11 w-full items-center gap-2 border-t px-4 text-left text-sm";
+    "text-muted-foreground hover:bg-muted/40 hover:text-foreground flex min-h-11 w-full items-center gap-2 border-t px-4 text-start text-sm";
 
   return (
     <SectionCard
@@ -1054,24 +1062,20 @@ function SyncHistoryItem({
     <div
       className={cn(
         "flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 sm:flex-nowrap sm:gap-4",
-        isFailed
-          ? "bg-destructive/5"
-          : needsAttention
-            ? "bg-yellow-500/10 dark:bg-yellow-500/5"
-            : "hover:bg-muted/30",
+        isFailed ? "bg-destructive/5" : needsAttention ? "bg-warning/10" : "hover:bg-muted/30",
       )}
     >
       <span
         className={cn(
           "inline-block h-2 w-2 shrink-0 rounded-full",
-          isFailed ? "bg-destructive" : needsAttention ? "bg-yellow-500" : "bg-green-500",
+          isFailed ? "bg-destructive" : needsAttention ? "bg-warning" : "bg-success",
         )}
       />
-      <span className="text-muted-foreground shrink-0 whitespace-nowrap text-xs sm:min-w-[80px] sm:text-sm">
+      <span className="text-muted-foreground shrink-0 whitespace-nowrap text-xs sm:min-w-20 sm:text-sm">
         {t("connect:page.timeAgo", { time: timeAgo })}
       </span>
       {accountName && (
-        <span className="hidden shrink-0 truncate text-sm font-medium sm:inline sm:min-w-[100px]">
+        <span className="sm:min-w-25 hidden shrink-0 truncate text-sm font-medium sm:inline">
           {accountName}
         </span>
       )}
@@ -1080,12 +1084,12 @@ function SyncHistoryItem({
         <span
           className={cn(
             isFailed && "text-destructive font-medium",
-            needsAttention && !isFailed && "font-medium text-amber-600 dark:text-amber-400",
+            needsAttention && !isFailed && "text-warning font-medium",
           )}
         >
           {description}
         </span>
-        {isRunning && <Icons.Spinner className="h-3 w-3 animate-spin" />}
+        {isRunning && <Spinner className="h-3 w-3" />}
       </div>
       {canReviewActivities && (
         <Link

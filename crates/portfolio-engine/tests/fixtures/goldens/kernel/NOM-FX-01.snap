@@ -102,7 +102,7 @@ baseline:
             contributions: "1950"
             distributions: "0"
             fees: "0"
-            fx_effect: "0"
+            fx_effect: "50"
             income: "0"
             realized_pnl: "100"
             residual: "0"
@@ -114,7 +114,7 @@ baseline:
           method: timeWeighted
           period_end: 2025-01-13
           period_start: 2025-01-02
-          quality: partial
+          quality: ok
           returns:
             annualized_irr: "10.71325995"
             annualized_twr: ~
@@ -155,14 +155,14 @@ baseline:
             - date: 2025-01-13
               value: "0.07692308"
           summary:
-            amount: "100"
+            amount: "150"
             amount_status: complete
             basis: marketValue
             basis_status: notApplicable
             method: timeWeighted
             percent: "0.07692308"
             percent_status: complete
-            quality: partial
+            quality: ok
       tracking_mode: TRANSACTIONS
       valuations:
         - basis_status: notApplicable
@@ -412,7 +412,7 @@ baseline:
         contributions: "1950"
         distributions: "0"
         fees: "0"
-        fx_effect: "0"
+        fx_effect: "50"
         income: "0"
         realized_pnl: "100"
         residual: "0"
@@ -424,7 +424,7 @@ baseline:
       method: timeWeighted
       period_end: 2025-01-13
       period_start: 2025-01-02
-      quality: partial
+      quality: ok
       returns:
         annualized_irr: "10.71325995"
         annualized_twr: ~
@@ -465,13 +465,13 @@ baseline:
         - date: 2025-01-13
           value: "0.07692308"
       summary:
-        amount: "100"
+        amount: "150"
         amount_status: complete
         basis: marketValue
         basis_status: notApplicable
         method: timeWeighted
         percent: "0.07692308"
         percent_status: complete
-        quality: partial
+        quality: ok
   portfolio_flows: []
 scenario: NOM-FX-01

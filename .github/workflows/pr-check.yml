@@ -56,6 +56,20 @@ jobs:
       - name: Check every language and namespace
         run: node apps/frontend/scripts/check-translations.mjs
 
+  design-ratchet:
+    name: Design ratchet
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Check that no file gains design-system debt
+        run: node scripts/design-ratchet.mjs
+
   formatting:
     name: Formatting
     needs: changes
@@ -107,8 +121,9 @@ jobs:
         # Declarations are already built above; the frontend build runs its type check.
         run: pnpm --filter './packages/*' -r type-check
 
-      - name: Run tests
-        run: pnpm test
+      - name: Run script tests
+        # The frontend unit tests run in the Frontend Tests job.
+        run: pnpm test:scripts
 
       - name: Build frontend
         run: pnpm build
@@ -123,6 +138,39 @@ jobs:
         run: pnpm test:e2e:addon-sandbox
         env:
           WF_ADDON_SANDBOX_SKIP_BUILD: "true"
+
+  frontend-tests:
+    # Vitest takes longer than every other Frontend Check step together, so it
+    # runs alongside them, split into two shards.
+    name: Frontend Tests (${{ matrix.shard }})
+    timeout-minutes: 20
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["1/2", "2/2"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          # No `cache: pnpm`: restore plus warm install is no faster than a cold
+          # install, and each PR would save its own ~120 MB copy.
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm --filter frontend exec vitest run --shard=${{ matrix.shard }}
 
   rust-check:
     name: Rust Check
@@ -255,7 +303,9 @@ jobs:
         changes,
         formatting,
         translation-parity,
+        design-ratchet,
         frontend-check,
+        frontend-tests,
         rust-check,
         android-check,
         ios-check,
@@ -275,13 +325,17 @@ jobs:
           FRONTEND_REQUIRED: ${{ needs.changes.outputs.frontend }}
           RUST_REQUIRED: ${{ needs.changes.outputs.rust }}
           TRANSLATION_RESULT: ${{ needs.translation-parity.result }}
+          DESIGN_RATCHET_RESULT: ${{ needs.design-ratchet.result }}
           FRONTEND_RESULT: ${{ needs.frontend-check.result }}
+          FRONTEND_TESTS_RESULT: ${{ needs.frontend-tests.result }}
           RUST_RESULT: ${{ needs.rust-check.result }}
         run: |
           test "$CHANGES_RESULT" = success
           if [ "$FRONTEND_REQUIRED" = true ]; then
             test "$FRONTEND_RESULT" = success
+            test "$FRONTEND_TESTS_RESULT" = success
             test "$TRANSLATION_RESULT" = success
+            test "$DESIGN_RATCHET_RESULT" = success
           fi
           if [ "$RUST_REQUIRED" = true ]; then
             test "$RUST_RESULT" = success

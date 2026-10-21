@@ -18,6 +18,10 @@ export function formatPercentValue(
 
 export const formatMonthName = (d: Date, formatting: Pick<FormattingApi, "formatCalendarDate">) =>
   formatting.formatCalendarDate(calendarDateFromLocalDate(d), { month: "long" });
+export const formatShortMonthName = (
+  d: Date,
+  formatting: Pick<FormattingApi, "formatCalendarDate">,
+) => formatting.formatCalendarDate(calendarDateFromLocalDate(d), { month: "short" });
 export const formatMonthYear = (d: Date, formatting: Pick<FormattingApi, "formatCalendarDate">) =>
   formatting.formatCalendarDate(calendarDateFromLocalDate(d), {
     month: "short",

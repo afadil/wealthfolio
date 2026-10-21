@@ -110,6 +110,7 @@
     "description": "Wählen Sie Konten aus, um ihre Performance im Zeitverlauf zu vergleichen."
   },
   "attribution": {
+    "partial_data": "Unvollständige Daten",
     "title": "Attribution",
     "close": "Attribution schließen",
     "period_gain_loss": "Periodengewinn/-verlust",

@@ -1,9 +1,10 @@
+import { cn } from "@/lib/utils";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { ShieldCheckIcon } from "@phosphor-icons/react/dist/csr/ShieldCheck";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { useDateFormatting, useLocalizationSettings } from "@wealthfolio/ui";
+import { useDateFormatting, useLocalizationSettings, buttonVariants } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/card";
@@ -50,6 +51,7 @@ import {
 } from "./backup-ui";
 import { formatBackupSize } from "./backup-size";
 import { backupDate, backupState, useCloudBackups } from "./use-cloud-backups";
+import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 
 type Flow = "setup" | "resume" | "unlock" | "replace" | "pause" | "help";
 /** The one operation in progress: `restore:<id>` and `download:<id>` name their row. */
@@ -81,8 +83,8 @@ function ProtectionStatus({ data }: { data: CloudBackupStatus }) {
   const state = backupState(data);
   return (
     <Badge
-      variant="outline"
-      className={`shrink-0 gap-1.5 border-0 px-2 py-0.5 text-[11px] font-medium ${state === "on" ? "bg-success/10 text-success" : "bg-muted/60 text-muted-foreground"}`}
+      variant={state === "on" ? "success-subtle" : "outline"}
+      className={`text-2xs shrink-0 gap-1.5 border-0 px-2 py-0.5 font-medium ${state === "on" ? "" : "bg-muted/60 text-muted-foreground"}`}
     >
       <span
         aria-hidden
@@ -145,17 +147,14 @@ function RecoveryDeadline({ data }: { data: CloudBackupStatus }) {
   const deadline = backupDate(data.policy.readGraceExpiresAt ?? null);
   if (data.policy.uploadEntitled || !data.history.length || !deadline) return null;
   return (
-    <p
-      role="status"
-      className="border-warning/30 bg-warning/10 flex gap-3 rounded-lg border p-3 text-sm leading-relaxed"
-    >
-      <Icons.AlertTriangle className="text-warning mt-0.5 size-4 shrink-0" aria-hidden />
-      <span>
+    <Alert variant="warning" role="status" className="p-3">
+      <Icons.AlertTriangle aria-hidden />
+      <AlertDescription className="leading-relaxed">
         {t("settings:cloud_backup_recovery_deadline", {
           date: formatting.formatDateTime(deadline, { dateStyle: "medium", timeStyle: "short" }),
         })}
-      </span>
-    </p>
+      </AlertDescription>
+    </Alert>
   );
 }
 
@@ -163,7 +162,7 @@ function CloudBackupPromotion() {
   const { t } = useTranslation();
   return (
     <Card className="@container border-connect-brand/15 from-connect-brand/5 via-card to-card overflow-hidden rounded-xl bg-gradient-to-br shadow-none">
-      <CardContent className="@min-[640px]:grid-cols-[auto_minmax(0,1fr)_auto] @min-[640px]:gap-x-4 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 px-4 py-3">
+      <CardContent className="@min-[40rem]:grid-cols-[auto_minmax(0,1fr)_auto] @min-[40rem]:gap-x-4 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 px-4 py-3">
         <div className="bg-connect-brand/10 text-connect-brand row-start-1 flex size-8 shrink-0 items-center justify-center rounded-lg">
           <Icons.ShieldCheck className="size-4" aria-hidden />
         </div>
@@ -177,10 +176,10 @@ function CloudBackupPromotion() {
         </div>
         <Link
           to="/settings/connect"
-          className="text-connect-brand hover:text-foreground focus-visible:ring-ring @min-[640px]:col-start-3 @min-[640px]:row-start-1 col-start-2 inline-flex min-h-11 w-fit items-center gap-1.5 rounded-md text-xs font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+          className="text-connect-brand hover:text-foreground focus-visible:ring-ring @min-[40rem]:col-start-3 @min-[40rem]:row-start-1 col-start-2 inline-flex min-h-11 w-fit items-center gap-1.5 rounded-md text-xs font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
         >
           {t("settings:cloud_backup_promotion_action")}
-          <Icons.ArrowRight className="size-3.5 shrink-0" aria-hidden />
+          <Icons.ArrowRight className="size-3.5 shrink-0 rtl:rotate-180" aria-hidden />
         </Link>
       </CardContent>
     </Card>
@@ -212,7 +211,7 @@ function describeBackupStatus(
 function BackupStatusLine({ dot, parts }: { dot: string; parts: (string | null)[] }) {
   return (
     <p className="text-muted-foreground flex items-start gap-1.5 text-xs">
-      <span className={`mt-[5px] size-1.5 shrink-0 rounded-full ${dot}`} aria-hidden />
+      <span className={`mt-[0.3125rem] size-1.5 shrink-0 rounded-full ${dot}`} aria-hidden />
       <span>
         {parts.filter(Boolean).map((part, index) => (
           <Fragment key={index}>
@@ -277,17 +276,17 @@ export function CloudBackupSummary() {
               />
             )}
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-foreground pointer-coarse:h-11 shrink-0"
-            asChild
+          <Link
+            to="/settings/exports"
+            aria-label={t("settings:cloud_backup_manage")}
+            className={cn(
+              buttonVariants({ variant: "ghost", size: "sm" }),
+              "text-muted-foreground hover:text-foreground pointer-coarse:h-11 shrink-0",
+            )}
           >
-            <Link to="/settings/exports" aria-label={t("settings:cloud_backup_manage")}>
-              <span className="hidden sm:inline">{t("settings:cloud_backup_manage")}</span>
-              <Icons.ChevronRight className="size-4" aria-hidden />
-            </Link>
-          </Button>
+            <span className="hidden sm:inline">{t("settings:cloud_backup_manage")}</span>
+            <Icons.ChevronRight className="size-4 rtl:rotate-180" aria-hidden />
+          </Link>
         </div>
         {data && <RecoveryDeadline data={data} />}
       </CardContent>
@@ -322,7 +321,7 @@ export function CloudBackupCompactSummary() {
           )}
         </h2>
         {summary && (
-          <div className="mt-0.5 pl-7">
+          <div className="mt-0.5 ps-7">
             {/* "On" is implied by a scheduled next backup; other states name themselves. */}
             <BackupStatusLine
               dot={summary.dot}
@@ -382,7 +381,7 @@ export function CloudBackupCompactSummary() {
         className="text-muted-foreground hover:bg-muted/40 hover:text-foreground flex min-h-11 items-center justify-between border-t px-4 text-sm"
       >
         {t("settings:cloud_backup_manage")}
-        <Icons.ChevronRight className="size-4" aria-hidden />
+        <Icons.ChevronRight className="size-4 rtl:rotate-180" aria-hidden />
       </Link>
     </Card>
   );
@@ -885,11 +884,11 @@ function CloudBackupPanel({ backup }: { backup: ReturnType<typeof useCloudBackup
             <Button
               variant="link"
               size="sm"
-              className="text-muted-foreground h-auto whitespace-normal p-0 text-left text-xs font-normal"
+              className="text-muted-foreground h-auto whitespace-normal p-0 text-start text-xs font-normal"
               onClick={() => showFlow("help")}
             >
               {t("settings:cloud_backup_restore_help")}
-              <Icons.ArrowRight className="size-3.5" aria-hidden />
+              <Icons.ArrowRight className="size-3.5 rtl:rotate-180" aria-hidden />
             </Button>
           )}
           {isMobile && history.length > 0 && (
@@ -910,7 +909,7 @@ function CloudBackupPanel({ backup }: { backup: ReturnType<typeof useCloudBackup
           mobileClassName="h-auto max-h-[85dvh] overflow-y-auto"
           showCloseButton={!busy && !recoveryCode}
         >
-          <DialogHeader className="pr-6 text-left">
+          <DialogHeader className="pe-6 text-start">
             <DialogTitle>
               {t(
                 flow === "help"
