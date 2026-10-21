@@ -88,6 +88,23 @@ const indicatorPairs = [
   ["ring", "card"],
 ] as const;
 
+// OKLab [L, a, b] of an sRGB colour (channels 0..255).
+function oklab([r, g, b]: number[]) {
+  const linear = (value: number) => {
+    const channel = value / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  };
+  const [lr, lg, lb] = [r, g, b].map(linear);
+  const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
+  const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
+  const s = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ];
+}
+
 function luminance([r, g, b]: number[]) {
   const linear = (value: number) => {
     const channel = value / 255;
@@ -151,6 +168,59 @@ for (const mode of modes) {
         ? [`${text} on ${surface}: ${results[index].toFixed(2)} < ${minimum}`]
         : [];
     });
+    expect(failures).toEqual([]);
+  });
+
+  test(`treemap gains and losses read apart and off the card, ${mode}`, async ({ page }) => {
+    // composition-chart draws each tile on the ramp from --heatmap-*-low to -high,
+    // at 0.45 opacity over the card in dark mode. Mid-tone gain and loss tiles must
+    // differ in hue and chroma, not only in lightness (OKLab a/b distance), and
+    // stand off the card. The minimums are the reference branch's, set between
+    // the themes whose tiles failed and every theme whose tiles read well.
+    await openGallery(page, { mode });
+    const tokens = [
+      "heatmap-positive-low",
+      "heatmap-positive-high",
+      "heatmap-negative-low",
+      "heatmap-negative-high",
+      "card",
+    ];
+    const colors = await page.evaluate((names) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 1;
+      const context = canvas.getContext("2d", { willReadFrequently: true })!;
+      const probe = document.createElement("div");
+      document.body.append(probe);
+      const result = names.map((name) => {
+        probe.style.color = `var(--${name})`;
+        context.clearRect(0, 0, 1, 1);
+        context.fillStyle = getComputedStyle(probe).color;
+        context.fillRect(0, 0, 1, 1);
+        return Array.from(context.getImageData(0, 0, 1, 1).data.slice(0, 3));
+      });
+      probe.remove();
+      return result;
+    }, tokens);
+    const [positiveLow, positiveHigh, negativeLow, negativeHigh, card] = colors;
+    const opacity = mode === "dark" ? 0.45 : 1;
+    const midTile = (low: number[], high: number[]) =>
+      low.map((value, i) => ((value + high[i]) / 2) * opacity + card[i] * (1 - opacity));
+    const [positive, negative, surface] = [
+      midTile(positiveLow, positiveHigh),
+      midTile(negativeLow, negativeHigh),
+      card,
+    ].map(oklab);
+    const distance = (a: number[], b: number[], from = 0) =>
+      Math.hypot(...a.slice(from).map((value, i) => value - b[from + i]));
+    const failures = [
+      ["gain and loss hue", distance(positive, negative, 1), 0.06],
+      ["gain off the card", distance(positive, surface), 0.1],
+      ["loss off the card", distance(negative, surface), 0.1],
+    ].flatMap(([name, value, minimum]) =>
+      (value as number) < (minimum as number)
+        ? [`${name}: ${(value as number).toFixed(3)} < ${minimum}`]
+        : [],
+    );
     expect(failures).toEqual([]);
   });
 
