@@ -26,6 +26,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
+import { cardSurfaceClassName } from "@wealthfolio/ui/components/ui/card";
 import { statusSurfaceVariants } from "@wealthfolio/ui/components/ui/status-surface";
 import { cn } from "@/lib/utils";
 
@@ -179,7 +180,12 @@ const AccountSummaryComponent = React.memo(
       }
 
       return (
-        <div className="border-border/40 bg-card/90 shadow-xs flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 md:px-5 md:py-4">
+        <div
+          className={cn(
+            cardSurfaceClassName,
+            "flex w-full items-center justify-between gap-3 px-4 py-3 md:px-5 md:py-4",
+          )}
+        >
           {skeletonContent}
         </div>
       );
@@ -364,7 +370,10 @@ const AccountSummaryComponent = React.memo(
       return (
         <Link
           to={`/accounts/${accountId}`}
-          className="border-border/40 bg-card/90 shadow-xs flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-all duration-150 hover:shadow-md md:px-5 md:py-4"
+          className={cn(
+            cardSurfaceClassName,
+            "flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3 transition-all duration-150 hover:shadow-md md:px-5 md:py-4",
+          )}
         >
           {content}
         </Link>
@@ -372,7 +381,12 @@ const AccountSummaryComponent = React.memo(
     }
 
     return (
-      <div className="border-border/40 bg-card/90 shadow-xs flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 md:px-5 md:py-4">
+      <div
+        className={cn(
+          cardSurfaceClassName,
+          "flex w-full items-center justify-between gap-3 px-4 py-3 md:px-5 md:py-4",
+        )}
+      >
         {content}
       </div>
     );
@@ -534,7 +548,7 @@ export const AccountsSummary = React.memo(
         return Array.from({ length: 4 }).map((_, index) => (
           <div
             key={`skeleton-${index}`}
-            className="border-border/40 bg-card/90 shadow-xs rounded-xl border px-4 py-3 md:px-5 md:py-4"
+            className={cn(cardSurfaceClassName, "px-4 py-3 md:px-5 md:py-4")}
           >
             <AccountSummarySkeleton />
           </div>
@@ -665,7 +679,10 @@ export const AccountsSummary = React.memo(
               return (
                 <div
                   key={group.accountName}
-                  className="border-border/40 bg-card/90 shadow-xs overflow-hidden rounded-xl border transition-shadow duration-150 hover:shadow-md"
+                  className={cn(
+                    cardSurfaceClassName,
+                    "overflow-hidden transition-shadow duration-150 hover:shadow-md",
+                  )}
                 >
                   <div className="cursor-pointer">
                     <AccountSummaryComponent
