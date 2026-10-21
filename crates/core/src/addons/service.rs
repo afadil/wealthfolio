@@ -850,7 +850,10 @@ fn extract_addon_zip_archive(zip_data: Vec<u8>) -> Result<ExtractedAddonArchive,
             continue;
         }
 
-        let file_name = file.name().to_string();
+        let file_name = file
+            .name()
+            .map_err(|_| "ZIP addon contains an invalid file name".to_string())?
+            .into_owned();
         validated_addon_archive_path(&file_name)?;
 
         if file_name.ends_with(".map") {
@@ -2049,7 +2052,10 @@ pub fn save_addon_to_staging(
             let mut manifest_found = false;
             for i in 0..archive.len() {
                 if let Ok(file) = archive.by_index(i) {
-                    if file.name() == "manifest.json" || file.name().ends_with("/manifest.json") {
+                    let file_name = file
+                        .name()
+                        .map_err(|_| "ZIP addon contains an invalid file name".to_string())?;
+                    if file_name == "manifest.json" || file_name.ends_with("/manifest.json") {
                         manifest_found = true;
                         break;
                     }

@@ -39,11 +39,32 @@ const MAX_PAGES: u32 = 50;
 
 /// Response from `GET /v1/forex/{base}/{quote}`.
 #[derive(Debug, Deserialize)]
+#[serde(try_from = "ForexResponseBody")]
 struct ForexResponse {
-    #[serde(default)]
     data: Vec<ForexRow>,
-    #[serde(default)]
     pagination: Option<Pagination>,
+}
+
+#[derive(Deserialize)]
+struct ForexResponseBody {
+    data: Vec<ForexRow>,
+    pagination: Option<Pagination>,
+    error: Option<serde_json::Value>,
+    detail: Option<serde_json::Value>,
+}
+
+impl TryFrom<ForexResponseBody> for ForexResponse {
+    type Error = &'static str;
+
+    fn try_from(body: ForexResponseBody) -> Result<Self, Self::Error> {
+        if body.error.is_some() || body.detail.is_some() {
+            return Err("Forex response contains an error");
+        }
+        Ok(Self {
+            data: body.data,
+            pagination: body.pagination,
+        })
+    }
 }
 
 /// One daily FX row. `val` is the reference rate (units of quote per base).
@@ -120,8 +141,7 @@ impl FxMacroDataProvider {
     }
 
     /// Map a non-success HTTP status to a market data error.
-    fn status_error(status: StatusCode, body: &str) -> MarketDataError {
-        let snippet = &body[..body.floor_char_boundary(300)];
+    fn status_error(status: StatusCode, _body: &str) -> MarketDataError {
         match status {
             StatusCode::TOO_MANY_REQUESTS => MarketDataError::RateLimited {
                 provider: PROVIDER_ID.to_string(),
@@ -133,16 +153,16 @@ impl FxMacroDataProvider {
             StatusCode::FORBIDDEN | StatusCode::PAYMENT_REQUIRED => {
                 MarketDataError::ProviderError {
                     provider: PROVIDER_ID.to_string(),
-                    message: format!("Access denied - check API key and plan: {}", snippet),
+                    message: "Access denied - check API key and plan".to_string(),
                 }
             }
             StatusCode::NOT_FOUND => MarketDataError::ProviderError {
                 provider: PROVIDER_ID.to_string(),
-                message: format!("Pair not available: {}", snippet),
+                message: "Pair not available".to_string(),
             },
             _ => MarketDataError::ProviderError {
                 provider: PROVIDER_ID.to_string(),
-                message: format!("HTTP {}: {}", status, snippet),
+                message: format!("HTTP {}", status),
             },
         }
     }
@@ -217,9 +237,9 @@ impl FxMacroDataProvider {
             return Err(Self::status_error(status, &body));
         }
 
-        serde_json::from_str(&body).map_err(|e| MarketDataError::ProviderError {
+        serde_json::from_str(&body).map_err(|_| MarketDataError::ProviderError {
             provider: PROVIDER_ID.to_string(),
-            message: format!("Failed to parse forex response: {}", e),
+            message: "Invalid forex response".to_string(),
         })
     }
 }
@@ -510,5 +530,81 @@ mod tests {
             assert!(w[0].timestamp < w[1].timestamp, "Quotes not sorted");
         }
         assert!(quotes.iter().all(|q| q.currency == "USD"));
+    }
+}
+
+#[cfg(test)]
+mod response_validation_tests {
+    use super::ForexResponse;
+
+    fn rejects(payload: &str) {
+        let error = serde_json::from_str::<ForexResponse>(payload).unwrap_err();
+        assert!(!error.to_string().contains("private-provider-marker"));
+    }
+
+    #[test]
+    fn rejects_missing_data() {
+        rejects(r#"{}"#);
+    }
+    #[test]
+    fn rejects_error_document() {
+        rejects(r#"{"error":"private-provider-marker"}"#);
+    }
+    #[test]
+    fn rejects_structured_error_with_empty_data() {
+        rejects(r#"{"data":[],"error":{"message":"private-provider-marker"}}"#);
+    }
+    #[test]
+    fn rejects_error_with_rows() {
+        rejects(r#"{"data":[{"date":"2026-01-01","val":1.2}],"error":"private-provider-marker"}"#);
+    }
+    #[test]
+    fn rejects_detail_string_with_empty_data() {
+        rejects(r#"{"data":[],"detail":"private-provider-marker"}"#);
+    }
+    #[test]
+    fn rejects_detail_object_with_empty_data() {
+        rejects(r#"{"data":[],"detail":{"message":"private-provider-marker"}}"#);
+    }
+    #[test]
+    fn preserves_empty_success() {
+        assert!(serde_json::from_str::<ForexResponse>(r#"{"data":[]}"#)
+            .unwrap()
+            .data
+            .is_empty());
+    }
+    #[test]
+    fn preserves_rows() {
+        let page =
+            serde_json::from_str::<ForexResponse>(r#"{"data":[{"date":"2026-01-01","val":1.2}]}"#)
+                .unwrap();
+        assert_eq!(page.data[0].date, "2026-01-01");
+        assert_eq!(page.data[0].val, Some(1.2));
+    }
+    #[test]
+    fn preserves_null_metadata() {
+        assert!(
+            serde_json::from_str::<ForexResponse>(r#"{"data":[],"error":null,"detail":null}"#)
+                .unwrap()
+                .data
+                .is_empty()
+        );
+    }
+    #[test]
+    fn preserves_pagination() {
+        let page = serde_json::from_str::<ForexResponse>(
+            r#"{"data":[],"pagination":{"has_more":true,"next_offset":100}}"#,
+        )
+        .unwrap();
+        let pagination = page.pagination.unwrap();
+        assert!(pagination.has_more);
+        assert_eq!(pagination.next_offset, Some(100));
+    }
+    #[test]
+    fn preserves_missing_pagination() {
+        assert!(serde_json::from_str::<ForexResponse>(r#"{"data":[]}"#)
+            .unwrap()
+            .pagination
+            .is_none());
     }
 }

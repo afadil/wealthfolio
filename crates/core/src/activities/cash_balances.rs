@@ -750,6 +750,7 @@ mod tests {
             kind: "INVESTMENT".to_string(),
             instrument_type: Some(instrument_type.to_string()),
             contract_multiplier: None,
+            alternative: false,
         };
         engine_cash_for(
             account,
