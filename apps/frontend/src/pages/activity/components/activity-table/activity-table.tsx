@@ -71,7 +71,8 @@ import { useVirtualScrollContainer } from "@/hooks/use-virtual-scroll-container"
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
-import { flattenActivityDayGroups, groupActivitiesByDay } from "./activity-day-groups";
+import { flattenDayGroups } from "@/lib/day-groups";
+import { groupActivitiesByDay } from "./activity-day-groups";
 import { ActivityDayHeaderRow } from "./activity-day-header";
 
 /**
@@ -807,7 +808,7 @@ export const ActivityTable = ({
       (row) => row.original,
       (activity) => formatDateTime(activity.date, dateFormatting, appTimezone).date,
     );
-    return flattenActivityDayGroups(groups, (row) => row.id);
+    return flattenDayGroups(groups, (row) => row.id);
   }, [appTimezone, dateFormatting, groupByDay, tableRows]);
 
   // Embedded tables may scroll with the page; the body can start below both

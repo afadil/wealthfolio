@@ -44,7 +44,8 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useVirtualScrollContainer } from "@/hooks/use-virtual-scroll-container";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
-import { flattenActivityDayGroups, groupActivitiesByDay } from "./activity-day-groups";
+import { flattenDayGroups } from "@/lib/day-groups";
+import { groupActivitiesByDay } from "./activity-day-groups";
 import { ActivityDayHeading } from "./activity-day-header";
 
 /**
@@ -127,7 +128,7 @@ export const ActivityTableMobile = ({
       (activity) => activity,
       (activity) => formatDateTime(activity.date, dateFormatting, appTimezone).date,
     );
-    return flattenActivityDayGroups(groups, (activity) => activity.id);
+    return flattenDayGroups(groups, (activity) => activity.id);
   }, [activities, appTimezone, dateFormatting, groupByDay]);
 
   // Embedded lists can share an already-scrolled page rather than their own box.

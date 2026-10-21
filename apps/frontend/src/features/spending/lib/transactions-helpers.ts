@@ -14,6 +14,7 @@ import type {
   TransferLinkStatus,
 } from "../types/cash-activity";
 import { formatZonedDateKey } from "./timezone";
+import type { DayGroup } from "@/lib/day-groups";
 
 /** Stable sorted Set→array used in React Query keys (insertion order is unstable). */
 export function stableArr(s: Set<string>): string[] | undefined {
@@ -171,12 +172,11 @@ export function toRowVM(
 }
 
 /** One day's worth of rows, as rendered by the grouped transactions table. */
-export interface TransactionDayGroup {
+export interface TransactionDayGroup extends DayGroup<TransactionRowVM> {
   /** Zoned `YYYY-MM-DD` key — also the React key for the header row. */
   key: string;
   /** Instant of the first row in the day, for header date formatting. */
   date: Date;
-  rows: TransactionRowVM[];
   /**
    * Signed net of the day in `currency`, or `null` when the day has no
    * contributing rows or mixes currencies (there is no FX rate on the row
@@ -283,58 +283,19 @@ export function groupRowsByDay(
 
     let group = groups.get(key);
     if (!group) {
-      group = { key, date: activityDate, rows: [], net: null };
+      group = { key, date: activityDate, items: [], net: null };
       groups.set(key, group);
     }
-    group.rows.push(row);
+    group.items.push(row);
   }
 
   for (const group of groups.values()) {
     // The header's amount column has room for a single figure, so a day that
     // mixes currencies shows no net; the totals in the filter bar have the room
     // to report one per currency.
-    const totals = netSummary(group.rows).byCurrency;
+    const totals = netSummary(group.items).byCurrency;
     group.net = totals.length === 1 ? totals[0] : null;
   }
 
   return [...groups.values()];
-}
-
-/** One entry in the flat rendering of the day-grouped transaction list. */
-export type TransactionListItem =
-  | {
-      kind: "header";
-      /** Stable across renders, so the virtualizer keeps item identity. */
-      key: string;
-      group: TransactionDayGroup;
-      /**
-       * True for the trailing day only. Its count and net describe just the
-       * rows fetched so far, so the header labels itself as partial while more
-       * pages are pending.
-       */
-      isLastGroup: boolean;
-    }
-  | { kind: "row"; key: string; row: TransactionRowVM };
-
-/**
- * Flattens day groups into the single index space a virtualizer needs, with
- * each header immediately preceding its own rows — the same reading order the
- * nested rendering produced.
- */
-export function flattenDayGroups(groups: TransactionDayGroup[]): TransactionListItem[] {
-  const items: TransactionListItem[] = [];
-
-  groups.forEach((group, index) => {
-    items.push({
-      kind: "header",
-      key: `day:${group.key}`,
-      group,
-      isLastGroup: index === groups.length - 1,
-    });
-    for (const row of group.rows) {
-      items.push({ kind: "row", key: row.activity.id, row });
-    }
-  });
-
-  return items;
 }
