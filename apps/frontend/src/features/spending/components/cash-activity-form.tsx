@@ -537,7 +537,7 @@ export function CashActivityForm({
                         name="activityType"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-lg font-semibold">
+                            <FormLabel className="text-lg font-semibold leading-none">
                               {t("spending:cashForm.selectType")}
                             </FormLabel>
                             <FormControl>

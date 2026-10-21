@@ -779,7 +779,7 @@ function CustomProviderFormContent({
                       control={form.control}
                       name="priority"
                       render={({ field }) => (
-                        <FormItem className="flex items-center gap-2 space-y-0">
+                        <FormItem className="flex items-center gap-2">
                           <FormLabel className="text-muted-foreground text-xs font-normal">
                             {t("settings:market_data_page.usage_fallback_order")}
                           </FormLabel>

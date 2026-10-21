@@ -65,7 +65,7 @@ export function AppearanceForm() {
           control={form.control}
           name="font"
           render={({ field }) => (
-            <FormItem className="space-y-3">
+            <FormItem className="gap-3">
               <div className="space-y-1">
                 <FormLabel className="text-base font-medium">
                   {t("settings:appearance_font_title")}
@@ -91,7 +91,7 @@ export function AppearanceForm() {
           control={form.control}
           name="theme"
           render={({ field }) => (
-            <FormItem className="space-y-3">
+            <FormItem className="gap-3">
               <div className="space-y-1">
                 <FormLabel className="text-base font-medium">{t("settings:theme")}</FormLabel>
                 <FormDescription className="text-sm">

@@ -431,7 +431,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                     name="baseCurrency"
                     render={({ field }) => (
                       <FormItem className="border-border/70 bg-muted/10 min-w-0 rounded-xl border p-4">
-                        <div className="mb-3 flex items-center gap-2.5">
+                        <div className="mb-1 flex items-center gap-2.5">
                           <div className="bg-muted rounded-md p-1.5">
                             <Icons.DollarSign className="text-muted-foreground size-4" />
                           </div>
@@ -476,7 +476,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                     name="timezone"
                     render={({ field }) => (
                       <FormItem className="border-border/70 bg-muted/10 min-w-0 rounded-xl border p-4">
-                        <div className="mb-3 flex items-center gap-2.5">
+                        <div className="mb-1 flex items-center gap-2.5">
                           <div className="bg-muted rounded-md p-1.5">
                             <Icons.Clock className="text-muted-foreground size-4" />
                           </div>
