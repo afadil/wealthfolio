@@ -397,7 +397,7 @@ function SymbolMappingRow({
           control={control}
           name={`providerConfig.${index}.provider` as Path<AssetFormValues>}
           render={({ field: providerField }) => (
-            <FormItem className="space-y-0">
+            <FormItem>
               <FormControl>
                 <ResponsiveSelect
                   value={providerField.value as string | undefined}
@@ -417,7 +417,7 @@ function SymbolMappingRow({
           control={control}
           name={`providerConfig.${index}.symbol` as Path<AssetFormValues>}
           render={({ field: symbolField }) => (
-            <FormItem className="space-y-0">
+            <FormItem>
               <FormControl>
                 <div className="relative flex items-center">
                   <Input

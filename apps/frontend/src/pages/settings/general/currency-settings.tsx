@@ -66,7 +66,7 @@ export function BaseCurrencyForm() {
           control={form.control}
           name="baseCurrency"
           render={({ field }) => (
-            <FormItem className="flex flex-col">
+            <FormItem>
               <FormControl className="w-[min(100%,18.75rem)]">
                 <CurrencyInput
                   value={field.value}

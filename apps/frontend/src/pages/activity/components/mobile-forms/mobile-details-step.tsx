@@ -95,7 +95,7 @@ function FmvPerUnitLabel() {
   const { t } = useTranslation();
   return (
     <div className="flex items-center gap-1.5">
-      <FormLabel className="text-base font-medium">
+      <FormLabel className="text-base font-medium leading-none">
         {t("activity:form.label_fmv_per_unit")}
       </FormLabel>
       <Tooltip>
@@ -557,7 +557,7 @@ export function MobileDetailsStep({
       name="fee"
       render={({ field }) => (
         <FormItem>
-          <FormLabel className="text-base font-medium">
+          <FormLabel className="text-base font-medium leading-none">
             {t("activity:mobile_fee_optional")}
           </FormLabel>
           <FormControl>
@@ -574,7 +574,7 @@ export function MobileDetailsStep({
       name="tax"
       render={({ field }) => (
         <FormItem>
-          <FormLabel className="text-base font-medium">
+          <FormLabel className="text-base font-medium leading-none">
             {isIncomeActivity
               ? t("activity:mobile_form.withholding_tax_optional")
               : t("activity:mobile_form.tax_optional")}
@@ -695,7 +695,7 @@ export function MobileDetailsStep({
               name="accountId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-base font-medium">
+                  <FormLabel className="text-base font-medium leading-none">
                     {isTransfer && isExternal
                       ? direction === "in"
                         ? t("activity:form.label_to_account")
@@ -736,7 +736,7 @@ export function MobileDetailsStep({
                     : t("activity:mobile_form.select_destination_account");
                   return (
                     <FormItem>
-                      <FormLabel className="text-base font-medium">
+                      <FormLabel className="text-base font-medium leading-none">
                         {t("activity:form.label_to_account")}
                       </FormLabel>
                       <FormControl>
@@ -769,7 +769,7 @@ export function MobileDetailsStep({
               name="activityDate"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel className="text-base font-medium">
+                  <FormLabel className="text-base font-medium leading-none">
                     {t("activity:mobile_date_time")}
                   </FormLabel>
                   <DatePickerInput
@@ -843,7 +843,9 @@ export function MobileDetailsStep({
                       name="quantity"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-medium">{quantityLabel}</FormLabel>
+                          <FormLabel className="text-base font-medium leading-none">
+                            {quantityLabel}
+                          </FormLabel>
                           <FormControl>
                             <QuantityInput {...field} />
                           </FormControl>
@@ -860,7 +862,9 @@ export function MobileDetailsStep({
                             {isFmvPriceLabel ? (
                               <FmvPerUnitLabel />
                             ) : (
-                              <FormLabel className="text-base font-medium">{priceLabel}</FormLabel>
+                              <FormLabel className="text-base font-medium leading-none">
+                                {priceLabel}
+                              </FormLabel>
                             )}
                             <FormControl>
                               <MoneyInput {...field} />
@@ -936,7 +940,7 @@ export function MobileDetailsStep({
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-base font-medium">
+                      <FormLabel className="text-base font-medium leading-none">
                         {activityType === ActivityType.DIVIDEND
                           ? t("activity:field_dividend_amount")
                           : activityType === ActivityType.INTEREST
@@ -988,7 +992,7 @@ export function MobileDetailsStep({
                         name={"sourceAmount" as any}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-base font-medium">
+                            <FormLabel className="text-base font-medium leading-none">
                               {t("activity:form.label_sent", {
                                 currency: effectiveSourceCurrency,
                               })}
@@ -1009,7 +1013,7 @@ export function MobileDetailsStep({
                         name={"destinationAmount" as any}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-base font-medium">
+                            <FormLabel className="text-base font-medium leading-none">
                               {t("activity:form.label_received", {
                                 currency: effectiveDestinationCurrency,
                               })}
@@ -1032,7 +1036,7 @@ export function MobileDetailsStep({
                       name={"sourceAmount" as any}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-medium">
+                          <FormLabel className="text-base font-medium leading-none">
                             {t("activity:form.label_amount")} ({effectiveSourceCurrency})
                           </FormLabel>
                           <FormControl>
@@ -1054,7 +1058,7 @@ export function MobileDetailsStep({
                       name={"transferRate" as any}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-medium">
+                          <FormLabel className="text-base font-medium leading-none">
                             {t("activity:form.label_transfer_rate")}
                             <span className="text-muted-foreground ms-2 text-xs font-normal">
                               1 {effectiveSourceCurrency} ={" "}
@@ -1085,7 +1089,7 @@ export function MobileDetailsStep({
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-base font-medium">
+                      <FormLabel className="text-base font-medium leading-none">
                         {t("activity:form.label_split_ratio")}
                       </FormLabel>
                       <FormControl>
@@ -1118,7 +1122,7 @@ export function MobileDetailsStep({
                   name="fee"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-base font-medium">
+                      <FormLabel className="text-base font-medium leading-none">
                         {t("activity:field_fee_amount")}
                       </FormLabel>
                       <FormControl>
@@ -1157,7 +1161,7 @@ export function MobileDetailsStep({
               name="comment"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-base font-medium">
+                  <FormLabel className="text-base font-medium leading-none">
                     {t("activity:mobile_description_optional")}
                   </FormLabel>
                   <FormControl>

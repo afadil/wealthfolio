@@ -970,7 +970,7 @@ function LiabilityFields({
           control={form.control}
           name="automaticLoan"
           render={({ field }) => (
-            <FormItem className="flex flex-row items-center justify-between gap-4 space-y-0 rounded-lg border p-3">
+            <FormItem className="flex flex-row items-center justify-between gap-4 rounded-lg border p-3">
               <div className="space-y-1">
                 <FormLabel>{t("asset:loanActions.automatic_schedule")}</FormLabel>
                 <FormDescription className="text-xs">

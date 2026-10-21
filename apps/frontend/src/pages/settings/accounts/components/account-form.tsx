@@ -482,7 +482,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                   control={form.control}
                   name="isActive"
                   render={({ field }) => (
-                    <FormItem className="flex items-center justify-between gap-4 space-y-0">
+                    <FormItem className="flex items-center justify-between gap-4">
                       <div className="min-w-0">
                         <FormLabel className="text-sm font-normal">
                           {t("settings:accounts.form_hide_label")}
@@ -507,7 +507,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                     control={form.control}
                     name="isArchived"
                     render={({ field }) => (
-                      <FormItem className="flex items-center justify-between gap-4 space-y-0">
+                      <FormItem className="flex items-center justify-between gap-4">
                         <div className="min-w-0">
                           <FormLabel className="text-sm font-normal">
                             {t("settings:accounts.form_archive_label")}
@@ -533,7 +533,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
               control={form.control}
               name="trackingMode"
               render={({ field }) => (
-                <FormItem className={cn(formCardClassName, "space-y-4")}>
+                <FormItem className={cn(formCardClassName, "gap-4")}>
                   <FormLabel className={formSectionLabelClassName}>
                     {t("settings:accounts.form_tracking_mode_label")}
                   </FormLabel>
