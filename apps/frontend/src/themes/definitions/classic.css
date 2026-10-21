@@ -208,6 +208,16 @@
      in light mode, bright leaf in dark. */
   --heatmap-accent: oklch(0.4 0.07 150);
 
+  /* Holdings treemap (composition-chart): gains lerp from positive-low to -high,
+     losses from negative-low to -high; labels are dark or light by tile
+     luminance. Dark mode draws the tiles at 0.45 over the card. */
+  --heatmap-positive-low: #cdd9bf;
+  --heatmap-positive-high: #355c4c;
+  --heatmap-negative-low: #e9b3a8;
+  --heatmap-negative-high: #d14e42;
+  --heatmap-label-dark: #1c2a24;
+  --heatmap-label-light: #f5f3ec;
+
   /* Spending-module shared chart tokens. --status-warn is the "approaching
      budget" amber (was #C28B47); --bar-stripe is the diagonal-stripe overlay on
      budget meters; --chart-cursor is the Recharts hover-cursor tint. */

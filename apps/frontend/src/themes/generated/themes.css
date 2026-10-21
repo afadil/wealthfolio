@@ -147,6 +147,12 @@
   --fi-stream-4: oklch(0.56 0.09 110);
   --fi-stream-5: oklch(0.5 0.08 135);
   --heatmap-accent: oklch(0.4 0.07 150);
+  --heatmap-positive-low: #cdd9bf;
+  --heatmap-positive-high: #355c4c;
+  --heatmap-negative-low: #e9b3a8;
+  --heatmap-negative-high: #d14e42;
+  --heatmap-label-dark: #1c2a24;
+  --heatmap-label-light: #f5f3ec;
   --status-warn: oklch(0.66 0.11 60);
   --bar-stripe: rgba(255, 255, 255, 0.25);
   --chart-cursor: rgba(0, 0, 0, 0.04);
