@@ -229,9 +229,9 @@ export function InsightsDashboard({ widgets, onCustomizeActionChange }: Insights
             <TooltipTrigger
               render={
                 <Button
-                  variant="ghost"
+                  variant="secondary"
                   size="icon"
-                  className="bg-secondary/30 hover:bg-muted/80 text-muted-foreground hover:text-foreground h-9 w-9 shrink-0 rounded-full"
+                  className="text-muted-foreground hover:text-foreground h-9 w-9 shrink-0 rounded-full"
                   aria-label={t("insights:customize.edit")}
                   disabled={isLoading || isError || !settings}
                   onClick={() => setDraft(readInsightsLayout(settings?.insightsOverviewLayout))}
