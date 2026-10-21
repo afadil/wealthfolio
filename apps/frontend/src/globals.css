@@ -303,6 +303,8 @@
   --color-connect-brand: var(--connect-brand);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
+  --color-allocation-over: var(--allocation-over);
+  --color-allocation-under: var(--allocation-under);
   --color-success-subtle: var(--success-subtle);
   --color-success-subtle-foreground: var(--success-subtle-foreground);
   --color-success-subtle-border: var(--success-subtle-border);

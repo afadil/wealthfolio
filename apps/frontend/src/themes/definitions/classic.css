@@ -208,6 +208,11 @@
      in light mode, bright leaf in dark. */
   --heatmap-accent: oklch(0.4 0.07 150);
 
+  /* Target allocation drift beyond the band, as text on cards: over target
+     (and holdings without a target), under target. */
+  --allocation-over: var(--destructive);
+  --allocation-under: var(--info);
+
   /* Holdings treemap (composition-chart): gains lerp from positive-low to -high,
      losses from negative-low to -high; labels are dark or light by tile
      luminance. Dark mode draws the tiles at 0.45 over the card. */
@@ -294,4 +299,7 @@
   --chart-cursor: rgba(255, 255, 255, 0.06);
   --event-default: oklch(0.78 0.13 150);
   --event-today: oklch(0.85 0.16 90);
+  /* The info fill read 4.1:1 as under-target drift text on the dark card;
+     its pale text colour passes. */
+  --allocation-under: var(--info-subtle-foreground);
 }

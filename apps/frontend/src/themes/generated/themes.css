@@ -147,6 +147,8 @@
   --fi-stream-4: oklch(0.56 0.09 110);
   --fi-stream-5: oklch(0.5 0.08 135);
   --heatmap-accent: oklch(0.4 0.07 150);
+  --allocation-over: var(--destructive);
+  --allocation-under: var(--info);
   --heatmap-positive-low: #cdd9bf;
   --heatmap-positive-high: #355c4c;
   --heatmap-negative-low: #e9b3a8;
@@ -213,4 +215,5 @@
   --chart-cursor: rgba(255, 255, 255, 0.06);
   --event-default: oklch(0.78 0.13 150);
   --event-today: oklch(0.85 0.16 90);
+  --allocation-under: var(--info-subtle-foreground);
 }
