@@ -845,7 +845,7 @@ export const TRACKED_FIELDS: (keyof LocalTransaction)[] = [
  * Column IDs that should be pinned to the left/right of the grid
  */
 export const PINNED_COLUMNS = {
-  left: ["select", "status", "date", "accountName", "activityType"] as const,
+  left: ["select", "date", "accountName", "activityType"] as const,
   right: ["actions"] as const,
 };
 
