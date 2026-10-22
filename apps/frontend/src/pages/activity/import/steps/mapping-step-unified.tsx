@@ -50,6 +50,7 @@ import {
 
 import { shouldResolveImportAsset } from "@/lib/activity-utils";
 import { ImportFormat, type ActivityType } from "@/lib/constants";
+import { generateId } from "@/lib/id";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, CsvRowData, ImportTemplateData } from "@/lib/types";
 import { ImportType } from "@/lib/types";
@@ -708,7 +709,7 @@ export function MappingStepUnified() {
     const templateId =
       state.selectedTemplateId && state.selectedTemplateScope === "USER"
         ? state.selectedTemplateId
-        : crypto.randomUUID();
+        : generateId();
 
     saveTemplateMutation.mutate(buildTemplatePayload(templateId));
   }, [
@@ -727,7 +728,7 @@ export function MappingStepUnified() {
       return;
     }
 
-    saveTemplateMutation.mutate(buildTemplatePayload(crypto.randomUUID()));
+    saveTemplateMutation.mutate(buildTemplatePayload(generateId()));
   }, [buildTemplatePayload, saveTemplateMutation, templateName, t]);
 
   const handleDeleteTemplate = useCallback(() => {
