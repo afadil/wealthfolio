@@ -29,7 +29,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { observeElementOffset, useVirtualizer } from "@tanstack/react-virtual";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   AmountDisplay,
   Button,
@@ -68,7 +68,10 @@ import { InfiniteScrollTrigger } from "@/components/infinite-scroll-trigger";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useHorizontalOverflow } from "@/hooks/use-horizontal-overflow";
 import { usePersistentState } from "@/hooks/use-persistent-state";
-import { useVirtualScrollContainer } from "@/hooks/use-virtual-scroll-container";
+import {
+  observeCurrentScrollOffset,
+  useVirtualScrollContainer,
+} from "@/hooks/use-virtual-scroll-container";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
@@ -855,10 +858,7 @@ export const ActivityTable = ({
     getScrollElement: () => scrollElement,
     // A tab can mount this table inside an already-scrolled page. Read the
     // current offset before the virtualizer performs its initial scrollTo.
-    observeElementOffset: (instance, onChange) => {
-      onChange(instance.scrollElement?.scrollTop ?? 0, false);
-      return observeElementOffset(instance, onChange);
-    },
+    observeElementOffset: observeCurrentScrollOffset,
     estimateSize: (index) => (listItems[index]?.kind === "header" ? DAY_HEADER_HEIGHT : ROW_HEIGHT),
     getItemKey,
     overscan: OVERSCAN,
@@ -888,17 +888,9 @@ export const ActivityTable = ({
   // the Total column is hidden.
   const cashColumnIndex = visibleColumns.findIndex((column) => column.id === "value");
 
-  if (isLoading) {
-    return (
-      <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-        {t("activity:table.loading")}
-      </div>
-    );
-  }
-
   const hasRows = tableRows.length > 0;
 
-  if (!hasRows) {
+  if (!hasRows && !isLoading) {
     return (
       <div className="flex h-full flex-col">
         <Empty>
@@ -1003,54 +995,62 @@ export const ActivityTable = ({
               rendered window are stood in for by one spacer row at each end
               and the real rows stay in normal table flow. */}
           <TableBody ref={listRef}>
-            {paddingTop > 0 && (
+            {isLoading && (
+              <TableRow>
+                <TableCell colSpan={columnCount} className="text-muted-foreground h-32 text-center">
+                  <span role="status">{t("activity:table.loading")}</span>
+                </TableCell>
+              </TableRow>
+            )}
+            {!isLoading && paddingTop > 0 && (
               <TableRow aria-hidden className="hover:bg-transparent">
                 <TableCell colSpan={columnCount} className="p-0" style={{ height: paddingTop }} />
               </TableRow>
             )}
-            {virtualItems.map((virtualItem) => {
-              const listItem = listItems[virtualItem.index];
-              if (!listItem) return null;
-              if (listItem.kind === "header") {
+            {!isLoading &&
+              virtualItems.map((virtualItem) => {
+                const listItem = listItems[virtualItem.index];
+                if (!listItem) return null;
+                if (listItem.kind === "header") {
+                  return (
+                    <ActivityDayHeaderRow
+                      key={virtualItem.key}
+                      ref={virtualizer.measureElement}
+                      data-index={virtualItem.index}
+                      group={listItem.group}
+                      date={listItem.group.items[0].original.date}
+                      isPartial={hasNextPage && listItem.isLastGroup}
+                      columnCount={columnCount}
+                      cashColumnIndex={cashColumnIndex}
+                    />
+                  );
+                }
+                const row = listItem.item;
                 return (
-                  <ActivityDayHeaderRow
+                  <TableRow
                     key={virtualItem.key}
                     ref={virtualizer.measureElement}
                     data-index={virtualItem.index}
-                    group={listItem.group}
-                    date={listItem.group.items[0].original.date}
-                    isPartial={hasNextPage && listItem.isLastGroup}
-                    columnCount={columnCount}
-                    cashColumnIndex={cashColumnIndex}
-                  />
+                    className={cn(
+                      "group/row cursor-pointer",
+                      row.original.needsReview && NEEDS_REVIEW_ROW_CLASS,
+                    )}
+                    onClick={(e) => isRowBodyClick(e) && handleEdit(row.original)}
+                  >
+                    {row.getVisibleCells().map((cell, cellIndex) => (
+                      <TableCell
+                        key={cell.id}
+                        className={cn("px-3 py-2", cellIndex === 0 && "relative")}
+                        data-row-click-ignore={cell.column.id === "actions" || undefined}
+                      >
+                        {cellIndex === 0 && row.original.needsReview && <NeedsReviewStripe />}
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
                 );
-              }
-              const row = listItem.item;
-              return (
-                <TableRow
-                  key={virtualItem.key}
-                  ref={virtualizer.measureElement}
-                  data-index={virtualItem.index}
-                  className={cn(
-                    "group/row cursor-pointer",
-                    row.original.needsReview && NEEDS_REVIEW_ROW_CLASS,
-                  )}
-                  onClick={(e) => isRowBodyClick(e) && handleEdit(row.original)}
-                >
-                  {row.getVisibleCells().map((cell, cellIndex) => (
-                    <TableCell
-                      key={cell.id}
-                      className={cn("px-3 py-2", cellIndex === 0 && "relative")}
-                      data-row-click-ignore={cell.column.id === "actions" || undefined}
-                    >
-                      {cellIndex === 0 && row.original.needsReview && <NeedsReviewStripe />}
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              );
-            })}
-            {paddingBottom > 0 && (
+              })}
+            {!isLoading && paddingBottom > 0 && (
               <TableRow aria-hidden className="hover:bg-transparent">
                 <TableCell
                   colSpan={columnCount}

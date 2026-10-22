@@ -40,6 +40,11 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
   const backButtonRef = useRef<HTMLButtonElement>(null);
   const profileButtonRef = useRef<HTMLButtonElement>(null);
   const showProfileView = (show: boolean) => {
+    // Keep focus inside the sheet while its focused button is replaced. Base UI
+    // otherwise restores the popup's focus next frame, overriding our target.
+    (show ? profileButtonRef : backButtonRef).current
+      ?.closest<HTMLElement>('[data-slot="sheet-content"]')
+      ?.focus();
     setProfileView(show);
     requestAnimationFrame(() => {
       (show ? backButtonRef : profileButtonRef).current?.focus();

@@ -1,5 +1,8 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
+import { Toaster, toast } from "sonner";
+import "sonner/dist/styles.css";
 import { AppDirectionProvider } from "@/i18n/direction";
 import i18next from "@/i18n/i18n";
 import {
@@ -197,6 +200,16 @@ function SampleSelect({ label }: { label: string }) {
 }
 
 function Fixture() {
+  useEffect(() => {
+    if (!params.has("blockingToast")) return;
+    const id = toast.loading("Calculating portfolio performance...", {
+      duration: Infinity,
+      action: { label: "View details", onClick: () => toast.dismiss() },
+    });
+    return () => {
+      toast.dismiss(id);
+    };
+  }, []);
   const [showFees, setShowFees] = useState(true);
   const [density, setDensity] = useState("comfortable");
   const [deleted, setDeleted] = useState(false);
@@ -533,6 +546,7 @@ function Fixture() {
           </div>
         </Section>
       </main>
+      {params.has("blockingToast") && createPortal(<Toaster closeButton />, document.body)}
     </TooltipProvider>
   );
 }

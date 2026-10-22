@@ -1028,8 +1028,8 @@ const AccountPage = () => {
       <PageContent>
         {hasHoldings && !isHoldingsLoading ? (
           <>
-            <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
-              <Card className="col-span-1 md:col-span-2">
+            <div className="grid grid-cols-1 gap-4 pt-0 lg:grid-cols-3">
+              <Card className="col-span-1 lg:col-span-2">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
                   <CardTitle className="text-md">
                     <PortfolioUpdateTrigger

@@ -1,4 +1,11 @@
 import { useCallback, useLayoutEffect, useState } from "react";
+import { observeElementOffset } from "@tanstack/react-virtual";
+
+/** Seed a newly mounted activity list before the virtualizer's initial scrollTo. */
+export const observeCurrentScrollOffset: typeof observeElementOffset = (instance, onChange) => {
+  onChange(instance.scrollElement?.scrollTop ?? 0, false);
+  return observeElementOffset(instance, onChange);
+};
 
 /**
  * Markers for the scroll port a virtualized list measures against.

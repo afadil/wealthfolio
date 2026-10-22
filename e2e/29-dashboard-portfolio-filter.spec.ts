@@ -6,6 +6,12 @@ test("dashboard portfolio selection, creation, persistence, deletion and mobile 
 }, testInfo) => {
   test.setTimeout(180000);
   await completeOnboardingIfNeeded(page);
+  // These exact portfolio amounts are in CAD; earlier specs can change the
+  // profile's reporting currency.
+  const currency = await page.request.put(`${BASE_URL}/api/v1/settings`, {
+    data: { baseCurrency: "CAD" },
+  });
+  expect(currency.ok()).toBe(true);
   const accountIds: string[] = [];
   for (const [name, amount] of [
     ["Portfolio filter savings", 1000000],
@@ -36,6 +42,23 @@ test("dashboard portfolio selection, creation, persistence, deletion and mobile 
     });
     expect(deposit.ok()).toBe(true);
   }
+  // Wait for our deposits to be valued independently of the shared profile's
+  // other assets and liabilities; its net total may be less than our deposits.
+  for (const [index, accountId] of accountIds.entries()) {
+    await expect
+      .poll(
+        async () => {
+          const response = await page.request.post(`${BASE_URL}/api/v1/valuations/current/query`, {
+            data: { filter: { type: "account", accountId } },
+          });
+          expect(response.ok()).toBe(true);
+          return ((await response.json()) as { summary: { totalValueBase: number } }).summary
+            .totalValueBase;
+        },
+        { timeout: 30000 },
+      )
+      .toBe(index === 0 ? 1_000_000 : 200);
+  }
   // Other specs share this profile, so All Accounts shows whatever the whole
   // profile is worth: compare it with the valuation the dashboard reads. The
   // portfolio totals below stay exact.
@@ -56,7 +79,7 @@ test("dashboard portfolio selection, creation, persistence, deletion and mobile 
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           });
-          return total >= 1_000_200 && ((await balanceValue.textContent()) ?? "").includes(text);
+          return ((await balanceValue.textContent()) ?? "").includes(text);
         },
         { timeout: 30000 },
       )
