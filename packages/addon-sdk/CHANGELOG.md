@@ -223,6 +223,11 @@ and this project adheres to
 - `IncomeSummary.yoyGrowth` is `null` for `YTD` and `LAST_YEAR` when the year
   before has no income to compare with, instead of `0`.
 
+- `DateRangeSelector` and `IntervalSelector` carry `data-no-swipe-drag`, so on a
+  page that switches views with a horizontal swipe, a sideways drag on them
+  scrolls their presets instead. On phones `DateRangeSelector` uses the
+  `compact` size, as `IntervalSelector` does.
+
 ### Deprecated
 
 These keep addons built against earlier SDKs working on the Base UI components.
