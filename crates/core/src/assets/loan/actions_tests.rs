@@ -501,7 +501,7 @@ fn a_kept_payment_changes_only_the_schedule_from_the_new_rate() {
 }
 
 #[test]
-fn a_rate_already_in_effect_adds_no_rate_event() {
+fn a_letters_rate_is_kept_with_its_payment_even_when_unchanged() {
     let loan = record(
         with_events(
             json!({ "loan_projection": terms() }),
@@ -509,15 +509,24 @@ fn a_rate_already_in_effect_adds_no_rate_event() {
         ),
         &[("2026-01-01", 1200.0, None)],
     );
-    // The renewal set 5%, so only the letter's payment is new.
+    // The renewal already set 5%; the letter's rate is recorded with its payment.
     let update = apply(&loan, change_rate("2026-06-01", 5.0, Some(110.0))).unwrap();
     assert_eq!(
         events(update.metadata.as_ref().unwrap()),
         vec![
             renewal("2026-05-01", 5.0, None),
+            rate("2026-06-01", 5.0),
             payment("2026-06-01", 110.0)
         ]
     );
+    // Deleting the renewal later doesn't carry the original 0% past the letter.
+    let letter = record(update.metadata.unwrap(), &[("2026-01-01", 1200.0, None)]);
+    let without = apply(&letter, edit(0, renewal("2026-05-01", 5.0, None), None)).unwrap();
+    let after = letter
+        .calculation(without.metadata.as_ref().unwrap(), date("2026-07-15"))
+        .unwrap();
+    assert_eq!(after.annual_rate, 5.0);
+    // The rate already in effect with no payment would record nothing.
     assert_eq!(
         apply(&loan, change_rate("2026-06-01", 5.0, None)).unwrap_err(),
         LoanError::Invalid
