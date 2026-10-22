@@ -151,7 +151,9 @@ export function DateRangeSelector({ value, onChange, hiddenRanges = [], asOf = n
   );
 
   return (
-    <div className="flex items-center space-x-1">
+    // data-no-swipe-drag: on a swipe page, a sideways drag scrolls the presets instead of
+    // switching the page's view.
+    <div className="flex items-center space-x-1" data-no-swipe-drag>
       <AnimatedToggleGroup
         items={visibleRanges.map((range) => ({
           value: range.label,
@@ -168,7 +170,7 @@ export function DateRangeSelector({ value, onChange, hiddenRanges = [], asOf = n
             onChange(selectedRange.getValue(asOf));
           }
         }}
-        size="sm"
+        size={isMobile ? "compact" : "sm"}
         variant="secondary"
       />
 

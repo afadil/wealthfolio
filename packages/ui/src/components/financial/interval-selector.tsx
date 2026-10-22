@@ -143,7 +143,9 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
   }));
 
   return (
-    <div className={cn("pointer-events-none relative w-full min-w-0", className)}>
+    // data-no-swipe-drag: on a swipe page, a sideways drag scrolls the intervals instead of
+    // switching the page's view.
+    <div className={cn("pointer-events-none relative w-full min-w-0", className)} data-no-swipe-drag>
       <div
         className={cn(
           "pointer-events-none relative z-30 flex w-full justify-center overflow-x-auto overflow-y-hidden",
