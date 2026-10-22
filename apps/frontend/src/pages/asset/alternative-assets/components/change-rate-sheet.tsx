@@ -16,7 +16,7 @@ import {
   LoanSheetFooter,
 } from "./loan-sheet-content";
 import { Label } from "@wealthfolio/ui/components/ui/label";
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { formatDateISO } from "@/lib/utils";
 import { inheritedLoanSettings } from "../lib/loan-event-editing";
@@ -57,14 +57,19 @@ export function ChangeRateSheet({ open, onOpenChange, metadata, onSubmit }: Chan
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const today = new Date();
-    setEffectiveDate(today);
-    setNewRate(String(rateOn(metadata, today)));
-    setPayment(undefined);
-    setSubmitError(null);
-  }, [metadata, open]);
+  // A fresh draft each time the sheet opens. A loan update while it is open
+  // keeps the draft; the checks below use the updated loan.
+  const [lastOpen, setLastOpen] = useState(false);
+  if (lastOpen !== open) {
+    setLastOpen(open);
+    if (open) {
+      const today = new Date();
+      setEffectiveDate(today);
+      setNewRate(String(rateOn(metadata, today)));
+      setPayment(undefined);
+      setSubmitError(null);
+    }
+  }
 
   const day = Number.isFinite(effectiveDate.getTime()) ? formatDateISO(effectiveDate) : "";
   const currentRate = inheritedLoanSettings(metadata, -1, day).annualRate;
@@ -144,7 +149,7 @@ export function ChangeRateSheet({ open, onOpenChange, metadata, onSubmit }: Chan
               maxDecimalPlaces={2}
               placeholder={t("asset:loanActions.payment_unchanged")}
               value={payment ?? null}
-              onValueChange={(value) => setPayment(value || undefined)}
+              onValueChange={(value) => setPayment(value)}
               disabled={isSubmitting}
             />
           </div>
