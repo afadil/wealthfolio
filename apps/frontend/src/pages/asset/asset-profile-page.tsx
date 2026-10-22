@@ -1376,10 +1376,19 @@ export const AssetProfilePage = () => {
                                 },
                               ]
                             : []),
-                          ...(altAssetActions.loanAvailability.recalculate
+                          ...(altAssetActions.loanAvailability.changeRate
                             ? [
                                 {
                                   icon: Icons.Percent,
+                                  label: t("asset:loanActions.change_rate"),
+                                  onClick: altAssetActions.loanActions.changeRate,
+                                },
+                              ]
+                            : []),
+                          ...(altAssetActions.loanAvailability.recalculate
+                            ? [
+                                {
+                                  icon: Icons.DollarSign,
                                   label: t("asset:loanActions.recalculate_schedule"),
                                   onClick: altAssetActions.loanActions.recalculate,
                                 },

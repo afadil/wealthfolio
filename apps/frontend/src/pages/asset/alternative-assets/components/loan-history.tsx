@@ -18,7 +18,7 @@ import {
 import type { AlternativeAssetHolding, Quote } from "@/lib/types";
 import type { LoanCalculation } from "@/adapters/shared/alternative-assets";
 import { cn } from "@/lib/utils";
-import { canRenewLoan } from "../lib/loan-events";
+import { canRenewLoan, readActiveLoanProjection } from "../lib/loan-events";
 import {
   buildLoanLedger,
   collapsePaymentRuns,
@@ -334,6 +334,11 @@ function LoanLedger({ holding, calculation, quotes, actions, onEditDetails }: Lo
               <DropdownMenuItem onClick={actions.extraPayment}>
                 {t("asset:loanActions.extra_repayment")}
               </DropdownMenuItem>
+              {readActiveLoanProjection(metadata) && (
+                <DropdownMenuItem onClick={actions.changeRate}>
+                  {t("asset:loanActions.change_rate")}
+                </DropdownMenuItem>
+              )}
               {canRenewLoan(metadata) && (
                 <DropdownMenuItem onClick={actions.renew}>
                   {t(

@@ -28,9 +28,12 @@ export function inheritedLoanSettings(metadata: LoanMetadata, index: number, dat
     ),
   });
   const priorMetadata = { ...metadata, [LOAN_EVENTS_METADATA_KEY]: preceding };
-  let interestMethod = readLoanProjectionMetadata(metadata)?.interestMethod ?? "nominal_periodic";
+  const projection = readLoanProjectionMetadata(metadata);
+  let interestMethod = projection?.interestMethod ?? "nominal_periodic";
+  let annualRate = projection?.annualRate ?? 0;
   for (const event of preceding) {
     if (event.type === "renewal" && event.interestMethod) interestMethod = event.interestMethod;
+    if (event.type === "renewal" || event.type === "rate_change") annualRate = event.annualRate;
   }
-  return { frequency: getLoanFrequencyAtDate(priorMetadata, date), interestMethod };
+  return { frequency: getLoanFrequencyAtDate(priorMetadata, date), interestMethod, annualRate };
 }

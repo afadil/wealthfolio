@@ -28,6 +28,7 @@ import {
   LoanBalanceEventDialog,
 } from "../components/loan-action-dialogs";
 import { RenewLoanDialog, type LoanRenewalInput } from "../components/renew-loan-dialog";
+import { ChangeRateSheet, type LoanRateChangeInput } from "../components/change-rate-sheet";
 import { isStaleLoanError, loanErrorText } from "../components/loan-error-text";
 
 import { LoanEventSheet, type LoanSheetEntry } from "../components/loan-event-sheet";
@@ -41,6 +42,7 @@ export interface LoanActionCallbacks {
   confirmBalance: () => void;
   extraPayment: () => void;
   renew: () => void;
+  changeRate: () => void;
   recalculate: () => void;
   close: () => void;
   /** Record a dated payment change, as repeated payment differences suggest. */
@@ -123,6 +125,7 @@ export function useLoanActions(
   const paymentAccountId = paymentAccount?.id;
   const paidFrom = paymentAccount?.name;
   const [closeLoanOpen, setCloseLoanOpen] = useState(false);
+  const [changeRateOpen, setChangeRateOpen] = useState(false);
   const [recalculateScheduleOpen, setRecalculateScheduleOpen] = useState(false);
   const [renewLoanOpen, setRenewLoanOpen] = useState(false);
   const [balanceCorrectionOpen, setBalanceCorrectionOpen] = useState(false);
@@ -136,6 +139,21 @@ export function useLoanActions(
     } catch (cause) {
       toast({ title: loanErrorText(t, cause, "asset:loanEvents.failed"), variant: "destructive" });
     }
+  };
+
+  const handleChangeRate = async ({
+    effectiveDate,
+    annualRate,
+    paymentAmount,
+  }: LoanRateChangeInput) => {
+    if (!holding) return;
+    await run({
+      type: "change_rate",
+      date: formatDateISO(effectiveDate),
+      annualRate,
+      paymentAmount,
+    });
+    setChangeRateOpen(false);
   };
 
   const handleRecalculateSchedule = async (newRate: number, effectiveDate: Date) => {
@@ -231,6 +249,7 @@ export function useLoanActions(
   const isMortgage = (metadata.sub_type ?? metadata.liability_type) === "mortgage";
   const availability = {
     mortgage: isMortgage,
+    changeRate: !!storedProjection,
     recalculate: !!storedProjection,
     renew: canRenewLoan(metadata),
   };
@@ -244,6 +263,7 @@ export function useLoanActions(
     confirmBalance: () => setBalanceCorrectionOpen(true),
     extraPayment: () => setExtraRepaymentOpen(true),
     renew: () => setRenewLoanOpen(true),
+    changeRate: () => setChangeRateOpen(true),
     recalculate: () => setRecalculateScheduleOpen(true),
     close: () => setCloseLoanOpen(true),
     changePayment: async (date, paymentAmount) => {
@@ -303,6 +323,13 @@ export function useLoanActions(
             onOpenChange={setCloseLoanOpen}
             onSubmit={handleCloseLoan}
             originationDate={loanOriginationDate ? parseISO(loanOriginationDate) : null}
+          />
+          <ChangeRateSheet
+            open={changeRateOpen}
+            onOpenChange={setChangeRateOpen}
+            interestRate={activeInterestRate}
+            metadata={metadata}
+            onSubmit={handleChangeRate}
           />
           <RecalculateScheduleDialog
             open={recalculateScheduleOpen}
