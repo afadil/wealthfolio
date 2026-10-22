@@ -212,6 +212,8 @@ export type LoanAction =
   | { type: "extra_repayment"; date: string; amount: number }
   | { type: "close"; date: string }
   | { type: "recalculate"; date: string; annualRate: number }
+  /** Omitted payment: the current payment continues. */
+  | { type: "change_rate"; date: string; annualRate: number; paymentAmount?: number }
   | {
       type: "renew";
       date: string;
