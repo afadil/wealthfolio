@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@/test/render";
 import { describe, expect, it, vi } from "vitest";
+import { formatDateISO } from "@/lib/utils";
 import { ChangeRateSheet } from "./change-rate-sheet";
 
 const metadata = {
@@ -14,16 +15,11 @@ const metadata = {
   loan_events: [{ type: "rate_change", effectiveDate: "2026-03-01", annualRate: 4.5 }],
 };
 
-const open = (onSubmit = vi.fn().mockResolvedValue(undefined)) => {
-  render(
-    <ChangeRateSheet
-      open
-      onOpenChange={vi.fn()}
-      interestRate={4.5}
-      metadata={metadata}
-      onSubmit={onSubmit}
-    />,
-  );
+const open = (
+  onSubmit = vi.fn().mockResolvedValue(undefined),
+  loan: Record<string, unknown> = metadata,
+) => {
+  render(<ChangeRateSheet open onOpenChange={vi.fn()} metadata={loan} onSubmit={onSubmit} />);
   return {
     onSubmit,
     save: screen.getByRole("button", { name: "Change interest rate" }),
@@ -43,6 +39,22 @@ describe("change interest rate", () => {
     expect(save).toBeDisabled();
     fireEvent.change(payment, { target: { value: "1050" } });
     expect(save).toBeEnabled();
+  });
+
+  it("starts from a rate already changed on today's date", () => {
+    // Saved on the device's date, which can be a day ahead of the settings
+    // timezone, so the calculation may still report the earlier rate.
+    const changedToday = {
+      ...metadata,
+      loan_events: [
+        ...metadata.loan_events,
+        { type: "rate_change", effectiveDate: formatDateISO(new Date()), annualRate: 5.25 },
+      ],
+    };
+    const { save, rate } = open(undefined, changedToday);
+    expect(rate).toHaveValue("5.25");
+    expect(screen.getByText("Rate on this date: 5.25%")).toBeInTheDocument();
+    expect(save).toBeDisabled();
   });
 
   it("keeps the current payment unless one is entered", async () => {

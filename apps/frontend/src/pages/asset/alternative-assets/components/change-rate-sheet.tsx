@@ -31,37 +31,37 @@ export interface LoanRateChangeInput {
 interface ChangeRateSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** The rate in effect today, the starting value. */
-  interestRate: number;
   metadata: Record<string, unknown>;
   onSubmit: (change: LoanRateChangeInput) => Promise<void>;
 }
 
+/** The rate in effect on a calendar day, including that day's recorded events. */
+function rateOn(metadata: Record<string, unknown>, date: Date) {
+  return inheritedLoanSettings(metadata, -1, formatDateISO(date)).annualRate;
+}
+
 /** Record a rate set by the lender. The payment stays unless a new one is entered. */
-export function ChangeRateSheet({
-  open,
-  onOpenChange,
-  interestRate,
-  metadata,
-  onSubmit,
-}: ChangeRateSheetProps) {
+export function ChangeRateSheet({ open, onOpenChange, metadata, onSubmit }: ChangeRateSheetProps) {
   const { t } = useTranslation();
   const { formatDecimal } = useNumberFormatting();
   const rateInputId = useId();
   const paymentInputId = useId();
   const [effectiveDate, setEffectiveDate] = useState<Date>(() => new Date());
-  const [newRate, setNewRate] = useState(String(interestRate));
+  // Starts from the rate on the default date, which the check below compares with.
+  // The calculation's rate is as of the settings timezone's day, which can differ.
+  const [newRate, setNewRate] = useState(() => String(rateOn(metadata, new Date())));
   const [payment, setPayment] = useState<number | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    setEffectiveDate(new Date());
-    setNewRate(String(interestRate));
+    const today = new Date();
+    setEffectiveDate(today);
+    setNewRate(String(rateOn(metadata, today)));
     setPayment(undefined);
     setSubmitError(null);
-  }, [interestRate, open]);
+  }, [metadata, open]);
 
   const day = Number.isFinite(effectiveDate.getTime()) ? formatDateISO(effectiveDate) : "";
   const currentRate = inheritedLoanSettings(metadata, -1, day).annualRate;

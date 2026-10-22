@@ -265,7 +265,7 @@ describe("loan actions are single backend calls", () => {
     show();
     expect(availability.changeRate).toBe(true);
     act(() => actions.changeRate());
-    expect(mocks.rateSheet.mock.lastCall![0]).toMatchObject({ open: true, interestRate: 4 });
+    expect(mocks.rateSheet.mock.lastCall![0].open).toBe(true);
     await act(async () => {
       await mocks.rateSheet.mock.lastCall![0].onSubmit({
         effectiveDate: new Date(2026, 5, 1),
