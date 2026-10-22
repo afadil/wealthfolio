@@ -3051,3 +3051,40 @@ mod service_tests {
             .is_err());
     }
 }
+
+#[test]
+fn test_extract_addon_zip_rejects_traversal_with_invalid_utf8_name() {
+    let mut zip_data = build_test_addon_zip(&[
+        (
+            "manifest.json",
+            r#"{"id":"test-addon","name":"Test Addon","version":"1.0.0","main":"addon.js"}"#,
+        ),
+        ("addon.js", "console.log('ok');"),
+        ("safe/xx/extra.bin", "unused"),
+    ]);
+    assert!(extract_addon_zip_internal(zip_data.clone()).is_ok());
+
+    // A malformed encoding prefix must not hide a parent-traversal segment.
+    // The valid manifest and main script remain untouched.
+    let filename = b"safe/xx/extra.bin";
+    let mut changed = 0;
+    for (signature, name_offset, flags_offset) in [
+        (b"PK\x03\x04", 30_usize, 6_usize),
+        (b"PK\x01\x02", 46_usize, 8_usize),
+    ] {
+        for offset in 0..zip_data.len().saturating_sub(name_offset + filename.len()) {
+            if &zip_data[offset..offset + 4] == signature
+                && &zip_data[offset + name_offset..offset + name_offset + filename.len()]
+                    == filename
+            {
+                zip_data[offset + name_offset] = 0xff;
+                zip_data[offset + name_offset + 5] = b'.';
+                zip_data[offset + name_offset + 6] = b'.';
+                zip_data[offset + flags_offset + 1] |= 0x08;
+                changed += 1;
+            }
+        }
+    }
+    assert_eq!(changed, 2);
+    assert!(extract_addon_zip_internal(zip_data).is_err());
+}

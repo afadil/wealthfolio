@@ -103,3 +103,7 @@ wealthfolio-spending = { path = "crates/spending" }
 wealthfolio-agent-tools = { path = "crates/agent-tools" }
 wealthfolio-mcp = { path = "crates/wealthfolio-mcp" }
 wealthfolio-portfolio-engine = { path = "crates/portfolio-engine" }
+
+# Security backport: upstream updater zip 9 dependency migration.
+[patch.crates-io]
+tauri-plugin-updater = { path = "vendor/tauri-plugin-updater" }
