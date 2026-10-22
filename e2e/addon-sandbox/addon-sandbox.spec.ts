@@ -68,6 +68,10 @@ function PackagedAssetProbe({ logoUrl }) {
 }
 
 export async function enable(context) {
+  // Sandboxed request and route IDs must work even without the crypto object.
+  Object.defineProperty(globalThis, "crypto", { configurable: true, value: undefined });
+  await context.router.add({ path: "", render() {} });
+  await context.router.add({ path: "", render() {} });
   if (!addonCss.includes("packaged-background")) {
     throw new Error("Native CSS import did not resolve to its packaged source");
   }
@@ -174,7 +178,7 @@ test("boots the opaque sandbox from parent-delivered Blobs without child request
         .querySelector('meta[http-equiv="Content-Security-Policy"]')
         ?.getAttribute("content");
 
-      return new Promise<{ csp: string; embedderCsp: string; sandbox: string }>(
+      return new Promise<{ csp: string; embedderCsp: string; sandbox: string; routeIds: string[] }>(
         (resolve, reject) => {
           const iframe = document.createElement("iframe");
           iframe.setAttribute("sandbox", "allow-scripts");
@@ -188,6 +192,7 @@ test("boots the opaque sandbox from parent-delivered Blobs without child request
           const timer = window.setTimeout(() => reject(new Error("Sandbox did not load")), 15_000);
           let addonLoaded = false;
           const packagedAssetsReturned = new Set<string>();
+          const routeIds: string[] = [];
           let packagedAssetLoaded = false;
           let tickerLogoReturned = false;
           let tickerAvatarLoaded = false;
@@ -208,6 +213,7 @@ test("boots the opaque sandbox from parent-delivered Blobs without child request
               csp: csp || "",
               embedderCsp: embedderCsp || "",
               sandbox: iframe.getAttribute("sandbox") || "",
+              routeIds,
             });
           };
 
@@ -263,6 +269,9 @@ test("boots the opaque sandbox from parent-delivered Blobs without child request
                   },
                 ],
               });
+            } else if (message.type === "router.add") {
+              routeIds.push(message.route.routeId);
+              post("rpcResponse", { ok: true, requestId: message.requestId });
             } else if (message.type === "addonAssetRequest") {
               const result =
                 message.assetId === "packaged-pixel"
@@ -316,6 +325,9 @@ test("boots the opaque sandbox from parent-delivered Blobs without child request
   );
 
   expect(result.sandbox).toBe("allow-scripts");
+  expect(result.routeIds).toHaveLength(2);
+  expect(result.routeIds.every((id) => /^[A-Za-z0-9_-]{21}$/.test(id))).toBe(true);
+  expect(result.routeIds[0]).not.toBe(result.routeIds[1]);
   expect(result.embedderCsp).toContain(`'${SANDBOX_BOOTSTRAP_HASH}'`);
   expect(result.embedderCsp).toContain("'wasm-unsafe-eval'");
   expect(result.embedderCsp).toContain("frame-src 'none'");
