@@ -310,7 +310,7 @@ export function RenewLoanDialog({
                 maxDecimalPlaces={2}
                 placeholder={t("asset:loanActions.payment_unchanged")}
                 value={payment ?? null}
-                onValueChange={(value) => setPayment(value || undefined)}
+                onValueChange={(value) => setPayment(value)}
               />
               {paymentMissing && (
                 <p className="text-warning text-xs">
