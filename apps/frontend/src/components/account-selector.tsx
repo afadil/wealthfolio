@@ -256,11 +256,12 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
               className={cn(
                 "h-full w-full justify-center rounded-lg border p-2 transition-colors",
                 !selectedAccount && "border-dashed",
+                // Dark mode: the empty card keeps the field fill and border of its dashed outline.
                 open
                   ? "border-primary bg-primary/5"
                   : selectedAccount
                     ? "border-border bg-background"
-                    : "border-border bg-background/50 hover:bg-background/80 hover:border-muted-foreground/50",
+                    : "border-border bg-background/50 hover:bg-background/80 hover:border-muted-foreground/50 dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
               )}
             >
               <div className="flex flex-col items-center justify-center space-y-1">

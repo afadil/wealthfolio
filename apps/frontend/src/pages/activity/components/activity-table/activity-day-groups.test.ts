@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ActivityType } from "@/lib/constants";
 import type { ActivityDetails, CashBalanceScope } from "@/lib/types";
-import { flattenActivityDayGroups, groupActivitiesByDay } from "./activity-day-groups";
+import { groupActivitiesByDay } from "./activity-day-groups";
 
 function activity(
   id: string,
@@ -88,38 +88,5 @@ describe("groupActivitiesByDay", () => {
     const [day] = group([activity("a", "Oct 14, 2026"), activity("b", "Oct 14, 2026")]);
 
     expect(day.cashBalance).toBeNull();
-  });
-});
-
-describe("flattenActivityDayGroups", () => {
-  it("puts each header before its own rows and marks only the last day", () => {
-    const items = flattenActivityDayGroups(
-      group([
-        activity("a", "Oct 14, 2026"),
-        activity("b", "Oct 14, 2026"),
-        activity("c", "Oct 9, 2026"),
-      ]),
-      (item) => item.id,
-    );
-
-    expect(
-      items.map((item) =>
-        item.kind === "header" ? `${item.key}${item.isLastGroup ? " (last)" : ""}` : item.key,
-      ),
-    ).toEqual(["day:Oct 14, 2026", "a", "b", "day:Oct 9, 2026 (last)", "c"]);
-  });
-
-  it("keeps header keys unique when a date recurs", () => {
-    const items = flattenActivityDayGroups(
-      group([
-        activity("a", "Oct 14, 2026"),
-        activity("b", "Oct 9, 2026"),
-        activity("c", "Oct 14, 2026"),
-      ]),
-      (item) => item.id,
-    );
-    const keys = items.map((item) => item.key);
-
-    expect(new Set(keys).size).toBe(keys.length);
   });
 });

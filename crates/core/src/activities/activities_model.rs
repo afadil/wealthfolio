@@ -1944,7 +1944,8 @@ mod optional_decimal_format {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IncomeData {
-    pub date: String,
+    /// When the income was received.
+    pub activity_date: DateTime<Utc>,
     pub income_type: String,
     pub asset_id: String,
     pub asset_kind: String,

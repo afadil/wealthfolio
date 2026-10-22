@@ -192,20 +192,30 @@ export default function IncomePage() {
     getPreviousPeriodData(month),
   ]);
 
+  // Compare the server-computed monthly averages. All Time has no previous period.
+  const previousPeriod =
+    selectedPeriod === "YTD"
+      ? "LAST_YEAR"
+      : selectedPeriod === "LAST_YEAR"
+        ? "TWO_YEARS_AGO"
+        : null;
   const previousMonthlyAverage =
-    previousMonthlyIncomeData.length > 0
-      ? previousMonthlyIncomeData.reduce((sum, [, value]) => {
-          const numericValue = Number(value) || 0;
-          return sum + numericValue;
-        }, 0) / previousMonthlyIncomeData.length
-      : 0;
+    Number(incomeData.find((summary) => summary.period === previousPeriod)?.monthlyAverage) || 0;
 
   const currentMonthlyAverageNumber = Number(monthlyAverage) || 0;
 
   const monthlyAverageChange =
     previousMonthlyAverage > 0
       ? (currentMonthlyAverageNumber - previousMonthlyAverage) / previousMonthlyAverage
-      : 0;
+      : null;
+
+  // Shown instead of a change when the earlier period has nothing to compare
+  // with: no income, only income without an exchange rate, or an average that
+  // rounds to zero.
+  const noComparisonLabel =
+    selectedPeriod === "LAST_YEAR"
+      ? t("income:no_comparison_year_before")
+      : t("income:no_comparison_last_year");
 
   // Only converted income gets a slice: income without an exchange rate has
   // none, and a zero-sized slice would still add padding to the pie.
@@ -261,7 +271,9 @@ export default function IncomePage() {
                       </div>
                     ) : (
                       <p className="text-muted-foreground text-xs">
-                        {t("income:cumulative_income")}
+                        {selectedPeriod === "ALL"
+                          ? t("income:cumulative_income")
+                          : noComparisonLabel}
                       </p>
                     )}
                   </div>
@@ -349,12 +361,20 @@ export default function IncomePage() {
                   isHidden={isBalanceHidden}
                 />
               </div>
-              <div className="flex items-center text-xs">
-                <GainPercent value={monthlyAverageChange} className="text-start text-xs" />
-                <span className="text-muted-foreground ms-2 text-xs">
-                  {t("income:since_last_period_label")}
-                </span>
-              </div>
+              {monthlyAverageChange !== null ? (
+                <div className="flex items-center text-xs">
+                  <GainPercent value={monthlyAverageChange} className="text-start text-xs" />
+                  <span className="text-muted-foreground ms-2 text-xs">
+                    {t("income:since_last_period_label")}
+                  </span>
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-xs">
+                  {selectedPeriod === "ALL"
+                    ? t("income:average_since_inception")
+                    : noComparisonLabel}
+                </p>
+              )}
             </CardContent>
           </Card>
           <Card className="border-warning/10 bg-warning/10">

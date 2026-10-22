@@ -111,6 +111,7 @@
     "description": "Selecione contas para comparar seu desempenho ao longo do tempo."
   },
   "attribution": {
+    "partial_data": "Dados parciais",
     "title": "Atribuição",
     "close": "Fechar atribuição",
     "period_gain_loss": "Ganho/perda do período",

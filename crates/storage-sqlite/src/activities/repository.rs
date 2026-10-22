@@ -2412,7 +2412,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
         let effective_type = effective_type_sql("a");
         let query = format!(
             "SELECT a.id as activity_id,
-             strftime('%Y-%m', a.activity_date) as date,
+             CAST(strftime('%s', a.activity_date) AS INTEGER) as activity_timestamp,
              {effective_type} as income_type,
              COALESCE(a.asset_id, 'CASH') as asset_id,
              COALESCE(ast.kind, 'CASH') as asset_kind,
@@ -2443,8 +2443,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
         struct RawIncomeData {
             #[diesel(sql_type = diesel::sql_types::Text)]
             pub activity_id: String,
-            #[diesel(sql_type = diesel::sql_types::Text)]
-            pub date: String,
+            #[diesel(sql_type = diesel::sql_types::BigInt)]
+            pub activity_timestamp: i64,
             #[diesel(sql_type = diesel::sql_types::Text)]
             pub income_type: String,
             #[diesel(sql_type = diesel::sql_types::Text)]
@@ -2501,8 +2501,16 @@ impl ActivityRepositoryTrait for ActivityRepository {
             };
             let fee = Decimal::from_str(&raw.fee).unwrap_or_else(|_| Decimal::zero());
             let tax = Decimal::from_str(&raw.tax).unwrap_or_else(|_| Decimal::zero());
+            let Some(activity_date) = DateTime::from_timestamp(raw.activity_timestamp, 0) else {
+                log::warn!(
+                    "Skipping {} activity {} with invalid date in income report",
+                    raw.income_type,
+                    raw.activity_id
+                );
+                continue;
+            };
             results.push(IncomeData {
-                date: raw.date,
+                activity_date,
                 income_type: raw.income_type,
                 asset_id: raw.asset_id,
                 asset_kind: raw.asset_kind,
@@ -5172,6 +5180,41 @@ mod tests {
         let mut amounts: Vec<Decimal> = rows.iter().map(|row| row.amount).collect();
         amounts.sort_unstable();
         assert_eq!(amounts, vec![Decimal::from(3), Decimal::from(100)]);
+    }
+
+    #[tokio::test]
+    async fn income_report_reads_when_each_income_was_received() {
+        // The income page converts each row at the rate on that day.
+        let (pool, writer) = setup_db();
+        let repo = ActivityRepository::new(pool.clone(), writer);
+        let mut conn = get_connection(&pool).expect("conn");
+        insert_account(&mut conn, "acc-income");
+        for (id, stored) in [
+            ("synced", "2025-05-03T20:15:00+00:00"),
+            ("legacy", "2025-05-02 10:00:00"),
+        ] {
+            insert_activity_with_subtype(&mut conn, id, "acc-income", "DIVIDEND", None, None);
+            diesel::update(activities::table.find(id))
+                .set(activities::activity_date.eq(stored))
+                .execute(&mut conn)
+                .expect("activity date");
+        }
+
+        let rows = repo
+            .get_income_activities_data(Some(&[String::from("acc-income")]))
+            .expect("income data");
+        let instant = |value: &str| {
+            DateTime::parse_from_rfc3339(value)
+                .unwrap()
+                .with_timezone(&Utc)
+        };
+        assert_eq!(
+            rows.iter().map(|row| row.activity_date).collect::<Vec<_>>(),
+            vec![
+                instant("2025-05-02T10:00:00Z"),
+                instant("2025-05-03T20:15:00Z"),
+            ]
+        );
     }
 
     #[tokio::test]

@@ -537,7 +537,7 @@ export function CashActivityForm({
                         name="activityType"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-lg font-semibold">
+                            <FormLabel className="text-lg font-semibold leading-none">
                               {t("spending:cashForm.selectType")}
                             </FormLabel>
                             <FormControl>
@@ -888,8 +888,11 @@ export function CashActivityForm({
                     </Button>
                   )}
 
+                  {/* Separate keys: reusing one element would turn the pressed Next into a
+                      submit button before the click's default action runs, which submits. */}
                   {currentStep < 2 && !isEditing ? (
                     <Button
+                      key="next"
                       type="button"
                       onClick={handleMobileNext}
                       className="flex-1 font-medium"
@@ -900,6 +903,7 @@ export function CashActivityForm({
                     </Button>
                   ) : (
                     <Button
+                      key="submit"
                       type="submit"
                       className="flex-1 font-medium"
                       disabled={saveMutation.isPending}

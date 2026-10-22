@@ -687,6 +687,7 @@
     "remove": "إزالة تنسيق {{currency}}",
     "title": "تخصيص تنسيقات العملات"
   },
+  "currency_code_error": "أدخل رمز عملة صالحًا من 3 أحرف، مثل USD.",
   "currency_description": "اختر العملة الأساسية لمحفظتك.",
   "currency_save_button": "حفظ العملة",
   "currency_select_error": "يُرجى اختيار عملة أساسية.",

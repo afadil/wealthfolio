@@ -1,10 +1,11 @@
 use crate::constants::DISPLAY_DECIMAL_PRECISION;
-use crate::utils::time_utils::{parse_user_timezone_or_default, user_today};
+use crate::utils::time_utils::{activity_date_in_tz, parse_user_timezone_or_default, user_today};
 use crate::{
     activities::{ActivityError, ActivityRepositoryTrait, IncomeData},
     Error, Result,
 };
-use chrono::{Datelike, NaiveDate};
+use chrono::Datelike;
+use chrono_tz::Tz;
 
 use super::IncomeSummary;
 use crate::fx::FxServiceTrait;
@@ -52,21 +53,22 @@ impl IncomeService {
         }
     }
 
-    fn today_in_user_timezone(&self) -> NaiveDate {
-        let tz = parse_user_timezone_or_default(
+    fn user_timezone(&self) -> Tz {
+        parse_user_timezone_or_default(
             &self
                 .timezone
                 .read()
                 .unwrap_or_else(|poisoned| poisoned.into_inner()),
-        );
-        user_today(tz)
+        )
     }
 
-    fn calculate_yoy_growth(current: Decimal, previous: Decimal) -> Decimal {
+    /// `None` when the previous period has no income to compare with,
+    /// including when all of it was left out for lack of an exchange rate.
+    fn calculate_yoy_growth(current: Decimal, previous: Decimal) -> Option<Decimal> {
         if previous > Decimal::zero() {
-            (current - previous) / previous
+            Some((current - previous) / previous)
         } else {
-            Decimal::zero()
+            None
         }
     }
 }
@@ -96,7 +98,8 @@ impl IncomeServiceTrait for IncomeService {
             .read()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .clone();
-        let current_date = self.today_in_user_timezone();
+        let timezone = self.user_timezone();
+        let current_date = user_today(timezone);
         let current_year = current_date.year();
         let last_year = current_year - 1;
         let two_years_ago = current_year - 2;
@@ -122,6 +125,8 @@ impl IncomeServiceTrait for IncomeService {
                 }
             }
         };
+        // Months count in the user's timezone, as the income below does.
+        let oldest_date = activity_date_in_tz(oldest_date, timezone);
         let mut months_since_first_transaction: i32 =
             (current_date.year() - oldest_date.year()) * 12;
         months_since_first_transaction = months_since_first_transaction
@@ -144,20 +149,20 @@ impl IncomeServiceTrait for IncomeService {
         let mut two_years_ago_summary = IncomeSummary::new("TWO_YEARS_AGO", base_currency.clone());
 
         for activity in activities {
-            let date = match NaiveDate::parse_from_str(&format!("{}-01", activity.date), "%Y-%m-%d")
-            {
-                Ok(d) => d,
-                Err(e) => {
-                    error!("Error parsing date {}: {:?}", activity.date, e);
-                    continue;
-                }
-            };
+            // Income counts toward the month and year of the day it was
+            // received in the user's timezone, the date the activity list
+            // shows, not its UTC date.
+            let date = activity_date_in_tz(activity.activity_date, timezone);
+            let month = date.format("%Y-%m").to_string();
 
-            // Correctly call methods on the FxService instance within the Arc
-            let converted_amount = match self.fx_service.convert_currency(
+            // Income converts at the rate on the day it was received, as the
+            // holdings income column does, so past totals don't move with
+            // today's rate.
+            let converted_amount = match self.fx_service.convert_currency_for_date(
                 activity.amount,
                 &activity.currency,
                 &base_currency,
+                date,
             ) {
                 Ok(amount) => Some(amount),
                 Err(e) => {
@@ -171,7 +176,7 @@ impl IncomeServiceTrait for IncomeService {
 
             // Create a copy of the activity with cloned fields to avoid ownership issues
             let activity_copy = IncomeData {
-                date: activity.date.clone(),
+                activity_date: activity.activity_date,
                 income_type: activity.income_type.clone(),
                 asset_id: activity.asset_id.clone(),
                 asset_kind: activity.asset_kind.clone(),
@@ -184,7 +189,7 @@ impl IncomeServiceTrait for IncomeService {
             };
 
             let add = |summary: &mut IncomeSummary| match converted_amount {
-                Some(amount) => summary.add_income(&activity_copy, amount),
+                Some(amount) => summary.add_income(&activity_copy, &month, amount),
                 None => summary.add_unconverted_income(&activity_copy),
             };
             add(&mut total_summary);
@@ -213,8 +218,8 @@ impl IncomeServiceTrait for IncomeService {
             two_years_ago_summary.total_income,
         );
 
-        ytd_summary.yoy_growth = Some(ytd_yoy_growth);
-        last_year_summary.yoy_growth = Some(last_year_yoy_growth);
+        ytd_summary.yoy_growth = ytd_yoy_growth;
+        last_year_summary.yoy_growth = last_year_yoy_growth;
 
         // Two years ago YoY growth can't be calculated without activity from three years ago
         two_years_ago_summary.yoy_growth = None;
@@ -228,7 +233,7 @@ impl IncomeServiceTrait for IncomeService {
             .unconverted_currencies
             .extend(two_years_ago_summary.unconverted_currencies.iter().cloned());
 
-        // Round the calculated values before returning
+        // Round monetary values before returning, not the ratios formatted as percentages.
         let summaries = vec![
             total_summary,
             ytd_summary,
@@ -242,10 +247,6 @@ impl IncomeServiceTrait for IncomeService {
                 summary.total_income = summary.total_income.round_dp(DISPLAY_DECIMAL_PRECISION);
                 summary.monthly_average =
                     summary.monthly_average.round_dp(DISPLAY_DECIMAL_PRECISION);
-                if let Some(growth) = summary.yoy_growth {
-                    summary.yoy_growth = Some(growth.round_dp(DISPLAY_DECIMAL_PRECISION));
-                }
-
                 for val in summary.by_month.values_mut() {
                     *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
                 }

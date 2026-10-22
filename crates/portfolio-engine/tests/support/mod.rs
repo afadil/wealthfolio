@@ -1054,6 +1054,7 @@ impl Pipeline {
             lots,
             &self.bundle.disposals,
             &self.bundle.rejected_activities(),
+            MeasureProfile::Full,
         )
     }
 

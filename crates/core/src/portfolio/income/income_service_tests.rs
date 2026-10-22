@@ -12,7 +12,7 @@ use crate::limits::ContributionActivity;
 use crate::test_support::in_memory::InMemoryFxRepository;
 use crate::utils::clock;
 use crate::Result;
-use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, NaiveDate, NaiveTime, TimeZone, Utc};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use std::collections::{BTreeSet, HashMap};
@@ -230,6 +230,7 @@ impl ActivityRepositoryTrait for MockActivityRepository {
     }
 }
 
+/// Income received at UTC midnight on `date` (YYYY-MM-DD).
 fn income(
     date: &str,
     income_type: &str,
@@ -238,8 +239,9 @@ fn income(
     amount: Decimal,
     account_id: &str,
 ) -> IncomeData {
+    let day = NaiveDate::parse_from_str(date, "%Y-%m-%d").expect("a YYYY-MM-DD date");
     IncomeData {
-        date: date.to_string(),
+        activity_date: day.and_time(NaiveTime::MIN).and_utc(),
         income_type: income_type.to_string(),
         asset_id: asset_id.to_string(),
         asset_kind: "INVESTMENT".to_string(),
@@ -257,6 +259,78 @@ fn summary<'a>(summaries: &'a [IncomeSummary], period: &str) -> &'a IncomeSummar
         .iter()
         .find(|summary| summary.period == period)
         .expect("every period has a summary")
+}
+
+#[test]
+fn income_growth_preserves_hundredth_percent_precision() {
+    let _clock = clock::freeze(Utc.with_ymd_and_hms(2026, 6, 15, 12, 0, 0).unwrap());
+    let fx = Arc::new(FxService::new(Arc::new(InMemoryFxRepository::new(vec![]))));
+    fx.initialize().unwrap();
+    for (previous, current, percent) in [
+        (dec!(100), dec!(112.34), dec!(12.34)),
+        (dec!(100), dec!(87.66), dec!(-12.34)),
+        (dec!(110), dec!(2500), dec!(2172.73)),
+    ] {
+        let service = IncomeService::new(
+            fx.clone(),
+            Arc::new(MockActivityRepository {
+                income: Mutex::new(vec![
+                    income("2025-03-15", "INTEREST", "CASH:USD", "USD", previous, "a"),
+                    income("2026-03-15", "INTEREST", "CASH:USD", "USD", current, "a"),
+                ]),
+                first_activity_date: Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),
+            }),
+            Arc::new(RwLock::new("USD".into())),
+        );
+        let summaries = service.get_income_summary(None).unwrap();
+        let ytd = summary(&summaries, "YTD");
+        assert_eq!(ytd.total_income, current);
+        assert_eq!(summary(&summaries, "LAST_YEAR").total_income, previous);
+        assert_eq!(summary(&summaries, "ALL").total_income, previous + current);
+        assert_eq!(
+            (ytd.yoy_growth.expect("positive comparison") * dec!(100)).round_dp(2),
+            percent
+        );
+    }
+}
+
+#[test]
+fn growth_is_left_out_when_the_year_before_has_no_income() {
+    let _clock = clock::freeze(Utc.with_ymd_and_hms(2026, 6, 15, 12, 0, 0).unwrap());
+
+    let fx_service = FxService::new(Arc::new(InMemoryFxRepository::new(Vec::new())));
+    fx_service.initialize().unwrap();
+
+    let service = IncomeService::new(
+        Arc::new(fx_service),
+        Arc::new(MockActivityRepository {
+            income: Mutex::new(vec![
+                income("2025-05-15", "DIVIDEND", "SAP", "USD", dec!(110), "acc"),
+                income(
+                    "2026-03-15",
+                    "INTEREST",
+                    "CASH:USD",
+                    "USD",
+                    dec!(2500),
+                    "acc",
+                ),
+            ]),
+            first_activity_date: Utc.with_ymd_and_hms(2025, 5, 2, 0, 0, 0).unwrap(),
+        }),
+        Arc::new(RwLock::new("USD".to_string())),
+    );
+
+    let summaries = service.get_income_summary(None).unwrap();
+
+    // 2,500 this year against 110 last year.
+    assert_eq!(
+        summary(&summaries, "YTD").yoy_growth,
+        Some((dec!(2500) - dec!(110)) / dec!(110))
+    );
+    // No income in 2024, so last year's growth would read as 0%.
+    assert_eq!(summary(&summaries, "LAST_YEAR").yoy_growth, None);
+    assert_eq!(summary(&summaries, "TWO_YEARS_AGO").yoy_growth, None);
+    assert_eq!(summary(&summaries, "ALL").yoy_growth, None);
 }
 
 #[test]
@@ -278,10 +352,10 @@ fn income_without_an_exchange_rate_is_left_out_of_converted_totals() {
         Arc::new(fx_service),
         Arc::new(MockActivityRepository {
             income: Mutex::new(vec![
-                income("2024-09", "DIVIDEND", "VOD", "GBP", dec!(40), "acc-gbp"),
-                income("2025-05", "DIVIDEND", "SAP", "EUR", dec!(100), "acc-eur"),
+                income("2024-09-15", "DIVIDEND", "VOD", "GBP", dec!(40), "acc-gbp"),
+                income("2025-05-15", "DIVIDEND", "SAP", "EUR", dec!(100), "acc-eur"),
                 income(
-                    "2025-07",
+                    "2025-07-15",
                     "INTEREST",
                     "CASH:JPY",
                     "JPY",
@@ -289,7 +363,7 @@ fn income_without_an_exchange_rate_is_left_out_of_converted_totals() {
                     "acc-jpy",
                 ),
                 income(
-                    "2026-03",
+                    "2026-03-15",
                     "INTEREST",
                     "CASH:USD",
                     "USD",
@@ -297,7 +371,7 @@ fn income_without_an_exchange_rate_is_left_out_of_converted_totals() {
                     "acc-usd",
                 ),
                 income(
-                    "2026-04",
+                    "2026-04-15",
                     "INTEREST",
                     "CASH:INR",
                     "INR",
@@ -358,8 +432,132 @@ fn income_without_an_exchange_rate_is_left_out_of_converted_totals() {
         last_year.unconverted_currencies,
         currencies(&["GBP", "JPY"])
     );
+    // 2024's only income, in GBP, was left out: nothing to compare with.
+    assert_eq!(last_year.yoy_growth, None);
 
     let two_years_ago = summary(&summaries, "TWO_YEARS_AGO");
     assert_eq!(two_years_ago.total_income, dec!(0));
     assert_eq!(two_years_ago.unconverted_currencies, currencies(&["GBP"]));
+}
+
+#[test]
+fn income_converts_at_the_rate_on_the_day_it_was_received() {
+    let _clock = clock::freeze(Utc.with_ymd_and_hms(2026, 6, 15, 12, 0, 0).unwrap());
+
+    let eur_usd = |year: i32, month: u32, day: u32, rate: Decimal| ExchangeRate {
+        id: format!("EURUSD-{year}-{month}-{day}"),
+        from_currency: "EUR".to_string(),
+        to_currency: "USD".to_string(),
+        rate,
+        source: "MANUAL".to_string(),
+        timestamp: Utc.with_ymd_and_hms(year, month, day, 0, 0, 0).unwrap(),
+    };
+    let fx_service = FxService::new(Arc::new(InMemoryFxRepository::new(vec![
+        eur_usd(2025, 5, 2, dec!(1.05)),
+        eur_usd(2025, 5, 3, dec!(1.06)),
+        eur_usd(2025, 5, 4, dec!(1.08)),
+        eur_usd(2026, 6, 1, dec!(1.17)),
+    ])));
+    fx_service.initialize().unwrap();
+
+    let service = IncomeService::new_with_timezone(
+        Arc::new(fx_service),
+        Arc::new(MockActivityRepository {
+            income: Mutex::new(vec![
+                income("2025-05-02", "DIVIDEND", "SAP", "EUR", dec!(100), "acc-eur"),
+                // 20:00 UTC on 3 May is already 4 May in Tokyo.
+                IncomeData {
+                    activity_date: Utc.with_ymd_and_hms(2025, 5, 3, 20, 0, 0).unwrap(),
+                    ..income(
+                        "2025-05-03",
+                        "DIVIDEND",
+                        "ASML",
+                        "EUR",
+                        dec!(100),
+                        "acc-eur",
+                    )
+                },
+            ]),
+            first_activity_date: Utc.with_ymd_and_hms(2025, 5, 2, 0, 0, 0).unwrap(),
+        }),
+        Arc::new(RwLock::new("USD".to_string())),
+        Arc::new(RwLock::new("Asia/Tokyo".to_string())),
+    );
+
+    let summaries = service.get_income_summary(None).unwrap();
+
+    // Today's rate (1.17) would make each $117. The holdings income column
+    // converts on the activity's day in the user's timezone; so does this.
+    for period in ["ALL", "LAST_YEAR"] {
+        let summary = summary(&summaries, period);
+        assert_eq!(summary.by_asset["SAP"].income, dec!(105));
+        assert_eq!(summary.by_asset["ASML"].income, dec!(108));
+        assert_eq!(summary.total_income, dec!(213));
+        assert_eq!(summary.by_month.get("2025-05"), Some(&dec!(213)));
+    }
+}
+
+#[test]
+fn income_counts_toward_its_month_in_the_users_timezone() {
+    let _clock = clock::freeze(Utc.with_ymd_and_hms(2026, 6, 15, 12, 0, 0).unwrap());
+
+    let fx_service = FxService::new(Arc::new(InMemoryFxRepository::new(Vec::new())));
+    fx_service.initialize().unwrap();
+
+    let service = IncomeService::new_with_timezone(
+        Arc::new(fx_service),
+        Arc::new(MockActivityRepository {
+            income: Mutex::new(vec![
+                // 08:30 on 1 January 2026 in Tokyo is still 2025 in UTC.
+                IncomeData {
+                    activity_date: Utc.with_ymd_and_hms(2025, 12, 31, 23, 30, 0).unwrap(),
+                    ..income("2025-12-31", "DIVIDEND", "SAP", "USD", dec!(100), "acc-usd")
+                },
+                // 08:30 on 1 March 2026 in Tokyo.
+                IncomeData {
+                    activity_date: Utc.with_ymd_and_hms(2026, 2, 28, 23, 30, 0).unwrap(),
+                    ..income(
+                        "2026-02-28",
+                        "DIVIDEND",
+                        "ASML",
+                        "USD",
+                        dec!(100),
+                        "acc-usd",
+                    )
+                },
+            ]),
+            first_activity_date: Utc.with_ymd_and_hms(2025, 12, 31, 23, 30, 0).unwrap(),
+        }),
+        Arc::new(RwLock::new("USD".to_string())),
+        Arc::new(RwLock::new("Asia/Tokyo".to_string())),
+    );
+
+    let summaries = service.get_income_summary(None).unwrap();
+
+    // The activity list shows these on 1 January and 1 March, so the income
+    // page counts them there too.
+    let months = |by_month: &HashMap<String, Decimal>| {
+        let mut months: Vec<_> = by_month
+            .iter()
+            .map(|(month, income)| (month.clone(), *income))
+            .collect();
+        months.sort();
+        months
+    };
+    let expected = vec![
+        ("2026-01".to_string(), dec!(100)),
+        ("2026-03".to_string(), dec!(100)),
+    ];
+    for period in ["ALL", "YTD"] {
+        let summary = summary(&summaries, period);
+        assert_eq!(summary.total_income, dec!(200));
+        assert_eq!(months(&summary.by_month), expected);
+        assert_eq!(months(&summary.by_account["acc-usd"].by_month), expected);
+    }
+    // Five months from January to June 2026, not six from December 2025.
+    assert_eq!(summary(&summaries, "ALL").monthly_average, dec!(40));
+
+    let last_year = summary(&summaries, "LAST_YEAR");
+    assert_eq!(last_year.total_income, dec!(0));
+    assert!(last_year.by_month.is_empty());
 }

@@ -6,6 +6,7 @@ import { StatusHeaderIndicator, StatusIndicator } from "./status-indicator";
 import type { LocalTransaction } from "./types";
 
 vi.mock("@wealthfolio/ui", () => ({
+  Icons: { AlertTriangle: () => <svg aria-hidden="true" /> },
   TooltipProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   Tooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
   TooltipTrigger: ({ children, render }: { children: ReactNode; render?: ReactElement }) =>
@@ -69,7 +70,7 @@ describe("StatusIndicator", () => {
 
     expect(
       screen.getByRole("button", {
-        name: "Newly imported & Pending verification",
+        name: "Needs Review: Newly imported & Pending verification",
       }),
     ).toBeInTheDocument();
   });

@@ -7,6 +7,7 @@ import {
   TableRow,
 } from "@wealthfolio/ui/components/ui/table";
 import { TooltipProvider } from "@wealthfolio/ui/components/ui/tooltip";
+import { Card } from "@wealthfolio/ui/components/ui/card";
 import { IMPORT_REQUIRED_FIELDS } from "@/lib/constants";
 import {
   Account,
@@ -72,10 +73,10 @@ export function MappingTable({
   };
 
   return (
-    <div
+    <Card
       className={cn(
         // `isolate` stops WebKitGTK painting rows over this scrollbar inside a scrolling parent
-        "border-border bg-card isolate h-full w-full overflow-auto rounded-md border shadow-sm",
+        "isolate h-full w-full overflow-auto",
         className,
       )}
     >
@@ -161,6 +162,6 @@ export function MappingTable({
           </Table>
         </TooltipProvider>
       </div>
-    </div>
+    </Card>
   );
 }

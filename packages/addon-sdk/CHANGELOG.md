@@ -8,6 +8,25 @@ and this project adheres to
 
 ### Added
 
+- Theme tokens for components: `Button`, `Input`, `Textarea`, `Select`,
+  `Toggle`, `Switch`, `Card`, `CardTitle`, `Badge`, `Dialog`, `AlertDialog`,
+  `Sheet`, the popups (select, menu, popover, hover card, command, combobox) and
+  `AnimatedToggleGroup` read their corners, field height, surfaces, borders and
+  shadows from CSS variables (`--button-*`, `--control-*`, `--field-*`,
+  `--switch-*`, `--card-*`, `--popup-*`, `--overlay-*`, `--dialog-radius`,
+  `--sheet-bg`, `--badge-radius`, `--segmented-*`). The host's Classic theme
+  sets them to the previous look. Classes an addon passes still win, in dark
+  mode too: an outline `Button`'s own background or border is no longer replaced
+  by the variant's dark colours. `Button` also sets `data-variant` and
+  `data-size`, as shadcn's does.
+- `AnimatedToggleGroup` items take an optional `aria-label`, for options whose
+  visible label needs more context.
+- `Button` variant `field`, for a button that opens a picker in a form: it takes
+  `SelectTrigger`'s surface, border, radius, label weight and hover, so a picker
+  matches the selects beside it.
+- `cardSurfaceClassName`, exported with `Card`: the card's surface, border,
+  radius and shadow as classes, for an element that must stay something else (a
+  link, say) but look like a card.
 - `NetworkRequest.timeoutSecs` for longer-running addon HTTP requests. Defaults
   to 10 seconds; positive integer values are capped server-side at 120 seconds.
 
@@ -195,6 +214,11 @@ and this project adheres to
 - `PopoverContent` is at most as tall as the space beside its trigger
   (`--available-height`) and scrolls beyond it, as menus and select lists do, so
   a tall popover no longer runs off the screen.
+- `DataTable` and `DataGrid` are drawn on a `Card` (its surface, border, radius
+  and shadow). Their sticky header, footer and pinned cells paint the card
+  surface, and the table's header row loses its muted tint. Pass `card={false}`
+  to `DataTable` for a table already inside a card or dialog to keep the
+  previous bordered frame.
 - `Spinner`, shadcn's spinner on the Loader2 icon. It is decorative
   (`aria-hidden`) unless you pass a translated `aria-label`, which makes it a
   `status`. `ProgressIndicator` uses it and is now built on `DialogContent` (no
@@ -220,6 +244,13 @@ and this project adheres to
 - `IncomeSummary` totals and breakdowns leave out income that has no exchange
   rate to the summary's currency, instead of counting it as if it were already
   in that currency. `byCurrency` still includes it.
+- `IncomeSummary.yoyGrowth` is `null` for `YTD` and `LAST_YEAR` when the year
+  before has no income to compare with, instead of `0`.
+
+- `DateRangeSelector` and `IntervalSelector` carry `data-no-swipe-drag`, so on a
+  page that switches views with a horizontal swipe, a sideways drag on them
+  scrolls their presets instead. On phones `DateRangeSelector` uses the
+  `compact` size, as `IntervalSelector` does.
 
 ### Deprecated
 

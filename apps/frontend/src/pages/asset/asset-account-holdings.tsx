@@ -34,6 +34,7 @@ import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@wealthfolio/ui/components/ui/sheet";
+import { Card } from "@wealthfolio/ui/components/ui/card";
 import {
   Table,
   TableBody,
@@ -147,9 +148,9 @@ export function AssetAccountHoldings({ assetId, baseCurrency }: AssetAccountHold
   }
 
   return (
-    <div className="rounded-md border">
+    <Card className="overflow-clip">
       <Table>
-        <TableHeader className="bg-muted/50">
+        <TableHeader>
           <TableRow>
             <TableHead>{t("asset:accountHoldings.account")}</TableHead>
             <TableHead className="text-end">{t("asset:accountHoldings.shares")}</TableHead>
@@ -207,7 +208,7 @@ export function AssetAccountHoldings({ assetId, baseCurrency }: AssetAccountHold
           })}
         </TableBody>
       </Table>
-    </div>
+    </Card>
   );
 }
 
@@ -474,9 +475,9 @@ export function AssetSnapshotHistory({
           ))}
         </div>
       ) : (
-        <div className="rounded-md border">
+        <Card className="overflow-clip">
           <Table>
-            <TableHeader className="bg-muted/50">
+            <TableHeader>
               <TableRow>
                 <TableHead>{t("asset:accountHoldings.date")}</TableHead>
                 <TableHead>{t("asset:accountHoldings.account")}</TableHead>
@@ -557,7 +558,7 @@ export function AssetSnapshotHistory({
               ))}
             </TableBody>
           </Table>
-        </div>
+        </Card>
       )}
 
       {editingSnapshot && (

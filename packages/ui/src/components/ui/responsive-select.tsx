@@ -70,10 +70,13 @@ export function ResponsiveSelect({
           id={id}
           aria-label={ariaLabel}
           type="button"
-          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          variant="field"
           disabled={disabled}
           className={cn(
-            "w-full justify-between truncate rounded-md font-normal",
+            "w-full justify-between truncate",
             !selectedOption && "text-muted-foreground",
             triggerClassName,
           )}

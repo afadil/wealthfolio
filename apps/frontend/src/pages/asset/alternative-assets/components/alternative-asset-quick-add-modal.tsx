@@ -592,6 +592,7 @@ export function AlternativeAssetQuickAddModal({
                         {t("asset:quickAdd.metal_type")}
                       </Label>
                       <ResponsiveSelect
+                        aria-label={t("asset:quickAdd.metal_type")}
                         value={formData.metalType || "gold"}
                         onValueChange={(v) => updateFormData("metalType", v)}
                         options={METAL_TYPES.map((metal) => ({
@@ -619,6 +620,7 @@ export function AlternativeAssetQuickAddModal({
                           {t("asset:quickAdd.unit")}
                         </Label>
                         <ResponsiveSelect
+                          aria-label={t("asset:quickAdd.unit")}
                           value={formData.unit || "oz"}
                           onValueChange={(v) => updateFormData("unit", v)}
                           options={WEIGHT_UNITS.map((unit) => ({
@@ -639,6 +641,7 @@ export function AlternativeAssetQuickAddModal({
                       {t("asset:quickAdd.liability_type")}
                     </Label>
                     <ResponsiveSelect
+                      aria-label={t("asset:quickAdd.liability_type")}
                       value={formData.liabilityType || "mortgage"}
                       onValueChange={(v) => updateFormData("liabilityType", v)}
                       options={LIABILITY_TYPES.map((type) => ({
@@ -760,6 +763,7 @@ export function AlternativeAssetQuickAddModal({
                             {t("asset:loanActions.payment_frequency")}
                           </Label>
                           <ResponsiveSelect
+                            aria-label={t("asset:loanActions.payment_frequency")}
                             value={formData.paymentFrequency ?? "monthly"}
                             onValueChange={(value) =>
                               updateFormData("paymentFrequency", value as LoanPaymentFrequency)
@@ -989,6 +993,7 @@ export function AlternativeAssetQuickAddModal({
                         {t("asset:quickAdd.link_to_asset_optional")}
                       </Label>
                       <ResponsiveSelect
+                        aria-label={t("asset:quickAdd.link_to_asset_optional")}
                         value={formData.linkedAssetId}
                         onValueChange={(v) => updateFormData("linkedAssetId", v)}
                         options={linkableAssetOptions}

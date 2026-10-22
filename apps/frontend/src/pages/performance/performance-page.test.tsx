@@ -2,7 +2,7 @@ import { useAccountScopeStore } from "@/lib/account-scope-store";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, AccountScope, TrackedItem } from "@/lib/types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   performance: vi.fn(),
   getAccounts: vi.fn(),
   settings: { timezone: "Asia/Shanghai" } as { timezone: string } | null,
+  mobile: false,
 }));
 vi.mock("@/lib/settings-provider", () => ({
   useSettingsContext: () => ({ settings: mocks.settings }),
@@ -21,7 +22,7 @@ vi.mock("@/adapters", () => ({ getAccounts: mocks.getAccounts }));
 vi.mock("@/hooks/use-portfolios", () => ({
   usePortfolios: () => ({ data: [{ id: "p", name: "Retirement" }] }),
 }));
-vi.mock("@/hooks/use-platform", () => ({ useIsMobileViewport: () => false }));
+vi.mock("@/hooks/use-platform", () => ({ useIsMobileViewport: () => mocks.mobile }));
 vi.mock("./hooks/use-performance-data", () => ({
   useCalculatePerformanceHistory: mocks.performance,
 }));
@@ -125,6 +126,7 @@ function renderPage(seedAccounts = true) {
 describe("PerformancePage shared scope", () => {
   beforeEach(() => {
     mocks.settings = { timezone: "Asia/Shanghai" };
+    mocks.mobile = false;
     localStorage.clear();
     useAccountScopeStore.setState(initialState, true);
     mocks.performance.mockReturnValue({
@@ -398,6 +400,189 @@ describe("PerformancePage shared scope", () => {
     expect(screen.queryByText(TWR_WARNING)).toBeNull();
     await userEvent.click(trigger);
     expect(await screen.findByText(TWR_WARNING)).toBeInTheDocument();
+  });
+
+  it.each([false, true])(
+    "shows partial P&L and its cash-FX reason in the attribution panel (mobile=%s)",
+    async (mobile) => {
+      mocks.mobile = mobile;
+      const warning =
+        "Cash FX attribution is incomplete for account a on 2026-02-01 because its exposure or valuation rate is unavailable.";
+      mocks.performance.mockReturnValue({
+        data: [
+          {
+            ...resultWithWarning,
+            dataQuality: { status: "partial", warnings: [warning], notApplicableReasons: [] },
+            summary: {
+              amount: 25,
+              amountStatus: "complete",
+              percent: 0.1,
+              percentStatus: "complete",
+              quality: "partial",
+              reasons: [warning],
+            },
+          },
+        ],
+        isLoading: false,
+        hasErrors: false,
+        errorMessages: [],
+        displayDateRange: "",
+      });
+      renderPage();
+      const trigger = await screen.findByRole("button", { name: /Partial data/i });
+      expect(trigger).toHaveTextContent("25");
+      await userEvent.click(trigger);
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByRole("note", { name: "Partial data" })).toHaveTextContent(warning);
+      expect(within(dialog).getByText("Partial data")).toBeVisible();
+    },
+  );
+
+  it.each([
+    { name: "complete data", quality: "ok", warnings: [], reasons: [] },
+    {
+      name: "holdings return inapplicability",
+      quality: "partial",
+      warnings: [],
+      reasons: [
+        "TWR unavailable for holdings-only scopes because transaction cash flows are not tracked.",
+        "IRR unavailable for holdings-only scopes because transaction cash flows are not tracked.",
+      ],
+    },
+    {
+      name: "an IRR-only reason",
+      quality: "partial",
+      warnings: [],
+      reasons: ["IRR unavailable: cash flows do not change sign."],
+    },
+    {
+      name: "an IRR-only warning",
+      quality: "partial",
+      warnings: ["IRR unavailable: cash flows do not change sign."],
+      reasons: [],
+    },
+  ])("keeps complete P&L unmarked with $name", async ({ quality, warnings, reasons }) => {
+    mocks.performance.mockReturnValue({
+      data: [
+        {
+          ...resultWithWarning,
+          dataQuality: { status: quality, warnings, notApplicableReasons: reasons },
+          summary: {
+            amount: 25,
+            amountStatus: "complete",
+            percent: 0.1,
+            percentStatus: "complete",
+            quality,
+            reasons: [...warnings, ...reasons],
+          },
+        },
+      ],
+      isLoading: false,
+      hasErrors: false,
+      errorMessages: [],
+      displayDateRange: "",
+    });
+    renderPage();
+    const trigger = await screen.findByRole("button", { name: /Gain \/ loss/i });
+    expect(trigger).toHaveTextContent("25");
+    expect(screen.queryByText("Partial data")).toBeNull();
+    await userEvent.click(trigger);
+    expect(within(await screen.findByRole("dialog")).queryByRole("note")).toBeNull();
+  });
+
+  it.each([
+    [false, false],
+    [true, false],
+    [false, true],
+    [true, true],
+  ])(
+    "separates mixed-scope return limitations from P&L warnings (mobile=%s, incomplete cash FX=%s)",
+    async (mobile, incompleteCashFx) => {
+      mocks.mobile = mobile;
+      const mixedScopeWarning =
+        "This scope mixes transaction-mode and holdings-mode accounts, so TWR and IRR are unavailable. The return is a value return over account-level components.";
+      const seriesWarning =
+        "Return series unavailable for all-time mixed scopes because transaction and holdings components use different baselines.";
+      const cashFxWarning =
+        "Cash FX attribution is incomplete for account a on 2026-02-01 because its exposure or valuation rate is unavailable.";
+      const warnings = [
+        mixedScopeWarning,
+        seriesWarning,
+        ...(incompleteCashFx ? [cashFxWarning] : []),
+      ];
+      const reasons = [
+        "TWR unavailable for mixed transaction and holdings scopes.",
+        "IRR unavailable for mixed transaction and holdings scopes.",
+      ];
+      mocks.performance.mockReturnValue({
+        data: [
+          {
+            ...resultWithWarning,
+            mode: "valueReturn",
+            isMixedTrackingMode: true,
+            series: [],
+            dataQuality: { status: "partial", warnings, notApplicableReasons: reasons },
+            summary: {
+              amount: 0,
+              amountStatus: "complete",
+              percent: 0,
+              percentStatus: "complete",
+              quality: "partial",
+              reasons: [...warnings, ...reasons],
+            },
+          },
+        ],
+        isLoading: false,
+        hasErrors: false,
+        errorMessages: [],
+        displayDateRange: "All Time",
+      });
+      renderPage();
+      const trigger = await screen.findByRole("button", { name: /Gain\s*\/\s*loss/i });
+      expect(trigger).toHaveTextContent("0.00");
+      if (!incompleteCashFx) expect(screen.queryByText("Partial data")).toBeNull();
+      await userEvent.click(trigger);
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).queryByText(seriesWarning)).toBeNull();
+      if (incompleteCashFx) {
+        expect(within(dialog).getByRole("note", { name: "Partial data" })).toHaveTextContent(
+          cashFxWarning,
+        );
+      } else {
+        expect(within(dialog).queryByRole("note")).toBeNull();
+        expect(within(dialog).queryByText("Partial data")).toBeNull();
+      }
+      await userEvent.click(within(dialog).getByRole("button", { name: "Close attribution" }));
+      await userEvent.click(
+        screen.getByRole("button", { name: /calculation notes? for value(?: return)?$/i }),
+      );
+      expect(await screen.findByText(seriesWarning)).toBeVisible();
+    },
+  );
+
+  it("does not present an unavailable P&L as a partial subtotal", async () => {
+    mocks.performance.mockReturnValue({
+      data: [
+        {
+          ...resultWithWarning,
+          summary: {
+            amount: null,
+            amountStatus: "unavailable",
+            percent: null,
+            percentStatus: "unavailable",
+            quality: "partial",
+            reasons: [TWR_WARNING],
+          },
+        },
+      ],
+      isLoading: false,
+      hasErrors: false,
+      errorMessages: [],
+      displayDateRange: "",
+    });
+    renderPage();
+    await screen.findByRole("button", { name: /calculation note for/i });
+    expect(screen.queryByRole("button", { name: /Gain \/ loss|Partial data/i })).toBeNull();
   });
 
   it("does not request unvalidated persisted scopes during a cold load", async () => {

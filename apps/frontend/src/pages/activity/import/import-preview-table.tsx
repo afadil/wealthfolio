@@ -27,6 +27,7 @@ import { DataTableFacetedFilterProps } from "@wealthfolio/ui/components/ui/data-
 import { DataTablePagination } from "@wealthfolio/ui/components/ui/data-table/data-table-pagination";
 import { DataTableToolbar } from "@wealthfolio/ui/components/ui/data-table/data-table-toolbar";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Card } from "@wealthfolio/ui/components/ui/card";
 import {
   Table,
   TableBody,
@@ -182,9 +183,9 @@ export const ImportPreviewTable = ({
     <div className="pt-0">
       <div className="space-y-2">
         <DataTableToolbar table={table} searchBy="symbol" filters={filters} />
-        <div className="rounded-md border">
+        <Card className="overflow-clip">
           <Table>
-            <TableHeader className="bg-muted/40">
+            <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
@@ -243,7 +244,7 @@ export const ImportPreviewTable = ({
               )}
             </TableBody>
           </Table>
-        </div>
+        </Card>
       </div>
 
       <DataTablePagination table={table} />

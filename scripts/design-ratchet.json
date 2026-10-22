@@ -49,7 +49,8 @@
     "apps/frontend/src/pages/asset/alternative-asset-content.tsx": 1,
     "apps/frontend/src/pages/asset/alternative-assets/components/alternative-asset-quick-add-modal.tsx": 18,
     "apps/frontend/src/pages/holdings/components/compact-allocation-strip.tsx": 6,
-    "apps/frontend/src/pages/holdings/components/composition-chart.tsx": 9,
+    "apps/frontend/src/pages/holdings/components/composition-chart.tsx": 1,
+    "apps/frontend/src/pages/holdings/components/treemap-palette.ts": 1,
     "apps/frontend/src/pages/net-worth/components/utils.ts": 9,
     "apps/frontend/src/pages/onboarding/onboarding-connect.tsx": 12,
     "apps/frontend/src/pages/onboarding/onboarding-step1.tsx": 2,
@@ -68,11 +69,10 @@
     "packages/ui/src/components/ui/tailwind-indicator.tsx": 1
   },
   "statusTints": {
+    "apps/frontend/src/components/needs-review.tsx": 2,
     "apps/frontend/src/features/goals/components/goal-funding-editor.tsx": 1,
     "apps/frontend/src/features/spending/components/reports/insights/event-detail-panel.tsx": 4,
     "apps/frontend/src/features/spending/components/rule-preset-picker.tsx": 1,
-    "apps/frontend/src/features/spending/components/transaction-card.tsx": 1,
-    "apps/frontend/src/features/spending/components/transaction-row.tsx": 1,
     "apps/frontend/src/features/wealthfolio-connect/pages/connect-page.tsx": 3,
     "apps/frontend/src/pages/account/account-snapshot-history.tsx": 2,
     "apps/frontend/src/pages/activity/import/components/csv-file-viewer.tsx": 2,

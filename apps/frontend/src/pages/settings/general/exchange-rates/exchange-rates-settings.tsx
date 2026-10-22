@@ -184,7 +184,7 @@ export function ExchangeRatesSettings() {
             ))}
           </div>
         ) : exchangeRates && exchangeRates.length > 0 ? (
-          <DataTable columns={columns} data={exchangeRates} />
+          <DataTable columns={columns} data={exchangeRates} card={false} />
         ) : (
           <div className="flex flex-col items-center justify-center py-10 text-center">
             <Icons.DollarSign className="text-muted-foreground h-12 w-12" />
