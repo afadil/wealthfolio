@@ -565,6 +565,7 @@ where
     }
 
     let mut pushed_count = 0usize;
+    let mut retryable_push_failure = None;
     if !push_events.is_empty() {
         match ports
             .push_events(
@@ -702,6 +703,8 @@ where
                             )
                             .await
                             .map_err(|e| e.to_string())?;
+                        // Keep the upload failure, but let incoming changes arrive first.
+                        retryable_push_failure = Some((format!("Push failed: {}", err), backoff));
                     }
                     ApiRetryClass::Permanent => {
                         ports
@@ -712,11 +715,11 @@ where
                             )
                             .await
                             .map_err(|e| e.to_string())?;
+                        return ctx
+                            .fail("push_error", format!("Push failed: {}", err), Some(backoff))
+                            .await;
                     }
                 }
-                return ctx
-                    .fail("push_error", format!("Push failed: {}", err), Some(backoff))
-                    .await;
             }
         }
     }
@@ -992,14 +995,32 @@ where
         let _ = ports.prune_applied_events_up_to_seq(prune_seq).await;
     }
 
-    ports
-        .mark_cycle_outcome(
-            "ok".to_string(),
-            cycle_started_at.elapsed().as_millis() as i64,
-            None,
-        )
-        .await
-        .map_err(|e| e.to_string())?;
+    let result = if let Some((message, backoff)) = retryable_push_failure {
+        ctx.local_cursor = local_cursor;
+        ctx.pulled_count = pulled_count;
+        ctx.fail("push_error", message, Some(backoff)).await?
+    } else {
+        ports
+            .mark_cycle_outcome(
+                "ok".to_string(),
+                cycle_started_at.elapsed().as_millis() as i64,
+                None,
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+
+        SyncCycleResult {
+            status: "ok".to_string(),
+            lock_version,
+            pushed_count,
+            pulled_count,
+            cursor: local_cursor,
+            needs_bootstrap: false,
+            bootstrap_snapshot_id: None,
+            bootstrap_snapshot_seq: None,
+            dead_letter_count: 0,
+        }
+    };
 
     if pulled_count > 0 {
         ports
@@ -1008,17 +1029,7 @@ where
             .map_err(|e| e.to_string())?;
     }
 
-    Ok(SyncCycleResult {
-        status: "ok".to_string(),
-        lock_version,
-        pushed_count,
-        pulled_count,
-        cursor: local_cursor,
-        needs_bootstrap: false,
-        bootstrap_snapshot_id: None,
-        bootstrap_snapshot_seq: None,
-        dead_letter_count: 0,
-    })
+    Ok(result)
 }
 
 fn compute_jitter_ms() -> u64 {
@@ -1231,11 +1242,13 @@ mod tests {
         pull_cursors: Arc<Mutex<Vec<Option<i64>>>>,
         set_cursor_calls: Arc<Mutex<Vec<i64>>>,
         applied_events: Arc<Mutex<Vec<ReplayEvent>>>,
+        pull_complete_counts: Arc<Mutex<Vec<usize>>>,
         push_error: Option<TransportError>,
         push_batches: Arc<Mutex<Vec<Vec<String>>>>,
         reconcile_response: crate::ReconcileReadyStateResponse,
         persisted_trust_states: Arc<Mutex<Vec<String>>>,
         cycle_outcomes: Arc<Mutex<Vec<String>>>,
+        last_cycle_retry_at: Arc<Mutex<Option<String>>>,
         engine_errors: Arc<Mutex<Vec<String>>>,
         prune_calls: Arc<AtomicUsize>,
         reconcile_delay_ms: u64,
@@ -1260,6 +1273,7 @@ mod tests {
                 pull_cursors: Arc::new(Mutex::new(Vec::new())),
                 set_cursor_calls: Arc::new(Mutex::new(Vec::new())),
                 applied_events: Arc::new(Mutex::new(Vec::new())),
+                pull_complete_counts: Arc::new(Mutex::new(Vec::new())),
                 push_error: None,
                 push_batches: Arc::new(Mutex::new(Vec::new())),
                 reconcile_response: crate::ReconcileReadyStateResponse {
@@ -1269,6 +1283,7 @@ mod tests {
                 },
                 persisted_trust_states: Arc::new(Mutex::new(Vec::new())),
                 cycle_outcomes: Arc::new(Mutex::new(Vec::new())),
+                last_cycle_retry_at: Arc::new(Mutex::new(None)),
                 engine_errors: Arc::new(Mutex::new(Vec::new())),
                 prune_calls: Arc::new(AtomicUsize::new(0)),
                 reconcile_delay_ms: 0,
@@ -1311,17 +1326,32 @@ mod tests {
             Ok(())
         }
 
-        async fn mark_outbox_sent(&self, _event_ids: Vec<String>) -> Result<(), String> {
+        async fn mark_outbox_sent(&self, event_ids: Vec<String>) -> Result<(), String> {
+            for event in self.pending_outbox.lock().await.iter_mut() {
+                if event_ids.contains(&event.event_id) {
+                    event.sent = true;
+                    event.status = wealthfolio_core::sync::SyncOutboxStatus::Sent;
+                }
+            }
             Ok(())
         }
 
         async fn schedule_outbox_retry(
             &self,
-            _event_ids: Vec<String>,
-            _delay_seconds: i64,
-            _error_message: Option<String>,
-            _error_code: Option<String>,
+            event_ids: Vec<String>,
+            delay_seconds: i64,
+            error_message: Option<String>,
+            error_code: Option<String>,
         ) -> Result<(), String> {
+            let retry_at = (Utc::now() + chrono::Duration::seconds(delay_seconds)).to_rfc3339();
+            for event in self.pending_outbox.lock().await.iter_mut() {
+                if event_ids.contains(&event.event_id) {
+                    event.retry_count += 1;
+                    event.next_retry_at = Some(retry_at.clone());
+                    event.last_error = error_message.clone();
+                    event.last_error_code = error_code.clone();
+                }
+            }
             Ok(())
         }
 
@@ -1367,6 +1397,9 @@ mod tests {
         }
 
         async fn mark_pull_completed(&self) -> Result<(), String> {
+            // Match the real store, which clears the previous error and retry time.
+            self.engine_errors.lock().await.clear();
+            *self.last_cycle_retry_at.lock().await = None;
             Ok(())
         }
 
@@ -1374,9 +1407,10 @@ mod tests {
             &self,
             status: String,
             _duration_ms: i64,
-            _next_retry_at: Option<String>,
+            next_retry_at: Option<String>,
         ) -> Result<(), String> {
             self.cycle_outcomes.lock().await.push(status);
+            *self.last_cycle_retry_at.lock().await = next_retry_at;
             if self.fail_mark_cycle_outcome {
                 return Err("forced cycle_outcome failure".to_string());
             }
@@ -1412,6 +1446,11 @@ mod tests {
                 last_cycle_status: self.cycle_outcomes.lock().await.last().cloned(),
                 last_cycle_duration_ms: None,
             })
+        }
+
+        async fn on_pull_complete(&self, pulled_count: usize) -> Result<(), String> {
+            self.pull_complete_counts.lock().await.push(pulled_count);
+            Ok(())
         }
     }
 
@@ -2296,6 +2335,190 @@ mod tests {
             events: vec![event],
             gc_watermark: None,
             latest_snapshot_seq: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn retryable_push_failure_downloads_without_clearing_upload_error_or_backoff() {
+        for (retry_count, delay_seconds) in [(0, 5), (3, 40), (12, 1280)] {
+            for has_incoming in [true, false] {
+                let mut ports = TestPorts::new(Some(ready_identity()), Ok(SyncState::Ready));
+                ports.cursor = 5;
+                ports.reconcile_response.cursor = Some(if has_incoming { 8 } else { 5 });
+                ports.push_error = Some(TransportError {
+                    message: "503 Service Unavailable".to_string(),
+                    retry_class: ApiRetryClass::Retryable,
+                    error_code: None,
+                    details: None,
+                });
+                let mut event = outbox_event("evt-local", "account-local", 1);
+                event.retry_count = retry_count;
+                ports.pending_outbox.lock().await.push(event);
+                if has_incoming {
+                    ports
+                        .pull_responses
+                        .lock()
+                        .await
+                        .push_back(single_event_pull_response(
+                            8,
+                            pull_event(
+                                "evt-remote",
+                                "account",
+                                "account.update.v1",
+                                "account-remote",
+                                8,
+                                r#"{"id":"account-remote","name":"Checking"}"#,
+                            ),
+                        ));
+                }
+                let before = Utc::now();
+
+                let result = run_sync_cycle(&ports, false).await.expect("cycle");
+
+                assert_eq!(result.status, "push_error");
+                assert_eq!(result.pushed_count, 0);
+                assert_eq!(result.pulled_count, usize::from(has_incoming));
+                assert_eq!(result.cursor, if has_incoming { 8 } else { 5 });
+                assert_eq!(
+                    ports.push_batches.lock().await.as_slice(),
+                    [vec!["evt-local".to_string()]]
+                );
+                assert_eq!(
+                    ports.applied_events.lock().await.len(),
+                    usize::from(has_incoming)
+                );
+                if has_incoming {
+                    assert_eq!(ports.pull_cursors.lock().await.as_slice(), [Some(5)]);
+                    assert_eq!(ports.set_cursor_calls.lock().await.as_slice(), [8]);
+                    assert_eq!(ports.pull_complete_counts.lock().await.as_slice(), [1]);
+                } else {
+                    assert!(ports.pull_cursors.lock().await.is_empty());
+                    assert!(ports.set_cursor_calls.lock().await.is_empty());
+                    assert!(ports.pull_complete_counts.lock().await.is_empty());
+                }
+                assert!(ports.dead_outbox_batches.lock().await.is_empty());
+                assert_eq!(ports.cycle_outcomes.lock().await.as_slice(), ["push_error"]);
+                assert_eq!(
+                    ports.engine_errors.lock().await.as_slice(),
+                    ["Push failed: 503 Service Unavailable"]
+                );
+                let pending = ports.pending_outbox.lock().await;
+                assert_eq!(pending.len(), 1);
+                assert!(!pending[0].sent);
+                assert_eq!(
+                    pending[0].status,
+                    wealthfolio_core::sync::SyncOutboxStatus::Pending
+                );
+                assert_eq!(pending[0].retry_count, retry_count + 1);
+                assert_eq!(
+                    pending[0].last_error.as_deref(),
+                    Some("503 Service Unavailable")
+                );
+                assert_eq!(pending[0].last_error_code.as_deref(), Some("retryable"));
+                for retry_at in [
+                    pending[0].next_retry_at.clone(),
+                    ports.last_cycle_retry_at.lock().await.clone(),
+                ] {
+                    let retry_at =
+                        chrono::DateTime::parse_from_rfc3339(&retry_at.expect("retry time"))
+                            .expect("valid retry time");
+                    assert!(retry_at >= before + chrono::Duration::seconds(delay_seconds));
+                    assert!(retry_at <= Utc::now() + chrono::Duration::seconds(delay_seconds));
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn retryable_push_failure_preserves_upload_retry_when_download_also_fails() {
+        let mut ports = TestPorts::new(Some(ready_identity()), Ok(SyncState::Ready));
+        ports.cursor = 5;
+        ports.reconcile_response.cursor = Some(8);
+        ports.push_error = Some(TransportError {
+            message: "503 Service Unavailable".to_string(),
+            retry_class: ApiRetryClass::Retryable,
+            error_code: None,
+            details: None,
+        });
+        ports
+            .pending_outbox
+            .lock()
+            .await
+            .push(outbox_event("evt-local", "account-local", 1));
+        // With no queued response, the transport fails the download.
+
+        let result = run_sync_cycle(&ports, false).await.expect("cycle");
+
+        assert_eq!(result.status, "pull_error");
+        assert_eq!(result.cursor, 5);
+        assert_eq!(result.pushed_count, 0);
+        assert_eq!(result.pulled_count, 0);
+        assert_eq!(ports.pull_cursors.lock().await.as_slice(), [Some(5)]);
+        assert!(ports.applied_events.lock().await.is_empty());
+        assert!(ports.set_cursor_calls.lock().await.is_empty());
+        assert!(ports.pull_complete_counts.lock().await.is_empty());
+        assert_eq!(ports.cycle_outcomes.lock().await.as_slice(), ["pull_error"]);
+        let pending = ports.pending_outbox.lock().await;
+        assert_eq!(pending.len(), 1);
+        assert!(!pending[0].sent);
+        assert_eq!(pending[0].retry_count, 1);
+        assert!(pending[0].next_retry_at.is_some());
+        assert_eq!(
+            pending[0].last_error.as_deref(),
+            Some("503 Service Unavailable")
+        );
+    }
+
+    #[tokio::test]
+    async fn other_push_failures_still_stop_before_downloading() {
+        for (retry_class, code, message, status) in [
+            (
+                ApiRetryClass::Permanent,
+                None,
+                "400 Bad Request",
+                "push_error",
+            ),
+            (
+                ApiRetryClass::ReauthRequired,
+                None,
+                "401 Unauthorized",
+                "auth_error",
+            ),
+            (
+                ApiRetryClass::Retryable,
+                Some("SUBSCRIPTION_REQUIRED"),
+                "Subscription required",
+                "subscription_required",
+            ),
+            (
+                ApiRetryClass::Retryable,
+                Some("SYNC_KEY_VERSION_MISMATCH"),
+                "KEY_VERSION_MISMATCH",
+                "key_version_mismatch",
+            ),
+        ] {
+            let mut ports = TestPorts::new(Some(ready_identity()), Ok(SyncState::Ready));
+            ports.reconcile_response.cursor = Some(8);
+            ports.push_error = Some(TransportError {
+                message: message.to_string(),
+                retry_class,
+                error_code: code.map(str::to_string),
+                details: None,
+            });
+            ports
+                .pending_outbox
+                .lock()
+                .await
+                .push(outbox_event("evt-local", "account-local", 1));
+
+            let result = run_sync_cycle(&ports, false).await.expect("cycle");
+
+            assert_eq!(result.status, status);
+            assert_eq!(result.cursor, 0);
+            assert!(ports.pull_cursors.lock().await.is_empty());
+            assert!(ports.applied_events.lock().await.is_empty());
+            assert!(ports.set_cursor_calls.lock().await.is_empty());
+            assert!(ports.pull_complete_counts.lock().await.is_empty());
         }
     }
 
