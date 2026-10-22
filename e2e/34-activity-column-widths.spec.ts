@@ -66,7 +66,9 @@ async function createAccountWithMixedActivities(page: Page) {
 async function headerWidthsWhileScrolling(page: Page) {
   return page.evaluate(async () => {
     const scroller = document.querySelector<HTMLElement>("[data-page-scroll-container]");
-    const box = document.querySelector<HTMLElement>("[data-virtual-scroll-parent]");
+    const box = document
+      .querySelector("main table")
+      ?.closest<HTMLElement>("[data-virtual-scroll-parent]");
     if (!scroller || !box) throw new Error("page scroller or table missing");
     const nextFrame = () =>
       new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));

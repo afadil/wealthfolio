@@ -38,10 +38,13 @@ import { Card } from "@wealthfolio/ui/components/ui/card";
 import { Link } from "react-router-dom";
 import { connectPagePath } from "@/features/wealthfolio-connect/lib/connect-url";
 import { useTranslation } from "react-i18next";
-import { observeElementOffset, useVirtualizer } from "@tanstack/react-virtual";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { InfiniteScrollTrigger } from "@/components/infinite-scroll-trigger";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import { useVirtualScrollContainer } from "@/hooks/use-virtual-scroll-container";
+import {
+  observeCurrentScrollOffset,
+  useVirtualScrollContainer,
+} from "@/hooks/use-virtual-scroll-container";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
 import { flattenDayGroups } from "@/lib/day-groups";
@@ -158,10 +161,7 @@ export const ActivityTableMobile = ({
     getScrollElement: () => scrollElement,
     // Seed the offset before the virtualizer's initial scrollTo. Swipeable views
     // mount neighboring lists while the shared page may already be scrolled.
-    observeElementOffset: (instance, onChange) => {
-      onChange(instance.scrollElement?.scrollTop ?? 0, false);
-      return observeElementOffset(instance, onChange);
-    },
+    observeElementOffset: observeCurrentScrollOffset,
     estimateSize: (index) =>
       listItems[index]?.kind === "header"
         ? DAY_HEADING_HEIGHT

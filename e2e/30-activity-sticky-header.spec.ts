@@ -4,13 +4,13 @@ import { BASE_URL, completeOnboardingIfNeeded, gotoAppPath } from "./helpers";
 const api = `${BASE_URL}/api/v1`;
 
 /** An account with enough activities for the page to scroll well past its table's top. */
-async function createAccountWithActivities(page: Page) {
+async function createAccountWithActivities(page: Page, accountType = "SECURITIES") {
   await completeOnboardingIfNeeded(page);
   const runId = Date.now().toString(36);
   const accountResponse = await page.request.post(`${api}/accounts`, {
     data: {
       name: `Sticky header ${runId}`,
-      accountType: "SECURITIES",
+      accountType,
       currency: "USD",
       isDefault: false,
       isActive: true,
@@ -45,7 +45,7 @@ async function createAccountWithActivities(page: Page) {
 async function scrollPastTableTop(page: Page) {
   return page.evaluate(async () => {
     const scroller = document.querySelector<HTMLElement>("[data-page-scroll-container]");
-    const table = document.querySelector<HTMLElement>("[data-virtual-scroll-parent] table");
+    const table = document.querySelector<HTMLElement>("main table");
     const thead = table?.querySelector("thead");
     if (!scroller || !table || !thead) throw new Error("page scroller or table missing");
     const pageHeader = [...scroller.querySelectorAll("header")].find(
@@ -76,10 +76,10 @@ async function scrollPastTableTop(page: Page) {
 
 /** Whether the table is wider than its box, and whether the box then scrolls to its last column. */
 async function sidewaysScroll(page: Page) {
-  return page.locator("[data-virtual-scroll-parent]").evaluate((box) => {
-    const table = box.querySelector("table");
-    const lastHeader = box.querySelector("thead th:last-child");
-    if (!table || !lastHeader) throw new Error("table missing");
+  return page.locator("main table").evaluate((table) => {
+    const box = table.closest<HTMLElement>("[data-virtual-scroll-parent]");
+    const lastHeader = table.querySelector("thead th:last-child");
+    if (!box || !lastHeader) throw new Error("table missing");
     box.scrollLeft = box.scrollWidth;
     return {
       overflows: table.offsetWidth > box.clientWidth,
@@ -173,4 +173,55 @@ test("Activities keeps the investment table's column header in view", async ({ p
 
   await expectHeaderPinned(page);
   expect(await sidewaysScroll(page)).toMatchObject({ overflows: false, lastColumnVisible: true });
+});
+
+test("Spending keeps its column header in view like Investments", async ({ page }) => {
+  test.setTimeout(120_000);
+  const accountId = await createAccountWithActivities(page, "CASH");
+  const settings = await page.request.put(`${api}/spending/settings`, {
+    data: { enabled: true, accountIds: [accountId] },
+  });
+  expect(settings.ok()).toBe(true);
+  await gotoAppPath(page, "/activities?tab=spending");
+  await expect(page.getByRole("columnheader", { name: "Name / Notes" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Row actions", exact: true }).first(),
+  ).toBeVisible();
+  await expectHeaderPinned(page);
+  expect(await sidewaysScroll(page)).toMatchObject({ overflows: false, lastColumnVisible: true });
+});
+
+test("Spending keeps rows rendered when the tablet scrollport moves", async ({ page }) => {
+  test.setTimeout(120_000);
+  const accountId = await createAccountWithActivities(page, "CASH");
+  const settings = await page.request.put(`${api}/spending/settings`, {
+    data: { enabled: true, accountIds: [accountId] },
+  });
+  expect(settings.ok()).toBe(true);
+
+  for (const direction of ["ltr", "rtl"]) {
+    for (const width of [768, 1024]) {
+      await page.setViewportSize({ width, height: 900 });
+      await gotoAppPath(page, `/activities?tab=spending&dir=${direction}`);
+      await expect(page.getByRole("columnheader", { name: "Name / Notes" })).toBeVisible();
+      const scroller = page.locator("[data-ptr-content]");
+      await scroller.evaluate((element) => element.scrollTo({ top: 550, behavior: "instant" }));
+      await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(550);
+      // The bottom of the visible table must be a rendered data row, not the
+      // virtualizer's spacer standing in for rows it failed to render.
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const table = document.querySelector("main table");
+            if (!table) return false;
+            const box = table.getBoundingClientRect();
+            const row = document
+              .elementFromPoint(box.left + box.width / 2, window.innerHeight - 100)
+              ?.closest("tr[data-index]");
+            return !!row && table.contains(row);
+          }),
+        )
+        .toBe(true);
+    }
+  }
 });

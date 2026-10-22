@@ -531,6 +531,12 @@
   z-index: 2147483647 !important;
 }
 
+/* Base UI leaves live regions announced during a modal. Their background
+   notifications must not intercept clicks intended for the modal. */
+[data-base-ui-inert] [data-sonner-toaster] {
+  pointer-events: none;
+}
+
 /* Per-type toast colors — override Sonner's --normal-* variables */
 [data-sonner-toast][data-type="success"] {
   --normal-bg: var(--toast-success-bg);

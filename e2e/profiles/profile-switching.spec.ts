@@ -78,6 +78,9 @@ test("real A → B → A reloads, different appearance, cross-tab route reset, a
   await expect(page.locator("body")).toHaveClass(/font-sans/);
 
   const active = await command(context, "get_profile_state");
+  // Change the grant while no app document is polling with the old scope.
+  // Otherwise its automatic reload can race the test's explicit navigation.
+  await page.goto("about:blank");
   await command(
     context,
     "set_profile_password",
@@ -85,10 +88,13 @@ test("real A → B → A reloads, different appearance, cross-tab route reset, a
     active.session.scopeId,
   );
   await command(context, "unlock_profile", { profileId: a.id, proof: "mobile passphrase" });
-  await page.reload();
+  await page.goto("/");
   await ready(page, "Profile A");
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("button", { name: "More options" }).click();
+  const moreOptions = page
+    .getByRole("navigation", { name: "Primary navigation" })
+    .getByRole("button", { name: "More options" });
+  await moreOptions.click();
   await page.getByRole("button", { name: "Profile menu for Profile A" }).click();
   await expect(page.getByRole("menu")).not.toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(1);
@@ -103,7 +109,7 @@ test("real A → B → A reloads, different appearance, cross-tab route reset, a
   await expect(page.getByRole("button", { name: "Profile menu for Profile A" })).toBeFocused();
   await page.getByRole("button", { name: "Profile menu for Profile A" }).click();
   await page.getByRole("button", { name: "Close more menu" }).click();
-  await page.getByRole("button", { name: "More options" }).click();
+  await moreOptions.click();
   await expect(page.getByRole("heading", { name: "More", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Profile menu for Profile A" }).click();
   await page.getByRole("button", { name: "Lock Wealthfolio" }).click();
@@ -115,12 +121,12 @@ test("real A → B → A reloads, different appearance, cross-tab route reset, a
   await page.getByLabel("Password", { exact: true }).fill("mobile passphrase");
   await page.getByRole("button", { name: "Unlock", exact: true }).click();
   await expect(page.locator(".app-shell").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "More options" })).toBeVisible();
-  await page.getByRole("button", { name: "More options" }).click();
+  await expect(moreOptions).toBeVisible();
+  await moreOptions.click();
   await page.getByRole("button", { name: "Profile menu for Profile A" }).click();
   await page.getByRole("button", { name: "Profile B", exact: true }).click();
   await expect(page.locator("body")).toHaveClass(/font-serif/);
-  await page.getByRole("button", { name: "More options" }).click();
+  await moreOptions.click();
   await page.getByRole("button", { name: "Profile menu for Profile B" }).click();
   await page.getByRole("button", { name: "Profile A", exact: true }).click();
   await page.getByLabel("Password", { exact: true }).fill("mobile passphrase");
@@ -139,10 +145,14 @@ test("real A → B → A reloads, different appearance, cross-tab route reset, a
 test("incorrect password stays on the chooser and can be retried", async ({ page, context }) => {
   const state = await command(context, "get_profile_state");
   const profile =
-    state.profiles.find((item: { id: string }) => item.id === state.session?.profileId) ??
-    state.profiles[0];
+    state.profiles.find(
+      (item: { id: string; lockEnabled: boolean }) =>
+        item.id === state.session?.profileId && !item.lockEnabled,
+    ) ?? state.profiles.find((item: { lockEnabled: boolean }) => !item.lockEnabled);
   const grant =
-    state.session ?? (await command(context, "unlock_profile", { profileId: profile.id }));
+    state.session?.profileId === profile.id
+      ? state.session
+      : await command(context, "unlock_profile", { profileId: profile.id });
   await settings(context, grant.scopeId, "light", "font-sans");
   await command(
     context,

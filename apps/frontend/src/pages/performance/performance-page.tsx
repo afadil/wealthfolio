@@ -1506,8 +1506,8 @@ export default function PerformancePage() {
 
   return (
     <>
-      {/* Account scope + date range selectors - fixed position in header area */}
-      <div className="pointer-events-auto fixed end-2 top-4 z-20 hidden items-center gap-2 md:flex lg:end-4">
+      {/* Keep tablet filters below the tabs; wide screens have room in the header. */}
+      <div className="pointer-events-auto mb-4 hidden items-center justify-end gap-2 md:flex xl:fixed xl:end-4 xl:top-4 xl:z-20 xl:mb-0">
         <AccountScopeSelector value={accountScope} onChange={setAccountScope} />
         <DateRangeSelector
           asOf={today}

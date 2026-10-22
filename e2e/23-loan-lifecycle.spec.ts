@@ -1,10 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { BASE_URL, completeOnboardingIfNeeded, waitOutLoadingToasts } from "./helpers";
+import { BASE_URL, completeOnboardingIfNeeded } from "./helpers";
 import fixtures from "../crates/core/src/assets/loan/fixtures.json" with { type: "json" };
-
-test.beforeEach(async ({ page }) => {
-  await waitOutLoadingToasts(page);
-});
 
 const fixture = fixtures.lifecycle;
 

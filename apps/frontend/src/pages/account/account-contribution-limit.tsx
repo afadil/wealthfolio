@@ -90,8 +90,8 @@ function AccountContributionLimitItem({
       )}
     >
       <CardContent className="space-y-3 p-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+          <div className="min-w-0 flex-1 basis-40">
             <p className="text-sm font-semibold">
               {t("account:contribution.year_limit", {
                 year: limit.contributionYear,
@@ -108,7 +108,7 @@ function AccountContributionLimitItem({
               />
             </p>
           </div>
-          <div className={`shrink-0 text-end text-xs font-semibold ${statusClassName}`}>
+          <div className={`max-w-full shrink-0 text-end text-xs font-semibold ${statusClassName}`}>
             {isOverLimit ? (
               <Trans
                 i18nKey="account:contribution.over_by"
@@ -141,8 +141,8 @@ AccountContributionLimit.Skeleton = function AccountContributionLimitSkeleton() 
     <div className="space-y-4">
       <Card className="border-none shadow-sm">
         <CardContent className="space-y-3 p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-2">
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+            <div className="min-w-0 flex-1 basis-40 space-y-2">
               <Skeleton className="h-4 w-32" />
               <Skeleton className="h-3 w-40" />
             </div>

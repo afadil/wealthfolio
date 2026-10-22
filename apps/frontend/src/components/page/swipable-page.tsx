@@ -229,6 +229,7 @@ export function SwipablePage({
     <Page className={cn("flex h-full flex-col", className)}>
       <div
         data-ptr-content
+        data-virtual-scroll-parent={!isMobile || undefined}
         className={cn("relative mx-auto flex w-full grow flex-col", contentClassName)}
       >
         {isMobile ? (

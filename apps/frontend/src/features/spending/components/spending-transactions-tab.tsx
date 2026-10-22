@@ -19,12 +19,16 @@ import { localizeActivityTypeName } from "@/lib/activity-utils";
 import { generateId } from "@/lib/id";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useIsMobileViewport } from "@/hooks/use-platform";
-import { useVirtualScrollContainer } from "@/hooks/use-virtual-scroll-container";
+import {
+  observeCurrentScrollOffset,
+  useVirtualScrollContainer,
+} from "@/hooks/use-virtual-scroll-container";
+import { useHorizontalOverflow } from "@/hooks/use-horizontal-overflow";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { InfiniteScrollTrigger } from "@/components/infinite-scroll-trigger";
 import { useTaxonomy } from "@/hooks/use-taxonomies";
 import { QueryKeys } from "@/lib/query-keys";
-import { formatDateISO } from "@/lib/utils";
+import { cn, formatDateISO } from "@/lib/utils";
 import type { Account, ActivityDetails, TaxonomyCategory } from "@/lib/types";
 import { useSettingsContext } from "@/lib/settings-provider";
 
@@ -966,6 +970,9 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
     // card list scrolls inside its swipeable pane — so both sit below a filter
     // bar whose height the virtualizer has to offset by.
     const { listRef, scrollElement, scrollMargin } = useVirtualScrollContainer();
+    const [tableBox, setTableBox] = useState<HTMLDivElement | null>(null);
+    const [tableElement, setTableElement] = useState<HTMLTableElement | null>(null);
+    const scrollsSideways = useHorizontalOverflow(tableBox, tableElement);
 
     /**
      * Keyed by activity rather than index, so a row keeps its measured height
@@ -983,6 +990,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
     const virtualizer = useVirtualizer({
       count: listItems.length,
       getScrollElement: () => scrollElement,
+      observeElementOffset: observeCurrentScrollOffset,
       estimateSize: (index) => {
         const isHeader = listItems[index]?.kind === "header";
         if (isMobile) return isHeader ? MOBILE_HEADING_HEIGHT : MOBILE_CARD_HEIGHT;
@@ -1272,12 +1280,19 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
           // Row checkboxes show on hover or focus until something is selected,
           // then on every row; `data-selecting` is what switches them on.
           <Card
-            className="group/list overflow-clip"
+            ref={setTableBox}
+            data-virtual-scroll-parent
+            className={cn("group/list", scrollsSideways ? "overflow-auto" : "overflow-clip")}
             data-selecting={selectedRowIds.size > 0 || undefined}
             style={{ overflowAnchor: "none" }}
           >
-            <Table>
-              <TableHeader>
+            <Table ref={setTableElement} containerClassName="overflow-visible">
+              <TableHeader
+                className={cn(
+                  "bg-card sticky top-0 z-10 [&_th]:shadow-[inset_0_-1px_0_var(--color-border)] [&_tr]:border-b-0",
+                  !scrollsSideways && "[@media(width>1024px)]:top-[var(--page-header-height,0px)]",
+                )}
+              >
                 <TableRow>
                   {/* Select-all stays visible: with the row boxes hidden at
                       rest, it is what shows the list can be selected. */}
