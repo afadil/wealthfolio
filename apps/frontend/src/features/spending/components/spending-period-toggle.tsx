@@ -1,6 +1,6 @@
 /**
  * Canonical period toggle for spending surfaces that need named comparison
- * periods (This month / Last month / 3M / 6M / YTD / 1Y). Used by the Insights page
+ * periods (This month / Last month / 3M / 6M / YTD / Last Year). Used by the Insights page
  * and any future page that compares period-over-period totals.
  *
  * Why this exists: prior to this primitive each surface inlined its own
@@ -9,7 +9,7 @@
  *
  * Not used by:
  * - The Budget page (uses `MonthSwitcher` — budgets are inherently
- *   per-month with rollover, no useful "1Y" view).
+ *   per-month with rollover, no useful "LAST_YEAR" view).
  *
  * Dashboard links use shared period-preference keys so the most recent explicit
  * dashboard or insights period selection wins when moving between surfaces.
@@ -22,8 +22,8 @@ import { cn } from "@/lib/utils";
 
 import { AnimatedToggleGroup, useIsMobile } from "@wealthfolio/ui";
 
-import { SpendingDatePicker } from "./spending-date-picker";
 import { REPORTS_PERIODS, type ReportsPeriod } from "../lib/reports-period";
+import { SpendingDatePicker } from "./spending-date-picker";
 
 function useSpendingPeriodLabels(): Record<ReportsPeriod, ReactNode> {
   const { t } = useTranslation();
@@ -45,6 +45,12 @@ function useSpendingPeriodLabels(): Record<ReportsPeriod, ReactNode> {
       "6M": "6M",
       YTD: "YTD",
       "1Y": "1Y",
+      "LAST_YEAR": (
+        <>
+          <span className="hidden sm:inline">{t("spending:period.lastYear")}</span>
+          <span className="sm:hidden">{t("spending:period.prevShort")}</span>
+        </>
+      ),
     }),
     [t],
   );

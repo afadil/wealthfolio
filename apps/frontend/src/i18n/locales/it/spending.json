@@ -235,6 +235,7 @@
     "mtdShort": "MTD",
     "lastMonth": "Mese scorso",
     "prevShort": "Prec.",
+    "lastYear": "Anno scorso",
     "viewingMonth": "Visualizzazione di {{label}}, clicca per cambiare",
     "pickMonth": "Scegli un mese specifico",
     "selectMonth": "Seleziona mese",
@@ -998,7 +999,8 @@
     "interval3M": "ultimi 3 mesi",
     "interval6M": "ultimi 6 mesi",
     "intervalYtd": "da inizio anno",
-    "interval1Y": "ultimo anno",
+    "interval1Y": "ultimi 12 mesi",
+    "intervalLastYear": "l'anno scorso",
     "plusMore_one": "+ {{count}} altre",
     "plusMore_many": "+ {{count}} altre",
     "plusMore_other": "+ {{count}} altre"
