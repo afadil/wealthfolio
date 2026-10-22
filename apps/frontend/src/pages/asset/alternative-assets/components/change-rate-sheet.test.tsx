@@ -71,6 +71,52 @@ describe("change interest rate", () => {
     expect(screen.getByRole("button", { name: "Change interest rate" })).toBeDisabled();
   });
 
+  it("starts a fresh draft each time it opens", () => {
+    const props = { onOpenChange: vi.fn(), onSubmit: vi.fn(), metadata };
+    const rate = () => screen.getByLabelText("Interest rate", { selector: "input" });
+    const { rerender } = render(<ChangeRateSheet {...props} open={false} />);
+    rerender(<ChangeRateSheet {...props} open />);
+    expect(rate()).toHaveValue("4.5");
+    fireEvent.change(rate(), { target: { value: "5.1" } });
+    rerender(<ChangeRateSheet {...props} open={false} />);
+    rerender(<ChangeRateSheet {...props} open />);
+    expect(rate()).toHaveValue("4.5");
+  });
+
+  it("keeps a draft when the loan changes while the sheet is open", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const props = { open: true, onOpenChange: vi.fn(), onSubmit };
+    const { rerender } = render(<ChangeRateSheet {...props} metadata={metadata} />);
+    fireEvent.change(screen.getByLabelText("Interest rate", { selector: "input" }), {
+      target: { value: "5.1" },
+    });
+    fireEvent.change(screen.getByLabelText("Payment", { selector: "input" }), {
+      target: { value: "1050" },
+    });
+    // Another device syncs an unrelated event onto the loan.
+    const synced = {
+      ...metadata,
+      loan_events: [
+        ...metadata.loan_events,
+        { type: "extra_repayment", effectiveDate: "2026-04-01", amount: 100 },
+      ],
+    };
+    rerender(<ChangeRateSheet {...props} metadata={synced} />);
+    fireEvent.click(screen.getByRole("button", { name: "Change interest rate" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.lastCall![0]).toMatchObject({ annualRate: 5.1, paymentAmount: 1050 });
+  });
+
+  it("refuses a payment of zero instead of keeping the current one", () => {
+    const { save, rate, payment } = open();
+    fireEvent.change(rate, { target: { value: "5.1" } });
+    fireEvent.change(payment, { target: { value: "0" } });
+    expect(save).toBeDisabled();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    fireEvent.change(payment, { target: { value: "" } });
+    expect(save).toBeEnabled();
+  });
+
   it("takes a rate in sixteenths of a point", async () => {
     const { onSubmit, save, rate } = open();
     fireEvent.change(rate, { target: { value: "6.0625" } });
