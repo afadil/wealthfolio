@@ -703,8 +703,10 @@ where
                             )
                             .await
                             .map_err(|e| e.to_string())?;
-                        // Keep the upload failure, but let incoming changes arrive first.
-                        retryable_push_failure = Some((format!("Push failed: {}", err), backoff));
+                        // Keep the original deadline while incoming changes arrive.
+                        let retry_at =
+                            (Utc::now() + chrono::Duration::seconds(backoff)).to_rfc3339();
+                        retryable_push_failure = Some((format!("Push failed: {}", err), retry_at));
                     }
                     ApiRetryClass::Permanent => {
                         ports
@@ -995,32 +997,23 @@ where
         let _ = ports.prune_applied_events_up_to_seq(prune_seq).await;
     }
 
-    let result = if let Some((message, backoff)) = retryable_push_failure {
-        ctx.local_cursor = local_cursor;
-        ctx.pulled_count = pulled_count;
-        ctx.fail("push_error", message, Some(backoff)).await?
-    } else {
+    let (status, next_retry_at) = if let Some((message, retry_at)) = retryable_push_failure {
         ports
-            .mark_cycle_outcome(
-                "ok".to_string(),
-                cycle_started_at.elapsed().as_millis() as i64,
-                None,
-            )
+            .mark_engine_error(message)
             .await
             .map_err(|e| e.to_string())?;
-
-        SyncCycleResult {
-            status: "ok".to_string(),
-            lock_version,
-            pushed_count,
-            pulled_count,
-            cursor: local_cursor,
-            needs_bootstrap: false,
-            bootstrap_snapshot_id: None,
-            bootstrap_snapshot_seq: None,
-            dead_letter_count: 0,
-        }
+        ("push_error", Some(retry_at))
+    } else {
+        ("ok", None)
     };
+    ports
+        .mark_cycle_outcome(
+            status.to_string(),
+            cycle_started_at.elapsed().as_millis() as i64,
+            next_retry_at,
+        )
+        .await
+        .map_err(|e| e.to_string())?;
 
     if pulled_count > 0 {
         ports
@@ -1029,7 +1022,17 @@ where
             .map_err(|e| e.to_string())?;
     }
 
-    Ok(result)
+    Ok(SyncCycleResult {
+        status: status.to_string(),
+        lock_version,
+        pushed_count,
+        pulled_count,
+        cursor: local_cursor,
+        needs_bootstrap: false,
+        bootstrap_snapshot_id: None,
+        bootstrap_snapshot_seq: None,
+        dead_letter_count: 0,
+    })
 }
 
 fn compute_jitter_ms() -> u64 {
@@ -2427,6 +2430,65 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[tokio::test]
+    async fn retryable_push_failure_does_not_extend_retry_deadline_while_downloading() {
+        let mut ports = TestPorts::new(Some(ready_identity()), Ok(SyncState::Ready));
+        ports.cursor = 5;
+        ports.reconcile_response.cursor = Some(8);
+        ports.push_error = Some(TransportError {
+            message: "503 Service Unavailable".to_string(),
+            retry_class: ApiRetryClass::Retryable,
+            error_code: None,
+            details: None,
+        });
+        let mut event = outbox_event("evt-local", "account-local", 1);
+        event.retry_count = 3; // Existing backoff: 40 seconds.
+        ports.pending_outbox.lock().await.push(event);
+
+        // Hold the response to pause the download after the upload retry is scheduled.
+        let mut responses = ports.pull_responses.lock().await;
+        responses.push_back(single_event_pull_response(
+            8,
+            pull_event(
+                "evt-remote",
+                "account",
+                "account.update.v1",
+                "account-remote",
+                8,
+                r#"{"id":"account-remote","name":"Checking"}"#,
+            ),
+        ));
+        let cycle_ports = ports.clone();
+        let cycle = tokio::spawn(async move { run_sync_cycle(&cycle_ports, false).await });
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while ports.pull_cursors.lock().await.is_empty() {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("cycle should reach the download");
+        let latest_original_deadline = Utc::now() + chrono::Duration::seconds(40);
+        tokio::time::sleep(Duration::from_millis(25)).await;
+        drop(responses);
+
+        let result = cycle.await.expect("cycle task").expect("cycle");
+
+        assert_eq!(result.status, "push_error");
+        assert_eq!(result.cursor, 8);
+        assert_eq!(result.pulled_count, 1);
+        let retry_at = ports
+            .last_cycle_retry_at
+            .lock()
+            .await
+            .clone()
+            .expect("retry time");
+        let retry_at = chrono::DateTime::parse_from_rfc3339(&retry_at).expect("valid retry time");
+        assert!(
+            retry_at <= latest_original_deadline,
+            "download extended the upload retry deadline"
+        );
     }
 
     #[tokio::test]
