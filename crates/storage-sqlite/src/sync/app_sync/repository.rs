@@ -2958,6 +2958,21 @@ impl AppSyncRepository {
         rows.into_iter().map(to_outbox_event).collect()
     }
 
+    pub fn next_outbox_retry_at(&self) -> Result<Option<String>> {
+        let mut conn = get_connection(&self.pool)?;
+        let pending_status = enum_to_db(&SyncOutboxStatus::Pending)?;
+        let retry_at = sync_outbox::table
+            .filter(
+                sync_outbox::status
+                    .eq(pending_status)
+                    .and(sync_outbox::sent.eq(0)),
+            )
+            .select(diesel::dsl::min(sync_outbox::next_retry_at))
+            .first::<Option<String>>(&mut conn)
+            .map_err(StorageError::from)?;
+        Ok(retry_at)
+    }
+
     pub async fn mark_outbox_sent(&self, event_ids: Vec<String>) -> Result<()> {
         if event_ids.is_empty() {
             return Ok(());
@@ -6658,6 +6673,79 @@ mod tests {
         assert!(
             !repo.needs_bootstrap("device-9").expect("needs bootstrap"),
             "bootstrap should be marked complete for the current device"
+        );
+    }
+
+    #[tokio::test]
+    async fn next_outbox_retry_at_only_considers_unsent_pending_rows() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool, writer.clone());
+        assert_eq!(repo.next_outbox_retry_at().expect("empty outbox"), None);
+
+        let now = Utc::now();
+        let earliest = (now + Duration::seconds(40)).to_rfc3339();
+        let later = (now + Duration::seconds(80)).to_rfc3339();
+        let rows = [
+            ("later", SyncOutboxStatus::Pending, 0, Some(later.clone())),
+            (
+                "earliest",
+                SyncOutboxStatus::Pending,
+                0,
+                Some(earliest.clone()),
+            ),
+            ("ready", SyncOutboxStatus::Pending, 0, None),
+            ("dead", SyncOutboxStatus::Dead, 0, Some(now.to_rfc3339())),
+            ("sent", SyncOutboxStatus::Sent, 1, Some(now.to_rfc3339())),
+            (
+                "marked-sent",
+                SyncOutboxStatus::Pending,
+                1,
+                Some(now.to_rfc3339()),
+            ),
+        ];
+        writer
+            .exec(move |conn| {
+                for (event_id, status, sent, retry_at) in rows {
+                    let mut request = OutboxWriteRequest::new(
+                        SyncEntity::Account,
+                        event_id,
+                        SyncOperation::Update,
+                        serde_json::json!({ "id": event_id }),
+                    );
+                    request.event_id = Some(event_id.to_string());
+                    insert_outbox_event(conn, request)?;
+                    diesel::update(sync_outbox::table.find(event_id))
+                        .set((
+                            sync_outbox::status.eq(enum_to_db(&status)?),
+                            sync_outbox::sent.eq(sent),
+                            sync_outbox::next_retry_at.eq(retry_at),
+                        ))
+                        .execute(conn)
+                        .map_err(StorageError::from)?;
+                }
+                Ok(())
+            })
+            .await
+            .expect("insert outbox rows");
+
+        assert_eq!(repo.list_pending_outbox(10).expect("ready rows").len(), 1);
+        assert_eq!(
+            repo.next_outbox_retry_at().expect("earliest retry"),
+            Some(earliest)
+        );
+        repo.mark_outbox_sent(vec!["earliest".to_string()])
+            .await
+            .expect("sent row");
+        assert_eq!(
+            repo.next_outbox_retry_at().expect("remaining retry"),
+            Some(later)
+        );
+        repo.mark_outbox_dead(vec!["later".to_string()], None, None)
+            .await
+            .expect("dead row");
+        assert_eq!(
+            repo.next_outbox_retry_at().expect("no remaining retry"),
+            None
         );
     }
 

@@ -72,6 +72,12 @@ impl OutboxStore for SqliteSyncEngineDbPorts {
             .map(|rows| !rows.is_empty())
             .map_err(|e| e.to_string())
     }
+
+    async fn next_outbox_retry_at(&self) -> Result<Option<String>, String> {
+        self.repository
+            .next_outbox_retry_at()
+            .map_err(|e| e.to_string())
+    }
 }
 
 #[async_trait]
