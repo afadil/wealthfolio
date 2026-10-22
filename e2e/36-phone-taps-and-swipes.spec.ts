@@ -80,3 +80,28 @@ test("Next on the phone spending form opens the details instead of saving", asyn
     await page.request.put(`${api}/spending/settings`, { data: previousSettings });
   }
 });
+
+test("the Performance Plus button stays on screen next to two badges", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 393, height: 852 });
+  await completeOnboardingIfNeeded(page);
+  const name = `Performance badge ${Date.now().toString(36)}`;
+  await newAccount(page, name, "SECURITIES");
+  await gotoAppPath(page, "/insights?tab=performance");
+
+  // All Portfolio is there by default; add the account as a second badge.
+  const plus = page
+    .getByRole("button", { name: "Add item", exact: true })
+    .filter({ visible: true });
+  await plus.click();
+  await page.getByRole("menuitem", { name: "Add account", exact: true }).click();
+  await page.getByRole("dialog").getByText(name, { exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: `Remove ${name}`, exact: true }).filter({ visible: true }),
+  ).toBeVisible();
+
+  for (const width of [360, 393, 412]) {
+    await page.setViewportSize({ width, height: 852 });
+    await expect(plus, `Plus button at ${width} px`).toBeInViewport({ ratio: 1 });
+  }
+});
