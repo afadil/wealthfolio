@@ -5,10 +5,11 @@ import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useTaxonomy } from "@/hooks/use-taxonomies";
+import { useSettingsContext } from "@/lib/settings-provider";
 import type { DateRange } from "@/lib/types";
 import { formatDateISO } from "@/lib/utils";
-import { useSettingsContext } from "@/lib/settings-provider";
 
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import {
   Page,
   PageContent,
@@ -17,7 +18,6 @@ import {
   useDateFormatting,
   useIsMobile,
 } from "@wealthfolio/ui";
-import { usePersistentState } from "@/hooks/use-persistent-state";
 
 import { CategoryTransactionsSheet } from "../components/reports/category-transactions-sheet";
 import { HeatmapCellSheet } from "../components/reports/heatmap-cell-sheet";
@@ -31,12 +31,18 @@ import { useEventSpendingSummaries } from "../hooks/use-spending-events";
 import { useSpendingInsight } from "../hooks/use-spending-insight";
 import { useSpendingSettings } from "../hooks/use-spending-settings";
 import { getActivitySpendingAmount, getVisibleSpendingAmount } from "../lib/constants";
+import {
+  SPENDING_RANGE_FROM_PARAM,
+  SPENDING_RANGE_TO_PARAM,
+  spendingRangeFromParams,
+  spendingRangeToReportsRange,
+} from "../lib/date-range-params";
 import { insightToReportProjection, UNCATEGORIZED_CATEGORY_ID } from "../lib/insight-projection";
 import {
   addMonthsToMonthKey,
   currentMonthKey,
-  monthReportsRange,
   monthLabel,
+  monthReportsRange,
   parseMonthKey,
   SPENDING_MONTH_PARAM,
   SPENDING_MONTH_STORAGE_KEY,
@@ -47,12 +53,6 @@ import {
   normalizeReportsPeriod,
   periodPreferenceTimestamp,
 } from "../lib/period-preferences";
-import {
-  SPENDING_RANGE_FROM_PARAM,
-  SPENDING_RANGE_TO_PARAM,
-  spendingRangeFromParams,
-  spendingRangeToReportsRange,
-} from "../lib/date-range-params";
 import {
   comparisonRange,
   DEFAULT_REPORTS_PERIOD,
@@ -704,6 +704,7 @@ const MONTHS_PER_PERIOD: Record<ReportsPeriod, number> = {
   "6M": 6,
   YTD: 12,
   "1Y": 12,
+  LAST_YEAR: 12,
 };
 
 function shiftRangeBack(

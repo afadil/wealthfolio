@@ -947,7 +947,8 @@
     "interval3M": "past 3 months",
     "interval6M": "past 6 months",
     "intervalYtd": "year to date",
-    "intervalLastYear": "past year",
+    "interval1Y": "past 12 months",
+    "intervalLastYear": "last year",
     "plusMore_one": "+ {{count}} more",
     "plusMore_other": "+ {{count}} more"
   },

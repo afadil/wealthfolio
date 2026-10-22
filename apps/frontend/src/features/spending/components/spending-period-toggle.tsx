@@ -44,13 +44,13 @@ function useSpendingPeriodLabels(): Record<ReportsPeriod, ReactNode> {
       "3M": "3M",
       "6M": "6M",
       YTD: "YTD",
+      "1Y": "1Y",
       "LAST_YEAR": (
         <>
           <span className="hidden sm:inline">{t("spending:period.lastYear")}</span>
           <span className="sm:hidden">{t("spending:period.prevShort")}</span>
         </>
       ),
-      "ALL": "ALL",
     }),
     [t],
   );
