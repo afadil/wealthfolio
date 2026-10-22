@@ -28,9 +28,22 @@ const RESIDUAL_TOLERANCE_RATE: Decimal = dec!(0.002);
 /// stored. Measuring reads no raw facts and resolves no rates.
 pub struct MeasureInputs<'a> {
     pub effects: Effects,
+    /// Prepared daily cash FX by account. None means preparation was skipped
+    /// for Dashboard; Some with empty daily entries means known zero FX.
+    /// Attribution reads require an entry for each transaction account used.
+    pub cash_fx: Option<BTreeMap<AccountId, Vec<CashFxEffect>>>,
     pub series: &'a BTreeMap<AccountId, ValuationSeries>,
     pub lots: &'a [LotRecord],
     pub disposals: &'a [LotDisposal],
+}
+
+/// Revaluation of opening cash exposure, priced before measurement. These
+/// transient inputs are independent of investment and conversion execution.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CashFxEffect {
+    pub date: NaiveDate,
+    /// None means exposure or its valuation rate could not be determined.
+    pub amount: Option<Decimal>,
 }
 
 impl MeasureInputs<'_> {
@@ -66,12 +79,6 @@ impl MeasureInputs<'_> {
             .account(account)
             .map(|a| a.tracking)
             .unwrap_or(TrackingMode::Transactions)
-    }
-
-    fn is_cash_account(&self, account: &AccountId) -> bool {
-        self.effects
-            .account(account)
-            .is_some_and(|a| a.kind == AccountKind::Cash)
     }
 }
 
@@ -204,6 +211,42 @@ fn check_not_archived(inputs: &MeasureInputs<'_>, scope: &[AccountId]) -> Result
     }
 }
 
+fn check_cash_fx_prepared(
+    inputs: &MeasureInputs<'_>,
+    scope: &[AccountId],
+    window: Window,
+    profile: MeasureProfile,
+) -> Result<(), EngineError> {
+    if profile == MeasureProfile::Dashboard {
+        return Ok(());
+    }
+    for account in scope {
+        if inputs.tracking(account) == TrackingMode::Holdings {
+            continue;
+        }
+        let points = inputs.series.get(account).map_or(0, |series| {
+            series
+                .days
+                .iter()
+                .filter(|day| window.contains(day.date))
+                .take(2)
+                .count()
+        });
+        if points == 2
+            && inputs
+                .cash_fx
+                .as_ref()
+                .and_then(|fx| fx.get(account))
+                .is_none()
+        {
+            return Err(EngineError::CashFxNotPrepared {
+                account: account.as_str().to_string(),
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Performance of one account (legacy `calculate_account_performance`).
 /// `include_series` adds the daily return series (history responses only).
 pub fn measure_account(
@@ -215,6 +258,7 @@ pub fn measure_account(
 ) -> Result<PerformanceResult, EngineError> {
     check_window(window)?;
     check_not_archived(inputs, std::slice::from_ref(account))?;
+    check_cash_fx_prepared(inputs, std::slice::from_ref(account), window, profile)?;
     let history = inputs.history(account, window);
     if history.len() < 2 {
         return Ok(empty_response(
@@ -232,7 +276,6 @@ pub fn measure_account(
         window.start,
         include_series,
         profile,
-        inputs.is_cash_account(account),
         inputs.account_is_base(account),
         inputs.base(),
     );
@@ -283,6 +326,7 @@ pub fn measure_scope(
         .cloned()
         .collect();
     let scope = started.as_slice();
+    check_cash_fx_prepared(inputs, scope, window, profile)?;
     let has_holdings = scope
         .iter()
         .any(|a| inputs.tracking(a) == TrackingMode::Holdings);
@@ -324,14 +368,12 @@ pub fn measure_scope(
         ));
     }
 
-    let all_cash = scope.iter().all(|a| inputs.is_cash_account(a));
     let mut result = performance_core(
         &history,
         has_holdings,
         window.start,
         include_series,
         profile,
-        all_cash,
         true,
         base,
     );
@@ -349,17 +391,12 @@ pub fn measure_scope(
         Baseline::PeriodStart
     };
     let unrealized = scoped_unrealized_effects(inputs, &result, scope, baseline);
-    let transfers = transfer_pair_effects(inputs, &result, scope, baseline);
     let mut seed = Seed::default();
     if unrealized.complete {
         seed.include_base_market_movement = false;
         seed.effects.extend(unrealized.effects);
     }
     seed.warnings.extend(unrealized.warnings);
-    if transfers.complete {
-        seed.effects.extend(transfers.effects);
-    }
-    seed.warnings.extend(transfers.warnings);
     finalize_attribution(inputs, &mut result, scope, &history, baseline, seed);
     Ok(result)
 }
@@ -367,14 +404,12 @@ pub fn measure_scope(
 // ------------------------------------------------------------ core math
 
 /// Legacy `compute_account_performance_with_flow_basis` (base currency).
-#[allow(clippy::too_many_arguments)]
 fn performance_core(
     history: &[DailyValuation],
     holdings: bool,
     start_opt: Option<NaiveDate>,
     include_series: bool,
     profile: MeasureProfile,
-    cash_fx_attribution: bool,
     account_is_base: bool,
     currency: &Currency,
 ) -> PerformanceResult {
@@ -595,10 +630,8 @@ fn performance_core(
         } else {
             let (contributions, distributions) =
                 flows_for_attribution(&flows, start_point, baseline);
-            let (unrealized_change, investment_fx) =
+            let (unrealized_change, fx_effect) =
                 unrealized_components(start_point, end_point, baseline, account_is_base);
-            let fx_effect = (investment_fx + cash_only_fx_effect(history, cash_fx_attribution))
-                .round_dp(STORED_PRECISION);
             (contributions, distributions, unrealized_change, fx_effect)
         };
     let delta_total_value = total_value_delta(start_point, end_point, baseline);
@@ -626,7 +659,7 @@ fn performance_core(
         });
     }
     let mut data_quality = data_quality(warnings, reasons, false);
-    if !holdings {
+    if !holdings && profile != MeasureProfile::Dashboard {
         let unreconciled = unreconciled_delta(delta_total_value, &attribution);
         push_residual_diagnostic(
             &mut data_quality,
@@ -1241,30 +1274,6 @@ fn unrealized_components(
     )
 }
 
-fn cash_only_fx_effect(history: &[DailyValuation], enabled: bool) -> Decimal {
-    let cash_only = history.iter().all(|d| {
-        d.investment_market_value.is_zero()
-            && d.investment_market_value_base.is_zero()
-            && d.cost_basis.is_zero()
-            && d.cost_basis_base.is_zero()
-    });
-    if !enabled || !cash_only {
-        return Decimal::ZERO;
-    }
-    history
-        .windows(2)
-        .map(|pair| {
-            let (prev, curr) = (&pair[0], &pair[1]);
-            let delta_base = curr.cash_balance_base - prev.cash_balance_base;
-            arith::mul(curr.cash_balance - prev.cash_balance, curr.fx_rate_to_base)
-                .map_or(Decimal::ZERO, |delta_at_current_fx| {
-                    (delta_base - delta_at_current_fx).round_dp(STORED_PRECISION)
-                })
-        })
-        .sum::<Decimal>()
-        .round_dp(STORED_PRECISION)
-}
-
 fn holdings_basis_is_complete(point: &DailyValuation) -> bool {
     matches!(
         point.basis_status,
@@ -1551,6 +1560,16 @@ fn finalize_attribution(
     effects.extend(seed.effects);
     let mut warnings = seed.warnings;
 
+    // Cash revaluation survives a scoped investment seed replacing the base
+    // market movement. Conversions' execution differences are separate from
+    // holding FX and count once, including same-account pairs on direct reads.
+    let cash_fx = cash_fx_attribution(inputs, result, scope);
+    effects.extend(cash_fx.effects);
+    warnings.extend(cash_fx.warnings);
+    let transfers = transfer_pair_effects(inputs, result, scope, baseline);
+    effects.extend(transfers.effects);
+    warnings.extend(transfers.warnings);
+
     let activity = activity_effects(inputs, result, scope, baseline);
     effects.extend(activity.effects);
     warnings.extend(activity.warnings);
@@ -1572,6 +1591,51 @@ fn finalize_attribution(
         recompute_residual(result, history, baseline);
     }
     refresh_summary(result);
+}
+
+fn cash_fx_attribution(
+    inputs: &MeasureInputs<'_>,
+    result: &PerformanceResult,
+    scope: &[AccountId],
+) -> EffectSet {
+    let (Some(start), Some(end)) = (result.period_start, result.period_end) else {
+        return EffectSet::default();
+    };
+    let mut set = EffectSet::default();
+    let mut total = Decimal::ZERO;
+    // Keep known daily FX when another day is unavailable. The warning marks
+    // the result Partial; completeness is not used to substitute a fallback
+    // here, unlike the scoped investment seed.
+    for account in scope {
+        let mut warned = false;
+        for day in inputs
+            .cash_fx
+            .as_ref()
+            .and_then(|fx| fx.get(account))
+            .into_iter()
+            .flatten()
+            .filter(|day| day.date > start && day.date <= end)
+        {
+            match day.amount {
+                Some(amount) => total += amount,
+                None if !warned => {
+                    set.warnings.push(QualityNote::CashFxUnavailable {
+                        account: account.as_str().to_string(),
+                        date: day.date,
+                    });
+                    warned = true;
+                }
+                None => {}
+            }
+        }
+    }
+    if !total.is_zero() {
+        set.effects.push(Effect {
+            fx_effect: total,
+            ..Effect::default()
+        });
+    }
+    set
 }
 
 /// With an UNAVAILABLE period endpoint the P&L has no value to break down:
@@ -2206,6 +2270,18 @@ fn transfer_pair_effects(
         if !scope.contains(&pair.in_account) || !scope.contains(&pair.out_account) {
             continue;
         }
+        // Holdings attribution already derives its entire P&L from snapshots
+        // and inferred flows; transaction legs must not be added to it.
+        if inputs.tracking(&pair.in_account) == TrackingMode::Holdings
+            || inputs.tracking(&pair.out_account) == TrackingMode::Holdings
+        {
+            continue;
+        }
+        // Unmarked same-account pairs already put their execution difference
+        // into net contribution (and fallback flows), so it is not P&L too.
+        if pair.in_account == pair.out_account && !pair.contribution_neutral {
+            continue;
+        }
         let (Some(transfer_in), Some(transfer_out)) = (
             by_source.get(pair.transfer_in.as_str()),
             by_source.get(pair.transfer_out.as_str()),
@@ -2228,6 +2304,12 @@ fn transfer_pair_effects(
             .as_str()
             .eq_ignore_ascii_case(transfer_out.currency.as_str())
         {
+            continue;
+        }
+        // A cut pair leaves principal in transit under the valuation rules.
+        // It is an unreconciled delta, not an execution FX gain or loss.
+        // Only a window containing both legs can attribute their difference.
+        if !period.contains(transfer_in.date) || !period.contains(transfer_out.date) {
             continue;
         }
         let priced = |leg: &EventEffect| leg.flow.map_or(Decimal::ZERO, |flow| flow.amount);
@@ -2407,7 +2489,6 @@ fn mixed_scope_performance(
                 window.start,
                 false,
                 component_profile,
-                inputs.is_cash_account(&component.account),
                 inputs.account_is_base(&component.account),
                 base,
             );
@@ -2922,7 +3003,6 @@ mod tests {
                 None,
                 false,
                 MeasureProfile::Full,
-                false,
                 true,
                 &currency,
             )
@@ -2998,7 +3078,6 @@ mod tests {
             None,
             false,
             MeasureProfile::Full,
-            false,
             true,
             &currency,
         )

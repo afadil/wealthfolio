@@ -14,15 +14,16 @@ test("new formatting regions persist after saving and reloading settings", async
     ["Romania", "RO", /1\.234,56/],
     ["Bulgaria", "BG", /1234,56/],
   ] as const) {
+    // The region list is searchable: narrow it by name, then pick the option.
     await regionSelect.click();
+    await page.getByPlaceholder("Search...").fill(label);
     const option = page.getByRole("option", { name: label, exact: true });
-    await option.focus();
     const saved = page.waitForResponse(
       (response) =>
         response.request().method() === "PUT" &&
         new URL(response.url()).pathname.endsWith("/settings"),
     );
-    await option.press("Enter");
+    await option.click();
     const response = await saved;
     expect(response.request().postDataJSON()).toMatchObject({ formattingRegion: code });
     expect(response.status(), await response.text()).toBe(200);
@@ -36,6 +37,6 @@ test("new formatting regions persist after saving and reloading settings", async
   }
 
   await regionSelect.click();
-  await page.getByRole("option", { name: /^System/ }).press("Enter");
+  await page.getByRole("option", { name: /^System/ }).click();
   await expect(regionSelect).toContainText("System");
 });

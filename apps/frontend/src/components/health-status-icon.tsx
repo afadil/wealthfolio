@@ -77,7 +77,7 @@ export function HealthStatusIndicator() {
               title={t("common:component.data_status")}
               className={cn(
                 buttonVariants({ variant: "secondary", size: "icon-xs" }),
-                "bg-secondary/50 rounded-full",
+                "rounded-full",
               )}
             />
           }

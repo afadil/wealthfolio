@@ -125,6 +125,13 @@ jobs:
         # The frontend unit tests run in the Frontend Tests job.
         run: pnpm test:scripts
 
+      - name: Check the generated theme CSS
+        # Fails when src/themes/generated is stale against the definitions, or a
+        # definition breaks the generator's rules (unknown tokens, font stacks
+        # without "Rubik Arabic", component rules). Contrast is checked by the
+        # on-demand design-system suite, not here.
+        run: pnpm themes:check
+
       - name: Build frontend
         run: pnpm build
 

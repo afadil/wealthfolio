@@ -309,6 +309,8 @@
     "screenshot_alt": "Captura de tela {{number}}",
     "downloading_update": "Baixando atualização...",
     "installing_update": "Instalando atualização...",
+    "update_external_flatpak": "Esta cópia do Wealthfolio foi instalada com o Flatpak. Atualize-a pelo Flatpak ou pela sua central de software.",
+    "update_external_package_manager": "Esta instalação não pode ser atualizada pelo Wealthfolio. Atualize-a da mesma forma que você a instalou.",
     "update_failed": "A atualização falhou. Tente novamente.",
     "remind_me_later": "Lembrar mais tarde",
     "view_changelog": "Ver registro de alterações",

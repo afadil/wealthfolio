@@ -45,7 +45,7 @@ function DropdownMenuContent({
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"
           className={cn(
-            "bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-start-2 data-[side=inline-start]:slide-in-from-end-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 max-h-(--available-height) origin-(--transform-origin) ring-foreground/5 dark:ring-foreground/10 z-50 min-w-32 overflow-y-auto overflow-x-hidden rounded-2xl p-1 shadow-2xl outline-none ring-1 duration-100",
+            "bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-start-2 data-[side=inline-start]:slide-in-from-end-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 max-h-(--available-height) origin-(--transform-origin) ring-foreground/5 dark:ring-foreground/10 rounded-(--popup-radius) shadow-(--popup-shadow) z-50 min-w-32 overflow-y-auto overflow-x-hidden p-1 outline-none ring-1 duration-100",
             className,
           )}
           {...props}
@@ -110,7 +110,7 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 data-inset:ps-9.5 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive-subtle data-[variant=destructive]:focus:text-destructive-subtle-foreground group/dropdown-menu-item relative flex cursor-pointer select-none items-center gap-2.5 rounded-xl px-3 py-2 text-sm outline-none transition-colors [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+        "focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 data-inset:ps-9.5 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive-subtle data-[variant=destructive]:focus:text-destructive-subtle-foreground group/dropdown-menu-item relative flex cursor-pointer select-none items-center gap-2.5 rounded-[calc(var(--popup-radius)-0.125rem)] px-3 py-2 text-sm outline-none transition-colors [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
         className,
       )}
       {...props}
@@ -133,7 +133,7 @@ function DropdownMenuSubTrigger({ className, inset, children, ...props }: Dropdo
       data-slot="dropdown-menu-sub-trigger"
       data-inset={inset}
       className={cn(
-        "focus:bg-accent data-popup-open:bg-accent data-inset:ps-9.5 flex cursor-default select-none items-center gap-2.5 rounded-xl px-3 py-2 text-sm outline-none [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+        "focus:bg-accent data-popup-open:bg-accent data-inset:ps-9.5 flex cursor-default select-none items-center gap-2.5 rounded-[calc(var(--popup-radius)-0.125rem)] px-3 py-2 text-sm outline-none [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
         className,
       )}
       {...props}
@@ -179,7 +179,7 @@ function DropdownMenuCheckboxItem({
     <MenuPrimitive.CheckboxItem
       data-slot="dropdown-menu-checkbox-item"
       className={cn(
-        "focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 ps-9.5 relative flex cursor-default select-none items-center rounded-xl py-2 pe-3 text-sm outline-none transition-colors",
+        "focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 ps-9.5 relative flex cursor-default select-none items-center rounded-[calc(var(--popup-radius)-0.125rem)] py-2 pe-3 text-sm outline-none transition-colors",
         className,
       )}
       closeOnClick={closeOnClick}
@@ -208,7 +208,7 @@ function DropdownMenuRadioItem({ className, children, closeOnClick = true, ...pr
     <MenuPrimitive.RadioItem
       data-slot="dropdown-menu-radio-item"
       className={cn(
-        "focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 ps-9.5 relative flex cursor-default select-none items-center rounded-xl py-2 pe-3 text-sm outline-none transition-colors",
+        "focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 ps-9.5 relative flex cursor-default select-none items-center rounded-[calc(var(--popup-radius)-0.125rem)] py-2 pe-3 text-sm outline-none transition-colors",
         className,
       )}
       closeOnClick={closeOnClick}

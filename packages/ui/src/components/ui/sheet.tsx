@@ -43,7 +43,7 @@ function SheetOverlay({ className, ...props }: SheetOverlayProps) {
 }
 
 const sheetVariants = cva(
-  "fixed z-50 gap-4 bg-background p-6 shadow-lg transition-transform ease-in-out data-closed:duration-300 data-open:duration-500",
+  "fixed z-50 gap-4 border-(color:--overlay-border) bg-(--sheet-bg) p-6 shadow-(--overlay-shadow) transition-transform ease-in-out data-closed:duration-300 data-open:duration-500",
   {
     variants: {
       side: {

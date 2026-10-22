@@ -4,6 +4,7 @@ import { DataTablePagination } from "@wealthfolio/ui/components/ui/data-table/da
 import { DataTableToolbar } from "@wealthfolio/ui/components/ui/data-table/data-table-toolbar";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Table, TableBody, TableCell, TableRow } from "@wealthfolio/ui/components/ui/table";
+import { Card } from "@wealthfolio/ui/components/ui/card";
 import {
   Tooltip,
   TooltipContent,
@@ -178,7 +179,7 @@ export function CSVFileViewer({ data, className, maxHeight = "400px" }: CSVFileV
     <div className={cn("space-y-2", className)}>
       <DataTableToolbar table={table} searchBy="content" filters={filters} />
 
-      <div className="overflow-hidden rounded-md border">
+      <Card className="overflow-clip">
         {/* Header bar similar to a code editor */}
         <div className="border-border bg-muted flex items-center justify-between border-b px-3 py-2">
           <span className="text-muted-foreground text-xs">
@@ -239,7 +240,7 @@ export function CSVFileViewer({ data, className, maxHeight = "400px" }: CSVFileV
             </TableBody>
           </Table>
         </div>
-      </div>
+      </Card>
 
       <DataTablePagination table={table} />
     </div>

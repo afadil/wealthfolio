@@ -2,7 +2,8 @@ import { memo, type Ref } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SELECTION_SLOT } from "@/lib/hover-slot";
-import { Checkbox, PrivacyAmount, TableCell, TableRow, useDateFormatting } from "@wealthfolio/ui";
+import { DayHeaderRow, DayHeading } from "@/components/day-header";
+import { Checkbox, PrivacyAmount, TableCell, useDateFormatting } from "@wealthfolio/ui";
 
 import type { TransactionDayGroup } from "../lib/transactions-helpers";
 
@@ -76,11 +77,7 @@ function TransactionDayHeaderImpl({
   const label = useDayLabel(group, appTimezone);
 
   return (
-    <TableRow
-      ref={ref as Ref<HTMLTableRowElement>}
-      data-index={dataIndex}
-      className="group/row bg-muted/40 hover:bg-muted/40"
-    >
+    <DayHeaderRow ref={ref as Ref<HTMLTableRowElement>} data-index={dataIndex}>
       <TableCell className="relative px-3 py-1.5">
         <Checkbox
           checked={selectionState === true}
@@ -96,14 +93,12 @@ function TransactionDayHeaderImpl({
       </TableCell>
       <TableCell colSpan={3} className="px-3 py-1.5">
         <div className="flex items-baseline gap-2">
-          <span className="text-xs font-medium">{label}</span>
-          {/* "1 transaction" restates the single row below it, so the count
-              only appears once it is telling the reader something. */}
-          {!isPartial && group.rows.length > 1 && (
-            <span className="text-muted-foreground text-xs">
-              {t("spending:txTab.dayCount", { count: group.rows.length })}
-            </span>
-          )}
+          <DayHeading
+            label={label}
+            count={group.items.length}
+            isPartial={isPartial}
+            countLabel={(count) => t("spending:txTab.dayCount", { count })}
+          />
         </div>
       </TableCell>
       <TableCell className="w-28 px-3 py-1.5 text-end">
@@ -111,7 +106,7 @@ function TransactionDayHeaderImpl({
       </TableCell>
       {showBalance && <TableCell className="hidden px-3 py-1.5 sm:table-cell" />}
       <TableCell className="px-3 py-1.5" />
-    </TableRow>
+    </DayHeaderRow>
   );
 }
 
@@ -126,14 +121,13 @@ function TransactionDayHeadingImpl({ group, appTimezone, isPartial }: Transactio
     // than in line with them, and selecting a whole day is already covered by
     // the list's select-all control.
     <div className="flex items-baseline gap-2 px-1 pt-2">
-      {/* The heading separates days; it should not read as loudly as the rows
-          it separates, so on the card list it stays muted throughout. */}
-      <span className="text-muted-foreground text-xs font-medium">{label}</span>
-      {!isPartial && group.rows.length > 1 && (
-        <span className="text-muted-foreground text-xs">
-          {t("spending:txTab.dayCount", { count: group.rows.length })}
-        </span>
-      )}
+      <DayHeading
+        label={label}
+        count={group.items.length}
+        isPartial={isPartial}
+        countLabel={(count) => t("spending:txTab.dayCount", { count })}
+        muted
+      />
       <span className="ms-auto">{!isPartial && <DayNet group={group} />}</span>
     </div>
   );

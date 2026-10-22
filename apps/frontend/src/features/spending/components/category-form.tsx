@@ -159,7 +159,7 @@ export function CategoryForm({
             control={form.control}
             name="excluded"
             render={({ field }) => (
-              <FormItem className="flex flex-row items-center justify-between gap-3 space-y-0 rounded-md border px-3 py-2.5">
+              <FormItem className="flex flex-row items-center justify-between gap-3 rounded-md border px-3 py-2.5">
                 <div>
                   <FormLabel>{t("spending:category.excludeLabel")}</FormLabel>
                   <p className="text-muted-foreground mt-0.5 text-xs">

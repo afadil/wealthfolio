@@ -147,7 +147,7 @@ export function AddExchangeRateForm({ onSubmit, onCancel }: AddExchangeRateFormP
                 <PopoverTrigger
                   render={
                     <Button
-                      variant="outline"
+                      variant="field"
                       role="combobox"
                       className={cn("justify-between", !field.value && "text-muted-foreground")}
                     />

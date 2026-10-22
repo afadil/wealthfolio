@@ -748,7 +748,7 @@ export function QuoteHistoryDataGrid({
         onChangeDataSource={onChangeDataSource}
       />
 
-      <div className="min-h-0 flex-1 overflow-hidden rounded-md border">
+      <div className="min-h-0 flex-1">
         <DataGrid {...dataGrid} stretchColumns height="calc(100vh - 340px)" />
       </div>
     </div>

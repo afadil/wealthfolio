@@ -1,4 +1,5 @@
 import { useDateFormatting, type FormattingApi, Spinner } from "@wealthfolio/ui";
+import type { TFunction } from "i18next";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -21,6 +22,7 @@ import {
 import { Progress } from "@wealthfolio/ui/components/ui/progress";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { usePersistentState } from "@/hooks/use-persistent-state";
+import type { ExternalUpdateSource } from "@/lib/types";
 
 interface DismissedUpdate {
   version: string;
@@ -58,6 +60,17 @@ function formatReleaseDate(
     month: "long",
     day: "numeric",
   });
+}
+
+function externalUpdateMessage(source: ExternalUpdateSource, t: TFunction): string {
+  switch (source.kind) {
+    case "packager":
+      return source.explanation;
+    case "flatpak":
+      return t("common:component.update_external_flatpak");
+    case "packageManager":
+      return t("common:component.update_external_package_manager");
+  }
 }
 
 export function UpdateDialog() {
@@ -223,6 +236,12 @@ export function UpdateDialog() {
 
         {/* Footer actions */}
         <div className="border-border bg-secondary/30 flex shrink-0 flex-col gap-3 border-t px-6 py-4">
+          {/* Something else installs updates here, so say how instead of offering to. */}
+          {updateInfo.externalUpdateSource && (
+            <p className="text-muted-foreground text-pretty text-sm">
+              {externalUpdateMessage(updateInfo.externalUpdateSource, t)}
+            </p>
+          )}
           {isPending ? (
             // Download / install progress
             <div className="flex flex-col gap-2">
@@ -282,7 +301,7 @@ export function UpdateDialog() {
                     <Button onClick={handleOpenStore} disabled={!updateInfo.storeUrl}>
                       {t("common:component.open_app_store")}
                     </Button>
-                  ) : (
+                  ) : updateInfo.externalUpdateSource ? null : (
                     <Button onClick={handleInstall}>
                       <Icons.Download className="me-2 h-4 w-4" />
                       {t("common:component.update_now")}

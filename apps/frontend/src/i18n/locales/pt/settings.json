@@ -47,6 +47,7 @@
   "nav_about_subtitle": "Sobre o Wealthfolio",
   "general_page_description": "Gerencie as configurações e preferências gerais do aplicativo.",
   "currency_select_error": "Selecione uma moeda base.",
+  "currency_code_error": "Insira um código de moeda válido de 3 letras, como USD.",
   "currency_title": "Moeda base",
   "currency_description": "Selecione a moeda base da sua carteira.",
   "currency_save_button": "Salvar moeda",

@@ -1043,7 +1043,7 @@ function BreakdownCanvas({
         })}
       </div>
 
-      <div className="md:border-border/60 md:bg-card/40 md:overflow-hidden md:rounded-2xl md:border md:backdrop-blur-xl">
+      <div className="md:bg-card md:text-card-foreground md:shadow-(--card-shadow) md:rounded-(--card-radius) md:border-(color:--card-border) md:overflow-hidden md:border">
         <CategoryHierarchyTable
           breakdown={filteredBreakdown}
           priorBreakdown={priorBreakdown}

@@ -40,6 +40,7 @@ import type {
   TaxonomyCategory,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { generateId } from "@/lib/id";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -560,7 +561,7 @@ function TargetEditor({
         : [
             ...constraintsDraft,
             {
-              id: crypto.randomUUID(),
+              id: generateId(),
               targetId: target?.id ?? "",
               subjectType,
               subjectId,

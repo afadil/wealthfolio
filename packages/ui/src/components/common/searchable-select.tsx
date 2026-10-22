@@ -30,6 +30,9 @@ interface SearchableSelectProps {
   emptyMessage?: string;
   className?: string;
   contentClassName?: string;
+  "data-testid"?: string;
+  /** Names the trigger when no visible label is tied to it. */
+  "aria-label"?: string;
 }
 
 // A select-style field whose list has a search box: shadcn's Combobox with the
@@ -44,6 +47,8 @@ export function SearchableSelect({
   emptyMessage = "No results found.",
   className = "",
   contentClassName = "",
+  "data-testid": testId,
+  "aria-label": ariaLabel,
 }: SearchableSelectProps) {
   const selectedOption = options.find((option) => option.value === value) ?? null;
 
@@ -61,9 +66,11 @@ export function SearchableSelect({
       <ComboboxTrigger
         render={
           <Button
-            variant="outline"
-            className={cn("w-full justify-between rounded-md font-normal", className)}
+            variant="field"
+            className={cn("w-full justify-between", className)}
             disabled={disabled}
+            data-testid={testId}
+            aria-label={ariaLabel}
           />
         }
       >

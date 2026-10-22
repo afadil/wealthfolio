@@ -4,7 +4,8 @@ import { useTranslation } from "react-i18next";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { formatDateTime } from "@/lib/utils";
-import { AmountDisplay, TableCell, TableRow, useDateFormatting } from "@wealthfolio/ui";
+import { DayHeaderRow, DayHeading } from "@/components/day-header";
+import { AmountDisplay, TableCell, useDateFormatting } from "@wealthfolio/ui";
 
 import type { ActivityDayGroup } from "./activity-day-groups";
 
@@ -22,18 +23,6 @@ function useDayLabel(date: string | Date): string {
   const { settings } = useSettingsContext();
   const appTimezone = settings?.timezone?.trim() || undefined;
   return formatDateTime(date, dateFormatting, appTimezone, { weekday: "long" }).date;
-}
-
-function DayCount({ group, isPartial }: Omit<DayHeaderProps, "date">) {
-  const { t } = useTranslation();
-  // "1 activity" restates the single row below it, so the count only appears
-  // once it tells the reader something.
-  if (isPartial || group.items.length < 2) return null;
-  return (
-    <span className="text-muted-foreground whitespace-nowrap text-xs">
-      {t("activity:table.day_count", { count: group.items.length })}
-    </span>
-  );
 }
 
 /**
@@ -81,11 +70,16 @@ function ActivityDayHeaderRowImpl({
   columnCount,
   cashColumnIndex,
 }: ActivityDayHeaderRowProps) {
+  const { t } = useTranslation();
   const label = useDayLabel(date);
   const heading = (
     <div className="flex items-baseline gap-2">
-      <span className="text-xs font-medium">{label}</span>
-      <DayCount group={group} isPartial={isPartial} />
+      <DayHeading
+        label={label}
+        count={group.items.length}
+        isPartial={isPartial}
+        countLabel={(count) => t("activity:table.day_count", { count })}
+      />
     </div>
   );
   // The cash spans the Total column and up to three before it, so its label
@@ -96,7 +90,7 @@ function ActivityDayHeaderRowImpl({
   const alignsCash = group.cashBalance != null && cashColumnIndex >= MIN_HEADING_COLUMNS;
 
   return (
-    <TableRow ref={ref} data-index={dataIndex} className="bg-muted/40 hover:bg-muted/40">
+    <DayHeaderRow ref={ref} data-index={dataIndex}>
       {alignsCash ? (
         <>
           <TableCell colSpan={cashStart} className="px-3 py-1.5">
@@ -120,7 +114,7 @@ function ActivityDayHeaderRowImpl({
           </div>
         </TableCell>
       )}
-    </TableRow>
+    </DayHeaderRow>
   );
 }
 
@@ -128,14 +122,20 @@ function ActivityDayHeaderRowImpl({
 export const ActivityDayHeaderRow = memo(ActivityDayHeaderRowImpl);
 
 function ActivityDayHeadingImpl({ group, date, isPartial }: DayHeaderProps) {
+  const { t } = useTranslation();
   const label = useDayLabel(date);
   return (
     // The heading separates days; on the card list it stays muted so it never
     // reads as loudly as the cards it separates.
     // On a narrow screen the cash moves under the date rather than squeezing it.
     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-1 pt-2">
-      <span className="text-muted-foreground whitespace-nowrap text-xs font-medium">{label}</span>
-      <DayCount group={group} isPartial={isPartial} />
+      <DayHeading
+        label={label}
+        count={group.items.length}
+        isPartial={isPartial}
+        countLabel={(count) => t("activity:table.day_count", { count })}
+        muted
+      />
       <span className="ms-auto">
         <DayCash group={group} />
       </span>

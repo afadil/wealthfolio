@@ -116,11 +116,11 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
           <Button
             ref={ref}
             type="button"
-            variant="outline"
+            variant="field"
             role="combobox"
             aria-expanded={open}
             className={cn(
-              "h-input-height w-full justify-between truncate rounded-md font-normal",
+              "h-input-height w-full justify-between truncate",
               !value && "text-muted-foreground",
               className,
             )}
@@ -262,14 +262,10 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
             <Button
               ref={ref}
               type="button"
-              variant="outline"
+              variant="field"
               role="combobox"
               aria-expanded={open}
-              className={cn(
-                "h-input-height w-full justify-between rounded-md",
-                !value && "text-muted-foreground",
-                className,
-              )}
+              className={cn("h-input-height w-full justify-between", !value && "text-muted-foreground", className)}
               {...props}
             />
           }

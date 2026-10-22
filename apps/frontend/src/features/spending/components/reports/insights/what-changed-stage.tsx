@@ -36,6 +36,7 @@ import type {
 import { CategoryIcon } from "../../category-chips";
 import { formatPercentValue } from "./format";
 import { badgeVariants } from "@wealthfolio/ui";
+import { Card } from "@wealthfolio/ui/components/ui/card";
 
 const CARD_CLASS = "border-border/60 bg-card/40 rounded-2xl border p-5 backdrop-blur-xl";
 const LABEL_CLASS = "text-muted-foreground/70 text-2xs font-semibold uppercase tracking-[0.12em]";
@@ -742,7 +743,7 @@ function ComparisonTable({
   const hidePct = periodState.kind === "no_prior_period";
 
   return (
-    <div className="border-border/60 bg-card/40 overflow-x-auto rounded-2xl border backdrop-blur-xl">
+    <Card className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-border/40 text-muted-foreground/70 text-2xs border-b font-semibold uppercase tracking-[0.12em]">
@@ -772,7 +773,7 @@ function ComparisonTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </Card>
   );
 }
 

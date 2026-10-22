@@ -110,6 +110,7 @@
     "description": "Select accounts to compare their performance over time."
   },
   "attribution": {
+    "partial_data": "Partial data",
     "title": "Attribution",
     "close": "Close attribution",
     "period_gain_loss": "Period Gain/Loss",

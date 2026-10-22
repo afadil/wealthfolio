@@ -1,7 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { ActivityType } from "@/lib/constants";
+import { ActivityType, InstrumentType } from "@/lib/constants";
 import { mapActivityTypeToPicker } from "../utils/activity-form-utils";
 import { ACTIVITY_FORM_CONFIG, hasActivityForm } from "./activity-form-config";
+
+describe("trade asset identity defaults", () => {
+  it.each(["BUY", "SELL"] as const)(
+    "preserves the stored %s instrument type and quote currency without reselection",
+    (type) => {
+      const defaults = ACTIVITY_FORM_CONFIG[type].getDefaults(
+        {
+          assetId: "asset-usdt",
+          assetSymbol: "USDT",
+          instrumentType: InstrumentType.CRYPTO,
+          assetQuoteCcy: "USD",
+          currency: "CAD",
+        },
+        [],
+      );
+
+      expect(defaults).toMatchObject({
+        assetId: "USDT",
+        symbolInstrumentType: InstrumentType.CRYPTO,
+        symbolQuoteCcy: "USD",
+        currency: "CAD",
+      });
+    },
+  );
+});
 
 describe("cash transfer defaults", () => {
   it.each([ActivityType.TRANSFER_OUT, ActivityType.TRANSFER_IN])(

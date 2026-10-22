@@ -20,7 +20,7 @@ export function ThemeSelector({ value, onChange, className }: ThemeSelectorProps
       <FormItem>
         <FormLabel className="[&:has([data-checked])>div]:border-primary cursor-pointer">
           <FormControl>
-            <RadioGroupItem value="light" className="sr-only" />
+            <RadioGroupItem value="light" className="sr-only absolute" />
           </FormControl>
           <div className="border-muted hover:border-accent items-center rounded-md border-2 p-2">
             <div className="space-y-1 rounded-sm bg-[hsl(51_59%_95%)] p-1 sm:space-y-1 sm:p-1.5">
@@ -50,7 +50,7 @@ export function ThemeSelector({ value, onChange, className }: ThemeSelectorProps
       <FormItem>
         <FormLabel className="[&:has([data-checked])>div]:border-primary cursor-pointer">
           <FormControl>
-            <RadioGroupItem value="dark" className="sr-only" />
+            <RadioGroupItem value="dark" className="sr-only absolute" />
           </FormControl>
           <div className="border-muted bg-popover hover:bg-accent hover:text-accent-foreground dark items-center rounded-md border-2 p-2">
             <div className="space-y-1 rounded-sm bg-[hsl(var(--flexoki-bg))] p-1 sm:space-y-1 sm:p-1.5">
@@ -80,7 +80,7 @@ export function ThemeSelector({ value, onChange, className }: ThemeSelectorProps
       <FormItem>
         <FormLabel className="[&:has([data-checked])>div]:border-primary cursor-pointer">
           <FormControl>
-            <RadioGroupItem value="system" className="sr-only" />
+            <RadioGroupItem value="system" className="sr-only absolute" />
           </FormControl>
           <div className="border-muted hover:border-accent items-center rounded-md border-2 p-2">
             <div className="flex overflow-hidden rounded-sm">

@@ -47,6 +47,7 @@
   "nav_about_subtitle": "Acerca de Wealthfolio",
   "general_page_description": "Gestiona los ajustes y preferencias generales de la aplicación.",
   "currency_select_error": "Selecciona una divisa base.",
+  "currency_code_error": "Introduce un código de divisa válido de 3 letras, como USD.",
   "currency_title": "Divisa base",
   "currency_description": "Selecciona la divisa base de tu cartera.",
   "currency_save_button": "Guardar divisa",

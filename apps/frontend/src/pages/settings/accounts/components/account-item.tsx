@@ -133,7 +133,7 @@ export function AccountItem({
           </div>
         </div>
       </div>
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center gap-2">
         {account.isArchived && (
           <span className="border-destructive-subtle-border bg-destructive-subtle text-destructive-subtle-foreground inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium">
             <Icons.FileArchive className="h-3 w-3" />

@@ -85,7 +85,7 @@ export default function PortfolioPage() {
         <Button
           variant="secondary"
           size="icon-xs"
-          className="bg-secondary/50 rounded-full"
+          className="rounded-full"
           onClick={toggleFocusMode}
           aria-label={t("common:component.exit_focus_mode")}
         >

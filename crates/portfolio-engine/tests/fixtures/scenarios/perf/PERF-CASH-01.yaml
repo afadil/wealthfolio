@@ -2,11 +2,10 @@ id: PERF-CASH-01
 title: Pure CASH account in a foreign currency across an FX move
 intent: >
   An EUR cash account (account_type CASH, base USD) holds 1000 EUR while
-  EUR/USD moves 1.05 -> 1.10 and pays out 200 EUR mid-way. Because every
-  account in scope is CASH and the history is cash-only, legacy attributes the
-  base-currency drift of the cash balance as fx_effect: sum over days of
-  (cash_base delta - cash delta x current FX) = 46 USD, and the attribution
-  reconciles exactly to the 880 USD ending value with residual 0.
+  EUR/USD moves 1.05 -> 1.10 and pays out 200 EUR mid-way. The account
+  and its single-account scope retain the original EUR exposure, attribute
+  46 USD of cash FX and reconcile exactly to the 880 USD ending value
+  with residual 0.
 policy:
   base_currency: USD
   timezone: UTC
@@ -47,8 +46,6 @@ expected_notes: >
   net_contribution_base), distributions 216, fx_effect 10 + 20 + 0 + 8 + 8 =
   46, unrealized 0 -> 1050 - 216 + 46 = 880 = delta, residual 0, no warning,
   quality ok, summary amount 46.
-  LEGACY BEHAVIOR (ledger candidate): the portfolio scope over the same single
-  CASH account reports fx_effect 0 and summary amount 0 with the warning
-  "Performance attribution is incomplete ... Difference: 46.00; tolerance:
-  1.7600": the scoped-unrealized pass replaces the base market movement and
-  only carries investment FX, dropping the cash-only fx_effect.
+  The portfolio scope over the same single CASH account also reports
+  fx_effect 46 and summary amount 46. Cash FX is independent of the scoped
+  investment attribution seed (#2155).
