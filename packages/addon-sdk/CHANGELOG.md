@@ -8,17 +8,21 @@ and this project adheres to
 
 ### Added
 
+- `Settings.themeId`: the host's theme (Classic, Signature, Ember, Cupertino,
+  Newspaper, Cyber or Terminal), absent on hosts without themes. Addon pages get
+  the theme's colours through the host's CSS variables and its `data-theme`
+  attribute on `<html>`, and follow it when the user switches.
 - Theme tokens for components: `Button`, `Input`, `Textarea`, `Select`,
   `Toggle`, `Switch`, `Card`, `CardTitle`, `Badge`, `Dialog`, `AlertDialog`,
-  `Sheet`, the popups (select, menu, popover, hover card, command, combobox) and
-  `AnimatedToggleGroup` read their corners, field height, surfaces, borders and
-  shadows from CSS variables (`--button-*`, `--control-*`, `--field-*`,
-  `--switch-*`, `--card-*`, `--popup-*`, `--overlay-*`, `--dialog-radius`,
-  `--sheet-bg`, `--badge-radius`, `--segmented-*`). The host's Classic theme
-  sets them to the previous look. Classes an addon passes still win, in dark
-  mode too: an outline `Button`'s own background or border is no longer replaced
-  by the variant's dark colours. `Button` also sets `data-variant` and
-  `data-size`, as shadcn's does.
+  `Sheet`, `Tabs`, the popups (select, menu, popover, hover card, command,
+  combobox) and `AnimatedToggleGroup` read their corners, field height,
+  surfaces, borders and shadows from CSS variables (`--button-*`, `--control-*`,
+  `--field-*`, `--switch-*`, `--card-*`, `--popup-*`, `--overlay-*`,
+  `--dialog-radius`, `--sheet-bg`, `--badge-radius`, `--segmented-*`), so they
+  follow the host's theme. Classic keeps the previous look. Classes an addon
+  passes still win, in dark mode too: an outline `Button`'s own background or
+  border is no longer replaced by the variant's dark colours. `Button` also sets
+  `data-variant` and `data-size`, as shadcn's does.
 - `AnimatedToggleGroup` items take an optional `aria-label`, for options whose
   visible label needs more context.
 - `Button` variant `field`, for a button that opens a picker in a form: it takes
