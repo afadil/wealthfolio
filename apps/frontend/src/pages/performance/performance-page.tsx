@@ -1530,14 +1530,15 @@ export default function PerformancePage() {
 
         {/* Mobile: Carousel + Plus button in same row */}
         <div className="flex items-center gap-2 md:hidden">
-          {/* Selected items badges carousel */}
+          {/* Selected items badges carousel. min-w-0 lets it shrink and scroll, so the
+              badges can't push the Plus button off the screen. */}
           {selectedItems.length > 0 && (
             <Carousel
               opts={{
                 align: "start",
                 loop: false,
               }}
-              className="flex-1 touch-pan-x overscroll-x-contain"
+              className="min-w-0 flex-1 touch-pan-x overscroll-x-contain"
               data-no-swipe-drag
             >
               <CarouselContent className="-ms-2">

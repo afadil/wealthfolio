@@ -161,7 +161,7 @@ npx playwright test && npx playwright show-report
 | `31-formatting-regions.spec.ts`        | Austria, Romania, and Bulgaria formatting selections persist after saving and reloading settings                            |
 | `33-cash-balance-edit.spec.ts`         | Desktop/mobile cash adjustments persist the selected currency's native delta without changing other currencies              |
 | `35-holdings-sticky-header.spec.ts`    | Holdings, account Holdings tab, Securities: header stays pinned as rows scroll, in short windows and on Shift+Tab (#2125)   |
-| `36-phone-taps-and-swipes.spec.ts`     | Phone: Spending's Next opens the details step without saving                                                                |
+| `36-phone-taps-and-swipes.spec.ts`     | Phone: Spending's Next doesn't save, and Performance's Plus stays on screen beside its badges                               |
 
 ---
 
