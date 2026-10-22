@@ -35,6 +35,9 @@ interface ChangeRateSheetProps {
   onSubmit: (change: LoanRateChangeInput) => Promise<void>;
 }
 
+/** As many decimals as Quick Add and Recalculate store, so a stored rate shows exactly. */
+const RATE_DECIMALS = 8;
+
 /** The rate in effect on a calendar day, including that day's recorded events. */
 function rateOn(metadata: Record<string, unknown>, date: Date) {
   return inheritedLoanSettings(metadata, -1, formatDateISO(date)).annualRate;
@@ -112,7 +115,7 @@ export function ChangeRateSheet({ open, onOpenChange, metadata, onSubmit }: Chan
                 id={rateInputId}
                 value={newRate}
                 onValueChange={(value) => setNewRate(value == null ? "" : String(value))}
-                maxDecimalPlaces={3}
+                maxDecimalPlaces={RATE_DECIMALS}
                 className="pe-8"
                 disabled={isSubmitting}
               />
@@ -123,7 +126,7 @@ export function ChangeRateSheet({ open, onOpenChange, metadata, onSubmit }: Chan
             {!dateInvalid && (
               <p className="text-muted-foreground text-xs">
                 {t("asset:loanActions.rate_in_effect", {
-                  rate: `${formatDecimal(currentRate, { maximumFractionDigits: 3 })}%`,
+                  rate: `${formatDecimal(currentRate, { maximumFractionDigits: RATE_DECIMALS })}%`,
                 })}
               </p>
             )}

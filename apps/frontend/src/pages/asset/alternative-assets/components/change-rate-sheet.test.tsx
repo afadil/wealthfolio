@@ -57,6 +57,28 @@ describe("change interest rate", () => {
     expect(save).toBeDisabled();
   });
 
+  it("keeps a precise rate exact while the loan updates", () => {
+    // Quick Add, Recalculate and the event editor can store more than three decimals.
+    const precise = {
+      ...metadata,
+      loan_events: [{ type: "rate_change", effectiveDate: "2026-03-01", annualRate: 5.3125 }],
+    };
+    const props = { open: true, onOpenChange: vi.fn(), onSubmit: vi.fn() };
+    const { rerender } = render(<ChangeRateSheet {...props} metadata={precise} />);
+    rerender(<ChangeRateSheet {...props} metadata={{ ...precise }} />);
+    expect(screen.getByLabelText("Interest rate", { selector: "input" })).toHaveValue("5.3125");
+    expect(screen.getByText("Rate on this date: 5.3125%")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change interest rate" })).toBeDisabled();
+  });
+
+  it("takes a rate in sixteenths of a point", async () => {
+    const { onSubmit, save, rate } = open();
+    fireEvent.change(rate, { target: { value: "6.0625" } });
+    fireEvent.click(save);
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.lastCall![0]).toMatchObject({ annualRate: 6.0625 });
+  });
+
   it("keeps the current payment unless one is entered", async () => {
     const { onSubmit, save, rate } = open();
     fireEvent.change(rate, { target: { value: "5.1" } });
