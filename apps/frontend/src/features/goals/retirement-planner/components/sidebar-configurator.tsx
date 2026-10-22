@@ -1,4 +1,5 @@
 import { useSettingsContext } from "@/lib/settings-provider";
+import { generateId } from "@/lib/id";
 import { formatZonedDateKey } from "@/features/spending/lib/timezone";
 import { parseLocalDate } from "@/lib/utils";
 import { GoalFundingEditor } from "@/features/goals/components/goal-funding-editor";
@@ -503,7 +504,7 @@ export function SidebarConfigurator({
   };
 
   const addStream = (preset?: Partial<RetirementIncomeStream>) => {
-    const id = crypto.randomUUID?.() ?? `stream-${Date.now()}`;
+    const id = generateId();
     update((d) => ({
       ...d,
       incomeStreams: [

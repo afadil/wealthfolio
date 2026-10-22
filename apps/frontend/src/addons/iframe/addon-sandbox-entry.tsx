@@ -2,6 +2,7 @@ import "./addon-sandbox.css";
 import "@/globals.css";
 
 import * as React from "react";
+import { generateId } from "@/lib/id";
 import * as ReactDOMClient from "react-dom/client";
 import { QueryClient } from "@tanstack/react-query";
 import { DirectionProvider, FormattingProvider } from "@wealthfolio/ui";
@@ -120,7 +121,7 @@ function post(type: string, payload: Record<string, unknown> = {}) {
 }
 
 function callHost(type: string, payload: Record<string, unknown> = {}) {
-  const requestId = crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
+  const requestId = generateId();
   return new Promise((resolve, reject) => {
     pending.set(requestId, { resolve, reject });
     post(type, { requestId, ...payload });
@@ -579,7 +580,7 @@ function iconNameFromUnknown(value: unknown): string | undefined {
 
 function normalizeRoute(route: LegacyRouteConfig) {
   const path = stringFromPrimitive(route.path) ?? "";
-  const routeId = (stringFromPrimitive(route.id) ?? path) || crypto.randomUUID?.() || "";
+  const routeId = (stringFromPrimitive(route.id) ?? path) || generateId();
   return {
     path,
     routeId,
