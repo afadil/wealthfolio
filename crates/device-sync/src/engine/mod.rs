@@ -1063,8 +1063,15 @@ where
         }
     }
 
-    if !subscription_paused && ports.has_pending_outbox().await.unwrap_or(false) {
-        delay_ms = delay_ms.min(2_000 + (jitter_ms % 500));
+    if !subscription_paused {
+        if ports.has_pending_outbox().await.unwrap_or(false) {
+            delay_ms = delay_ms.min(2_000 + (jitter_ms % 500));
+        } else if let Ok(Some(retry_at)) = ports.next_outbox_retry_at().await {
+            // Waiting uploads need a wake even if a download changed the cycle deadline.
+            if let Some(wait_ms) = millis_until_rfc3339(&retry_at) {
+                delay_ms = delay_ms.min(wait_ms.saturating_add(jitter_ms).max(1_000));
+            }
+        }
     }
 
     delay_ms
@@ -1309,7 +1316,19 @@ mod tests {
         ) -> Result<Vec<wealthfolio_core::sync::SyncOutboxEvent>, String> {
             let pending = self.pending_outbox.lock().await.clone();
             let max = usize::try_from(limit.max(0)).unwrap_or(usize::MAX);
-            Ok(pending.into_iter().take(max).collect())
+            let now = Utc::now().to_rfc3339();
+            Ok(pending
+                .into_iter()
+                .filter(|event| {
+                    !event.sent
+                        && event.status == wealthfolio_core::sync::SyncOutboxStatus::Pending
+                        && event
+                            .next_retry_at
+                            .as_deref()
+                            .is_none_or(|retry_at| retry_at <= now.as_str())
+                })
+                .take(max)
+                .collect())
         }
 
         async fn mark_outbox_dead(
@@ -1363,7 +1382,20 @@ mod tests {
         }
 
         async fn has_pending_outbox(&self) -> Result<bool, String> {
-            Ok(!self.pending_outbox.lock().await.is_empty())
+            Ok(!self.list_pending_outbox(1).await?.is_empty())
+        }
+
+        async fn next_outbox_retry_at(&self) -> Result<Option<String>, String> {
+            Ok(self
+                .pending_outbox
+                .lock()
+                .await
+                .iter()
+                .filter(|event| {
+                    !event.sent && event.status == wealthfolio_core::sync::SyncOutboxStatus::Pending
+                })
+                .filter_map(|event| event.next_retry_at.clone())
+                .min())
         }
     }
 
@@ -1445,7 +1477,7 @@ mod tests {
                 last_pull_at: None,
                 last_error: None,
                 consecutive_failures: 0,
-                next_retry_at: None,
+                next_retry_at: self.last_cycle_retry_at.lock().await.clone(),
                 last_cycle_status: self.cycle_outcomes.lock().await.last().cloned(),
                 last_cycle_duration_ms: None,
             })
@@ -1665,7 +1697,7 @@ mod tests {
         assert_eq!(ports.pending_outbox.lock().await.len(), 1);
         assert!(ports.persisted_trust_states.lock().await.is_empty());
         assert_eq!(ports.max_active_reconcile_count.load(Ordering::SeqCst), 0);
-        assert!(compute_cycle_delay_ms(&ports, 0).await >= 300_000);
+        assert!((299_000..=300_000).contains(&compute_cycle_delay_ms(&ports, 0).await));
         ports.sync_allowed = Ok(true);
         let resumed = run_sync_cycle(&ports, false).await.unwrap();
         assert_eq!(resumed.status, "ok");
@@ -2529,6 +2561,146 @@ mod tests {
             pending[0].last_error.as_deref(),
             Some("503 Service Unavailable")
         );
+    }
+
+    #[tokio::test]
+    async fn upload_retry_wakes_after_download_recovers_during_backoff() {
+        let mut ports = TestPorts::new(Some(ready_identity()), Ok(SyncState::Ready));
+        ports.cursor = 5;
+        ports.reconcile_response.cursor = Some(8);
+        ports.push_error = Some(TransportError {
+            message: "503 Service Unavailable".to_string(),
+            retry_class: ApiRetryClass::Retryable,
+            error_code: None,
+            details: None,
+        });
+        let mut event = outbox_event("evt-local", "account-local", 1);
+        event.retry_count = 3; // Existing backoff: 40 seconds.
+        ports.pending_outbox.lock().await.push(event);
+
+        // No response: the first download fails and schedules a 10-second retry.
+        let failed = run_sync_cycle(&ports, false).await.expect("failed cycle");
+        assert_eq!(failed.status, "pull_error");
+        let download_delay = compute_cycle_delay_ms(&ports, 0).await;
+        assert!((1_000..=10_000).contains(&download_delay));
+        let upload_retry_at = ports.pending_outbox.lock().await[0]
+            .next_retry_at
+            .clone()
+            .expect("upload retry deadline");
+
+        // Run the recovery cycle before the upload becomes eligible again.
+        ports
+            .pull_responses
+            .lock()
+            .await
+            .push_back(single_event_pull_response(
+                8,
+                pull_event(
+                    "evt-remote",
+                    "account",
+                    "account.update.v1",
+                    "account-remote",
+                    8,
+                    r#"{"id":"account-remote","name":"Checking"}"#,
+                ),
+            ));
+        let recovered = run_sync_cycle(&ports, false).await.expect("recovery cycle");
+        assert_eq!(recovered.status, "ok");
+        assert_eq!(recovered.cursor, 8);
+        assert_eq!(recovered.pulled_count, 1);
+        assert_eq!(ports.push_batches.lock().await.len(), 1);
+        assert!(ports.last_cycle_retry_at.lock().await.is_none());
+        assert!(!ports.has_pending_outbox().await.expect("ready uploads"));
+        assert_eq!(
+            ports.pending_outbox.lock().await[0]
+                .next_retry_at
+                .as_deref(),
+            Some(upload_retry_at.as_str())
+        );
+        let remaining_ms = millis_until_rfc3339(&upload_retry_at).expect("retry time");
+        let delay_ms = compute_cycle_delay_ms(&ports, 0).await;
+        assert!(
+            (1_000..=remaining_ms).contains(&delay_ms),
+            "upload retry was delayed until the periodic cycle: {delay_ms} ms"
+        );
+    }
+
+    #[tokio::test]
+    async fn upload_retry_wakes_before_unsupported_download_backoff() {
+        let mut ports = TestPorts::new(Some(ready_identity()), Ok(SyncState::Ready));
+        ports.cursor = 5;
+        ports.reconcile_response.cursor = Some(8);
+        ports.push_error = Some(TransportError {
+            message: "503 Service Unavailable".to_string(),
+            retry_class: ApiRetryClass::Retryable,
+            error_code: None,
+            details: None,
+        });
+        let mut event = outbox_event("evt-local", "account-local", 1);
+        event.retry_count = 3;
+        ports.pending_outbox.lock().await.push(event);
+        ports
+            .pull_responses
+            .lock()
+            .await
+            .push_back(single_event_pull_response(
+                8,
+                pull_event(
+                    "evt-remote",
+                    "account",
+                    "account.future.v1",
+                    "account-remote",
+                    8,
+                    "{}",
+                ),
+            ));
+
+        let result = run_sync_cycle(&ports, false).await.expect("cycle");
+        assert_eq!(result.status, "replay_blocked");
+        assert_eq!(result.cursor, 5);
+        assert!(ports.applied_events.lock().await.is_empty());
+        let cycle_retry_at = ports
+            .last_cycle_retry_at
+            .lock()
+            .await
+            .clone()
+            .expect("replay retry");
+        assert!(millis_until_rfc3339(&cycle_retry_at).expect("retry time") > 21_000_000);
+        let upload_retry_at = ports.pending_outbox.lock().await[0]
+            .next_retry_at
+            .clone()
+            .expect("upload retry deadline");
+        let remaining_ms = millis_until_rfc3339(&upload_retry_at).expect("retry time");
+        let delay_ms = compute_cycle_delay_ms(&ports, 0).await;
+        assert!(
+            (1_000..=remaining_ms).contains(&delay_ms),
+            "upload retry was delayed by the replay backoff: {delay_ms} ms"
+        );
+        assert_eq!(ports.push_batches.lock().await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn upload_retry_does_not_shorten_subscription_pause() {
+        for (status, seconds) in [
+            ("subscription_required", 300),
+            ("subscription_check_error", 60),
+        ] {
+            let ports = TestPorts::new(Some(ready_identity()), Ok(SyncState::Ready));
+            let mut event = outbox_event("evt-local", "account-local", 1);
+            event.next_retry_at = Some((Utc::now() + chrono::Duration::seconds(40)).to_rfc3339());
+            ports.pending_outbox.lock().await.push(event);
+            ports
+                .mark_cycle_outcome(
+                    status.to_string(),
+                    0,
+                    Some((Utc::now() + chrono::Duration::seconds(seconds)).to_rfc3339()),
+                )
+                .await
+                .expect("subscription pause");
+            assert!(compute_cycle_delay_ms(&ports, 0).await > 40_000);
+            assert!(ports.push_batches.lock().await.is_empty());
+            assert!(ports.pull_cursors.lock().await.is_empty());
+        }
     }
 
     #[tokio::test]
