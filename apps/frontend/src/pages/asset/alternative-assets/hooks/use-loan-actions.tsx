@@ -327,7 +327,6 @@ export function useLoanActions(
           <ChangeRateSheet
             open={changeRateOpen}
             onOpenChange={setChangeRateOpen}
-            interestRate={activeInterestRate}
             metadata={metadata}
             onSubmit={handleChangeRate}
           />
