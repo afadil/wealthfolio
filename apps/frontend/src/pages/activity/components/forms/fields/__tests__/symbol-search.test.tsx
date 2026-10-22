@@ -163,6 +163,126 @@ function TestForm() {
   );
 }
 
+interface ManualFormValues extends FormValues {
+  existingAssetId?: string;
+}
+
+const storedManualValues: ManualFormValues = {
+  assetId: "RETYPEOLD",
+  exchangeMic: "XTSE",
+  currency: "CAD",
+  symbolQuoteCcy: "USD",
+  symbolInstrumentType: "EQUITY",
+  quoteMode: "MANUAL",
+  existingAssetId: "asset-retypeold",
+  assetMetadata: {
+    name: "Claims RETYPEOLD EQUITY",
+    kind: "INVESTMENT",
+    providerId: "CUSTOM",
+    providerSymbol: "RETYPEOLD.CUSTOM",
+  },
+};
+
+const otherStoredValues: ManualFormValues = {
+  assetId: "OTHER",
+  currency: "USD",
+  symbolQuoteCcy: "EUR",
+  symbolInstrumentType: "ETF",
+  quoteMode: "MANUAL",
+  existingAssetId: "asset-other",
+  assetMetadata: { name: "Other fund" },
+};
+
+function ManualTestForm() {
+  const methods = useForm<ManualFormValues>({ defaultValues: storedManualValues });
+  const values = methods.watch();
+
+  return (
+    <FormProvider {...methods}>
+      <form>
+        <SymbolSearch<ManualFormValues>
+          name="assetId"
+          isManualAsset
+          exchangeMicName="exchangeMic"
+          currencyName="currency"
+          quoteCcyName="symbolQuoteCcy"
+          instrumentTypeName="symbolInstrumentType"
+          existingAssetIdName="existingAssetId"
+          quoteModeName="quoteMode"
+          assetMetadataName="assetMetadata"
+        />
+        <output data-testid="values">{JSON.stringify(values)}</output>
+        <button type="button" onClick={() => methods.reset(otherStoredValues)}>
+          Reset to other
+        </button>
+      </form>
+    </FormProvider>
+  );
+}
+
+function manualValues() {
+  return JSON.parse(screen.getByTestId("values").textContent ?? "{}") as ManualFormValues;
+}
+
+describe("SymbolSearch manual input", () => {
+  it("drops the previous security's details when another symbol is typed", async () => {
+    const user = userEvent.setup();
+    render(<ManualTestForm />);
+
+    await user.clear(screen.getByTestId("symbol-input"));
+    await user.type(screen.getByTestId("symbol-input"), "btc");
+
+    // JSON drops undefined fields, so only what is kept remains.
+    expect(manualValues()).toEqual({
+      assetId: "BTC",
+      currency: "CAD",
+      quoteMode: "MANUAL",
+      assetMetadata: {},
+    });
+  });
+
+  it("keeps the details when only spacing changes", async () => {
+    const user = userEvent.setup();
+    render(<ManualTestForm />);
+
+    await user.type(screen.getByTestId("symbol-input"), " ");
+
+    expect(manualValues()).toEqual({ ...storedManualValues, assetId: "RETYPEOLD " });
+  });
+
+  it("restores the details when the original symbol is typed back", async () => {
+    const user = userEvent.setup();
+    render(<ManualTestForm />);
+
+    await user.clear(screen.getByTestId("symbol-input"));
+    await user.type(screen.getByTestId("symbol-input"), "BTC");
+    await user.clear(screen.getByTestId("symbol-input"));
+    await user.type(screen.getByTestId("symbol-input"), "retypeold");
+
+    expect(manualValues()).toEqual(storedManualValues);
+  });
+
+  it("follows the defaults of a form reset to another activity", async () => {
+    const user = userEvent.setup();
+    render(<ManualTestForm />);
+
+    await user.clear(screen.getByTestId("symbol-input"));
+    await user.click(screen.getByRole("button", { name: "Reset to other" }));
+    expect(manualValues()).toEqual(otherStoredValues);
+
+    await user.type(screen.getByTestId("symbol-input"), "X");
+    expect(manualValues()).toEqual({
+      assetId: "OTHERX",
+      currency: "USD",
+      quoteMode: "MANUAL",
+      assetMetadata: {},
+    });
+
+    await user.type(screen.getByTestId("symbol-input"), "{Backspace}");
+    expect(manualValues()).toEqual(otherStoredValues);
+  });
+});
+
 describe("SymbolSearch", () => {
   beforeEach(() => {
     resolveSymbolQuoteMock.mockReset();

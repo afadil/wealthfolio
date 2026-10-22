@@ -16,6 +16,7 @@ import {
   createActivity,
   saveActivities,
   saveInternalTransferPair,
+  searchActivities,
   updateActivity,
 } from "./activities";
 
@@ -26,6 +27,30 @@ const baseActivity = {
   activityDate: "2026-08-11T00:00:00.000Z",
   currency: "USD",
 };
+
+describe("activity search", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("reads the asset quote mode that the backend sends as assetPricingMode", async () => {
+    mocks.invoke.mockResolvedValue({
+      data: [
+        { id: "manual", assetPricingMode: "MANUAL" },
+        { id: "market", assetPricingMode: "MARKET" },
+      ],
+      meta: { totalRowCount: 2 },
+    });
+
+    const response = await searchActivities(0, 50, {}, "");
+
+    expect(response.data).toEqual([
+      { id: "manual", assetPricingMode: "MANUAL", assetQuoteMode: "MANUAL" },
+      { id: "market", assetPricingMode: "MARKET", assetQuoteMode: "MARKET" },
+    ]);
+    expect(response.meta).toEqual({ totalRowCount: 2 });
+  });
+});
 
 describe("activity metadata serialization", () => {
   beforeEach(() => {

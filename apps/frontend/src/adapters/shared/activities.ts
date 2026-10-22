@@ -1,5 +1,5 @@
 // Activity Commands
-import { ImportType } from "@/lib/types";
+import { ImportType, QuoteMode } from "@/lib/types";
 import type {
   Activity,
   ActivityBulkMutationRequest,
@@ -23,6 +23,16 @@ import type {
 } from "@/lib/types";
 
 import { invoke, logger } from "./platform";
+
+// `search_activities` sends the asset's quote mode as `assetPricingMode`.
+type ActivityDetailsResponse = ActivityDetails & { assetPricingMode?: string | null };
+
+function withAssetQuoteMode(activity: ActivityDetailsResponse): ActivityDetails {
+  const mode = activity.assetPricingMode;
+  return mode === QuoteMode.MANUAL || mode === QuoteMode.MARKET
+    ? { ...activity, assetQuoteMode: mode }
+    : activity;
+}
 
 interface ActivityFilters {
   accountIds?: string | string[];
@@ -102,7 +112,9 @@ export const searchActivities = async (
   const dateTo = filters?.dateTo;
 
   try {
-    return await invoke<ActivitySearchResponse>("search_activities", {
+    const response = await invoke<
+      Omit<ActivitySearchResponse, "data"> & { data: ActivityDetailsResponse[] }
+    >("search_activities", {
       page,
       pageSize,
       accountIdFilter,
@@ -116,6 +128,7 @@ export const searchActivities = async (
       activityIdFilter,
       ...(options?.includeCashBalances ? { includeCashBalances: true } : {}),
     });
+    return { ...response, data: response.data.map(withAssetQuoteMode) };
   } catch (err) {
     logger.error("Error fetching activities.");
     throw err;
