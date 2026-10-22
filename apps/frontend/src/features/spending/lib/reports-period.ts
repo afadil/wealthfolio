@@ -85,7 +85,10 @@ export function periodToReportsRange(
       case "YTD":
         return { start: { year: today.year, month: 1, day: 1 }, end: today };
       case "1Y":
-        return { start: { ...today, year: today.year - 1 }, end: today };
+        return {
+          start: addCalendarMonths({ year: today.year, month: today.month, day: 1 }, -11),
+          end: today,
+        };
       case "LAST_YEAR":
         return {
           start: { year: today.year - 1, month: 1, day: 1 },
