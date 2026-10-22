@@ -357,7 +357,9 @@ where
     let has_pending = ports.has_pending_outbox().await.unwrap_or(false);
     match reconcile.action.as_str() {
         "NOOP" => {
-            if !has_pending {
+            // The server's device cursor can advance before incoming changes are applied locally.
+            let has_remote_changes = reconcile.cursor.is_some_and(|c| c > ctx.local_cursor);
+            if !has_pending && !has_remote_changes {
                 debug!(
                     "[DeviceSync] Reconcile action=NOOP and no pending outbox, skipping push+pull"
                 );
@@ -381,7 +383,7 @@ where
                     dead_letter_count: 0,
                 });
             }
-            debug!("[DeviceSync] Reconcile action=NOOP but has pending outbox, proceeding with push+pull");
+            debug!("[DeviceSync] Reconcile action=NOOP but has pending outbox or remote changes, proceeding with push+pull");
         }
         "BOOTSTRAP_SNAPSHOT" => {
             if post_bootstrap {
@@ -1226,6 +1228,7 @@ mod tests {
         pending_outbox: Arc<Mutex<Vec<wealthfolio_core::sync::SyncOutboxEvent>>>,
         dead_outbox_batches: Arc<Mutex<Vec<Vec<String>>>>,
         pull_responses: Arc<Mutex<VecDeque<crate::SyncPullResponse>>>,
+        pull_cursors: Arc<Mutex<Vec<Option<i64>>>>,
         set_cursor_calls: Arc<Mutex<Vec<i64>>>,
         applied_events: Arc<Mutex<Vec<ReplayEvent>>>,
         push_error: Option<TransportError>,
@@ -1254,6 +1257,7 @@ mod tests {
                 pending_outbox: Arc::new(Mutex::new(Vec::new())),
                 dead_outbox_batches: Arc::new(Mutex::new(Vec::new())),
                 pull_responses: Arc::new(Mutex::new(VecDeque::new())),
+                pull_cursors: Arc::new(Mutex::new(Vec::new())),
                 set_cursor_calls: Arc::new(Mutex::new(Vec::new())),
                 applied_events: Arc::new(Mutex::new(Vec::new())),
                 push_error: None,
@@ -1448,9 +1452,10 @@ mod tests {
             &self,
             _token: &str,
             _device_id: &str,
-            _from_cursor: Option<i64>,
+            from_cursor: Option<i64>,
             _limit: Option<i64>,
         ) -> Result<crate::SyncPullResponse, TransportError> {
+            self.pull_cursors.lock().await.push(from_cursor);
             self.pull_responses
                 .lock()
                 .await
@@ -2292,6 +2297,80 @@ mod tests {
             gc_watermark: None,
             latest_snapshot_seq: None,
         }
+    }
+
+    #[tokio::test]
+    async fn run_sync_cycle_noop_pulls_when_server_cursor_is_ahead() {
+        let mut ports = TestPorts::new(Some(ready_identity()), Ok(SyncState::Ready));
+        ports.cursor = 5;
+        ports.reconcile_response.cursor = Some(8);
+        ports
+            .pull_responses
+            .lock()
+            .await
+            .push_back(single_event_pull_response(
+                8,
+                pull_event(
+                    "evt-account-1",
+                    "account",
+                    "account.update.v1",
+                    "account-1",
+                    8,
+                    r#"{"id":"account-1","name":"Checking"}"#,
+                ),
+            ));
+
+        let result = run_sync_cycle(&ports, false).await.expect("cycle");
+
+        assert_eq!(result.status, "ok");
+        assert_eq!(result.cursor, 8);
+        assert_eq!(result.pulled_count, 1);
+        assert_eq!(ports.pull_cursors.lock().await.as_slice(), [Some(5)]);
+        assert_eq!(ports.set_cursor_calls.lock().await.as_slice(), [8]);
+        let applied_events = ports.applied_events.lock().await;
+        assert_eq!(applied_events.len(), 1);
+        assert_eq!(applied_events[0].event_id, "evt-account-1");
+        assert!(ports.push_batches.lock().await.is_empty());
+        assert!(ports.engine_errors.lock().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn run_sync_cycle_noop_skips_pull_when_server_cursor_is_not_ahead() {
+        for server_cursor in [Some(5), Some(4), None] {
+            let mut ports = TestPorts::new(Some(ready_identity()), Ok(SyncState::Ready));
+            ports.cursor = 5;
+            ports.reconcile_response.cursor = server_cursor;
+
+            let result = run_sync_cycle(&ports, false).await.expect("cycle");
+
+            assert_eq!(result.status, "ok");
+            assert_eq!(result.cursor, 5);
+            assert_eq!(result.lock_version, 0);
+            assert_eq!(result.pulled_count, 0);
+            assert!(ports.pull_cursors.lock().await.is_empty());
+            assert!(ports.set_cursor_calls.lock().await.is_empty());
+            assert!(ports.applied_events.lock().await.is_empty());
+            assert!(ports.push_batches.lock().await.is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn run_sync_cycle_noop_reports_pull_failure_when_server_cursor_is_ahead() {
+        let mut ports = TestPorts::new(Some(ready_identity()), Ok(SyncState::Ready));
+        ports.cursor = 5;
+        ports.reconcile_response.cursor = Some(8);
+        // With no queued response, the transport fails the pull.
+
+        let result = run_sync_cycle(&ports, false).await.expect("cycle");
+
+        assert_eq!(result.status, "pull_error");
+        assert_eq!(result.cursor, 5);
+        assert_eq!(ports.pull_cursors.lock().await.as_slice(), [Some(5)]);
+        assert!(ports.set_cursor_calls.lock().await.is_empty());
+        assert!(ports.applied_events.lock().await.is_empty());
+        assert!(ports.push_batches.lock().await.is_empty());
+        assert_eq!(ports.engine_errors.lock().await.len(), 1);
+        assert_eq!(ports.cycle_outcomes.lock().await.as_slice(), ["pull_error"]);
     }
 
     #[tokio::test]
