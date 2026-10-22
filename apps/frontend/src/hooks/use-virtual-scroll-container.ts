@@ -10,8 +10,9 @@ export const observeCurrentScrollOffset: typeof observeElementOffset = (instance
 /**
  * Markers for the scroll port a virtualized list measures against.
  *
- * `PageScrollContainer` marks itself, the swipeable pager marks each pane, and
- * a list that scrolls inside its own box marks that box.
+ * `PageScrollContainer` marks itself, `SwipablePage` marks its desktop content,
+ * the swipeable pager marks each phone pane, and a list that scrolls inside its
+ * own box marks that box.
  *
  * Resolving the port by walking up for a scrollable `overflow` alone would pick
  * the wrong element: below 1024px `globals.css` sets `overflow-x` on every

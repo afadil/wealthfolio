@@ -149,6 +149,7 @@ test("incorrect password stays on the chooser and can be retried", async ({ page
       (item: { id: string; lockEnabled: boolean }) =>
         item.id === state.session?.profileId && !item.lockEnabled,
     ) ?? state.profiles.find((item: { lockEnabled: boolean }) => !item.lockEnabled);
+  expect(profile, "Expected an unprotected profile in the disposable installation").toBeDefined();
   const grant =
     state.session?.profileId === profile.id
       ? state.session
