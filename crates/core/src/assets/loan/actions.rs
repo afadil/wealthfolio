@@ -352,13 +352,14 @@ fn settings_on(metadata: &Value, date: NaiveDate) -> Option<(LoanFrequency, Inte
 }
 
 /// A new rate from `date`, and a new payment when given. The rate already in
-/// effect that day adds no event, so recalculating at the same rate records
-/// only the payment. A change that records nothing is refused.
+/// effect that day adds no event unless `record_unchanged_rate`, so recalculating
+/// at the same rate records only the payment. A change that records nothing is refused.
 fn with_rate_change(
     metadata: &Value,
     date: NaiveDate,
     annual_rate: f64,
     payment_amount: Option<f64>,
+    record_unchanged_rate: bool,
 ) -> Result<Value, LoanError> {
     let rate = checked(LoanEvent::RateChange {
         effective_date: date,
@@ -375,7 +376,7 @@ fn with_rate_change(
         })
         .transpose()?;
     let (_, _, current) = settings_on(metadata, date).ok_or(LoanError::Invalid)?;
-    let events: Vec<_> = (annual_rate != current)
+    let events: Vec<_> = (record_unchanged_rate || annual_rate != current)
         .then_some(rate)
         .into_iter()
         .chain(payment)
@@ -589,6 +590,7 @@ pub fn apply_loan_action(
                 *date,
                 *annual_rate,
                 Some(solved.payment_amount),
+                false,
             )?);
         }
         LoanAction::ChangeRate {
@@ -600,11 +602,14 @@ pub fn apply_loan_action(
             if LoanTerms::active(metadata).is_none() {
                 return Err(LoanError::Invalid);
             }
+            // A letter's rate is kept with its payment even when unchanged, so a
+            // later edit to an earlier event can't carry another rate past it.
             update.metadata = Some(with_rate_change(
                 metadata,
                 *date,
                 *annual_rate,
                 *payment_amount,
+                payment_amount.is_some(),
             )?);
         }
         LoanAction::Renew {
