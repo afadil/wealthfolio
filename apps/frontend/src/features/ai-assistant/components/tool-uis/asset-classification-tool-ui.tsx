@@ -1,3 +1,4 @@
+import { getTaxonomyLabel, getCategoryLabel } from "@/lib/taxonomy-labels";
 import { updateToolResult } from "@/adapters";
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { useReplaceAssetTaxonomyAssignments } from "@/hooks/use-taxonomies";
@@ -355,6 +356,7 @@ function buildComparisonRows(
 }
 
 function ClassificationComparisonTable({
+  taxonomyId,
   currentRows,
   proposedRows,
   emptyLabel,
@@ -363,6 +365,7 @@ function ClassificationComparisonTable({
   onDraftPercentValueChange,
   onNewWeightChange,
 }: {
+  taxonomyId: string;
   currentRows: AssetClassificationAssignmentPreview[];
   proposedRows: AssetClassificationAssignmentPreview[];
   emptyLabel: string;
@@ -405,13 +408,15 @@ function ClassificationComparisonTable({
                   style={row.categoryColor ? { backgroundColor: row.categoryColor } : undefined}
                 />
                 <div className="min-w-0">
-                  <div className="truncate text-xs font-medium sm:text-sm">{row.categoryName}</div>
+                  <div className="truncate text-xs font-medium sm:text-sm">
+                    {getCategoryLabel(t, taxonomyId, row.categoryId, row.categoryName)}
+                  </div>
                 </div>
               </div>
               <div className="text-end">
                 <span
                   aria-label={t("ai:assetClassification.currentPercentLabel", {
-                    categoryName: row.categoryName,
+                    categoryName: getCategoryLabel(t, taxonomyId, row.categoryId, row.categoryName),
                   })}
                   className={cn(
                     "bg-muted/60 inline-flex min-w-[3.75rem] justify-end rounded-md px-1.5 py-0.5 text-xs font-medium sm:min-w-[4.5rem]",
@@ -697,7 +702,7 @@ export function AssetClassificationToolUIContentImpl({
                 })}
             </CardTitle>
             <p className="text-muted-foreground mt-1 text-xs">
-              {parsedResult.taxonomy.name}
+              {getTaxonomyLabel(t, parsedResult.taxonomy.taxonomyId, parsedResult.taxonomy.name)}
               {selectedAsset ? ` · ${selectedAsset.currency}` : ""}
               {selectedAsset?.exchangeMic ? ` · ${selectedAsset.exchangeMic}` : ""}
             </p>
@@ -808,6 +813,7 @@ export function AssetClassificationToolUIContentImpl({
         </div>
 
         <ClassificationComparisonTable
+          taxonomyId={parsedResult.taxonomy.taxonomyId}
           currentRows={currentAssignments}
           proposedRows={proposedAssignments}
           emptyLabel={
