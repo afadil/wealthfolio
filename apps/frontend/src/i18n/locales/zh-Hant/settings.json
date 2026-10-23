@@ -1495,7 +1495,12 @@
     "copied_generic": "{{label}} 已複製到剪貼簿。",
     "hero_aria": "AI 代理存取狀態",
     "pat_scope_custom_other": "自訂 · {{count}} 個範圍",
-    "pat_scope_custom_one": "自訂 · {{count}} 個範圍"
+    "pat_scope_custom_one": "自訂 · {{count}} 個範圍",
+    "edit_permissions": "編輯權限",
+    "edit_title": "{{name}} 的權限",
+    "edit_description": "Key 維持不變，新權限對後續請求生效。新增工具可能需要重新整理工具清單或重新連線用戶端。",
+    "edit_success": "權限已更新",
+    "edit_failed": "權限更新失敗"
   },
   "tax_add_category": "新增類別",
   "tax_export": "匯出",

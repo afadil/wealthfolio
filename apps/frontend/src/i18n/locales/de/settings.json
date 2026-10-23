@@ -1495,7 +1495,12 @@
     "copied_generic": "{{label}} in die Zwischenablage kopiert.",
     "hero_aria": "Status des KI-Agenten-Zugriffs",
     "pat_scope_custom_one": "Benutzerdefiniert · {{count}} Berechtigung",
-    "pat_scope_custom_other": "Benutzerdefiniert · {{count}} Berechtigungen"
+    "pat_scope_custom_other": "Benutzerdefiniert · {{count}} Berechtigungen",
+    "edit_permissions": "Berechtigungen bearbeiten",
+    "edit_title": "Berechtigungen für {{name}}",
+    "edit_description": "Der Schlüssel bleibt unverändert. Berechtigungen gelten für folgende Anfragen. Aktualisieren Sie die Werkzeuge oder verbinden Sie den Client neu, um neue Werkzeuge zu sehen.",
+    "edit_success": "Berechtigungen aktualisiert",
+    "edit_failed": "Berechtigungen konnten nicht aktualisiert werden"
   },
   "tax_add_category": "Kategorie hinzufügen",
   "tax_export": "Exportieren",

@@ -1452,7 +1452,12 @@
     "copied_generic": "{{label}} copied to clipboard.",
     "hero_aria": "AI Agent Access status",
     "pat_scope_custom_one": "Custom · {{count}} scope",
-    "pat_scope_custom_other": "Custom · {{count}} scopes"
+    "pat_scope_custom_other": "Custom · {{count}} scopes",
+    "edit_permissions": "Edit permissions",
+    "edit_title": "Permissions for {{name}}",
+    "edit_description": "The key remains unchanged. Permissions apply to subsequent requests. Refresh tools or reconnect your client to discover newly granted tools.",
+    "edit_success": "Permissions updated",
+    "edit_failed": "Failed to update permissions"
   },
   "tax_add_category": "Add Category",
   "tax_export": "Export",

@@ -1536,7 +1536,12 @@
     "hero_aria": "Status do acesso de agentes de IA",
     "pat_scope_custom_one": "Personalizado · {{count}} escopo",
     "pat_scope_custom_other": "Personalizado · {{count}} escopos",
-    "pat_scope_custom_many": "Personalizado · {{count}} escopos"
+    "pat_scope_custom_many": "Personalizado · {{count}} escopos",
+    "edit_permissions": "Editar permissões",
+    "edit_title": "Permissões de {{name}}",
+    "edit_description": "A chave permanece igual. As permissões valem para as próximas solicitações. Atualize as ferramentas ou reconecte o cliente para descobrir as novas ferramentas autorizadas.",
+    "edit_success": "Permissões atualizadas",
+    "edit_failed": "Falha ao atualizar permissões"
   },
   "tax_add_category": "Adicionar categoria",
   "tax_export": "Exportar",
