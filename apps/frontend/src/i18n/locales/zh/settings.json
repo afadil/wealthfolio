@@ -1477,7 +1477,12 @@
     },
     "copied_generic": "{{label}} 已复制到剪贴板。",
     "hero_aria": "AI 代理访问状态",
-    "pat_scope_custom_other": "自定义 · {{count}} 个作用域"
+    "pat_scope_custom_other": "自定义 · {{count}} 个作用域",
+    "edit_permissions": "编辑权限",
+    "edit_title": "{{name}} 的权限",
+    "edit_description": "Key 保持不变，新权限对后续请求生效。新增工具可能需要刷新工具列表或重新连接客户端。",
+    "edit_success": "权限已更新",
+    "edit_failed": "权限更新失败"
   },
   "tax_add_category": "添加类别",
   "tax_export": "导出",
