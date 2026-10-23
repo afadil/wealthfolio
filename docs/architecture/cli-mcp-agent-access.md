@@ -409,9 +409,9 @@ There are **two catalogs** (`crates/agent-tools/src/catalog.rs`):
 - `assistant_catalog()` — read + draft/suggest tools, for the in-app assistant.
   It excludes the commit and CSV-import tools (the assistant persists through
   its own confirmation widget / `import_csv` flow).
-- `mcp_catalog()` — everything (read + draft/suggest + commit +
-  categorization rules + import + transfer linking + quote import), scope-filtered
-  at the MCP boundary so a token sees only what its scopes reach.
+- `mcp_catalog()` — everything (read + draft/suggest + commit + categorization
+  rules + import + transfer linking + quote import), scope-filtered at the MCP
+  boundary so a token sees only what its scopes reach.
 
 ### Read Tools
 
@@ -461,16 +461,16 @@ list_categorization_rules          -- list saved rules with their origin
 rerun_categorization_rules         -- re-apply the rules to the spending accounts
 ```
 
-`list_categorization_rules` returns every saved rule, highest priority (the
-one that wins a match) first: pattern, match type, target taxonomy and
-category (with the category's key and name), activity type, amount condition,
-priority and account scope. `origin` is `user`, `preset` (with `presetId`,
+`list_categorization_rules` returns every saved rule, highest priority (the one
+that wins a match) first: pattern, match type, target taxonomy and category
+(with the category's key and name), activity type, amount condition, priority
+and account scope. `origin` is `user`, `preset` (with `presetId`,
 `presetVersion` and `presetModified`) or `addon` (with `addonId`, read from the
 `addon:<addonId>:` prefix of the ids add-ons give their rules). It filters by
 `taxonomyId` and `origin`. `rerun_categorization_rules` runs the same rerun as
-the rules page over the accounts opted in to spending tracking, and does
-nothing when tracking is off. With `onlyUncategorized` (default `true`) it only
-fills activities without a category in the rule's taxonomy; with `false` it also
+the rules page over the accounts opted in to spending tracking, and does nothing
+when tracking is off. With `onlyUncategorized` (default `true`) it only fills
+activities without a category in the rule's taxonomy; with `false` it also
 replaces rule, import and AI categories. Manual categories are never changed. It
 returns the number of spending accounts and of activities a rule matched.
 
