@@ -1604,6 +1604,10 @@ impl CashActivityServiceTrait for MockCashActivityService {
         anyhow::bail!("Category commits are not supported by assistant fixtures")
     }
 
+    async fn spending_account_ids(&self) -> anyhow::Result<Vec<String>> {
+        Ok(Vec::new())
+    }
+
     async fn search(
         &self,
         req: wealthfolio_spending::cash_activities::CashActivitySearchRequest,
@@ -1652,6 +1656,10 @@ impl CategorizationRulesServiceTrait for MockCategorizationRulesService {
         _new_rule: wealthfolio_spending::categorization_rules::NewCategorizationRule,
     ) -> anyhow::Result<wealthfolio_spending::categorization_rules::CategorizationRule> {
         unimplemented!("MockCategorizationRulesService::create")
+    }
+
+    async fn rerun_all(&self, _: &[String], _: bool) -> anyhow::Result<usize> {
+        unimplemented!("MockCategorizationRulesService::rerun_all")
     }
 }
 

@@ -1329,6 +1329,45 @@ fn test_extract_addon_zip_accepts_valid_nested_paths() {
 }
 
 #[test]
+fn test_extract_addon_zip_accepts_windows_separators() {
+    let zip_data = build_test_addon_zip(&[
+        (
+            "my-addon\\manifest.json",
+            r#"{"id":"test-addon","name":"Test Addon","version":"1.0.0","main":"addon.js"}"#,
+        ),
+        ("my-addon\\addon.js", "console.log('ok');"),
+    ]);
+
+    let extracted = extract_addon_zip_internal(zip_data).expect("zip should extract");
+    assert_eq!(extracted.metadata.id, "test-addon");
+    assert!(
+        extracted
+            .files
+            .iter()
+            .any(|file| file.name == "addon.js" && file.is_main),
+        "main file should be found under the normalized package root"
+    );
+}
+
+#[test]
+fn test_extract_addon_zip_rejects_windows_parent_traversal_path() {
+    let zip_data = build_test_addon_zip(&[
+        (
+            "manifest.json",
+            r#"{"id":"test-addon","name":"Test Addon","version":"1.0.0","main":"dist/addon.js"}"#,
+        ),
+        ("dist/addon.js", "console.log('ok');"),
+        ("..\\evil.js", "console.log('bad');"),
+    ]);
+
+    let err = match extract_addon_zip_internal(zip_data) {
+        Ok(_) => panic!("zip should be rejected"),
+        Err(err) => err,
+    };
+    assert!(err.contains("parent traversal"));
+}
+
+#[test]
 fn test_extract_addon_zip_normalizes_wrapped_package_assets() {
     let zip_data = build_test_addon_zip_owned(vec![
         (

@@ -297,7 +297,8 @@ async fn mcp_pat_lifecycle() {
     let session = mcp_initialize(&server, &pat).await;
 
     // tools/list -> the read-only catalog: 16 read tools + get_import_mapping
-    // and find_transfer_matches (also activities:read) = 18.
+    // and find_transfer_matches (also activities:read) + list_categorization_rules
+    // (classification:read) = 19.
     let response = mcp_post(
         &server,
         Some(&pat),
@@ -310,8 +311,8 @@ async fn mcp_pat_lifecycle() {
     let tools = list["result"]["tools"].as_array().unwrap();
     assert_eq!(
         tools.len(),
-        18,
-        "read-only catalog must expose 18 tools (incl. get_import_mapping): {tools:?}"
+        19,
+        "read-only catalog must expose 19 tools (incl. get_import_mapping): {tools:?}"
     );
 
     // (h) tools/call succeeds and writes an audit row (awaited before the
@@ -501,10 +502,12 @@ async fn mcp_write_scoped_token_sees_write_tools() {
     let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
     assert_eq!(
         tools.len(),
-        36,
-        "full-scope token must see all 36 tools: {names:?}"
+        38,
+        "full-scope token must see all 38 tools: {names:?}"
     );
     for name in [
+        "list_categorization_rules",
+        "rerun_categorization_rules",
         "find_transfer_matches",
         "link_transfer_activities",
         "unlink_transfer_activities",

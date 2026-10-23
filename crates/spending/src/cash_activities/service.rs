@@ -124,6 +124,13 @@ impl CashActivityService {
         ))
     }
 
+    /// Accounts opted in to spending tracking; empty when tracking is disabled.
+    /// The same scope the rerun command passes to `rerun_all`.
+    pub async fn spending_account_ids(&self) -> Result<Vec<String>> {
+        let s = self.settings.get().await?;
+        Ok(if s.enabled { s.account_ids } else { Vec::new() })
+    }
+
     /// List cash activities matching the (legacy) filter, scoped to opted-in
     /// spending accounts. Returns empty vec if spending tracking is disabled
     /// or no accounts opted in.
