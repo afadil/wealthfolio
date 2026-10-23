@@ -74,6 +74,10 @@ pub struct OidcConfig {
     /// Whether to perform RP-Initiated Logout when the IdP supports it.
     /// Default `true`; set `WF_OIDC_RP_LOGOUT=false` to force local-only logout.
     pub rp_logout: bool,
+    /// Optional PEM bundle (`WF_OIDC_CA_FILE`) of extra root certificates trusted
+    /// for OIDC traffic only, for IdPs behind a private CA (step-ca, internal PKI).
+    /// The bundled Mozilla roots stay trusted; this only adds to them.
+    pub ca_file: Option<String>,
 }
 
 impl OidcConfig {
@@ -134,6 +138,7 @@ impl OidcConfig {
                     allowed_subs,
                     post_logout_redirect_url: env_nonempty("WF_OIDC_POST_LOGOUT_REDIRECT_URL"),
                     rp_logout,
+                    ca_file: env_nonempty("WF_OIDC_CA_FILE"),
                 }))
             }
             _ => anyhow::bail!(
@@ -177,11 +182,16 @@ impl OidcManager {
         // Disallow redirects: discovery and token endpoints must be hit directly.
         // Bounded timeouts so a slow/unreachable IdP can't hang startup discovery
         // or tie up a worker during the token exchange in `oidc_callback`.
-        let http_client = reqwest::ClientBuilder::new()
+        let mut builder = reqwest::ClientBuilder::new()
             .redirect(reqwest::redirect::Policy::none())
             .connect_timeout(Duration::from_secs(5))
-            .timeout(Duration::from_secs(10))
-            .build()?;
+            .timeout(Duration::from_secs(10));
+        if let Some(path) = config.ca_file.as_deref() {
+            for cert in load_extra_roots(path)? {
+                builder = builder.add_root_certificate(cert);
+            }
+        }
+        let http_client = builder.build()?;
 
         let issuer = IssuerUrl::new(config.issuer_url.clone())
             .map_err(|e| anyhow::anyhow!("Invalid WF_OIDC_ISSUER_URL: {e}"))?;
@@ -702,6 +712,19 @@ fn error_redirect(code: &str) -> Response {
     Redirect::to(&format!("/?oidc_error={code}")).into_response()
 }
 
+/// Reads the `WF_OIDC_CA_FILE` PEM bundle. Fails closed: an unreadable file or a
+/// file without any certificate is a startup error, not a silent fallback.
+fn load_extra_roots(path: &str) -> anyhow::Result<Vec<reqwest::Certificate>> {
+    let pem = std::fs::read(path)
+        .map_err(|e| anyhow::anyhow!("Cannot read WF_OIDC_CA_FILE {path}: {e}"))?;
+    let certs = reqwest::Certificate::from_pem_bundle(&pem)
+        .map_err(|e| anyhow::anyhow!("Invalid PEM in WF_OIDC_CA_FILE {path}: {e}"))?;
+    if certs.is_empty() {
+        anyhow::bail!("WF_OIDC_CA_FILE {path} contains no certificates");
+    }
+    Ok(certs)
+}
+
 fn env_nonempty(key: &str) -> Option<String> {
     std::env::var(key)
         .ok()
@@ -723,6 +746,42 @@ fn csv_list(key: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Two throwaway self-signed P-256 CA certificates, used only to exercise
+    // `WF_OIDC_CA_FILE` parsing.
+    const TEST_CA_A: &str = "-----BEGIN CERTIFICATE-----\nMIIBhDCCASugAwIBAgIUemYmWyF+rKBBcl7hYyL0a6lMEU8wCgYIKoZIzj0EAwIw\nFzEVMBMGA1UEAwwMd2YtdGVzdC1jYS1hMCAXDTI2MTAyMzE1NDg0OVoYDzIxMjYw\nOTI5MTU0ODQ5WjAXMRUwEwYDVQQDDAx3Zi10ZXN0LWNhLWEwWTATBgcqhkjOPQIB\nBggqhkjOPQMBBwNCAATMxeVH0eP+0RGFQnjoMY3lk7u5ChGBloyHYaUoom8lF+T0\n6o7N25kCMDTZ9+3yPFAdfLymfA24huZdxiJAJdRDo1MwUTAdBgNVHQ4EFgQU5ERJ\nDwqnqGutt6uRcrVJcdu6LlowHwYDVR0jBBgwFoAU5ERJDwqnqGutt6uRcrVJcdu6\nLlowDwYDVR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNHADBEAiAiIWf/Jr/KVnQe\nX6r5eXANdjwI11Q1o0z+6qMZsiyEGQIgGe/nVpJKgtNdN6aZ7neVkAvN5dCTH0sk\nFJPC0Ua/a6c=\n-----END CERTIFICATE-----";
+    const TEST_CA_B: &str = "-----BEGIN CERTIFICATE-----\nMIIBhTCCASugAwIBAgIUOZL8Tau5seRhzqm/EjxL1CxkDx8wCgYIKoZIzj0EAwIw\nFzEVMBMGA1UEAwwMd2YtdGVzdC1jYS1iMCAXDTI2MTAyMzE1NDg0OVoYDzIxMjYw\nOTI5MTU0ODQ5WjAXMRUwEwYDVQQDDAx3Zi10ZXN0LWNhLWIwWTATBgcqhkjOPQIB\nBggqhkjOPQMBBwNCAARpruWklxw5+Grx5PajKRYm4Zfyoym1Ev7evb7o2R97N7mE\nXwcmX7q6hXq7tyVORj0YRg+nNqt1k4Bb+q55tXfeo1MwUTAdBgNVHQ4EFgQUjdpr\nVpn/w/geXfH6Vt0RcQr97o0wHwYDVR0jBBgwFoAUjdprVpn/w/geXfH6Vt0RcQr9\n7o0wDwYDVR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNIADBFAiEAmJKr9xOIGU1P\nGEAkBwhFgQheKByrlTYOCM1YzChnR/oCICojQMFZs8yRA9i5sP4L3+fFBScUlhxB\nyHO5idlqsvOL\n-----END CERTIFICATE-----";
+
+    fn write_temp(name: &str, contents: &str) -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(format!("wf-oidc-{}-{name}", std::process::id()));
+        std::fs::write(&path, contents).unwrap();
+        path
+    }
+
+    #[test]
+    fn extra_roots_load_every_cert_in_bundle() {
+        let path = write_temp("bundle.pem", &format!("{TEST_CA_A}\n{TEST_CA_B}\n"));
+        let certs = load_extra_roots(path.to_str().unwrap()).unwrap();
+        std::fs::remove_file(&path).ok();
+        assert_eq!(certs.len(), 2);
+    }
+
+    #[test]
+    fn extra_roots_reject_file_without_certificates() {
+        let path = write_temp("empty.pem", "not a certificate\n");
+        let err = load_extra_roots(path.to_str().unwrap()).unwrap_err();
+        std::fs::remove_file(&path).ok();
+        assert!(err.to_string().contains("WF_OIDC_CA_FILE"), "{err}");
+    }
+
+    #[test]
+    fn extra_roots_reject_missing_file() {
+        let err = load_extra_roots("/nonexistent/wf-oidc-ca.pem").unwrap_err();
+        assert!(
+            err.to_string().contains("Cannot read WF_OIDC_CA_FILE"),
+            "{err}"
+        );
+    }
 
     #[test]
     fn tx_cookie_roundtrips() {
