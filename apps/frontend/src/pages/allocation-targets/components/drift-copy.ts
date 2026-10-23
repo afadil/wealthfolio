@@ -25,7 +25,7 @@ export function taxonomyLabel(t: TFunction, taxonomyId: string, taxonomyName: st
 }
 
 export function targetLabel(t: TFunction, targetName: string | undefined) {
-  return targetName?.trim() || t("allocation:savedTarget");
+  return targetName?.trim() || t("allocation:editor.savedTarget");
 }
 
 export function formatPp(bps: number, decimals = 1) {

@@ -44,13 +44,12 @@ type HoldingsByAllocationQueryKey = readonly [string, AccountScope, string, stri
 export function AllocationDetailSheet({
   isOpen,
   onOpenChange,
-  allocation: sourceAllocation,
+  allocation,
   accountFilter,
   baseCurrency,
   initialCategoryId,
 }: AllocationDetailSheetProps) {
   const { t } = useTranslation();
-  const allocation = sourceAllocation;
   const navigate = useNavigate();
   const titleRef = useRef<HTMLHeadingElement>(null);
   const { isBalanceHidden } = useBalancePrivacy();

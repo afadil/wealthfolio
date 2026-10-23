@@ -369,7 +369,6 @@
     "assetClass_other": "资产类别",
     "industry_other": "行业"
   },
-  "savedTarget": "已保存目标",
   "builtInPresets": {
     "balanced_60_40": {
       "name": "均衡型 60 / 40",

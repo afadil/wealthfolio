@@ -1267,7 +1267,6 @@
     }
   },
   "notifications": {
-    "error_try_later": "{{error}}。请稍后重试。",
     "no_issues_found": "没有发现问题。",
     "review_the_details_in_the_health_center": "查看健康中心的详细信息。",
     "health_refresh_after_recalculation": "重新计算完成后将刷新健康检查结果。",
@@ -1434,7 +1433,6 @@
     "security_has_activities": "该证券已有交易记录，无法删除。请先删除所有关联交易。",
     "security_delete_error_description": "目前无法移除该证券。",
     "security_added": "已添加 {{name}}。",
-    "categorized_other": "已分类 {{count}} 笔交易。",
     "recategorized_other": "已重新分类 {{count}} 笔交易。",
     "activity_failed_adding": "添加活动失败",
     "activity_failed_updating": "更新活动失败",

@@ -390,7 +390,6 @@
     "region_many": "regioni",
     "category_many": "categorie"
   },
-  "savedTarget": "Obiettivo salvato",
   "builtInPresets": {
     "balanced_60_40": {
       "name": "Equilibrato 60/40",

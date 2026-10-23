@@ -1291,7 +1291,6 @@
     }
   },
   "notifications": {
-    "error_try_later": "{{error}}. Veuillez réessayer plus tard.",
     "no_issues_found": "Aucun problème trouvé.",
     "review_the_details_in_the_health_center": "Consultez les détails dans le centre de santé.",
     "health_refresh_after_recalculation": "La santé sera actualisée une fois le recalcul terminé.",
@@ -1460,8 +1459,6 @@
     "addon_installed_successfully": "Module complémentaire installé avec succès",
     "error_toggling_addon": "Erreur lors du basculement du module complémentaire",
     "addon_uninstalled": "Module complémentaire désinstallé",
-    "categorized_one": "{{count}} activité catégorisée.",
-    "categorized_other": "{{count}} activités catégorisées.",
     "recategorized_one": "Activités {{count}} recatégorisées.",
     "recategorized_other": "Activités {{count}} recatégorisées.",
     "recategorized_many": "Activités {{count}} recatégorisées.",
@@ -1470,8 +1467,7 @@
     "activity_failed_deleting": "Échec de la suppression de l'activité",
     "activity_failed_duplicating": "Échec de la duplication de l'activité",
     "addon_error": "Erreur du module complémentaire '{{addonId}}'",
-    "security_update_failed": "Échec de la mise à jour de la sécurité",
-    "categorized_many": "Activités {{count}} catégorisées."
+    "security_update_failed": "Échec de la mise à jour de la sécurité"
   },
   "unknown": "Inconnu",
   "budgetGroupNames": {

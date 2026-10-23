@@ -139,7 +139,7 @@ export function useExecuteHealthFix() {
       if (action.id === "sync_prices" || action.id === "retry_sync") {
         toast.error(i18n.t("common:globalEvents.marketSyncFailed"), {
           id: "market-sync-error",
-          description: i18n.t("common:notifications.error_try_later", { error: error.message }),
+          description: i18n.t("common:globalEvents.errorTryAgainLater", { error: error.message }),
         });
       } else {
         toast.error(i18n.t("common:notifications.fix_failed"), { description: error.message });

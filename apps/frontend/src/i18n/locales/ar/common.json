@@ -1336,7 +1336,6 @@
     }
   },
   "notifications": {
-    "error_try_later": "{{error}}. يُرجى المحاولة مرة أخرى لاحقًا.",
     "no_issues_found": "لم يتم العثور على أي مشاكل.",
     "review_the_details_in_the_health_center": "قم بمراجعة التفاصيل في المركز الصحي.",
     "health_refresh_after_recalculation": "سيتم تحديث الصحة بعد انتهاء عملية إعادة الحساب.",
@@ -1508,8 +1507,6 @@
     "security_has_activities": "لا يمكن حذف هذا الأمان لأنه يحتوي على أنشطة موجودة. يرجى حذف جميع الأنشطة المرتبطة أولاً.",
     "security_delete_error_description": "لا يمكن إزالة الأمان الآن.",
     "security_added": "تمت إضافة {{name}}.",
-    "categorized_one": "تم تصنيف {{count}} نشاط.",
-    "categorized_other": "تم تصنيف {{count}} نشاط.",
     "recategorized_one": "تمت إعادة تصنيف أنشطة {{count}}.",
     "recategorized_other": "تمت إعادة تصنيف أنشطة {{count}}.",
     "recategorized_few": "تمت إعادة تصنيف أنشطة {{count}}.",
@@ -1521,11 +1518,7 @@
     "activity_failed_deleting": "فشل في حذف النشاط",
     "activity_failed_duplicating": "فشل في تكرار النشاط",
     "addon_error": "خطأ في الوظيفة الإضافية '{{addonId}}'",
-    "security_update_failed": "فشل في تحديث الأمان",
-    "categorized_few": "أنشطة {{count}} مصنفة.",
-    "categorized_many": "أنشطة {{count}} مصنفة.",
-    "categorized_two": "أنشطة {{count}} مصنفة.",
-    "categorized_zero": "أنشطة {{count}} مصنفة."
+    "security_update_failed": "فشل في تحديث الأمان"
   },
   "unknown": "غير معروف",
   "budgetGroupNames": {

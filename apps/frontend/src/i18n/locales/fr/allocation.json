@@ -390,7 +390,6 @@
     "region_many": "régions",
     "category_many": "catégories"
   },
-  "savedTarget": "Cible enregistrée",
   "builtInPresets": {
     "balanced_60_40": {
       "name": "Equilibré 60/40",

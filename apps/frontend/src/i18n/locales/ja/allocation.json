@@ -369,7 +369,6 @@
     "assetClass_other": "資産クラス",
     "industry_other": "産業"
   },
-  "savedTarget": "保存済みの目標",
   "builtInPresets": {
     "balanced_60_40": {
       "name": "バランス 60 / 40",

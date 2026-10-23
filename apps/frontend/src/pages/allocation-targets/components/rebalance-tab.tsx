@@ -1591,7 +1591,7 @@ export function RebalanceTab({
       )}
 
       {/* ── Plan results ── */}
-      {plan && !isCalculating && (
+      {rawPlan && plan && !isCalculating && (
         <>
           <Warnings items={plan.warnings} />
 
@@ -1665,7 +1665,7 @@ export function RebalanceTab({
                 size="sm"
                 className="min-w-0 justify-center"
                 onClick={() => {
-                  exportCsv(plan, currency, profile.name, t, amountFormatting);
+                  exportCsv(rawPlan, currency, profile.name, t, amountFormatting);
                   toast.success(t("allocation:toast.csvDownloaded"));
                 }}
               >

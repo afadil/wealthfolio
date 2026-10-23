@@ -1267,7 +1267,6 @@
     }
   },
   "notifications": {
-    "error_try_later": "{{error}}. 나중에 다시 시도해 주세요.",
     "no_issues_found": "발견된 문제가 없습니다.",
     "review_the_details_in_the_health_center": "보건센터에서 자세한 내용을 검토하세요.",
     "health_refresh_after_recalculation": "재계산이 끝나면 체력이 새로 고쳐집니다.",
@@ -1434,7 +1433,6 @@
     "security_has_activities": "이 보안에는 기존 활동이 있으므로 삭제할 수 없습니다. 먼저 관련된 활동을 모두 삭제하세요.",
     "security_delete_error_description": "지금은 보안을 제거할 수 없습니다.",
     "security_added": "{{name}}이(가) 추가되었습니다.",
-    "categorized_other": "활동 {{count}}건을 분류했습니다.",
     "recategorized_other": "{{count}} 활동을 다시 분류했습니다.",
     "activity_failed_adding": "활동을 추가하지 못했습니다.",
     "activity_failed_updating": "활동을 업데이트하지 못했습니다.",

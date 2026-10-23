@@ -369,7 +369,6 @@
     "assetClass_other": "자산 클래스",
     "industry_other": "산업"
   },
-  "savedTarget": "저장된 목표",
   "builtInPresets": {
     "balanced_60_40": {
       "name": "균형 잡힌 60/40",

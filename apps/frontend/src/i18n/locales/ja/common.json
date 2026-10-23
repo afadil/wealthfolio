@@ -1267,7 +1267,6 @@
     }
   },
   "notifications": {
-    "error_try_later": "{{error}}。後でもう一度お試しください。",
     "no_issues_found": "問題は見つかりませんでした。",
     "review_the_details_in_the_health_center": "保健センターで詳細を確認してください。",
     "health_refresh_after_recalculation": "再計算が完了するとヘルスが更新されます。",
@@ -1434,7 +1433,6 @@
     "security_has_activities": "このセキュリティには既存のアクティビティがあるため、削除できません。まず、関連するアクティビティをすべて削除してください。",
     "security_delete_error_description": "現在セキュリティを削除できませんでした。",
     "security_added": "{{name}} が追加されました。",
-    "categorized_other": "取引{{count}}件を分類しました。",
     "recategorized_other": "{{count}} アクティビティを再分類しました。",
     "activity_failed_adding": "アクティビティの追加に失敗しました",
     "activity_failed_updating": "アクティビティの更新に失敗しました",

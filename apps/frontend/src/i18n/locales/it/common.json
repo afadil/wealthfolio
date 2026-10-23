@@ -1291,7 +1291,6 @@
     }
   },
   "notifications": {
-    "error_try_later": "{{error}}. Riprova più tardi.",
     "add_on_permission_denied": "Autorizzazione del componente aggiuntivo negata",
     "failed_to_set_category": "Impossibile impostare la categoria.",
     "failed_to_clear_category": "Impossibile cancellare la categoria.",
@@ -1460,8 +1459,6 @@
     "security_has_activities": "Impossibile eliminare questo titolo perché presenta attività esistenti. Elimina prima tutte le attività associate.",
     "security_delete_error_description": "Impossibile rimuovere la sicurezza in questo momento.",
     "security_added": "{{name}} è stato aggiunto.",
-    "categorized_one": "Categorizzato {{count}} movimento.",
-    "categorized_other": "Categorizzati {{count}} movimenti.",
     "recategorized_one": "Attività {{count}} riclassificate.",
     "recategorized_other": "Attività {{count}} riclassificate.",
     "recategorized_many": "Attività {{count}} riclassificate.",
@@ -1470,8 +1467,7 @@
     "activity_failed_deleting": "Impossibile eliminare l'attività",
     "activity_failed_duplicating": "Impossibile duplicare l'attività",
     "addon_error": "Errore componente aggiuntivo '{{addonId}}'",
-    "security_update_failed": "Impossibile aggiornare la sicurezza",
-    "categorized_many": "Attività {{count}} categorizzate."
+    "security_update_failed": "Impossibile aggiornare la sicurezza"
   },
   "unknown": "Sconosciuto",
   "budgetGroupNames": {

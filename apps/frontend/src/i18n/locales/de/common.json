@@ -1276,7 +1276,6 @@
     }
   },
   "notifications": {
-    "error_try_later": "{{error}}. Bitte versuchen Sie es später erneut.",
     "no_issues_found": "Keine Probleme gefunden.",
     "review_the_details_in_the_health_center": "Überprüfen Sie die Details im Gesundheitszentrum.",
     "health_refresh_after_recalculation": "Die Gesundheit wird aktualisiert, nachdem die Neuberechnung abgeschlossen ist.",
@@ -1444,8 +1443,6 @@
     "security_has_activities": "Dieses Wertpapier kann nicht gelöscht werden, da es über vorhandene Aktivitäten verfügt. Bitte löschen Sie zunächst alle zugehörigen Aktivitäten.",
     "security_delete_error_description": "Die Sicherheit konnte derzeit nicht entfernt werden.",
     "security_added": "{{name}} wurde hinzugefügt.",
-    "categorized_one": "{{count}} Aktivität kategorisiert.",
-    "categorized_other": "{{count}} Aktivitäten kategorisiert.",
     "recategorized_one": "{{count}} Aktivitäten neu kategorisiert.",
     "recategorized_other": "{{count}} Aktivitäten neu kategorisiert.",
     "activity_failed_adding": "Aktivität konnte nicht hinzugefügt werden",

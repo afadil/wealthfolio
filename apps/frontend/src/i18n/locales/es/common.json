@@ -1291,7 +1291,6 @@
     }
   },
   "notifications": {
-    "error_try_later": "{{error}}. Inténtalo de nuevo más tarde.",
     "no_issues_found": "No se encontraron problemas.",
     "review_the_details_in_the_health_center": "Revisa los detalles en el Centro de Salud.",
     "health_refresh_after_recalculation": "El estado se actualizará una vez finalizado el recálculo.",
@@ -1460,8 +1459,6 @@
     "security_has_activities": "Esta seguridad no se puede eliminar porque tiene actividades existentes. Primero elimine todas las actividades asociadas.",
     "security_delete_error_description": "La seguridad no se pudo eliminar en este momento.",
     "security_added": "{{name}} ha sido agregado.",
-    "categorized_one": "Se categorizó {{count}} actividad.",
-    "categorized_other": "Se categorizaron {{count}} actividades.",
     "recategorized_one": "Se han recategorizado {{count}} actividades.",
     "recategorized_other": "Se han recategorizado {{count}} actividades.",
     "recategorized_many": "Se han recategorizado {{count}} actividades.",
@@ -1470,8 +1467,7 @@
     "activity_failed_deleting": "No se pudo eliminar la actividad",
     "activity_failed_duplicating": "No se pudo duplicar la actividad",
     "addon_error": "Error del complemento '{{addonId}}'",
-    "security_update_failed": "No se pudo actualizar la seguridad",
-    "categorized_many": "Actividades categorizadas {{count}}."
+    "security_update_failed": "No se pudo actualizar la seguridad"
   },
   "unknown": "Desconocido",
   "budgetGroupNames": {

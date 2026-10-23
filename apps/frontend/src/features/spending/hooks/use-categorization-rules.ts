@@ -73,7 +73,7 @@ export function useCategorizationRuleMutations() {
       toast.success(
         i18n.t(
           onlyUncategorized
-            ? "common:notifications.categorized"
+            ? "spending:txTab.categorizedCount"
             : "common:notifications.recategorized",
           { count },
         ),
