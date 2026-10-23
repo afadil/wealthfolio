@@ -13,6 +13,7 @@ pub mod asset_classification;
 pub mod asset_taxonomies;
 pub mod cash_balances;
 pub mod categorization_context;
+pub mod categorization_rules;
 pub mod commit_activity;
 pub mod commit_asset_classification;
 pub mod commit_categorization_rule;
@@ -113,6 +114,13 @@ pub use commit_transaction_categories::{
     CommitTransactionCategories, CommitTransactionCategoriesArgs, CommitTransactionCategoriesOutput,
 };
 
+// MCP-only categorization rule tools.
+pub use categorization_rules::{
+    CategorizationRuleDto, ListCategorizationRules, ListCategorizationRulesArgs,
+    ListCategorizationRulesOutput, RerunCategorizationRules, RerunCategorizationRulesArgs,
+    RerunCategorizationRulesOutput,
+};
+
 // MCP-only transfer linking tools.
 pub use transfer_links::{
     FindTransferMatches, FindTransferMatchesArgs, FindTransferMatchesOutput,
@@ -191,6 +199,16 @@ pub fn commit_tools() -> Vec<Arc<dyn AgentTool>> {
         Arc::new(CommitAssetClassificationDraft),
         Arc::new(CommitCategorizationRule),
         Arc::new(CommitTransactionCategories),
+    ]
+}
+
+/// The MCP-only categorization rule tools: list the saved rules, then re-apply
+/// them to the spending accounts. Not exposed to the in-app assistant, whose
+/// categorization flow applies rules through list_categorization_context.
+pub fn categorization_rule_tools() -> Vec<Arc<dyn AgentTool>> {
+    vec![
+        Arc::new(ListCategorizationRules),
+        Arc::new(RerunCategorizationRules),
     ]
 }
 

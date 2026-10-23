@@ -16,6 +16,7 @@ pub trait CashActivityServiceTrait: Send + Sync {
         &self,
         items: &[BulkCategoryAssignment],
     ) -> Result<Vec<ActivityTaxonomyAssignment>>;
+    async fn spending_account_ids(&self) -> Result<Vec<String>>;
 }
 
 #[async_trait]
@@ -36,5 +37,9 @@ impl CashActivityServiceTrait for CashActivityService {
         items: &[BulkCategoryAssignment],
     ) -> Result<Vec<ActivityTaxonomyAssignment>> {
         CashActivityService::bulk_assign_categories(self, items).await
+    }
+
+    async fn spending_account_ids(&self) -> Result<Vec<String>> {
+        CashActivityService::spending_account_ids(self).await
     }
 }

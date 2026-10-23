@@ -10,6 +10,7 @@ use super::service::CategorizationRulesService;
 pub trait CategorizationRulesServiceTrait: Send + Sync {
     async fn list(&self) -> Result<Vec<CategorizationRule>>;
     async fn create(&self, new_rule: NewCategorizationRule) -> Result<CategorizationRule>;
+    async fn rerun_all(&self, account_ids: &[String], only_uncategorized: bool) -> Result<usize>;
 }
 
 #[async_trait]
@@ -20,6 +21,10 @@ impl CategorizationRulesServiceTrait for CategorizationRulesService {
 
     async fn create(&self, new_rule: NewCategorizationRule) -> Result<CategorizationRule> {
         CategorizationRulesService::create(self, new_rule).await
+    }
+
+    async fn rerun_all(&self, account_ids: &[String], only_uncategorized: bool) -> Result<usize> {
+        CategorizationRulesService::rerun_all(self, account_ids, only_uncategorized).await
     }
 }
 

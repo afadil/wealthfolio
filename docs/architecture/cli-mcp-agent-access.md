@@ -409,9 +409,9 @@ There are **two catalogs** (`crates/agent-tools/src/catalog.rs`):
 - `assistant_catalog()` — read + draft/suggest tools, for the in-app assistant.
   It excludes the commit and CSV-import tools (the assistant persists through
   its own confirmation widget / `import_csv` flow).
-- `mcp_catalog()` — everything (read + draft/suggest + commit + import +
-  transfer linking + quote import), scope-filtered at the MCP boundary so a
-  token sees only what its scopes reach.
+- `mcp_catalog()` — everything (read + draft/suggest + commit +
+  categorization rules + import + transfer linking + quote import), scope-filtered
+  at the MCP boundary so a token sees only what its scopes reach.
 
 ### Read Tools
 
@@ -453,6 +453,26 @@ commit_asset_classification_draft  -- persist one reviewed classification draft
 commit_categorization_rule         -- persist one reviewed categorization rule draft
 commit_transaction_categories     -- persist reviewed transaction category assignments
 ```
+
+### MCP-only Categorization Rule Tools
+
+```text
+list_categorization_rules          -- list saved rules with their origin
+rerun_categorization_rules         -- re-apply the rules to the spending accounts
+```
+
+`list_categorization_rules` returns every saved rule, highest priority (the
+one that wins a match) first: pattern, match type, target taxonomy and
+category (with the category's key and name), activity type, amount condition,
+priority and account scope. `origin` is `user`, `preset` (with `presetId`,
+`presetVersion` and `presetModified`) or `addon` (with `addonId`, read from the
+`addon:<addonId>:` prefix of the ids add-ons give their rules). It filters by
+`taxonomyId` and `origin`. `rerun_categorization_rules` runs the same rerun as
+the rules page over the accounts opted in to spending tracking, and does
+nothing when tracking is off. With `onlyUncategorized` (default `true`) it only
+fills activities without a category in the rule's taxonomy; with `false` it also
+replaces rule, import and AI categories. Manual categories are never changed. It
+returns the number of spending accounts and of activities a rule matched.
 
 ### MCP-only CSV Import Tools
 
@@ -637,7 +657,8 @@ confirmation, an MCP client passes the returned `rule` object to
 `commit_categorization_rule`. The commit calls the same rule service as the
 in-app confirmation widget; there is no server-side pending-draft queue. The
 commit saves the rule for future categorization; it does not rerun rules over
-existing transactions.
+existing transactions. `rerun_categorization_rules` does that once the user
+asks.
 
 Rules:
 
@@ -686,7 +707,8 @@ activities:read          search_activities, get_import_mapping,
 financial-planning:read  get_goals, get_contribution_limits
 health:read              get_health_status
 classification:read      list_asset_taxonomies, get_asset_taxonomy_assignments,
-                         list_categorization_context
+                         list_categorization_context,
+                         list_categorization_rules
 ```
 
 Write / draft / suggest scopes:
@@ -708,7 +730,8 @@ classification:suggest   propose_transaction_categories,
                          prepare_asset_classification
 classification:write     commit_asset_classification_draft,
                          commit_categorization_rule,
-                         commit_transaction_categories
+                         commit_transaction_categories,
+                         rerun_categorization_rules
                          (also requires classification:suggest)
 market-data:write        prepare_quote_import, commit_quote_import
                          (each also requires holdings:read)

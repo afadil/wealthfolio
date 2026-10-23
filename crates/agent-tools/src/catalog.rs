@@ -35,13 +35,14 @@ impl AgentToolCatalog {
         Self::new(tools)
     }
 
-    /// The MCP catalog: read + draft/suggest + commit, import, transfer
-    /// linking, quote import and activity update tools. Scope filtering at the
+    /// The MCP catalog: read + draft/suggest + commit, categorization rule,
+    /// import, transfer linking, quote import and activity update tools. Scope filtering at the
     /// boundary (`execute`, `list_tools`) hides whatever a token can't reach.
     pub fn mcp_catalog() -> Self {
         let mut tools = crate::tools::v1_read_tools();
         tools.extend(crate::tools::draft_suggest_tools());
         tools.extend(crate::tools::commit_tools());
+        tools.extend(crate::tools::categorization_rule_tools());
         tools.extend(crate::tools::import_tools());
         tools.extend(crate::tools::transfer_link_tools());
         tools.extend(crate::tools::quote_import_tools());
@@ -105,11 +106,49 @@ mod tests {
     #[derive(Default)]
     struct PanicEnv {
         rules: Option<Arc<TestRuleService>>,
+        cash: Option<Arc<TestCashService>>,
     }
 
     #[derive(Default)]
     struct TestRuleService {
         created: Mutex<Vec<NewCategorizationRule>>,
+        reruns: Mutex<Vec<(Vec<String>, bool)>>,
+    }
+
+    /// Cash-activity service that only reports the opted-in spending accounts.
+    struct TestCashService {
+        spending_account_ids: Vec<String>,
+    }
+
+    #[async_trait::async_trait]
+    impl wealthfolio_spending::cash_activities::CashActivityServiceTrait for TestCashService {
+        async fn search(
+            &self,
+            _: wealthfolio_spending::cash_activities::CashActivitySearchRequest,
+        ) -> anyhow::Result<wealthfolio_spending::cash_activities::CashActivitySearchResponse>
+        {
+            unreachable!("not used by the rerun test")
+        }
+
+        async fn get_by_activity_ids(
+            &self,
+            _: &[String],
+        ) -> anyhow::Result<Vec<wealthfolio_spending::cash_activities::CashActivity>> {
+            unreachable!("not used by the rerun test")
+        }
+
+        async fn bulk_assign_categories(
+            &self,
+            _: &[wealthfolio_spending::activity_assignments::BulkCategoryAssignment],
+        ) -> anyhow::Result<
+            Vec<wealthfolio_spending::activity_assignments::ActivityTaxonomyAssignment>,
+        > {
+            unreachable!("not used by the rerun test")
+        }
+
+        async fn spending_account_ids(&self) -> anyhow::Result<Vec<String>> {
+            Ok(self.spending_account_ids.clone())
+        }
     }
 
     #[async_trait::async_trait]
@@ -145,6 +184,18 @@ mod tests {
             };
             self.created.lock().unwrap().push(rule);
             Ok(created)
+        }
+
+        async fn rerun_all(
+            &self,
+            account_ids: &[String],
+            only_uncategorized: bool,
+        ) -> anyhow::Result<usize> {
+            self.reruns
+                .lock()
+                .unwrap()
+                .push((account_ids.to_vec(), only_uncategorized));
+            Ok(account_ids.len() * 2)
         }
     }
 
@@ -219,7 +270,7 @@ mod tests {
         fn cash_activity_service(
             &self,
         ) -> Arc<dyn wealthfolio_spending::cash_activities::CashActivityServiceTrait> {
-            unimplemented!("PanicEnv")
+            self.cash.clone().expect("PanicEnv")
         }
         fn categorization_rules_service(
             &self,
@@ -263,6 +314,8 @@ mod tests {
         assert!(!names.contains(&"commit_asset_classification_draft"));
         assert!(!names.contains(&"commit_categorization_rule"));
         assert!(!names.contains(&"commit_transaction_categories"));
+        assert!(!names.contains(&"list_categorization_rules"));
+        assert!(!names.contains(&"rerun_categorization_rules"));
         assert!(!names.contains(&"prepare_activity_import"));
         assert!(!names.contains(&"commit_activity_import"));
         assert!(!names.contains(&"get_import_mapping"));
@@ -284,6 +337,8 @@ mod tests {
         assert!(names.contains(&"commit_asset_classification_draft"));
         assert!(names.contains(&"commit_categorization_rule"));
         assert!(names.contains(&"commit_transaction_categories"));
+        assert!(names.contains(&"list_categorization_rules"));
+        assert!(names.contains(&"rerun_categorization_rules"));
         assert!(names.contains(&"get_import_mapping"));
         assert!(names.contains(&"prepare_activity_import"));
         assert!(names.contains(&"commit_activity_import"));
@@ -308,6 +363,8 @@ mod tests {
             "commit_asset_classification_draft",
             "commit_categorization_rule",
             "commit_transaction_categories",
+            "list_categorization_rules",
+            "rerun_categorization_rules",
             "find_transfer_matches",
             "link_transfer_activities",
             "unlink_transfer_activities",
@@ -354,6 +411,74 @@ mod tests {
                 "{error}"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn rule_tools_need_their_classification_scopes() {
+        let catalog = AgentToolCatalog::mcp_catalog();
+        let cases = [
+            ("list_categorization_rules", vec!["classification:suggest"]),
+            ("list_categorization_rules", vec!["classification:write"]),
+            ("rerun_categorization_rules", vec!["classification:read"]),
+            ("rerun_categorization_rules", vec!["classification:suggest"]),
+            ("rerun_categorization_rules", vec!["classification:write"]),
+        ];
+        for (name, scopes) in cases {
+            let error = catalog
+                .execute(
+                    Arc::new(PanicEnv::default()),
+                    &AgentScopeSet::from_strs(scopes.clone()),
+                    name,
+                    serde_json::json!({}),
+                )
+                .await
+                .unwrap_err();
+            assert!(
+                matches!(error, AgentToolError::ScopeDenied { .. }),
+                "{name} with {scopes:?}: {error}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn rerun_runs_rules_over_the_spending_accounts() {
+        let catalog = AgentToolCatalog::mcp_catalog();
+        let writable = AgentScopeSet::from_strs(["classification:suggest", "classification:write"]);
+        let rules = Arc::new(TestRuleService::default());
+        let env = Arc::new(PanicEnv {
+            rules: Some(rules.clone()),
+            cash: Some(Arc::new(TestCashService {
+                spending_account_ids: vec!["acct-1".to_string(), "acct-2".to_string()],
+            })),
+        });
+
+        let result = catalog
+            .execute(
+                env.clone(),
+                &writable,
+                "rerun_categorization_rules",
+                serde_json::json!({}),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            result.content,
+            serde_json::json!({ "onlyUncategorized": true, "accounts": 2, "matched": 4 })
+        );
+        catalog
+            .execute(
+                env,
+                &writable,
+                "rerun_categorization_rules",
+                serde_json::json!({ "onlyUncategorized": false }),
+            )
+            .await
+            .unwrap();
+        let accounts = vec!["acct-1".to_string(), "acct-2".to_string()];
+        assert_eq!(
+            *rules.reruns.lock().unwrap(),
+            [(accounts.clone(), true), (accounts, false)]
+        );
     }
 
     /// Generated duplicate pairs must be rejected before any service access,
@@ -403,6 +528,7 @@ mod tests {
         let rules = Arc::new(TestRuleService::default());
         let env = Arc::new(PanicEnv {
             rules: Some(rules.clone()),
+            ..Default::default()
         });
         let input = serde_json::json!({
             "rule": {
