@@ -110,6 +110,7 @@
     "description": "Chọn tài khoản để so sánh hiệu suất theo thời gian."
   },
   "attribution": {
+    "partial_data": "Dữ liệu một phần",
     "title": "Phân bổ lợi nhuận",
     "close": "Đóng phân bổ",
     "period_gain_loss": "Lãi/Lỗ trong kỳ",

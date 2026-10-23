@@ -47,6 +47,7 @@
   "nav_about_subtitle": "Giới thiệu về Wealthfolio",
   "general_page_description": "Quản lý các cài đặt ứng dụng và tùy chọn chung.",
   "currency_select_error": "Vui lòng chọn tiền tệ cơ sở.",
+  "currency_code_error": "Nhập mã tiền tệ hợp lệ gồm 3 chữ cái, ví dụ như USD.",
   "currency_title": "Tiền tệ cơ sở",
   "currency_description": "Chọn tiền tệ cơ sở cho danh mục đầu tư của bạn.",
   "currency_save_button": "Lưu loại tiền tệ",
