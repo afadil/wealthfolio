@@ -1,3 +1,4 @@
+import { getCategoryLabel } from "@/lib/taxonomy-labels";
 import { useCallback, useEffect, useMemo, useRef, useState, type FC } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -825,14 +826,14 @@ export default function SpendingTabContent() {
     >();
     (taxonomy.data?.categories ?? []).forEach((c: TaxonomyCategory) => {
       meta.set(c.id, {
-        name: c.name,
+        name: getCategoryLabel(t, c.taxonomyId, c.id, c.name),
         color: c.color ?? null,
         icon: c.icon ?? null,
         parentId: c.parentId ?? null,
       });
     });
     return meta;
-  }, [taxonomy.data?.categories]);
+  }, [taxonomy.data?.categories, t]);
 
   const categoryRows = useMemo(() => {
     if (!report) return [];
