@@ -394,7 +394,8 @@ fn action_for(activity: &Activity, diagnostics: &mut Vec<Diagnostic>) -> Action 
 /// taxes are attributed for trades, income and standalone charge rows; fees
 /// on deposits, withdrawals and transfers are booked but knowingly not
 /// attributed. Credit-card interest is a charge on a liability (its cash is
-/// negative), so its amount is attributed as a fee, never as income.
+/// negative), so its amount is attributed as a fee, never as income. An
+/// internal credit is income; an external one is a contribution.
 fn attribution_for(activity: &Activity, account: &AccountFacts, action: &Action) -> Attributed {
     use ActivityKind::*;
     let amount = activity.amount.unwrap_or(Decimal::ZERO);
@@ -430,6 +431,17 @@ fn attribution_for(activity: &Activity, account: &AccountFacts, action: &Action)
             fee,
             tax,
             ..Attributed::default()
+        },
+        // A credit inside the boundary (cash back, a rebate, a refund) is a
+        // gain without a contribution, so it is income like interest. An
+        // external credit is new capital and attributes like a deposit.
+        Credit if !credit_is_external(activity) => Attributed {
+            income: activity
+                .amount
+                .map(|amount| amount + fee + tax)
+                .unwrap_or(Decimal::ZERO),
+            fee,
+            tax,
         },
         // Cash transfers book tax to cash; asset transfers book only the fee.
         Credit | Deposit | Withdrawal => Attributed {
@@ -787,10 +799,26 @@ mod tests {
                 assert_eq!(event.contribution, Contribution::CashGross, "{case}");
                 assert_eq!(event.flow.boundary, Boundary::External, "{case}");
                 assert_eq!(event.flow.value, FlowValue::Cash(dec!(100)), "{case}");
+                assert_eq!(event.attribution.income, Decimal::ZERO, "{case}");
             } else {
                 assert_eq!(event.contribution, Contribution::None, "{case}");
                 assert_eq!(event.flow, Flow::NONE, "{case}");
+                assert_eq!(event.attribution.income, dec!(100), "{case}");
             }
         }
+    }
+
+    #[test]
+    fn internal_credit_is_income_attributed_gross() {
+        let mut rebate = raw("rebate", "a1", "CREDIT", "2025-03-01T10:00:00Z");
+        rebate.subtype = Some("REBATE".into());
+        rebate.amount = Some(dec!(100));
+        rebate.fee = Some(dec!(2));
+        rebate.tax = Some(dec!(5));
+        let ledger = ledger(vec![rebate], "SECURITIES");
+        let attribution = &ledger.events[0].attribution;
+        assert_eq!(attribution.income, dec!(107));
+        assert_eq!(attribution.fee, dec!(2));
+        assert_eq!(attribution.tax, dec!(5));
     }
 }
