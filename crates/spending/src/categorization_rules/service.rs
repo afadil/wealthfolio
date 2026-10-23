@@ -325,7 +325,7 @@ impl CategorizationRulesService {
                 match_type,
                 taxonomy_id: Some(tax_id),
                 category_id: Some(cat_id),
-                activity_type: None,
+                activity_type: rule.activity_type,
                 amount_op: None,
                 amount_value: None,
                 amount_value2: None,
@@ -1460,6 +1460,69 @@ mod tests {
         assert_eq!(repeated.added, 0);
         assert_eq!(repeated.updated, 0);
         assert_eq!(repeated.skipped_existing, preset.rules.len());
+    }
+
+    #[tokio::test]
+    async fn preset_import_and_upgrade_keep_rule_activity_types() {
+        let preset = presets::load_preset("it").unwrap();
+        let mut groceries = mk_rule(
+            "installed-groceries",
+            "(?i)esselunga",
+            "spending_categories",
+            "groceries",
+            80,
+        );
+        groceries.match_type = RuleMatchType::Regex;
+        groceries.preset_id = Some("it".to_string());
+        groceries.preset_rule_key = Some("it.food_groceries".to_string());
+        groceries.preset_version = Some("0.0.0".to_string());
+
+        let (svc, repo, _) = mk_svc(vec![groceries], vec![]);
+        let result = svc.import_preset("it", &resolver_for("it")).await.unwrap();
+        assert_eq!(result.added, preset.rules.len() - 1);
+        assert_eq!(result.updated, 1);
+
+        let activity_type_of = |key: &str| {
+            let rules = repo.rules.lock().unwrap();
+            rules
+                .iter()
+                .find(|rule| rule.preset_rule_key.as_deref() == Some(key))
+                .unwrap_or_else(|| panic!("rule {key} should be installed"))
+                .activity_type
+                .clone()
+        };
+        assert_eq!(
+            activity_type_of("it.food_groceries").as_deref(),
+            Some("WITHDRAWAL")
+        );
+        assert_eq!(
+            activity_type_of("it.income_salary").as_deref(),
+            Some("DEPOSIT")
+        );
+        assert_eq!(activity_type_of("it.fees_bank"), None);
+
+        let (svc, repo, _) = mk_svc(vec![], vec![]);
+        svc.import_preset("fr", &resolver_for("fr")).await.unwrap();
+        assert!(repo
+            .rules
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|rule| rule.activity_type.is_none()));
+    }
+
+    fn resolver_for(preset_id: &str) -> HashMap<String, (String, String)> {
+        presets::load_preset(preset_id)
+            .unwrap()
+            .rules
+            .iter()
+            .map(|rule| {
+                (
+                    rule.category_key.clone(),
+                    ("spending_categories".to_string(), rule.category_key.clone()),
+                )
+            })
+            .collect()
     }
 
     fn dec(s: &str) -> Decimal {
