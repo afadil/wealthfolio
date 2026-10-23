@@ -175,7 +175,7 @@ Key parity does not detect strings that never call `t()`, including API
 metadata, constant tables, callback notifications, or English inserted into
 translated sentences. Use `i18n:lint` together with a source review; brands,
 technical identifiers, CSV examples, and test galleries are expected false
-positives. See `docs/i18n-audit.md` for the audit and validation boundaries.
+positives.
 
 The additional built-in catalogs are machine-drafted for all supported locales
 and remain subject to native-speaker review. Country labels use CLDR names.
