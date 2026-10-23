@@ -674,7 +674,9 @@ const AccountPage = () => {
   };
 
   const accountActivitiesContent = isMobile ? (
-    <>
+    // Activities load when their section opens. Until then the section keeps a
+    // screen's height: a shorter page would pull the scroll position up.
+    <div className={cn("space-y-4", accountActivitiesSearch.isLoading && "min-h-dvh")}>
       <ActivityTableMobile
         activities={accountActivitiesSearch.data}
         isLoading={accountActivitiesSearch.isLoading}
@@ -695,7 +697,7 @@ const AccountPage = () => {
         totalFetched={accountActivitiesSearch.data.length}
         totalCount={accountActivitiesSearch.totalRowCount}
       />
-    </>
+    </div>
   ) : (
     <>
       <ActivityTable

@@ -163,6 +163,7 @@ npx playwright test && npx playwright show-report
 | `34-activity-column-widths.spec.ts`    | The activity table's column widths stay the same while scrolling brings rows with wider values into view                    |
 | `35-holdings-sticky-header.spec.ts`    | Holdings, account Holdings tab, Securities: header stays pinned as rows scroll, in short windows and on Shift+Tab (#2125)   |
 | `36-phone-taps-and-swipes.spec.ts`     | Phone: Spending's Next doesn't save, Performance's Plus stays on screen, swipes scroll period rows                          |
+| `38-account-section-scroll.spec.ts`    | Phone, in WebKit: switching an account between Holdings and Activities keeps the page's scroll position                     |
 
 ---
 
