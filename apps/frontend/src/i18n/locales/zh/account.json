@@ -47,7 +47,17 @@
   "search_accounts": "搜索账户……",
   "no_accounts_found": "未找到账户。",
   "holdings": "持仓",
-  "click_to_update_cash_balance": "点击以更新现金余额",
+  "balance_edit": {
+    "title": "调整现金余额",
+    "description": "每次调整一个币种。差额将记录为该币种的一笔存款或取款。",
+    "current_balance": "当前余额",
+    "new_balance": "新余额",
+    "no_change": "余额未变化",
+    "unavailable": "现金余额暂不可用，请等待加载完成或刷新页面。",
+    "invalid_amount": "请输入大于或等于零的有效余额。",
+    "success": "余额已更新",
+    "error": "更新余额失败，请重试。"
+  },
   "investments": "投资",
   "net_contribution": "净投入",
   "cost_basis": "成本基础",

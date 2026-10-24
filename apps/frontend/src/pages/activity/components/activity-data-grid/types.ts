@@ -35,6 +35,8 @@ export interface LocalTransaction extends ActivityDetails {
   _originalNeedsReview?: boolean;
   /** Session-only: direct Total edit disables further automatic calculation. */
   _amountEdited?: boolean;
+  /** Session-only: the instrument type came from a search pick, not the user. */
+  _instrumentTypeFromPick?: boolean;
 }
 
 /**

@@ -15,7 +15,7 @@ export function RawResponseViewer({ rawResponse, format, onPathClick }: RawRespo
     return <JsonTreeViewer rawResponse={rawResponse} onPathClick={onPathClick} />;
   }
   return (
-    <pre className="text-muted-foreground whitespace-pre-wrap break-all p-3 text-[12px] leading-relaxed">
+    <pre className="text-muted-foreground whitespace-pre-wrap break-all p-3 text-xs leading-relaxed">
       {rawResponse}
     </pre>
   );
@@ -44,14 +44,14 @@ function JsonTreeViewer({
 
   if (!parsed.ok) {
     return (
-      <pre className="text-muted-foreground whitespace-pre-wrap break-all p-3 text-[12px] leading-relaxed">
+      <pre className="text-muted-foreground whitespace-pre-wrap break-all p-3 text-xs leading-relaxed">
         {rawResponse}
       </pre>
     );
   }
 
   return (
-    <pre className="p-3 font-mono text-[12px] leading-relaxed">
+    <pre className="p-3 font-mono text-xs leading-relaxed">
       <JsonValue value={parsed.value} path="$" depth={0} onSelect={onPathClick} />
     </pre>
   );
@@ -253,8 +253,8 @@ function PrimitiveSpan({
   onSelect?: (path: string) => void;
 }) {
   const colorClass = cn(
-    kind === "number" && "text-sky-600 dark:text-sky-400",
-    kind === "string" && "text-emerald-700 dark:text-emerald-400",
+    kind === "number" && "text-info",
+    kind === "string" && "text-success-subtle-foreground",
     kind === "bool" && "text-violet-600 dark:text-violet-400",
     kind === "null" && "text-muted-foreground",
   );

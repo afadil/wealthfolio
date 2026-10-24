@@ -39,6 +39,8 @@ export interface MoneyInputProps {
   readOnly?: boolean;
   /** Aria label for accessibility */
   "aria-label"?: string;
+  /** ID of the element that labels the input */
+  "aria-labelledby"?: string;
   /** ID used to associate the input with its form label */
   id?: string;
   /** IDs of elements describing the input */
@@ -70,6 +72,7 @@ const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
       disabled,
       readOnly,
       "aria-label": ariaLabel,
+      "aria-labelledby": ariaLabelledBy,
       id,
       "aria-describedby": ariaDescribedBy,
       "aria-invalid": ariaInvalid,
@@ -96,11 +99,12 @@ const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
         customInput={Input}
         getInputRef={ref}
         name={name}
-        className={cn("text-right", className)}
+        className={cn("text-end", className)}
         placeholder={resolvedPlaceholder}
         disabled={disabled}
         readOnly={readOnly}
         aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
         id={id}
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid}

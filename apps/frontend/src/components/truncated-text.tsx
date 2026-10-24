@@ -27,10 +27,19 @@ export function TruncatedText({ text, className, ...props }: TruncatedTextProps)
         setOpen(next && el !== null && el.scrollWidth > el.clientWidth);
       }}
     >
-      <TooltipTrigger asChild>
-        <span ref={ref} className={cn("block min-w-0 truncate", className)} {...props}>
-          {text}
-        </span>
+      <TooltipTrigger
+        // User text reads in its own direction, so a clipped line keeps its start
+        // visible; in a right-to-left page it stays on the right.
+        render={
+          <span
+            ref={ref}
+            dir="auto"
+            className={cn("block min-w-0 truncate rtl:text-right", className)}
+            {...props}
+          />
+        }
+      >
+        {text}
       </TooltipTrigger>
       <TooltipContent
         side="bottom"

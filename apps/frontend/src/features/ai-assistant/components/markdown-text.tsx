@@ -165,7 +165,7 @@ const customComponents = memoizeMarkdownComponents({
   th: ({ className, ...props }) => (
     <th
       className={cn(
-        "aui-md-th bg-muted whitespace-nowrap px-3 py-2 text-left text-xs font-semibold first:rounded-tl-lg last:rounded-tr-lg",
+        "aui-md-th bg-muted whitespace-nowrap px-3 py-2 text-start text-xs font-semibold first:rounded-ss-lg last:rounded-se-lg",
         className,
       )}
       {...props}
@@ -174,7 +174,7 @@ const customComponents = memoizeMarkdownComponents({
   td: ({ className, ...props }) => (
     <td
       className={cn(
-        "aui-md-td whitespace-nowrap border-b border-l px-3 py-2 text-left text-sm last:border-r",
+        "aui-md-td whitespace-nowrap border-b border-s px-3 py-2 text-start text-sm last:border-e",
         className,
       )}
       {...props}
@@ -183,7 +183,7 @@ const customComponents = memoizeMarkdownComponents({
   tr: ({ className, ...props }) => (
     <tr
       className={cn(
-        "aui-md-tr m-0 border-b p-0 first:border-t [&:last-child>td:first-child]:rounded-bl-lg [&:last-child>td:last-child]:rounded-br-lg",
+        "aui-md-tr m-0 border-b p-0 first:border-t [&:last-child>td:first-child]:rounded-es-lg [&:last-child>td:last-child]:rounded-ee-lg",
         className,
       )}
       {...props}

@@ -124,9 +124,9 @@ export function LoanTermsStrip({
               return (
                 <div
                   key={term.key}
-                  className="bg-success/15 border-background absolute inset-y-0 border-r-2 last:border-r-0"
+                  className="bg-success/15 border-background absolute inset-y-0 border-e-2 last:border-e-0"
                   style={{
-                    left: `${position(term.start)}%`,
+                    insetInlineStart: `${position(term.start)}%`,
                     width: `${position(term.end) - position(term.start)}%`,
                   }}
                 >
@@ -144,7 +144,7 @@ export function LoanTermsStrip({
               <div
                 className="border-muted-foreground/40 bg-muted/30 absolute inset-y-0 border border-dashed"
                 style={{
-                  left: `${position(future.start)}%`,
+                  insetInlineStart: `${position(future.start)}%`,
                   width: `${position(future.end) - position(future.start)}%`,
                 }}
               />
@@ -154,23 +154,25 @@ export function LoanTermsStrip({
             <div
               data-testid="loan-term-today"
               className="absolute bottom-0 top-0 w-px"
-              style={{ left: `${todayPosition}%` }}
+              style={{ insetInlineStart: `${todayPosition}%` }}
             >
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className={cn(
-                      "text-success focus-visible:ring-ring absolute whitespace-nowrap rounded-sm text-xs font-medium focus-visible:outline-none focus-visible:ring-2",
-                      todayPosition < 20
-                        ? "left-0"
-                        : todayPosition > 80
-                          ? "right-0"
-                          : "-translate-x-1/2",
-                    )}
-                  >
-                    {t("asset:loanOverview.today")}
-                  </button>
+                <TooltipTrigger
+                  render={
+                    <button
+                      type="button"
+                      className={cn(
+                        "text-success focus-visible:ring-ring absolute whitespace-nowrap rounded-sm text-xs font-medium focus-visible:outline-none focus-visible:ring-2",
+                        todayPosition < 20
+                          ? "start-0"
+                          : todayPosition > 80
+                            ? "end-0"
+                            : "-translate-x-1/2 rtl:translate-x-1/2",
+                      )}
+                    />
+                  }
+                >
+                  {t("asset:loanOverview.today")}
                 </TooltipTrigger>
                 <TooltipContent>
                   {dates.formatCalendarDate(today, {
@@ -180,8 +182,8 @@ export function LoanTermsStrip({
                   })}
                 </TooltipContent>
               </Tooltip>
-              <span className="bg-success absolute bottom-0 left-0 h-4 w-px -translate-x-1/2" />
-              <span className="border-background bg-success absolute -bottom-0.5 left-0 size-3 -translate-x-1/2 rounded-full border-2" />
+              <span className="bg-success absolute bottom-0 start-0 h-4 w-px -translate-x-1/2 rtl:translate-x-1/2" />
+              <span className="border-background bg-success absolute -bottom-0.5 start-0 size-3 -translate-x-1/2 rounded-full border-2 rtl:translate-x-1/2" />
             </div>
           )}
         </div>
@@ -196,7 +198,7 @@ export function LoanTermsStrip({
               key={term.key}
               type="button"
               onClick={term.onEdit}
-              className="hover:bg-muted/50 -m-1.5 rounded-md p-1.5 text-left transition-colors"
+              className="hover:bg-muted/50 -m-1.5 rounded-md p-1.5 text-start transition-colors"
             >
               <span
                 className={cn(
@@ -217,12 +219,10 @@ export function LoanTermsStrip({
                       : "asset:loanEvents.original_terms",
                 )}
                 <Badge
-                  variant="secondary"
+                  variant={term.key === current ? "success-subtle" : "secondary"}
                   className={cn(
                     "rounded-md px-1.5 py-0.5 text-xs font-medium tabular-nums",
-                    term.key === current
-                      ? "bg-success/10 text-success"
-                      : "bg-muted text-muted-foreground",
+                    term.key !== current && "bg-muted text-muted-foreground",
                   )}
                 >
                   {rate(term.annualRate)}
@@ -249,14 +249,16 @@ export function LoanTermsStrip({
               <span className="text-muted-foreground flex items-center gap-1.5 text-sm font-medium">
                 {t("asset:loanEvents.after_renewal")}
                 <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      className="focus-visible:ring-ring rounded-sm focus-visible:outline-none focus-visible:ring-2"
-                      aria-label={t("asset:loanOverview.forecast_hint")}
-                    >
-                      <Icons.Info className="size-3.5" />
-                    </button>
+                  <TooltipTrigger
+                    render={
+                      <button
+                        type="button"
+                        className="focus-visible:ring-ring rounded-sm focus-visible:outline-none focus-visible:ring-2"
+                        aria-label={t("asset:loanOverview.forecast_hint")}
+                      />
+                    }
+                  >
+                    <Icons.Info className="size-3.5" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
                     {t("asset:loanEvents.rate_unknown")}. {t("asset:loanOverview.forecast_hint")}

@@ -121,7 +121,7 @@ baseline:
             contributions: "3300"
             distributions: "0"
             fees: "0"
-            fx_effect: "157.5"
+            fx_effect: "397.5"
             income: "0"
             realized_pnl: "177.5"
             residual: "0"
@@ -133,7 +133,7 @@ baseline:
           method: timeWeighted
           period_end: 2025-01-10
           period_start: 2025-01-02
-          quality: partial
+          quality: ok
           returns:
             annualized_irr: "103866.58158574"
             annualized_twr: ~
@@ -168,14 +168,14 @@ baseline:
             - date: 2025-01-10
               value: "0.28787879"
           summary:
-            amount: "710"
+            amount: "950"
             amount_status: complete
             basis: marketValue
             basis_status: notApplicable
             method: timeWeighted
             percent: "0.28787879"
             percent_status: complete
-            quality: partial
+            quality: ok
       tracking_mode: TRANSACTIONS
       valuations:
         - basis_status: notApplicable
@@ -365,7 +365,7 @@ baseline:
         contributions: "3300"
         distributions: "0"
         fees: "0"
-        fx_effect: "157.5"
+        fx_effect: "397.5"
         income: "0"
         realized_pnl: "177.5"
         residual: "0"
@@ -377,7 +377,7 @@ baseline:
       method: timeWeighted
       period_end: 2025-01-10
       period_start: 2025-01-02
-      quality: partial
+      quality: ok
       returns:
         annualized_irr: "103866.58158574"
         annualized_twr: ~
@@ -412,13 +412,13 @@ baseline:
         - date: 2025-01-10
           value: "0.28787879"
       summary:
-        amount: "710"
+        amount: "950"
         amount_status: complete
         basis: marketValue
         basis_status: notApplicable
         method: timeWeighted
         percent: "0.28787879"
         percent_status: complete
-        quality: partial
+        quality: ok
   portfolio_flows: []
 scenario: EDGE-CB-01

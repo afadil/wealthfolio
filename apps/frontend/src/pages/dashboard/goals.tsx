@@ -43,7 +43,7 @@ function sortDashboardGoals(a: Goal, b: Goal) {
 
 function statusDotClass(status: Goal["statusHealth"]) {
   if (status === "off_track") return "bg-destructive";
-  if (status === "at_risk") return "bg-amber-500";
+  if (status === "at_risk") return "bg-warning";
   if (status === "on_track") return "bg-success";
   return "bg-muted-foreground/35";
 }
@@ -72,10 +72,10 @@ function ViewAllLink() {
   return (
     <Link
       to="/goals"
-      className="text-muted-foreground hover:bg-success/10 inline-flex h-8 items-center rounded-md px-3 text-xs font-medium transition-colors"
+      className="text-muted-foreground hover:bg-success-subtle inline-flex h-8 items-center rounded-md px-3 text-xs font-medium transition-colors"
     >
       {t("dashboard:view_all")}
-      <Icons.ChevronRight className="ml-1 h-3 w-3" />
+      <Icons.ChevronRight className="ms-1 h-3 w-3 rtl:rotate-180" />
     </Link>
   );
 }
@@ -94,7 +94,7 @@ export function SavingGoals() {
 
   if (isLoading) {
     return (
-      <DashboardCard title={t("common:goals")} elevated>
+      <DashboardCard title={t("common:goals")}>
         <div className="space-y-6">
           {[0, 1, 2].map((i) => (
             <div key={i} className="space-y-2">
@@ -116,7 +116,7 @@ export function SavingGoals() {
 
   if (activeGoals.length === 0) {
     return (
-      <DashboardCard title={t("common:goals")} elevated action={<ViewAllLink />}>
+      <DashboardCard title={t("common:goals")} action={<ViewAllLink />}>
         <div className="py-2 text-center">
           <p className="text-sm">{t("dashboard:goals.no_goals_set")}</p>
           <Link
@@ -124,7 +124,7 @@ export function SavingGoals() {
             className="text-muted-foreground hover:text-foreground mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
           >
             {t("dashboard:goals.create_first_goal")}
-            <Icons.ChevronRight className="h-3 w-3" />
+            <Icons.ChevronRight className="h-3 w-3 rtl:rotate-180" />
           </Link>
         </div>
       </DashboardCard>
@@ -132,7 +132,7 @@ export function SavingGoals() {
   }
 
   return (
-    <DashboardCard title={t("common:goals")} elevated action={<ViewAllLink />}>
+    <DashboardCard title={t("common:goals")} action={<ViewAllLink />}>
       {visibleGoals.map((goal) => {
         const progress = goal.summaryProgress ?? 0;
         const pct = Math.max(0, Math.min(1, progress));
@@ -175,17 +175,17 @@ export function SavingGoals() {
                 </div>
 
                 {/* Amounts directly under title */}
-                <div className="text-muted-foreground mt-0.5 text-[11px] tabular-nums">
+                <div className="text-muted-foreground text-2xs mt-0.5 tabular-nums">
                   {currentDisplay} / {targetDisplay}
                 </div>
               </div>
 
               {/* Right: big % + time */}
-              <div className="shrink-0 text-right">
+              <div className="shrink-0 text-end">
                 <div className="text-base font-semibold tabular-nums leading-none">
                   {pctDisplay}
                 </div>
-                <div className="text-muted-foreground mt-1 text-[10px] tracking-[0.1em]">
+                <div className="text-muted-foreground text-2xs mt-1 tracking-[0.1em]">
                   {timeStr}
                 </div>
               </div>
@@ -207,7 +207,7 @@ export function SavingGoals() {
           className="text-muted-foreground hover:text-foreground flex items-center justify-between pt-3 text-xs transition-colors"
         >
           <span>{t("dashboard:goals.more_goals", { count: hiddenGoalsCount })}</span>
-          <Icons.ChevronRight className="h-4 w-4" />
+          <Icons.ChevronRight className="h-4 w-4 rtl:rotate-180" />
         </Link>
       )}
     </DashboardCard>

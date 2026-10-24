@@ -19,6 +19,7 @@ const ACTIVITY_TYPE_TEST_IDS: Record<string, string> = {
 interface E2ESettings {
   language?: string;
   onboardingCompleted?: boolean;
+  autoUpdateCheckEnabled?: boolean;
 }
 
 interface AuthStatus {
@@ -69,10 +70,22 @@ async function getE2ESettings(page: Page) {
 
 async function canSkipLoginAndOnboardingUi(page: Page) {
   const [authDisabled, settings] = await Promise.all([isAuthDisabled(page), getE2ESettings(page)]);
+  if (authDisabled) await disableAutoUpdateCheck(page, settings);
   if (!authDisabled || !settings?.onboardingCompleted) return false;
 
   await ensureE2ELanguage(page, settings);
   return true;
+}
+
+// When the release feed has a newer version than this checkout, the app opens an
+// update dialog that blocks clicks. Turn the check off before the app loads.
+async function disableAutoUpdateCheck(page: Page, settings: E2ESettings | null) {
+  if (settings?.autoUpdateCheckEnabled === false) return;
+
+  const updated = await putApiJson<E2ESettings>(page, "/settings", {
+    autoUpdateCheckEnabled: false,
+  });
+  expect(updated?.autoUpdateCheckEnabled, "turn off automatic update checks").toBe(false);
 }
 
 async function ensureE2ELanguage(page: Page, settings?: E2ESettings | null) {
@@ -215,7 +228,7 @@ export async function fillDateField(page: Page, daysAgo: number) {
 
 export async function waitForOverlayClose(page: Page) {
   await page
-    .locator('[data-state="open"][aria-hidden="true"]')
+    .locator('[data-slot$="-overlay"][data-open]')
     .waitFor({ state: "hidden", timeout: 5000 })
     .catch(() => {});
 }
@@ -245,10 +258,16 @@ export async function selectActivityType(page: Page, type: string) {
   await page.waitForTimeout(200);
 }
 
+// A select mounts its options, hidden, once its trigger has had focus, and a
+// select that just closed keeps showing them while it animates out, so options are
+// looked up in the open popup.
+const OPEN_SELECT = '[data-slot="select-content"][data-open]';
+
 export async function selectFirstAccount(page: Page) {
   await page.getByTestId("account-select").click();
-  await expect(page.getByTestId("account-option").first()).toBeAttached({ timeout: 5000 });
-  await page.keyboard.press("Enter");
+  const option = page.locator(OPEN_SELECT).getByTestId("account-option").first();
+  await expect(option).toBeVisible({ timeout: 5000 });
+  await option.click();
   await page.waitForTimeout(200);
 }
 
@@ -264,6 +283,7 @@ export async function selectAccountOption(
 ) {
   await accountSelect.click();
   const option = page
+    .locator(OPEN_SELECT)
     .locator(
       `[data-testid="account-option"][data-account-name="${cssAttributeValue(
         accountName,

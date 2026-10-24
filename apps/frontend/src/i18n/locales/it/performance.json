@@ -111,6 +111,7 @@
     "description": "Seleziona i conti per confrontarne la performance nel tempo."
   },
   "attribution": {
+    "partial_data": "Dati parziali",
     "title": "Attribuzione",
     "close": "Chiudi attribuzione",
     "period_gain_loss": "Guadagno/Perdita del periodo",

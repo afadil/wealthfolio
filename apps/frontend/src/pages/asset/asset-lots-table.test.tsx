@@ -41,7 +41,105 @@ const ctyLot: AssetLotView = {
   valuationRealizedPnl: null,
 };
 
+const usdLot: AssetLotView = {
+  ...ctyLot,
+  id: "usd-lot",
+  currency: "USD",
+  baseCurrency: "USD",
+  valuationCurrency: "USD",
+  quantity: 3,
+  originalQuantity: 3,
+  remainingQuantity: 3,
+  costBasis: 30.3,
+  costBasisBase: 30.3,
+  unitCost: 10.1,
+  valuationUnitCost: 10.1,
+  valuationCostBasis: 30.3,
+  fxRateToBase: 1,
+};
+
 describe("AssetLotsTable", () => {
+  it.each([
+    { marketPrice: 10.1, costBasis: 30.3 },
+    { marketPrice: 0.1, costBasis: 0.3 },
+  ])("shows break-even lots as neutral zero at $marketPrice", ({ marketPrice, costBasis }) => {
+    render(
+      <AssetLotsTable
+        lots={[{ ...usdLot, valuationCostBasis: costBasis }]}
+        currency="USD"
+        marketPrice={marketPrice}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /expand all/i }));
+
+    // Overall total, account subtotal, desktop lot row and mobile lot row.
+    const gains = screen.getAllByText("0.00");
+    expect(gains).toHaveLength(4);
+    gains.forEach((gain) => expect(gain.parentElement).toHaveClass("text-foreground"));
+    expect(screen.getAllByText("0.00%")).toHaveLength(4);
+  });
+
+  it.each([
+    { currency: "USD", costBasis: 30.29, expected: "+0.01" },
+    { currency: "USD", costBasis: 30.31, expected: "-0.01" },
+    { currency: "JPY", costBasis: 29.3, expected: "+1" },
+    { currency: "JPY", costBasis: 31.3, expected: "-1" },
+    { currency: "KWD", costBasis: 30.296, expected: "+0.004" },
+    { currency: "KWD", costBasis: 30.304, expected: "-0.004" },
+  ])(
+    "shows $currency lot gains at normal precision ($expected)",
+    ({ currency, costBasis, expected }) => {
+      render(
+        <AssetLotsTable
+          lots={[{ ...usdLot, valuationCurrency: currency, valuationCostBasis: costBasis }]}
+          currency={currency}
+          marketPrice={10.1}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: /expand all/i }));
+
+      const gains = screen.getAllByText(expected);
+      expect(gains).toHaveLength(4);
+      gains.forEach((gain) =>
+        expect(gain.parentElement).toHaveClass(
+          expected.startsWith("+") ? "text-success" : "text-destructive",
+        ),
+      );
+    },
+  );
+
+  it.each([
+    { costBasis: 100_000_000_000_000 - 0.02, expected: "+0.02" },
+    { costBasis: 100_000_000_000_000 + 0.02, expected: "-0.02" },
+  ])("keeps a cent-sized $expected gain on a large position", ({ costBasis, expected }) => {
+    render(
+      <AssetLotsTable
+        lots={[
+          {
+            ...usdLot,
+            quantity: 10_000_000_000_000,
+            originalQuantity: 10_000_000_000_000,
+            remainingQuantity: 10_000_000_000_000,
+            costBasis,
+            costBasisBase: costBasis,
+            valuationCostBasis: costBasis,
+          },
+        ]}
+        currency="USD"
+        marketPrice={10}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /expand all/i }));
+
+    const gains = screen.getAllByText(expected);
+    expect(gains).toHaveLength(4);
+    gains.forEach((gain) =>
+      expect(gain.parentElement).toHaveClass(
+        expected.startsWith("+") ? "text-success" : "text-destructive",
+      ),
+    );
+  });
+
   it("uses valuation-normalized lot values for GBp lots", () => {
     render(<AssetLotsTable lots={[ctyLot]} currency="GBP" marketPrice={5.65} />);
 

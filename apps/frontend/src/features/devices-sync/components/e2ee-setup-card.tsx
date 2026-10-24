@@ -3,7 +3,7 @@
 // One button: "Enable Device Sync" - handles enrollment + key init automatically
 // ===============================================================================
 
-import { Icons } from "@wealthfolio/ui";
+import { Icons, Spinner } from "@wealthfolio/ui";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
@@ -64,7 +64,7 @@ export function E2EESetupCard({ onPairingNeeded }: E2EESetupCardProps) {
           </p>
 
           {hasTrustedDevices && (
-            <div className="bg-muted/40 mt-3 w-full max-w-xs rounded-lg border px-3 py-2 text-left">
+            <div className="bg-muted/40 mt-3 w-full max-w-xs rounded-lg border px-3 py-2 text-start">
               <p className="text-xs font-medium">{t("sync:section.otherConnectedDevices")}</p>
               <ul className="text-muted-foreground mt-1 space-y-0.5 text-xs">
                 {trustedDevicePreview.map((device) => (
@@ -89,19 +89,15 @@ export function E2EESetupCard({ onPairingNeeded }: E2EESetupCardProps) {
             </Alert>
           )}
 
-          <Button
-            onClick={handleEnable}
-            disabled={enableSync.isPending}
-            className="mt-4 min-w-[200px]"
-          >
+          <Button onClick={handleEnable} disabled={enableSync.isPending} className="min-w-50 mt-4">
             {enableSync.isPending ? (
               <>
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="me-2 h-4 w-4" />
                 {t("sync:setup.settingUp")}
               </>
             ) : (
               <>
-                <Icons.Shield className="mr-2 h-4 w-4" />
+                <Icons.Shield className="me-2 h-4 w-4" />
                 {hasTrustedDevices
                   ? t("sync:setup.connectThisDevice")
                   : t("sync:setup.enableDeviceSync")}

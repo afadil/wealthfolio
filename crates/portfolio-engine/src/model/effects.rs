@@ -123,4 +123,7 @@ pub struct PairEffect {
     /// A pair of security legs (not cash).
     #[serde(default)]
     pub security: bool,
+    /// Recognized same-account FX conversions leave contribution unchanged.
+    #[serde(default)]
+    pub contribution_neutral: bool,
 }

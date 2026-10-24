@@ -77,13 +77,13 @@ export function AccountOperations({
               {t("settings:accounts.operations_restore")}
             </DropdownMenuItem>
           ) : (
-            <DropdownMenuItem onSelect={() => setShowArchiveAlert(true)}>
+            <DropdownMenuItem onClick={() => setShowArchiveAlert(true)}>
               {t("settings:accounts.operations_archive")}
             </DropdownMenuItem>
           )}
           <DropdownMenuItem
             className="text-destructive focus:text-destructive flex cursor-pointer items-center"
-            onSelect={() => setShowDeleteAlert(true)}
+            onClick={() => setShowDeleteAlert(true)}
           >
             {t("settings:accounts_operations_delete")}
           </DropdownMenuItem>
@@ -100,8 +100,8 @@ export function AccountOperations({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("settings:accounts_cancel_button")}</AlertDialogCancel>
-            <Button onClick={handleDelete} className="bg-red-600 focus:ring-red-600">
-              <Icons.Trash className="mr-2 h-4 w-4" />
+            <Button onClick={handleDelete} className="bg-destructive focus:ring-destructive">
+              <Icons.Trash className="me-2 h-4 w-4" />
               <span>{t("settings:accounts_operations_delete")}</span>
             </Button>
           </AlertDialogFooter>
@@ -113,7 +113,7 @@ export function AccountOperations({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <Icons.AlertTriangle className="h-5 w-5 text-amber-500" />
+              <Icons.AlertTriangle className="text-warning h-5 w-5" />
               {t("settings:accounts.archive_title")}
             </AlertDialogTitle>
             <AlertDialogDescription>

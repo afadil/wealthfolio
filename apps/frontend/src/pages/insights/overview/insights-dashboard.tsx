@@ -226,17 +226,19 @@ export function InsightsDashboard({ widgets, onCustomizeActionChange }: Insights
       editing ? null : (
         <TooltipProvider>
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="bg-secondary/30 hover:bg-muted/80 text-muted-foreground hover:text-foreground h-9 w-9 shrink-0 rounded-full"
-                aria-label={t("insights:customize.edit")}
-                disabled={isLoading || isError || !settings}
-                onClick={() => setDraft(readInsightsLayout(settings?.insightsOverviewLayout))}
-              >
-                <Icons.LayoutDashboard className="h-4 w-4" />
-              </Button>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="text-muted-foreground hover:text-foreground h-9 w-9 shrink-0 rounded-full"
+                  aria-label={t("insights:customize.edit")}
+                  disabled={isLoading || isError || !settings}
+                  onClick={() => setDraft(readInsightsLayout(settings?.insightsOverviewLayout))}
+                />
+              }
+            >
+              <Icons.LayoutDashboard className="h-4 w-4" />
             </TooltipTrigger>
             <TooltipContent>{t("insights:customize.edit")}</TooltipContent>
           </Tooltip>
@@ -273,41 +275,45 @@ export function InsightsDashboard({ widgets, onCustomizeActionChange }: Insights
                 </Button>
                 <div className="bg-border mx-1 h-5 w-px shrink-0" />
                 <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground hover:text-foreground h-9 w-9 shrink-0 rounded-full"
-                      aria-label={t("insights:customize.reset")}
-                      disabled={saving}
-                      onClick={() => setDraft(defaultInsightsLayout())}
-                    >
-                      <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                    </Button>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-foreground h-9 w-9 shrink-0 rounded-full"
+                        aria-label={t("insights:customize.reset")}
+                        disabled={saving}
+                        onClick={() => setDraft(defaultInsightsLayout())}
+                      />
+                    }
+                  >
+                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
                   </TooltipTrigger>
                   <TooltipContent>{t("insights:customize.reset")}</TooltipContent>
                 </Tooltip>
                 <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground hover:text-foreground h-9 w-9 shrink-0 rounded-full"
-                      aria-label={t("insights:customize.cancel")}
-                      disabled={saving}
-                      onClick={() => {
-                        setDraft(null);
-                        setPickerOpen(false);
-                      }}
-                    >
-                      <X className="h-4 w-4" aria-hidden="true" />
-                    </Button>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-foreground h-9 w-9 shrink-0 rounded-full"
+                        aria-label={t("insights:customize.cancel")}
+                        disabled={saving}
+                        onClick={() => {
+                          setDraft(null);
+                          setPickerOpen(false);
+                        }}
+                      />
+                    }
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
                   </TooltipTrigger>
                   <TooltipContent>{t("insights:customize.cancel")}</TooltipContent>
                 </Tooltip>
                 <Button
                   size="sm"
-                  className="ml-1 h-9 shrink-0 gap-1.5 rounded-full px-4"
+                  className="ms-1 h-9 shrink-0 gap-1.5 rounded-full px-4"
                   aria-label={t(saving ? "insights:customize.saving" : "insights:customize.save")}
                   disabled={saving}
                   onClick={() => void save()}
@@ -324,7 +330,7 @@ export function InsightsDashboard({ widgets, onCustomizeActionChange }: Insights
       )}
       <Sheet open={pickerOpen} onOpenChange={setPickerOpen}>
         <SheetContent
-          side={isMobile ? "bottom" : "right"}
+          side={isMobile ? "bottom" : "inline-end"}
           className={
             isMobile
               ? "max-h-[85dvh] overflow-y-auto rounded-t-3xl pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]"

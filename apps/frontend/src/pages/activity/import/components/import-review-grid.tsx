@@ -108,10 +108,10 @@ function getStatusTitle(
 
 const STATUS_DOT_COLOR: Record<DraftActivityStatus, string> = {
   valid: "",
-  error: "bg-red-500",
-  warning: "bg-yellow-500",
-  duplicate: "bg-blue-500",
-  skipped: "bg-gray-400",
+  error: "bg-destructive",
+  warning: "bg-warning",
+  duplicate: "bg-info",
+  skipped: "bg-muted-foreground",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -178,9 +178,8 @@ function useImportReviewColumns({
         header: ({ table }) => (
           <Checkbox
             disabled={!table.getRowModel().rows.some((row) => row.getCanSelect())}
-            checked={
-              table.getIsAllRowsSelected() || (table.getIsSomeRowsSelected() && "indeterminate")
-            }
+            checked={table.getIsAllRowsSelected()}
+            indeterminate={table.getIsSomeRowsSelected()}
             onCheckedChange={(checked) => table.toggleAllRowsSelected(Boolean(checked))}
             aria-label={t("activity:import.columns.selectAllRows")}
           />
@@ -228,7 +227,7 @@ function useImportReviewColumns({
                 errors,
                 warnings,
               );
-          const dotColor = isForcedDuplicate ? "bg-amber-500" : STATUS_DOT_COLOR[status];
+          const dotColor = isForcedDuplicate ? "bg-warning" : STATUS_DOT_COLOR[status];
           const dot = dotColor ? (
             <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${dotColor}`} />
           ) : null;
@@ -236,14 +235,14 @@ function useImportReviewColumns({
             <div className="flex items-center gap-1.5">
               <span className="text-muted-foreground shrink-0 text-xs">{rowIndex + 1}</span>
               {dot && title ? (
-                <TooltipProvider delayDuration={200}>
+                <TooltipProvider delay={200}>
                   <Tooltip>
-                    <TooltipTrigger asChild>{dot}</TooltipTrigger>
+                    <TooltipTrigger render={dot} />
                     <TooltipContent
-                      side="right"
+                      side="inline-end"
                       className={
                         status === "error"
-                          ? "bg-destructive text-destructive-foreground border-destructive max-w-xs whitespace-pre-wrap text-xs"
+                          ? "max-w-xs whitespace-pre-wrap text-xs"
                           : "max-w-xs whitespace-pre-wrap text-xs"
                       }
                     >
@@ -548,7 +547,10 @@ export function ImportReviewGrid({
     // Convert vertical scroll to horizontal when Shift is pressed
     if (e.shiftKey && e.deltaY !== 0) {
       e.preventDefault();
-      target.scrollLeft += e.deltaY;
+      // Scrolling down moves toward the end of the row, which is leftward
+      // (negative scrollLeft) in right-to-left.
+      const towardEnd = getComputedStyle(target).direction === "rtl" ? -1 : 1;
+      target.scrollLeft += towardEnd * e.deltaY;
     }
   }, []);
 

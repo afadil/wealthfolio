@@ -191,6 +191,9 @@ describe("custom range in Spending Insights", () => {
     expect(screen.queryByTestId("spending-selected-range")).not.toBeInTheDocument();
   });
 
+  // Opening the date picker twice dominates this test: each Base UI popover open
+  // costs about 0.5 s in jsdom (0.15 s with Radix), so it runs 1.6 s locally and
+  // went over 5 s in CI's full run. In Chrome the picker opens in ~115 ms either way.
   it("applies a new range and clears back to the preset", async () => {
     const user = setup();
     await user.click(screen.getByRole("button", { name: "Select dates" }));
@@ -204,7 +207,7 @@ describe("custom range in Spending Insights", () => {
     await user.click(screen.getByRole("button", { name: "Clear" }));
     expect(screen.getByTestId("location")).not.toHaveTextContent("spendingFrom");
     expect(screen.getByTestId("location")).toHaveTextContent("period=MTD");
-  });
+  }, 15_000);
 });
 
 it.each(["where", "changed", "when"])(

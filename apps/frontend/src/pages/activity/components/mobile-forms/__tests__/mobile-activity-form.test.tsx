@@ -1,6 +1,6 @@
-import { ActivityType } from "@/lib/constants";
+import { ActivityType, InstrumentType } from "@/lib/constants";
 import type { ActivityDetails } from "@/lib/types";
-import { render, screen } from "@/test/render";
+import { render, screen, waitFor } from "@/test/render";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -32,21 +32,39 @@ vi.mock("@wealthfolio/ui/components/ui/sheet", () => ({
 
 // The details step has its own field-level coverage; what matters here is which
 // type it is handed, and whether it is reached at all.
-vi.mock("../mobile-details-step", () => ({
-  MobileDetailsStep: ({
-    activityType,
-    isEditing,
-  }: {
-    activityType?: string;
-    isEditing?: boolean;
-  }) => (
-    <div data-testid="details-step" data-editing={String(!!isEditing)}>
-      {activityType ?? "no-type"}
-    </div>
-  ),
-}));
+vi.mock("../mobile-details-step", async () => {
+  const { useFormContext } = await import("react-hook-form");
+  return {
+    MobileDetailsStep: ({
+      activityType,
+      isEditing,
+    }: {
+      activityType?: string;
+      isEditing?: boolean;
+    }) => {
+      const form = useFormContext();
+      return (
+        <div
+          data-testid="details-step"
+          data-editing={String(!!isEditing)}
+          data-quote-ccy={form.getValues("symbolQuoteCcy")}
+        >
+          {activityType ?? "no-type"}
+          <input aria-label="Record notes" {...form.register("comment")} />
+          <button
+            type="button"
+            onClick={() => form.setValue("activityDate", new Date("2026-02-01T10:00:00Z"))}
+          >
+            Correct record date
+          </button>
+        </div>
+      );
+    },
+  };
+});
 
 const noopMutation = { mutateAsync: vi.fn(), isPending: false };
+const savePairMutation = { mutateAsync: vi.fn(), isPending: false };
 
 vi.mock("../../../hooks/use-activity-mutations", () => ({
   useActivityMutations: () => ({
@@ -55,7 +73,7 @@ vi.mock("../../../hooks/use-activity-mutations", () => ({
     deleteActivityMutation: noopMutation,
     duplicateActivityMutation: noopMutation,
     saveActivitiesMutation: noopMutation,
-    saveInternalTransferPairMutation: noopMutation,
+    saveInternalTransferPairMutation: savePairMutation,
     linkTransferActivitiesMutation: noopMutation,
     unlinkTransferActivitiesMutation: noopMutation,
   }),
@@ -126,6 +144,116 @@ describe("MobileActivityForm reclassification", () => {
 
       expect(screen.queryByText("Select Transaction Type")).not.toBeInTheDocument();
       expect(screen.getByTestId("details-step")).toHaveTextContent(activityType);
+    },
+  );
+});
+
+describe("mobile linked transfer edits", () => {
+  it.each([ActivityType.TRANSFER_OUT, ActivityType.TRANSFER_IN])(
+    "sends the selected %s record with date and notes corrections in one pair save",
+    async (activityType) => {
+      savePairMutation.mutateAsync.mockReset().mockResolvedValue({});
+      const incoming = activityType === ActivityType.TRANSFER_IN;
+      const selectedId = incoming ? "pair-in" : "pair-out";
+      const user = userEvent.setup();
+      render(
+        <MobileActivityForm
+          accounts={[...accounts, { value: "acc_2", label: "Other account", currency: "CAD" }]}
+          open
+          onClose={vi.fn()}
+          activity={{
+            id: selectedId,
+            activityType,
+            accountId: incoming ? "acc_2" : "acc_1",
+            counterpartAccountId: incoming ? "acc_1" : "acc_2",
+            currency: incoming ? "CAD" : "USD",
+            counterpartCurrency: incoming ? "USD" : "CAD",
+            amount: incoming ? "130" : "100",
+            counterpartAmount: incoming ? "100" : "130",
+            transferOutId: "pair-out",
+            transferInId: "pair-in",
+            sourceRecordId: "provider-record",
+            sourceGroupId: "wf-transfer-pair",
+            date: new Date("2026-01-18T00:00:00Z"),
+            comment: "Original reference",
+          }}
+        />,
+      );
+      await user.clear(screen.getByRole("textbox", { name: "Record notes" }));
+      await user.click(screen.getByRole("button", { name: "Correct record date" }));
+      await user.click(screen.getByRole("button", { name: "Update Activity" }));
+      await waitFor(() =>
+        expect(savePairMutation.mutateAsync).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({
+            editedActivityId: selectedId,
+            transferOutId: "pair-out",
+            transferInId: "pair-in",
+            fromAccountId: "acc_1",
+            toAccountId: "acc_2",
+            sourceAmount: 100,
+            destinationAmount: 130,
+            activityDate: new Date("2026-02-01T10:00:00Z"),
+            notes: "",
+          }),
+        ),
+      );
+    },
+  );
+});
+
+describe("MobileActivityForm option defaults", () => {
+  const option = {
+    ...activity(ActivityType.BUY),
+    instrumentType: "OPTION",
+    assetSymbol: "AAPL270618C01234500",
+    currency: "CAD",
+  };
+
+  it("starts the quote currency from the option's, not the activity's", () => {
+    renderForm({ ...option, assetQuoteCcy: "USD" });
+
+    expect(screen.getByTestId("details-step")).toHaveAttribute("data-quote-ccy", "USD");
+  });
+
+  it("starts the quote currency from the activity's when the option's is unknown", () => {
+    renderForm(option);
+
+    expect(screen.getByTestId("details-step")).toHaveAttribute("data-quote-ccy", "CAD");
+  });
+});
+
+describe("mobile trade asset identity", () => {
+  it.each([ActivityType.BUY, ActivityType.SELL])(
+    "submits the stored %s instrument type and quote currency without reselection",
+    async (type) => {
+      noopMutation.mutateAsync.mockReset().mockResolvedValue({});
+      const user = userEvent.setup();
+      renderForm({
+        ...activity(type),
+        assetId: "asset-usdt",
+        assetSymbol: "USDT",
+        instrumentType: InstrumentType.CRYPTO,
+        assetQuoteCcy: "USD",
+        currency: "CAD",
+        quantity: "2",
+        unitPrice: "25",
+        amount: "50",
+      });
+
+      await user.click(screen.getByRole("button", { name: "Update Activity" }));
+
+      await waitFor(() =>
+        expect(noopMutation.mutateAsync).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({
+            id: "act_1",
+            assetId: "USDT",
+            currentAssetId: "asset-usdt",
+            symbolInstrumentType: InstrumentType.CRYPTO,
+            symbolQuoteCcy: "USD",
+            currency: "CAD",
+          }),
+        ),
+      );
     },
   );
 });

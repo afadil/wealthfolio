@@ -149,6 +149,61 @@ pub enum SyncEntity {
     AssetLogo,
 }
 
+impl SyncEntity {
+    /// Whether this entity's IDs are derived from natural or user keys (an
+    /// account and a date, an activity and a taxonomy, a setting key), so a
+    /// deleted ID can legitimately be written again.
+    ///
+    /// Replay resolves every operation on these entities by last-writer-wins:
+    /// a delete is one more write to the key. The other entities get random IDs
+    /// that never come back, so replay keeps their deletes permanent and treats
+    /// a later write to a deleted ID as a stale edit.
+    pub fn reuses_entity_ids(self) -> bool {
+        match self {
+            SyncEntity::Quote
+            | SyncEntity::BrokerActivityUserPatch
+            | SyncEntity::ImportTemplate
+            | SyncEntity::GoalPlan
+            | SyncEntity::Snapshot
+            | SyncEntity::PortfolioAccount
+            | SyncEntity::SpendingSetting
+            | SyncEntity::AppPreference
+            | SyncEntity::ActivityTaxonomyAssignment
+            | SyncEntity::SpendingActivityEvent
+            | SyncEntity::SpendingCategorizationRule
+            | SyncEntity::SpendingPresetRuleDeletion
+            | SyncEntity::BudgetGroupAssignment
+            | SyncEntity::BudgetTarget
+            | SyncEntity::BudgetRolloverSetting
+            | SyncEntity::AddonStorage
+            | SyncEntity::AssetLogo => true,
+            SyncEntity::Account
+            | SyncEntity::Asset
+            | SyncEntity::AssetTaxonomyAssignment
+            | SyncEntity::Activity
+            | SyncEntity::ActivityImportProfile
+            | SyncEntity::Goal
+            | SyncEntity::GoalsAllocation
+            | SyncEntity::AiThread
+            | SyncEntity::AiMessage
+            | SyncEntity::AiThreadTag
+            | SyncEntity::ContributionLimit
+            | SyncEntity::Platform
+            | SyncEntity::CustomProvider
+            | SyncEntity::CustomTaxonomy
+            | SyncEntity::ImportRun
+            | SyncEntity::Portfolio
+            | SyncEntity::AllocationTarget
+            | SyncEntity::AllocationTargetWeight
+            | SyncEntity::AllocationTargetConstraint
+            | SyncEntity::SpendingActivitySplit
+            | SyncEntity::SpendingEvent
+            | SyncEntity::SpendingEventType
+            | SyncEntity::BudgetGroup => false,
+        }
+    }
+}
+
 /// Supported sync operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

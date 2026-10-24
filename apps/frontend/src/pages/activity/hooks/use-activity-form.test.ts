@@ -77,6 +77,55 @@ describe("useActivityForm", () => {
     adapterMocks.loggerError.mockReset();
   });
 
+  it.each([ActivityType.TRANSFER_OUT, ActivityType.TRANSFER_IN])(
+    "identifies the selected %s record when saving a linked cash transfer",
+    async (activityType) => {
+      const selectedId = activityType === ActivityType.TRANSFER_OUT ? "pair-out" : "pair-in";
+      const { result } = renderHook(() =>
+        useActivityForm({
+          accounts,
+          selectedType: "TRANSFER",
+          activity: {
+            id: selectedId,
+            activityType,
+            sourceRecordId: "provider-record",
+            transferOutId: "pair-out",
+            transferInId: "pair-in",
+          },
+        }),
+      );
+      const activityDate = new Date("2026-02-01T10:00:00.000Z");
+      await act(async () => {
+        await result.current.handleSubmit({
+          isExternal: false,
+          transferMode: "cash",
+          fromAccountId: "acc-usd",
+          toAccountId: "acc-cad",
+          sourceCurrency: "USD",
+          destinationCurrency: "CAD",
+          sourceAmount: 100,
+          destinationAmount: 130,
+          currency: "USD",
+          activityDate,
+          comment: null,
+        } as ActivityFormValues);
+      });
+      expect(mutationMocks.savePairMutateAsync).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          editedActivityId: selectedId,
+          transferOutId: "pair-out",
+          transferInId: "pair-in",
+          activityDate,
+          notes: null,
+          sourceAmount: 100,
+          destinationAmount: 130,
+        }),
+      );
+      expect(mutationMocks.updateMutateAsync).not.toHaveBeenCalled();
+      expect(mutationMocks.saveMutateAsync).not.toHaveBeenCalled();
+    },
+  );
+
   it("preserves user-selected currency for DEPOSIT", async () => {
     const { result } = renderHook(() =>
       useActivityForm({

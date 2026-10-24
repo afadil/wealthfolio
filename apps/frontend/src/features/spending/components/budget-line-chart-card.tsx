@@ -106,6 +106,7 @@ export function BudgetLineChartCard({
 }) {
   const amountFormatting = useAmountFormatting();
   const dateFormatting = useDateFormatting();
+  const { isBalanceHidden } = useBalancePrivacy();
 
   const { t } = useTranslation();
   // All hooks must run unconditionally — the `target <= 0` early return below
@@ -292,25 +293,17 @@ export function BudgetLineChartCard({
   const endY = cumulative.length ? yForVal(cumulative[cumulative.length - 1].value) : padT + innerH;
 
   const gapAbs = Math.abs(gapVsPace);
+  const pillAmount = (value: number) =>
+    isBalanceHidden ? "••••" : amountFormatting.formatCompactAmount(value, currency);
   const gapLabel = isCurrentMonth
     ? isOver
-      ? t("spending:budgetChart.overBudgetAmount", {
-          amount: amountFormatting.formatCompactAmount(overBy, currency),
-        })
+      ? t("spending:budgetChart.overBudgetAmount", { amount: pillAmount(overBy) })
       : aheadOfPace
-        ? t("spending:budgetChart.underBudgetAmount", {
-            amount: amountFormatting.formatCompactAmount(gapAbs, currency),
-          })
-        : t("spending:budgetChart.overPaceAmount", {
-            amount: amountFormatting.formatCompactAmount(gapAbs, currency),
-          })
+        ? t("spending:budgetChart.underBudgetAmount", { amount: pillAmount(gapAbs) })
+        : t("spending:budgetChart.overPaceAmount", { amount: pillAmount(gapAbs) })
     : isOver
-      ? t("spending:budgetChart.overBudgetAmount", {
-          amount: amountFormatting.formatCompactAmount(overBy, currency),
-        })
-      : t("spending:budgetChart.leftAmount", {
-          amount: amountFormatting.formatCompactAmount(remaining, currency),
-        });
+      ? t("spending:budgetChart.overBudgetAmount", { amount: pillAmount(overBy) })
+      : t("spending:budgetChart.leftAmount", { amount: pillAmount(remaining) });
 
   const pillLeftPctRaw = (endX / chartW) * 100;
   const pillLeftPct = Math.min(78, Math.max(8, pillLeftPctRaw - 4));
@@ -328,7 +321,7 @@ export function BudgetLineChartCard({
       <div className="flex items-center gap-2">
         <Icon className="h-4 w-4 shrink-0" style={{ color: a.accent }} />
         <span className="text-foreground text-sm font-semibold">{statusLabel}</span>
-        <span className="text-muted-foreground/70 ml-auto text-xs tabular-nums">
+        <span className="text-muted-foreground/70 ms-auto text-xs tabular-nums">
           {isCurrentMonth
             ? t("spending:budgetChart.dayOf", { day: dayOfMonth, total: daysInMonth })
             : t("spending:budgetChart.closed")}
@@ -402,7 +395,7 @@ export function BudgetLineChartCard({
         <svg
           viewBox={`0 0 ${chartW} ${chartH}`}
           preserveAspectRatio="none"
-          className="block h-[110px] w-full"
+          className="h-27.5 block w-full"
         >
           {targetPacePath ? (
             <path
@@ -446,7 +439,7 @@ export function BudgetLineChartCard({
           // SVG uses preserveAspectRatio="none", which would stretch a circle
           // into an ellipse.
           <div
-            className="absolute h-[9px] w-[9px] rounded-full bg-white"
+            className="absolute h-[0.5625rem] w-[0.5625rem] rounded-full bg-white"
             style={{
               left: `${pillLeftPctRaw}%`,
               top: `${endY}px`,
@@ -457,7 +450,7 @@ export function BudgetLineChartCard({
         )}
         {cumulative.length > 0 && (
           <div
-            className="absolute whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums shadow-sm"
+            className="text-2xs absolute whitespace-nowrap rounded-full px-2 py-0.5 font-semibold tabular-nums shadow-sm"
             style={{
               left: `${pillFlip ? pillLeftPctRaw : pillLeftPct}%`,
               top: `${pillTopPx}px`,
@@ -470,14 +463,14 @@ export function BudgetLineChartCard({
           </div>
         )}
       </div>
-      <div className="text-muted-foreground/70 mt-1 flex justify-between text-[10px] tabular-nums">
+      <div className="text-muted-foreground/70 text-2xs mt-1 flex justify-between tabular-nums">
         <span>{t("spending:budgetChart.dayN", { day: 1 })}</span>
         <span>{t("spending:budgetChart.dayN", { day: daysInMonth })}</span>
       </div>
 
       <div className="border-border mt-4 grid grid-cols-2 gap-3 border-t pt-3 text-xs">
         <div>
-          <div className="text-muted-foreground/70 text-[11px] uppercase tracking-wide">
+          <div className="text-muted-foreground/70 text-2xs uppercase tracking-wide">
             {isCurrentMonth
               ? t("spending:budgetChart.spentSoFar")
               : t("spending:budgetChart.spentUpper")}
@@ -486,8 +479,8 @@ export function BudgetLineChartCard({
             <PrivacyAmount value={spent} currency={currency} />
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-muted-foreground/70 text-[11px] uppercase tracking-wide">
+        <div className="text-end">
+          <div className="text-muted-foreground/70 text-2xs uppercase tracking-wide">
             {isCurrentMonth
               ? t("spending:budgetChart.forecastUpper")
               : t("spending:budgetChart.result")}
@@ -515,7 +508,7 @@ export function BudgetLineChartCard({
               <PrivacyAmount value={isOver ? overBy : remaining} currency={currency} />
             </div>
           )}
-          <div className="text-muted-foreground/60 text-[10px]">
+          <div className="text-muted-foreground/60 text-2xs">
             {isCurrentMonth
               ? forecastReliable
                 ? haveHistory
@@ -531,7 +524,7 @@ export function BudgetLineChartCard({
 
       <div className="border-border mt-5 border-t pt-4">
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-muted-foreground/80 text-[11px] font-semibold uppercase tracking-wide">
+          <span className="text-muted-foreground/80 text-2xs font-semibold uppercase tracking-wide">
             {t("spending:budgetChart.byCategory")}
           </span>
           <BudgetManageLink monthKey={monthKey} />
@@ -679,9 +672,9 @@ function BudgetCardHeaderActions({
           className="hover:bg-background flex h-6 w-6 items-center justify-center rounded-full transition-colors"
           aria-label={t("spending:budgetChart.previousBudgetMonth")}
         >
-          <Icons.ChevronLeft className="h-3.5 w-3.5" />
+          <Icons.ChevronLeft className="h-3.5 w-3.5 rtl:rotate-180" />
         </button>
-        <span className="text-foreground min-w-[74px] px-1 text-center text-[11px] font-medium tabular-nums">
+        <span className="text-foreground text-2xs min-w-18.5 px-1 text-center font-medium tabular-nums">
           {monthLabel}
         </span>
         <button
@@ -691,7 +684,7 @@ function BudgetCardHeaderActions({
           className="hover:bg-background disabled:text-muted-foreground/40 flex h-6 w-6 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed"
           aria-label={t("spending:budgetChart.nextBudgetMonth")}
         >
-          <Icons.ChevronRight className="h-3.5 w-3.5" />
+          <Icons.ChevronRight className="h-3.5 w-3.5 rtl:rotate-180" />
         </button>
       </div>
       <BudgetManageLink monthKey={monthKey} />
@@ -749,7 +742,11 @@ function BudgetRing({
         activityRange.from
       }&to=${activityRange.to}`}
       className="hover:bg-muted/40 flex w-16 shrink-0 flex-col items-center gap-1 rounded-md px-1 py-1 transition-colors"
-      title={`${ring.name}: ${ring.spent.toFixed(2)} / ${ring.target.toFixed(2)}`}
+      title={`${ring.name}: ${
+        isBalanceHidden
+          ? "•••• / ••••"
+          : `${formatting.formatAmount(ring.spent, currency, false)} / ${formatting.formatAmount(ring.target, currency, false)}`
+      }`}
     >
       <div className="relative" style={{ width: size, height: size }}>
         <svg width={size} height={size} className="-rotate-90">
@@ -785,7 +782,7 @@ function BudgetRing({
       </div>
       <div
         className={cn(
-          "text-[10px] uppercase tracking-wide",
+          "text-2xs uppercase tracking-wide",
           isOver ? "text-destructive" : "text-muted-foreground/70",
         )}
       >

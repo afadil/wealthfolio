@@ -20,9 +20,10 @@ import type { ColumnDef } from "@tanstack/react-table";
 import {
   Badge,
   Checkbox,
+  type FormattingApi,
   type SymbolSearchResult,
+  useAmountFormatting,
   useDateFormatting,
-  useNumberFormatting,
 } from "@wealthfolio/ui";
 import type { TFunction } from "i18next";
 import { useCallback, useMemo } from "react";
@@ -31,6 +32,8 @@ import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
 import { StatusHeaderIndicator, StatusIndicator } from "./status-indicator";
 import { isPendingReview, type LocalTransaction } from "./types";
+import { NeedsReviewStripe } from "@/components/needs-review";
+import { SELECTION_SLOT } from "@/lib/hover-slot";
 
 // Status badge variants (labels are resolved via translation at render time)
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
@@ -75,6 +78,27 @@ export const shouldDisplaySubtypeInTypeColumn = (
   subtype: string | null | undefined,
 ): boolean => showSubtypeInType && shouldDisplaySubtype(transaction, activityType, subtype);
 
+/** The symbol cell's second line: an option's contract, or the exchange. */
+export const getSymbolDisplayContext = (
+  row: LocalTransaction,
+  formatting: Pick<FormattingApi, "formatCalendarDate" | "formatPrice">,
+): string | undefined => {
+  const symbol = normalizeActivityToken(row.assetSymbol);
+  if (!symbol || symbol === "CASH" || symbol.startsWith("$CASH")) {
+    return undefined;
+  }
+  // Show contract description for options
+  const parsed = row.instrumentType === "OPTION" ? parseOccSymbol(symbol) : null;
+  if (parsed) {
+    // The loaded quote currency is the saved asset's. A changed symbol uses the
+    // picked symbol's, which saving sends for the asset.
+    const symbolChanged = symbol !== normalizeActivityToken(row._originalAssetSymbol);
+    const quoteCcy = symbolChanged ? row.pendingQuoteCcy : row.assetQuoteCcy;
+    return formatOptionSubtitle(parsed, quoteCcy ?? row.currency, formatting);
+  }
+  return getExchangeDisplayName(row.exchangeMic);
+};
+
 const getSubtypeDisplayLabel = (t: TFunction, subtype: string, optionLabel?: string): string => {
   return optionLabel ?? localizeActivitySubtypeName(t, subtype);
 };
@@ -107,10 +131,10 @@ export function useActivityColumns({
   onSymbolSelect,
   onCreateCustomAsset,
 }: UseActivityColumnsOptions) {
-  const numberFormatting = useNumberFormatting();
+  const amountFormatting = useAmountFormatting();
   const dateFormatting = useDateFormatting();
 
-  const formatting = { ...dateFormatting, ...numberFormatting };
+  const formatting = { ...dateFormatting, ...amountFormatting };
 
   const { t } = useTranslation();
 
@@ -139,50 +163,54 @@ export function useActivityColumns({
   const columns = useMemo<ColumnDef<LocalTransaction>[]>(
     () => [
       // === Pinned left (always visible) ===
-      // 1. Select
+      // 1. Row gutter: for a row pending review, the review icon (and the
+      // stripe on the leading edge), then the selection checkbox. The icon
+      // comes first so it lines up with the stripe and never moves when the
+      // checkbox appears on hover.
       {
         id: "select",
-        header: ({ table }) => (
-          <Checkbox
-            checked={
-              table.getIsAllRowsSelected() || (table.getIsSomeRowsSelected() && "indeterminate")
-            }
-            onCheckedChange={(checked) => table.toggleAllRowsSelected(Boolean(checked))}
-            aria-label={t("activity:datagrid.select_all_rows")}
-          />
-        ),
-        cell: ({ row }) => (
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(checked) => row.toggleSelected(Boolean(checked))}
-            aria-label={t("activity:datagrid.select_row")}
-          />
-        ),
-        size: 40,
-        minSize: 40,
-        maxSize: 40,
-        enableSorting: false,
-        enableResizing: false,
-        enableHiding: false,
-        enablePinning: false,
-      },
-      // 2. Status indicator
-      {
-        id: "status",
         header: ({ table }) => {
           const hasRowsToReview = table
             .getRowModel()
             .rows.some((row) => isPendingReview(row.original));
-          return <StatusHeaderIndicator hasRowsToReview={hasRowsToReview} />;
+          return (
+            <div className="flex items-center gap-1.5">
+              {/* The icon's slot is kept on every row, so the checkboxes line up. */}
+              <span className="flex w-3.5 shrink-0">
+                <StatusHeaderIndicator hasRowsToReview={hasRowsToReview} />
+              </span>
+              <Checkbox
+                checked={table.getIsAllRowsSelected()}
+                indeterminate={table.getIsSomeRowsSelected()}
+                onCheckedChange={(checked) => table.toggleAllRowsSelected(Boolean(checked))}
+                aria-label={t("activity:datagrid.select_all_rows")}
+              />
+            </div>
+          );
         },
-        size: 32,
-        minSize: 32,
-        maxSize: 32,
-        enableResizing: false,
+        cell: ({ row }) => (
+          <div className="flex items-center gap-1.5">
+            {isPendingReview(row.original) && <NeedsReviewStripe />}
+            <span className="flex w-3.5 shrink-0">
+              <StatusIndicator transaction={row.original} />
+            </span>
+            <Checkbox
+              checked={row.getIsSelected()}
+              onCheckedChange={(checked) => row.toggleSelected(Boolean(checked))}
+              aria-label={t("activity:datagrid.select_row")}
+              // Shown on hover or focus until a row is selected, as in the activity table.
+              className={SELECTION_SLOT}
+            />
+          </div>
+        ),
+        // px-3 either side, the 14px icon slot, the gap and the 16px checkbox.
+        size: 60,
+        minSize: 60,
+        maxSize: 60,
         enableSorting: false,
+        enableResizing: false,
         enableHiding: false,
         enablePinning: false,
-        cell: ({ row }) => <StatusIndicator transaction={row.original} />,
       },
       // 3. Date & Time (primary sort key)
       {
@@ -310,6 +338,8 @@ export function useActivityColumns({
         header: t("activity:datagrid.column.symbol"),
         size: 160,
         meta: {
+          // The display context reads more than the symbol, such as the quote currency.
+          getRenderKey: (rowData) => getSymbolDisplayContext(rowData, formatting),
           cell: {
             variant: "symbol",
             isDisabled: (rowData: unknown) => {
@@ -320,19 +350,8 @@ export function useActivityColumns({
                 !isTransferActivity(row.activityType)
               );
             },
-            getDisplayContext: (rowData: unknown) => {
-              const row = rowData as LocalTransaction;
-              const symbol = (row.assetSymbol ?? "").trim().toUpperCase();
-              if (!symbol || symbol === "CASH" || symbol.startsWith("$CASH")) {
-                return undefined;
-              }
-              // Show contract description for options
-              const parsed = row.instrumentType === "OPTION" ? parseOccSymbol(symbol) : null;
-              if (parsed) {
-                return formatOptionSubtitle(parsed, formatting);
-              }
-              return getExchangeDisplayName(row.exchangeMic);
-            },
+            getDisplayContext: (rowData: unknown) =>
+              getSymbolDisplayContext(rowData as LocalTransaction, formatting),
             isClearable: (rowData: unknown) => {
               const row = rowData as LocalTransaction;
               return !isAssetIdentityRequired(row.activityType ?? "", row.subtype);

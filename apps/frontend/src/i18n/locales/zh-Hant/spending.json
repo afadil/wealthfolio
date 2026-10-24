@@ -1031,6 +1031,7 @@
     "addSource_other": "新增來源（{{count}} 個可用）",
     "overridesTitle_other": "自訂設定 · {{count}}",
     "addSource_one": "新增來源（{{count}} 個可用）",
-    "overridesTitle_one": "覆寫 · {{count}}"
+    "overridesTitle_one": "覆寫 · {{count}}",
+    "sourceMonth": "來源月份"
   }
 }

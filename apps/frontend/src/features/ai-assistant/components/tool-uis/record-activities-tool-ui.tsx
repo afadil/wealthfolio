@@ -1,4 +1,5 @@
 import { saveActivities, updateToolResult } from "@/adapters";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,7 @@ import {
   useAmountFormatting,
   useDateFormatting,
   useNumberFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import type { TFunction } from "i18next";
@@ -39,6 +41,7 @@ import {
 } from "./record-activities-tool-utils";
 import {
   createActivityAmountFormatter,
+  createActivityPriceFormatter,
   createActivityQuantityFormatter,
   estimateDraftAmount,
   formatActivityAmount,
@@ -155,6 +158,10 @@ function RecordActivitiesToolUIContentImpl({
     () => createActivityAmountFormatter(amountFormatting),
     [amountFormatting],
   );
+  const priceFormatter = useMemo(
+    () => createActivityPriceFormatter(amountFormatting),
+    [amountFormatting],
+  );
   const quantityFormatter = useMemo(
     () => createActivityQuantityFormatter(numberFormatting),
     [numberFormatting],
@@ -195,25 +202,19 @@ function RecordActivitiesToolUIContentImpl({
 
   if (isIncomplete) {
     return (
-      <Card className="border-destructive/30 bg-destructive/5">
-        <CardContent className="py-4">
-          <p className="text-destructive text-sm font-medium">
-            {t("ai:recordActivities.failedPrepare")}
-          </p>
-        </CardContent>
-      </Card>
+      <Alert variant="destructive">
+        <Icons.AlertCircle />
+        <AlertTitle>{t("ai:recordActivities.failedPrepare")}</AlertTitle>
+      </Alert>
     );
   }
 
   if (!parsed) {
     return (
-      <Card className="border-destructive/30 bg-destructive/5">
-        <CardContent className="py-4">
-          <p className="text-destructive text-sm font-medium">
-            {t("ai:recordActivities.noBatchDraft")}
-          </p>
-        </CardContent>
-      </Card>
+      <Alert variant="destructive">
+        <Icons.AlertCircle />
+        <AlertTitle>{t("ai:recordActivities.noBatchDraft")}</AlertTitle>
+      </Alert>
     );
   }
 
@@ -315,24 +316,22 @@ function RecordActivitiesToolUIContentImpl({
           </div>
         </div>
 
-        <div className="max-h-[360px] overflow-y-auto">
+        <div className="max-h-90 overflow-y-auto">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4 text-xs">{t("ai:recordActivities.date")}</TableHead>
+                <TableHead className="ps-4 text-xs">{t("ai:recordActivities.date")}</TableHead>
                 <TableHead className="text-xs">{t("ai:recordActivities.type")}</TableHead>
                 <TableHead className="text-xs">{t("ai:recordActivities.symbol")}</TableHead>
-                <TableHead className="text-right text-xs">{t("ai:recordActivities.qty")}</TableHead>
-                <TableHead className="text-right text-xs">
-                  {t("ai:recordActivities.price")}
-                </TableHead>
-                <TableHead className="text-right text-xs">
+                <TableHead className="text-end text-xs">{t("ai:recordActivities.qty")}</TableHead>
+                <TableHead className="text-end text-xs">{t("ai:recordActivities.price")}</TableHead>
+                <TableHead className="text-end text-xs">
                   {t("ai:recordActivities.amount")}
                 </TableHead>
-                <TableHead className="text-right text-xs">{t("ai:recordActivities.fee")}</TableHead>
-                <TableHead className="text-right text-xs">{t("ai:recordActivities.tax")}</TableHead>
+                <TableHead className="text-end text-xs">{t("ai:recordActivities.fee")}</TableHead>
+                <TableHead className="text-end text-xs">{t("ai:recordActivities.tax")}</TableHead>
                 <TableHead className="text-xs">{t("ai:recordActivities.account")}</TableHead>
-                <TableHead className="pr-4 text-xs">{t("ai:recordActivities.status")}</TableHead>
+                <TableHead className="pe-4 text-xs">{t("ai:recordActivities.status")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -342,34 +341,34 @@ function RecordActivitiesToolUIContentImpl({
                 const rowStatusBadge = getRowStatusBadge(statusEntry, row.validation.isValid, t);
                 return (
                   <TableRow key={row.rowIndex} className="text-xs">
-                    <TableCell className="py-2 pl-4 tabular-nums">
+                    <TableCell className="py-2 ps-4 tabular-nums">
                       {formatActivityDate(row.draft.activityDate, dateFormatting)}
                     </TableCell>
                     <TableCell className="py-2">
                       <Badge
                         variant={activityBadge.variant}
-                        className={cn("text-[10px] uppercase", activityBadge.className)}
+                        className={cn("text-2xs uppercase", activityBadge.className)}
                       >
                         {formatActivityType(row.draft.activityType)}
                       </Badge>
                     </TableCell>
                     <TableCell className="py-2">{row.draft.symbol ?? "-"}</TableCell>
-                    <TableCell className="py-2 text-right tabular-nums">
+                    <TableCell className="py-2 text-end tabular-nums">
                       {formatActivityQuantity(
                         row.draft.quantity,
                         quantityFormatter,
                         isBalanceHidden,
                       )}
                     </TableCell>
-                    <TableCell className="py-2 text-right tabular-nums">
+                    <TableCell className="py-2 text-end tabular-nums">
                       {formatActivityAmount(
                         row.draft.unitPrice,
-                        amountFormatter,
+                        priceFormatter,
                         isBalanceHidden,
                         row.draft.currency,
                       )}
                     </TableCell>
-                    <TableCell className="py-2 text-right tabular-nums">
+                    <TableCell className="py-2 text-end tabular-nums">
                       {formatActivityAmount(
                         // Stated amounts verbatim; trade totals preview the
                         // mirror calc (the backend derives them at commit).
@@ -379,7 +378,7 @@ function RecordActivitiesToolUIContentImpl({
                         row.draft.currency,
                       )}
                     </TableCell>
-                    <TableCell className="py-2 text-right tabular-nums">
+                    <TableCell className="py-2 text-end tabular-nums">
                       {formatActivityAmount(
                         row.draft.fee,
                         amountFormatter,
@@ -387,7 +386,7 @@ function RecordActivitiesToolUIContentImpl({
                         row.draft.currency,
                       )}
                     </TableCell>
-                    <TableCell className="py-2 text-right tabular-nums">
+                    <TableCell className="py-2 text-end tabular-nums">
                       {formatActivityAmount(
                         row.draft.tax,
                         amountFormatter,
@@ -398,23 +397,23 @@ function RecordActivitiesToolUIContentImpl({
                     <TableCell className="py-2">
                       {row.draft.accountName ?? row.draft.accountId ?? "-"}
                     </TableCell>
-                    <TableCell className="py-2 pr-4">
+                    <TableCell className="py-2 pe-4">
                       <div className="space-y-1">
                         <Badge
                           variant={rowStatusBadge.variant}
-                          className={cn("text-[10px] uppercase", rowStatusBadge.className)}
+                          className={cn("text-2xs uppercase", rowStatusBadge.className)}
                         >
                           {rowStatusBadge.label}
                         </Badge>
                         {statusEntry?.error && (
-                          <p className="text-destructive max-w-[180px] truncate text-[10px]">
+                          <p className="text-destructive text-2xs max-w-45 truncate">
                             {statusEntry.error}
                           </p>
                         )}
                         {!statusEntry?.error &&
                           row.errors[0] &&
                           statusEntry?.status !== "submitted" && (
-                            <p className="text-muted-foreground max-w-[180px] truncate text-[10px]">
+                            <p className="text-muted-foreground text-2xs max-w-45 truncate">
                               {row.errors[0]}
                             </p>
                           )}
@@ -428,10 +427,10 @@ function RecordActivitiesToolUIContentImpl({
         </div>
 
         {submitError && (
-          <div className="border-destructive/50 bg-destructive/10 text-destructive mx-6 flex items-center gap-2 rounded-md border px-3 py-2 text-xs">
-            <Icons.AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{submitError}</span>
-          </div>
+          <Alert variant="destructive" className="mx-6 w-auto px-3 py-2 text-xs">
+            <Icons.AlertCircle />
+            <AlertDescription>{submitError}</AlertDescription>
+          </Alert>
         )}
 
         {(submitSummary || parsed.submittedAt) && (
@@ -446,9 +445,9 @@ function RecordActivitiesToolUIContentImpl({
         <div className="flex items-center justify-end px-6 pt-1">
           <Button onClick={handleSubmit} disabled={!canSubmit}>
             {isSubmitting ? (
-              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+              <Spinner className="me-2 h-4 w-4" />
             ) : (
-              <Icons.Check className="mr-2 h-4 w-4" />
+              <Icons.Check className="me-2 h-4 w-4" />
             )}
             {pendingValidRows.length > 0
               ? t("ai:recordActivities.confirmActivities", { count: pendingValidRows.length })

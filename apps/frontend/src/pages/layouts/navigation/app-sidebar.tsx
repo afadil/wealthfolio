@@ -8,6 +8,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  buttonVariants,
 } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -34,7 +35,7 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
   return (
     <div
       className={cn({
-        "light:bg-secondary/50 hidden h-full border-r pt-12 transition-[width] duration-300 ease-in-out md:flex md:flex-shrink-0 md:overflow-hidden": true,
+        "light:bg-secondary/50 hidden h-full border-e pt-12 transition-[width] duration-300 ease-in-out md:flex md:flex-shrink-0 md:overflow-hidden": true,
         "md:w-sidebar": !collapsed,
         "md:w-sidebar-collapsed": collapsed,
       })}
@@ -53,7 +54,11 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                   data-tauri-drag-region="true"
                   className="draggable flex items-center justify-center pb-6"
                 >
-                  <Link to="/" className="group/logo block shrink-0 [perspective:400px]">
+                  <Link
+                    to="/"
+                    aria-label={t("common:app_name")}
+                    className="group/logo block shrink-0 [perspective:400px]"
+                  >
                     <img
                       className={cn(
                         "h-10 w-10 rounded-full bg-transparent shadow-lg transition-transform duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
@@ -68,7 +73,7 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
 
                   <span
                     className={cn(
-                      "text-md text-foreground/90 ml-2 font-serif text-xl font-bold transition-opacity delay-100 duration-300 ease-in-out",
+                      "text-md text-foreground/90 ms-2 font-serif text-xl font-bold transition-opacity delay-100 duration-300 ease-in-out",
                       {
                         "sr-only opacity-0": collapsed,
                         "block opacity-100": !collapsed,
@@ -109,7 +114,7 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                   </span>
                   <span
                     className={cn({
-                      "text-muted-foreground ml-2 flex-1 text-left text-sm transition-opacity delay-100 duration-300 ease-in-out": true,
+                      "text-muted-foreground ms-2 flex-1 text-start text-sm transition-opacity delay-100 duration-300 ease-in-out": true,
                       "sr-only opacity-0": collapsed,
                       "block opacity-100": !collapsed,
                     })}
@@ -117,7 +122,7 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                     {t("common:layout.search")}
                   </span>
                   {!collapsed && (
-                    <kbd className="bg-background text-muted-foreground pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border px-1.5 font-mono text-[10px] font-medium opacity-100">
+                    <kbd className="bg-background text-muted-foreground text-2xs pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border px-1.5 font-mono font-medium opacity-100">
                       <span className="text-xs">{modKey}</span>K
                     </kbd>
                   )}
@@ -167,7 +172,7 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                   </span>
                   <span
                     className={cn({
-                      "ml-2 transition-opacity delay-100 duration-300 ease-in-out": true,
+                      "ms-2 transition-opacity delay-100 duration-300 ease-in-out": true,
                       "sr-only opacity-0": collapsed,
                       "block opacity-100": !collapsed,
                     })}
@@ -225,24 +230,26 @@ function PinnedAddonNavItem({ item, collapsed, onSetPinned }: PinnedAddonNavItem
 
   return (
     <div className="group relative">
-      <NavItem item={item} collapsed={collapsed} className="w-full pr-10" />
+      <NavItem item={item} collapsed={collapsed} className="w-full pe-10" />
 
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="hover:bg-accent pointer-events-none absolute right-1 top-1/2 z-10 h-8 w-8 -translate-y-1/2 rounded-full opacity-0 transition-opacity focus:pointer-events-auto focus:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
-            title={t("common:layout.addon_options", { name: item.title })}
-            aria-label={t("common:layout.addon_options", { name: item.title })}
-          >
-            <Icons.MoreHorizontal className="h-4 w-4" />
-          </Button>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="hover:bg-accent pointer-events-none absolute end-1 top-1/2 z-10 h-8 w-8 -translate-y-1/2 rounded-full opacity-0 transition-opacity focus:pointer-events-auto focus:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
+              title={t("common:layout.addon_options", { name: item.title })}
+              aria-label={t("common:layout.addon_options", { name: item.title })}
+            />
+          }
+        >
+          <Icons.MoreHorizontal className="h-4 w-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent side="bottom" align="start" className="w-48">
           <DropdownMenuItem onClick={() => onSetPinned(item, false)}>
-            <Icons.PinOff className="mr-2 h-4 w-4" />
+            <Icons.PinOff className="me-2 h-4 w-4" />
             {t("common:layout.unpin_from_sidebar")}
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -263,36 +270,33 @@ function NavItem({ item, collapsed, className, ...props }: NavItemProps) {
   const isActive = isPathActive(location.pathname, item.href);
 
   return (
-    <Button
+    <Link
       key={item.title}
-      variant={isActive ? "secondary" : "ghost"}
-      asChild
+      to={item.href}
+      title={item.title}
+      aria-current={isActive ? "page" : undefined}
+      {...props}
       className={cn(
-        "text-foreground [&_svg]:size-5! mb-1 h-12 rounded-md transition-all duration-300",
-        collapsed ? "justify-center" : "justify-start",
-        className,
+        buttonVariants({ variant: isActive ? "secondary" : "ghost" }),
+        cn(
+          "text-foreground [&_svg]:size-5! mb-1 h-12 rounded-md transition-all duration-300",
+          collapsed ? "justify-center" : "justify-start",
+          className,
+        ),
       )}
     >
-      <Link
-        key={item.title}
-        to={item.href}
-        title={item.title}
-        aria-current={isActive ? "page" : undefined}
-        {...props}
-      >
-        <span aria-hidden="true">{resolveNavigationIcon(item.icon, "h-5 w-5")}</span>
+      <span aria-hidden="true">{resolveNavigationIcon(item.icon, "h-5 w-5")}</span>
 
-        <span
-          className={cn({
-            "ml-2 transition-opacity delay-100 duration-300 ease-in-out": true,
-            "sr-only opacity-0": collapsed,
-            "block opacity-100": !collapsed,
-          })}
-        >
-          {item.title}
-        </span>
-      </Link>
-    </Button>
+      <span
+        className={cn({
+          "ms-2 transition-opacity delay-100 duration-300 ease-in-out": true,
+          "sr-only opacity-0": collapsed,
+          "block opacity-100": !collapsed,
+        })}
+      >
+        {item.title}
+      </span>
+    </Link>
   );
 }
 
@@ -310,27 +314,29 @@ function AddonsMenu({ addons, collapsed, onSetPinned }: AddonsMenuProps) {
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant={hasActiveAddon ? "secondary" : "ghost"}
-          className={cn(
-            "text-foreground [&_svg]:size-5! mb-1 h-12 rounded-md transition-all duration-300",
-            collapsed ? "justify-center" : "justify-start",
-          )}
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant={hasActiveAddon ? "secondary" : "ghost"}
+            className={cn(
+              "text-foreground [&_svg]:size-5! mb-1 h-12 rounded-md transition-all duration-300",
+              collapsed ? "justify-center" : "justify-start",
+            )}
+          />
+        }
+      >
+        <span aria-hidden="true">
+          <Icons.Addons className="h-5 w-5" />
+        </span>
+        <span
+          className={cn({
+            "ms-2 transition-opacity delay-100 duration-300 ease-in-out": true,
+            "sr-only opacity-0": collapsed,
+            "block opacity-100": !collapsed,
+          })}
         >
-          <span aria-hidden="true">
-            <Icons.Addons className="h-5 w-5" />
-          </span>
-          <span
-            className={cn({
-              "ml-2 transition-opacity delay-100 duration-300 ease-in-out": true,
-              "sr-only opacity-0": collapsed,
-              "block opacity-100": !collapsed,
-            })}
-          >
-            {t("common:addons")}
-          </span>
-        </Button>
+          {t("common:addons")}
+        </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         side={collapsed ? "right" : "bottom"}
@@ -353,23 +359,21 @@ function AddonsMenu({ addons, collapsed, onSetPinned }: AddonsMenuProps) {
               )}
             >
               <DropdownMenuItem
-                asChild
                 className="h-12 min-w-0 flex-1 gap-3 px-3 py-3 text-sm font-medium"
+                render={<Link to={addon.href} onClick={() => setOpen(false)} />}
               >
-                <Link to={addon.href} onClick={() => setOpen(false)}>
-                  <span
-                    aria-hidden="true"
-                    className="flex size-5 shrink-0 items-center justify-center"
-                  >
-                    {resolveNavigationIcon(addon.icon, "h-5 w-5")}
-                  </span>
-                  <span className="whitespace-nowrap">{addon.title}</span>
-                </Link>
+                <span
+                  aria-hidden="true"
+                  className="flex size-5 shrink-0 items-center justify-center"
+                >
+                  {resolveNavigationIcon(addon.icon, "h-5 w-5")}
+                </span>
+                <span className="whitespace-nowrap">{addon.title}</span>
               </DropdownMenuItem>
               {onSetPinned && (
                 <button
                   type="button"
-                  className="hover:bg-background focus:bg-background group-hover:bg-background hover:ring-border focus:ring-border group-hover:ring-border mr-1 flex size-8 shrink-0 items-center justify-center rounded-full opacity-0 outline-none transition-[background-color,box-shadow,opacity] hover:ring-1 focus:opacity-100 focus:ring-1 group-hover:opacity-100 group-hover:ring-1"
+                  className="hover:bg-background focus:bg-background group-hover:bg-background hover:ring-border focus:ring-border group-hover:ring-border me-1 flex size-8 shrink-0 items-center justify-center rounded-full opacity-0 outline-none transition-[background-color,box-shadow,opacity] hover:ring-1 focus:opacity-100 focus:ring-1 group-hover:opacity-100 group-hover:ring-1"
                   title={t("common:layout.pin_to_sidebar")}
                   aria-label={t("common:layout.pin_addon_to_sidebar", { name: addon.title })}
                   onMouseDown={(event) => {

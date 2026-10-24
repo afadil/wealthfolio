@@ -131,7 +131,12 @@ export function DashboardActions({ onAddAsset, onAddLiability }: DashboardAction
       onOpenChange={setOpen}
       groups={groups}
       trigger={
-        <Button variant="secondary" size="icon-xs" className="bg-secondary/50 rounded-full">
+        <Button
+          variant="secondary"
+          size="icon-xs"
+          className="rounded-full"
+          aria-label={t("common:layout.more_options")}
+        >
           <Icons.DotsThreeVertical className="size-5" weight="fill" />
         </Button>
       }

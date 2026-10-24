@@ -247,7 +247,7 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
               value: formatAmount(0, chartData[0].currency),
               position: "insideTopLeft",
               fill: "var(--muted-foreground)",
-              fontSize: 11,
+              fontSize: "0.6875rem",
             }}
           />
         )}

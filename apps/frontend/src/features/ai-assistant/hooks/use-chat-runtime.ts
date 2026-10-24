@@ -286,7 +286,7 @@ const fileAttachmentAdapter: AttachmentAdapter = {
  * Convert a ChatMessage from the database to ExternalMessage format.
  * Preserves part ordering for inline tool UI rendering.
  */
-function convertToExternalMessage(msg: ChatMessage): ExternalMessage {
+export function convertToExternalMessage(msg: ChatMessage): ExternalMessage {
   const parts: ExternalMessagePart[] = [];
   // Map toolCallId -> part index for attaching results
   const toolCallIndexes = new Map<string, number>();
@@ -324,6 +324,10 @@ function convertToExternalMessage(msg: ChatMessage): ExternalMessage {
         }
         break;
       }
+      case "error":
+        // A reply cut off by a provider error, shown as it was live.
+        parts.push({ type: "text", content: formatErrorMessage(part.message) });
+        break;
     }
   }
 

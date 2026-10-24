@@ -1,5 +1,6 @@
 import * as React from "react";
-import { Slot } from "@radix-ui/react-slot";
+import { mergeProps } from "@base-ui/react/merge-props";
+import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "../../lib/utils";
@@ -16,7 +17,7 @@ function ItemSeparator({ className, ...props }: React.ComponentProps<typeof Sepa
 }
 
 const itemVariants = cva(
-  "group/item [a]:hover:bg-accent/50 focus-visible:border-ring focus-visible:ring-ring/50 [a]:transition-colors flex flex-wrap items-center rounded-md border border-transparent text-sm outline-none transition-colors duration-100 focus-visible:ring-[3px]",
+  "group/item [a]:hover:bg-accent/50 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [a]:transition-colors flex flex-wrap items-center rounded-md border border-transparent text-sm outline-none transition-colors duration-100",
   {
     variants: {
       variant: {
@@ -27,6 +28,7 @@ const itemVariants = cva(
       size: {
         default: "gap-4 p-4 ",
         sm: "gap-2.5 px-4 py-3",
+        xs: "gap-2.5 px-3 py-2.5",
       },
     },
     defaultVariants: {
@@ -40,19 +42,15 @@ function Item({
   className,
   variant = "default",
   size = "default",
-  asChild = false,
+  render,
   ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof itemVariants> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot : "div";
-  return (
-    <Comp
-      data-slot="item"
-      data-variant={variant}
-      data-size={size}
-      className={cn(itemVariants({ variant, size, className }))}
-      {...props}
-    />
-  );
+}: useRender.ComponentProps<"div"> & VariantProps<typeof itemVariants>) {
+  return useRender({
+    defaultTagName: "div",
+    props: mergeProps<"div">({ className: cn(itemVariants({ variant, size, className })) }, props),
+    render,
+    state: { slot: "item", variant, size },
+  });
 }
 
 const itemMediaVariants = cva(
@@ -62,7 +60,8 @@ const itemMediaVariants = cva(
       variant: {
         default: "bg-transparent",
         icon: "bg-muted size-8 rounded-sm border [&_svg:not([class*='size-'])]:size-4",
-        image: "size-10 overflow-hidden rounded-sm [&_img]:size-full [&_img]:object-cover",
+        image:
+          "size-10 overflow-hidden rounded-sm group-data-[size=sm]/item:size-8 group-data-[size=xs]/item:size-6 [&_img]:size-full [&_img]:object-cover",
       },
     },
     defaultVariants: {

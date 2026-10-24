@@ -47,7 +47,7 @@ export function EditableTickerAvatar({
       </button>
       <span
         aria-hidden="true"
-        className="bg-background text-muted-foreground pointer-coarse:block pointer-events-none absolute -bottom-0.5 -right-0.5 hidden rounded-full border p-0.5"
+        className="bg-background text-muted-foreground pointer-coarse:block pointer-events-none absolute -bottom-0.5 -end-0.5 hidden rounded-full border p-0.5"
       >
         <Icons.ImageUp className="size-2.5" />
       </span>

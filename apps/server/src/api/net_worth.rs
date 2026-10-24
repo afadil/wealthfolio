@@ -46,7 +46,10 @@ async fn get_net_worth_history(
     let start = parse_date(&q.start_date, "startDate")?;
     let end = parse_date(&q.end_date, "endDate")?;
 
-    let history = state.net_worth_service.get_net_worth_history(start, end)?;
+    let history = state
+        .net_worth_service
+        .get_net_worth_history(start, end)
+        .await?;
     Ok(Json(history))
 }
 

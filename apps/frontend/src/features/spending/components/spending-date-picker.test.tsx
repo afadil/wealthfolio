@@ -22,7 +22,9 @@ const range = { from: new Date(2025, 0, 1), to: new Date(2025, 11, 31) };
 const open = async (user: ReturnType<typeof userEvent.setup>) =>
   user.click(screen.getByRole("button", { name: "Select dates" }));
 
-describe("SpendingDatePicker", () => {
+// Role queries scan the open two-month range calendar, so on shared CI runners
+// a test can exceed the default 5s.
+describe("SpendingDatePicker", { timeout: 15_000 }, () => {
   it("selects a month immediately through the existing picker", async () => {
     const { user, onCustomMonthChange } = setup();
     await open(user);

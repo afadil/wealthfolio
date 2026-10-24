@@ -8,7 +8,7 @@ import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { formatDate } from "@/lib/utils";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ActionConfirm, useDateFormatting } from "@wealthfolio/ui";
+import { ActionConfirm, useDateFormatting, Spinner } from "@wealthfolio/ui";
 import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@wealthfolio/ui/components/ui/avatar";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
@@ -31,6 +31,7 @@ import type { BrokerAccount, BrokerConnection } from "../types";
 import { BrokerageLogo } from "./brokerage-logo";
 import { PortalLink } from "./portal-link";
 import { SubscriptionPlans } from "./subscription-plans";
+import { statusSurfaceVariants } from "@wealthfolio/ui/components/ui/status-surface";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Custom Hooks
@@ -72,11 +73,11 @@ interface ServiceUnavailableCardProps {
 function ServiceUnavailableCard({ onRetry, isRetrying }: ServiceUnavailableCardProps) {
   const { t } = useTranslation();
   return (
-    <Card className="border-warning/30 bg-warning/5">
+    <Card className={statusSurfaceVariants({ status: "warning" })}>
       <CardContent className="py-8">
         <div className="flex flex-col items-center justify-center text-center">
-          <div className="bg-warning/15 mb-4 rounded-full p-4">
-            <Icons.CloudOff className="text-warning h-8 w-8" />
+          <div className="text-warning-subtle-foreground bg-current/15 mb-4 rounded-full p-4">
+            <Icons.CloudOff className="h-8 w-8" />
           </div>
           <h3 className="text-foreground mb-2 text-base font-medium">
             {t("connect:serviceUnavailable.title")}
@@ -87,7 +88,7 @@ function ServiceUnavailableCard({ onRetry, isRetrying }: ServiceUnavailableCardP
           <Button variant="outline" onClick={onRetry} disabled={isRetrying}>
             {isRetrying ? (
               <>
-                <Icons.Spinner className="h-4 w-4 animate-spin" />
+                <Spinner className="h-4 w-4" />
                 {t("connect:serviceUnavailable.retrying")}
               </>
             ) : (
@@ -172,14 +173,20 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
               {account.name || t("connect:accounts.accountFallback")}
             </span>
             {account.is_paper && (
-              <Badge variant="outline" className="h-5 shrink-0 text-[10px]">
+              <Badge variant="outline" className="text-2xs h-5 shrink-0">
                 {t("connect:accounts.paper")}
               </Badge>
             )}
             <Tooltip>
-              <TooltipTrigger>
+              <TooltipTrigger
+                aria-label={
+                  account.sync_enabled
+                    ? t("connect:accounts.syncEnabled")
+                    : t("connect:accounts.excludedFromSync")
+                }
+              >
                 {account.sync_enabled ? (
-                  <Icons.Eye className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                  <Icons.Eye className="text-info h-3.5 w-3.5 shrink-0" />
                 ) : (
                   <Icons.EyeOff className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
                 )}
@@ -210,10 +217,10 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
               </>
             )}
             {/* Sync time inline on sm+ */}
-            <span className="ml-auto hidden shrink-0 pl-2 sm:inline">{lastSyncedText}</span>
+            <span className="ms-auto hidden shrink-0 ps-2 sm:inline">{lastSyncedText}</span>
           </div>
           {/* Row 3: Sync time on its own line on mobile */}
-          <p className="text-muted-foreground mt-0.5 text-[11px] sm:hidden">{lastSyncedText}</p>
+          <p className="text-muted-foreground text-2xs mt-0.5 sm:hidden">{lastSyncedText}</p>
         </div>
       </div>
     </div>
@@ -305,8 +312,8 @@ function BrokerConnectionsCard({
                   <Badge
                     className={`shrink-0 ${
                       isConnected
-                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                        : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                        ? "bg-success-subtle text-success-subtle-foreground"
+                        : "bg-warning-subtle text-warning-subtle-foreground"
                     }`}
                   >
                     {isConnected
@@ -417,8 +424,8 @@ export function ConnectedView() {
                 src={user?.user_metadata?.avatar_url}
                 alt={user?.email ?? t("connect:account.userAvatar")}
               />
-              <AvatarFallback className="bg-success/15">
-                <span className="text-success text-lg font-semibold">
+              <AvatarFallback className="bg-success-subtle">
+                <span className="text-success-subtle-foreground text-lg font-semibold">
                   {(userInfo?.full_name?.[0] ?? user?.email?.[0] ?? "U").toUpperCase()}
                 </span>
               </AvatarFallback>
@@ -431,7 +438,7 @@ export function ConnectedView() {
                     t("connect:account.userFallback")}
                 </h3>
                 {hasSubscription && (
-                  <Badge className="h-5 shrink-0 bg-green-100 px-2 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                  <Badge className="text-2xs bg-success-subtle text-success-subtle-foreground h-5 shrink-0 px-2 font-medium">
                     {t("connect:account.active")}
                   </Badge>
                 )}
@@ -455,7 +462,7 @@ export function ConnectedView() {
                   disabled={isSigningOut || isLoading}
                 >
                   {isSigningOut ? (
-                    <Icons.Spinner className="h-4 w-4 animate-spin" />
+                    <Spinner className="h-4 w-4" />
                   ) : (
                     <Icons.LogOut className="h-4 w-4" />
                   )}
@@ -596,7 +603,7 @@ export function ConnectedView() {
                 }
               >
                 {t("connect:upgrade.button")}
-                <Icons.ExternalLink className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
+                <Icons.ExternalLink className="ms-1 h-3.5 w-3.5" aria-hidden="true" />
               </Button>
             </div>
           </CardContent>

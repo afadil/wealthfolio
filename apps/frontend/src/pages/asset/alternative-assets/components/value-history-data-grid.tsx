@@ -233,6 +233,7 @@ export function ValueHistoryDataGrid({
               className="text-muted-foreground hover:text-destructive h-7 w-7"
               disabled={isPersisting}
               onClick={() => handleDeleteRow(row.original)}
+              aria-label={t("common:delete")}
             >
               <Icons.X className="h-4 w-4" />
             </Button>
@@ -543,7 +544,7 @@ export function ValueHistoryDataGrid({
             onClick={handleMobileAdd}
             disabled={mobileDraft !== null || isPersisting}
           >
-            <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+            <Icons.Plus className="me-2 h-4 w-4" aria-hidden="true" />
             {isLiability ? t("asset:valueToolbar.add_balance") : t("asset:valueToolbar.add_value")}
           </Button>
         </div>
@@ -595,7 +596,7 @@ export function ValueHistoryDataGrid({
                           </InputGroupAddon>
                           <MoneyInput
                             data-slot="input-group-control"
-                            className="min-w-0 flex-1 rounded-none border-0 bg-transparent shadow-none ring-0 focus-visible:ring-0"
+                            className="min-w-0 flex-1 rounded-none border-0 bg-transparent shadow-none ring-0 focus-visible:outline-none"
                             value={draft.value}
                             maxDecimalPlaces={2}
                             fixedDecimalScale
@@ -634,7 +635,7 @@ export function ValueHistoryDataGrid({
                         {t("common:cancel")}
                       </Button>
                       <Button className="h-11" disabled={isPersisting} onClick={handleMobileSave}>
-                        <Icons.Save className="mr-2 h-4 w-4" aria-hidden="true" />
+                        <Icons.Save className="me-2 h-4 w-4" aria-hidden="true" />
                         {t("common:save")}
                       </Button>
                     </div>
@@ -646,7 +647,7 @@ export function ValueHistoryDataGrid({
                 <div key={entry.id} className="flex items-center p-1.5">
                   <button
                     type="button"
-                    className="active:bg-muted/40 grid min-h-11 min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 rounded-md px-1.5 py-2 text-left disabled:opacity-50"
+                    className="active:bg-muted/40 grid min-h-11 min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 rounded-md px-1.5 py-2 text-start disabled:opacity-50"
                     aria-label={t("asset:valueHistory.edit_entry_aria", {
                       date: dateFormatting.formatCalendarDate(format(entry.date, "yyyy-MM-dd")),
                       value: amountFormatting.formatAmount(entry.value, entry.currency),
@@ -731,10 +732,10 @@ export function ValueHistoryDataGrid({
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isPersisting}>{t("common:cancel")}</AlertDialogCancel>
               <AlertDialogAction
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                variant="destructive"
                 disabled={isPersisting}
                 onClick={(event) => {
-                  event.preventDefault();
+                  event.preventBaseUIHandler();
                   void handleMobileDelete();
                 }}
               >
@@ -762,7 +763,7 @@ export function ValueHistoryDataGrid({
         isLiability={isLiability}
       />
 
-      <div className="min-h-0 flex-1 overflow-hidden rounded-md border">
+      <div className="min-h-0 flex-1">
         <DataGrid {...dataGrid} stretchColumns height="calc(100vh - 340px)" />
       </div>
     </div>

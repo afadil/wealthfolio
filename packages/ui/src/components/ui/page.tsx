@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 
 import { cn } from "../../lib/utils";
 import { Button } from "./button";
@@ -37,7 +38,8 @@ export const PageScrollContainer = React.forwardRef<HTMLDivElement, PageScrollCo
         data-page-scroll-container
         data-with-mobile-nav-offset={withMobileNavOffset ? "true" : undefined}
         className={cn(
-          "momentum-scroll scroll-pt-header min-h-0 w-full max-w-full flex-1 overflow-y-auto overflow-x-hidden",
+          // `relative` stops WebKitGTK painting the sticky page header over this scrollbar
+          "momentum-scroll scroll-pt-header relative min-h-0 w-full max-w-full flex-1 overflow-y-auto overflow-x-hidden",
           withMobileNavOffset && "scroll-pb-nav",
           className,
         )}
@@ -120,7 +122,27 @@ export function PageHeader({
   dragRegion = true,
   ...props
 }: PageHeaderProps) {
+  const { t } = useTranslation();
   const { isScrolled } = usePage();
+  const headerRef = React.useRef<HTMLElement>(null);
+
+  // Content that pins below this header, like a sticky table header, offsets
+  // itself by `--page-header-height`. The height varies with the safe-area
+  // inset, a subtitle and wrapping actions, so it is measured.
+  React.useLayoutEffect(() => {
+    const header = headerRef.current;
+    const parent = header?.parentElement;
+    if (!header || !parent || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(() => {
+      parent.style.setProperty("--page-header-height", `${header.getBoundingClientRect().height}px`);
+    });
+    observer.observe(header);
+    return () => {
+      observer.disconnect();
+      parent.style.removeProperty("--page-header-height");
+    };
+  }, []);
 
   const titleContent = heading ? (
     <div data-tauri-drag-region={dragRegion ? "true" : undefined} className="flex min-w-0 items-center gap-3">
@@ -139,6 +161,7 @@ export function PageHeader({
 
   return (
     <header
+      ref={headerRef}
       className={cn(
         "sticky top-0 z-50",
         // Native app feel with backdrop blur
@@ -161,8 +184,8 @@ export function PageHeader({
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               {onBack && (
-                <Button variant="ghost" size="icon" onClick={onBack}>
-                  <Icons.ArrowLeft className="size-5" />
+                <Button variant="ghost" size="icon" onClick={onBack} aria-label={t("ui:page.back", "Back")}>
+                  <Icons.ArrowLeft className="size-5 rtl:rotate-180" />
                 </Button>
               )}
               {titleContent ?? children}

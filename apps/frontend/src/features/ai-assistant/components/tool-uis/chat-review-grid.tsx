@@ -41,7 +41,7 @@ const FILTER_CONFIG: {
   {
     key: "duplicate",
     labelKey: "ai:importReview.duplicates",
-    accentClass: "text-blue-500",
+    accentClass: "text-info",
     countKey: "duplicates",
   },
   {
