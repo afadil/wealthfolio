@@ -299,7 +299,10 @@ impl FxServiceTrait for FxService {
         to_currency: &str,
         date: NaiveDate,
     ) -> Result<Decimal> {
-        if from_currency.len() != 3 || !from_currency.chars().all(|c| c.is_alphabetic()) {
+        // Any length (USDT, FDUSD), but letters only: the stored pair key
+        // `FX:<from>/<to>` doesn't escape `/`, so `A/B`→`C` and `A`→`B/C`
+        // would find each other's rate.
+        if from_currency.is_empty() || !from_currency.chars().all(|c| c.is_alphabetic()) {
             return Err(FxError::InvalidCurrencyCode(format!(
                 "Invalid currency code: {}",
                 from_currency
@@ -307,7 +310,7 @@ impl FxServiceTrait for FxService {
             .into());
         }
 
-        if to_currency.len() != 3 || !to_currency.chars().all(|c| c.is_alphabetic()) {
+        if to_currency.is_empty() || !to_currency.chars().all(|c| c.is_alphabetic()) {
             return Err(FxError::InvalidCurrencyCode(format!(
                 "Invalid currency code: {}",
                 to_currency
@@ -724,6 +727,52 @@ mod tests {
         let date = NaiveDate::from_ymd_opt(2026, 5, 18).unwrap();
         let result = service.get_exchange_rate_for_date("USD", "JPY", date);
         assert!(result.is_err());
+    }
+
+    /// Codes such as USDT can be stored with a rate and convert at the latest
+    /// rate; a dated conversion of the same amount must find that rate too
+    /// instead of rejecting the code for not being three letters (#2099).
+    #[test]
+    fn convert_currency_for_date_converts_codes_that_are_not_three_letters() {
+        let date = NaiveDate::from_ymd_opt(2026, 6, 1).unwrap();
+        let repo = Arc::new(MockFxRepository::default());
+        repo.historical_rates.lock().unwrap().extend([
+            make_historical_rate("USDT", "USD", Decimal::new(101, 2), date),
+            make_historical_rate("USD", "FDUSD", Decimal::new(99, 2), date),
+        ]);
+        let service = FxService::new(repo);
+        service.initialize().unwrap();
+        let amount = Decimal::new(100, 0);
+
+        for (from, to, expected) in [
+            ("USDT", "USD", Decimal::new(101, 0)),
+            ("USD", "FDUSD", Decimal::new(99, 0)),
+        ] {
+            let dated = service
+                .convert_currency_for_date(amount, from, to, date)
+                .unwrap();
+            assert_eq!(dated, expected, "{from}/{to}");
+            assert_eq!(
+                dated,
+                service.convert_currency(amount, from, to).unwrap(),
+                "{from}/{to}: dated and latest conversions disagree"
+            );
+        }
+        assert!(
+            service
+                .get_exchange_rate_for_date("USDC", "USD", date)
+                .is_err(),
+            "a code with no stored rate still has no rate"
+        );
+        for (from, to) in [("A/B", "C"), ("A", "B/C")] {
+            assert!(
+                matches!(
+                    service.get_exchange_rate_for_date(from, to, date),
+                    Err(crate::Error::Fx(FxError::InvalidCurrencyCode(_)))
+                ),
+                "{from}/{to} would share the stored key FX:A/B/C"
+            );
+        }
     }
 
     #[test]

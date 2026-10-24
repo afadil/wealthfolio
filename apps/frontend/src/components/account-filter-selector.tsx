@@ -86,19 +86,21 @@ const SelectorTrigger = forwardRef<HTMLButtonElement, SelectorTriggerProps>(
     return (
       <Button
         ref={ref}
-        variant="outline"
+        variant={compact ? "secondary" : "outline"}
         role="combobox"
         aria-expanded={open}
         className={cn(
           "flex items-center gap-2 font-medium",
           triggerVariant === "input"
-            ? "bg-background/70 text-foreground hover:bg-background/70 focus-visible:border-foreground w-full justify-between rounded-lg border px-3 py-2.5 text-[14px] font-semibold shadow-none"
-            : "bg-secondary/30 hover:bg-muted/80 rounded-full border-none",
-          triggerVariant === "icon" && "bg-secondary/50 h-8 w-8 justify-center rounded-full p-0",
+            ? "bg-background/70 text-foreground hover:bg-background/70 focus-visible:border-foreground w-full justify-between rounded-lg border px-3 py-2.5 text-sm font-semibold shadow-none"
+            : compact
+              ? "rounded-full"
+              : "bg-secondary/30 hover:bg-muted/80 rounded-full border-none",
+          triggerVariant === "icon" && "h-8 w-8 justify-center p-0",
           triggerVariant === "default" &&
             (isMobile
               ? "h-9 w-9 justify-center p-0"
-              : "h-10 min-w-[220px] justify-between px-4 text-sm"),
+              : "min-w-55 h-10 justify-between px-4 text-sm"),
           className,
         )}
         size={compact ? "sm" : "default"}
@@ -108,7 +110,7 @@ const SelectorTrigger = forwardRef<HTMLButtonElement, SelectorTriggerProps>(
           <span className="relative" aria-hidden="true">
             <Icons.ListFilter className="h-4 w-4" />
             {value.type !== "all" && (
-              <span className="bg-primary absolute -left-[1.5px] -top-1 h-2 w-2 rounded-full" />
+              <span className="bg-primary absolute -start-[1.5px] -top-1 h-2 w-2 rounded-full" />
             )}
           </span>
         ) : (
@@ -118,7 +120,7 @@ const SelectorTrigger = forwardRef<HTMLButtonElement, SelectorTriggerProps>(
           <span className="sr-only">{label}</span>
         ) : (
           <>
-            <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+            <span className="min-w-0 flex-1 truncate text-start">{label}</span>
             <Icons.ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
           </>
         )}
@@ -171,11 +173,11 @@ function AccountScopeCommand({
         <CommandGroup className={groupClassName}>
           <CommandItem className={itemClassName} onSelect={() => onSelect({ type: "all" })}>
             <Icons.Wallet
-              className={cn("mr-1 h-4 w-4", portfoliosOnly && "text-muted-foreground mr-0")}
+              className={cn("me-1 h-4 w-4", portfoliosOnly && "text-muted-foreground me-0")}
             />
             <span className="min-w-0 flex-1 truncate">{t("common:component.all_accounts")}</span>
             <Icons.Check
-              className={cn("ml-auto h-4 w-4", value.type === "all" ? "opacity-100" : "opacity-0")}
+              className={cn("ms-auto h-4 w-4", value.type === "all" ? "opacity-100" : "opacity-0")}
             />
           </CommandItem>
         </CommandGroup>
@@ -191,12 +193,12 @@ function AccountScopeCommand({
                 onSelect={() => onSelect({ type: "portfolio", portfolioId: p.id })}
               >
                 <Icons.Folder
-                  className={cn("mr-1 h-4 w-4", portfoliosOnly && "text-muted-foreground mr-0")}
+                  className={cn("me-1 h-4 w-4", portfoliosOnly && "text-muted-foreground me-0")}
                 />
                 <span className="min-w-0 flex-1 truncate">{p.name}</span>
                 <Icons.Check
                   className={cn(
-                    "ml-auto h-4 w-4",
+                    "ms-auto h-4 w-4",
                     value.type === "portfolio" && value.portfolioId === p.id
                       ? "opacity-100"
                       : "opacity-0",
@@ -219,11 +221,11 @@ function AccountScopeCommand({
                   className={itemClassName}
                   onSelect={() => onToggleAccount(a.id)}
                 >
-                  <Icons.CreditCard className="mr-1 h-4 w-4" />
+                  <Icons.CreditCard className="me-1 h-4 w-4" />
                   <span className="min-w-0 flex-1 truncate">{a.name}</span>
                   <span className="text-muted-foreground shrink-0 text-xs">({a.currency})</span>
                   <Icons.Check
-                    className={cn("ml-auto h-4 w-4", checked ? "opacity-100" : "opacity-0")}
+                    className={cn("ms-auto h-4 w-4", checked ? "opacity-100" : "opacity-0")}
                   />
                 </CommandItem>
               );
@@ -236,7 +238,7 @@ function AccountScopeCommand({
           <CommandSeparator alwaysRender className="bg-border/70 mx-3 my-1.5" />
           <Button
             variant="ghost"
-            className={cn("h-auto w-full justify-start has-[>svg]:px-3", itemClassName)}
+            className={cn("h-auto w-full justify-start border-0 has-[>svg]:px-3", itemClassName)}
             onClick={onManagePortfolios}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") event.stopPropagation();
@@ -244,11 +246,11 @@ function AccountScopeCommand({
           >
             {showAddPortfolio ? (
               <Icons.Plus
-                className={cn("text-muted-foreground", portfoliosOnly ? "size-5" : "mr-1 h-4 w-4")}
+                className={cn("text-muted-foreground", portfoliosOnly ? "size-5" : "me-1 h-4 w-4")}
               />
             ) : (
               <Icons.Settings
-                className={cn("text-muted-foreground", portfoliosOnly ? "size-5" : "mr-1 h-4 w-4")}
+                className={cn("text-muted-foreground", portfoliosOnly ? "size-5" : "me-1 h-4 w-4")}
               />
             )}
             {t(
@@ -326,26 +328,22 @@ export function AccountScopeSelector({
   if (isMobile) {
     return (
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <SelectorTrigger
-            value={value}
-            label={label}
-            aria-label={`${t(portfoliosOnly ? "dashboard:portfolio_filter.choose" : "common:component.select_account_scope")}: ${label}`}
-            open={open}
-            isMobile
-            triggerVariant={triggerVariant}
-            className={className}
-          />
-        </SheetTrigger>
+        <SheetTrigger
+          render={
+            <SelectorTrigger
+              value={value}
+              label={label}
+              aria-label={`${t(portfoliosOnly ? "dashboard:portfolio_filter.choose" : "common:component.select_account_scope")}: ${label}`}
+              open={open}
+              isMobile
+              triggerVariant={triggerVariant}
+              className={className}
+            />
+          }
+        />
         <SheetContent
           side="bottom"
-          aria-describedby={undefined}
-          onOpenAutoFocus={(event) => {
-            if (portfoliosOnly) {
-              event.preventDefault();
-              sheetTitleRef.current?.focus();
-            }
-          }}
+          initialFocus={portfoliosOnly ? sheetTitleRef : undefined}
           className={cn(
             "mx-1 p-0",
             portfoliosOnly ? "bg-card max-h-[80dvh] rounded-t-2xl" : "rounded-t-4xl h-[80vh]",
@@ -377,7 +375,7 @@ export function AccountScopeSelector({
                 : "h-[calc(80vh-4.5rem)]",
             )}
             listClassName="min-h-0 max-h-none flex-1 px-2 py-2"
-            groupClassName="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider"
+            groupClassName="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-2xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider"
             footerClassName="px-2 pb-2"
             itemClassName={cn(
               "min-h-12 rounded-xl px-3 py-3 text-base",
@@ -391,17 +389,19 @@ export function AccountScopeSelector({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <SelectorTrigger
-          value={value}
-          label={label}
-          aria-label={`${t(portfoliosOnly ? "dashboard:portfolio_filter.choose" : "common:component.select_account_scope")}: ${label}`}
-          open={open}
-          isMobile={false}
-          triggerVariant={triggerVariant}
-          className={className}
-        />
-      </PopoverTrigger>
+      <PopoverTrigger
+        render={
+          <SelectorTrigger
+            value={value}
+            label={label}
+            aria-label={`${t(portfoliosOnly ? "dashboard:portfolio_filter.choose" : "common:component.select_account_scope")}: ${label}`}
+            open={open}
+            isMobile={false}
+            triggerVariant={triggerVariant}
+            className={className}
+          />
+        }
+      />
       <PopoverContent
         className={cn(
           "w-80 p-0",
@@ -427,7 +427,7 @@ export function AccountScopeSelector({
           footerClassName="px-3 pb-4"
           itemClassName={
             portfoliosOnly
-              ? "cursor-pointer gap-4 rounded-xl px-3 py-3 text-[15px] font-medium transition-colors duration-150 [&_svg]:size-5"
+              ? "cursor-pointer gap-4 rounded-xl px-3 py-3 text-base font-medium transition-colors duration-150 [&_svg]:size-5"
               : "py-2"
           }
         />

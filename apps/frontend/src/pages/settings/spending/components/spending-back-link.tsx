@@ -11,7 +11,7 @@ export function SpendingBackLink() {
       to="/settings/spending"
       className="text-muted-foreground hover:text-foreground hidden items-center gap-1.5 text-sm font-medium underline-offset-4 hover:underline sm:inline-flex"
     >
-      <Icons.ArrowLeft className="h-4 w-4" />
+      <Icons.ArrowLeft className="h-4 w-4 rtl:rotate-180" />
       {t("settings:spending.back_to_tracker")}
     </Link>
   );

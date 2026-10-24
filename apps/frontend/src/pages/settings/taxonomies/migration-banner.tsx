@@ -1,4 +1,4 @@
-import { Alert, AlertDescription, AlertTitle, Button, Icons } from "@wealthfolio/ui";
+import { Alert, AlertDescription, AlertTitle, Button, Icons, Spinner } from "@wealthfolio/ui";
 import { useMigrationStatus, useMigrateLegacyClassifications } from "@/hooks/use-taxonomies";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -41,7 +41,7 @@ export function MigrationBanner() {
         <Button onClick={handleMigrate} disabled={migrateMutation.isPending} size="sm">
           {migrateMutation.isPending ? (
             <>
-              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+              <Spinner className="me-2 h-4 w-4" />
               {t("settings:tax_migrating")}
             </>
           ) : (

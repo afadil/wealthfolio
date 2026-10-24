@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useState } from "react";
@@ -146,7 +147,7 @@ function AssetLogoDialogBody({
             />
             <Badge
               variant={hasCustom ? "default" : "secondary"}
-              className="h-5 px-1.5 text-[10px]"
+              className="text-2xs h-5 px-1.5"
               title={
                 override.ref
                   ? t("logo.updated_at", {
@@ -159,7 +160,7 @@ function AssetLogoDialogBody({
             </Badge>
           </div>
 
-          <Icons.ArrowRight className="text-muted-foreground mt-8 size-4 shrink-0" />
+          <Icons.ArrowRight className="text-muted-foreground mt-8 size-4 shrink-0 rtl:rotate-180" />
 
           <div className="flex w-24 flex-col items-center gap-2">
             <AssetLogoDropzone
@@ -178,7 +179,7 @@ function AssetLogoDialogBody({
             </AssetLogoDropzone>
             <span
               className={cn(
-                "flex h-5 items-center text-[10px] font-medium uppercase tracking-wide",
+                "text-2xs flex h-5 items-center font-medium uppercase tracking-wide",
                 isReady ? "text-primary" : "text-muted-foreground",
               )}
             >
@@ -194,7 +195,7 @@ function AssetLogoDialogBody({
         >
           {state.status === "processing" ? (
             <>
-              <Icons.Spinner className="size-3.5 animate-spin" />
+              <Spinner className="size-3.5" />
               {t("logo.processing")}
             </>
           ) : isReady ? (
@@ -255,14 +256,14 @@ function AssetLogoDialogBody({
           <Button
             type="button"
             variant="ghost"
-            className={cn(isMobile ? "w-full" : "sm:mr-auto")}
+            className={cn(isMobile ? "w-full" : "sm:me-auto")}
             disabled={isBusy}
             aria-busy={resetLogo.isPending}
             onClick={handleReset}
             data-testid="asset-logo-reset"
           >
             {resetLogo.isPending ? (
-              <Icons.Spinner className="size-4 animate-spin" />
+              <Spinner className="size-4" />
             ) : (
               <Icons.RotateCcw className="size-4" />
             )}
@@ -287,7 +288,7 @@ function AssetLogoDialogBody({
             onClick={handleSave}
             data-testid="asset-logo-save"
           >
-            {setLogo.isPending && <Icons.Spinner className="size-4 animate-spin" />}
+            {setLogo.isPending && <Spinner className="size-4" />}
             {t("logo.save")}
           </Button>
         </div>

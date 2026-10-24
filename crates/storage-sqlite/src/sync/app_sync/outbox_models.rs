@@ -84,8 +84,11 @@ impl SyncOutboxModel for QuoteDB {
         &self.id
     }
 
+    // Manual quotes carry user-entered prices under UUIDs (valuations) or
+    // `{asset}_{day}_MANUAL` ids (history edits, imports, loan balances); both
+    // sync. Provider quotes are refetched on each device.
     fn should_sync_outbox(&self, _op: SyncOperation) -> bool {
-        self.source.eq_ignore_ascii_case("MANUAL") && Uuid::parse_str(&self.id).is_ok()
+        self.source.eq_ignore_ascii_case("MANUAL")
     }
 }
 

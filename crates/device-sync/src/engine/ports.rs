@@ -87,6 +87,8 @@ pub trait OutboxStore: Send + Sync {
     ) -> Result<(), String>;
     async fn mark_push_completed(&self) -> Result<(), String>;
     async fn has_pending_outbox(&self) -> Result<bool, String>;
+    /// Earliest retry deadline among unsent pending rows, including rows still in backoff.
+    async fn next_outbox_retry_at(&self) -> Result<Option<String>, String>;
 }
 
 #[async_trait]

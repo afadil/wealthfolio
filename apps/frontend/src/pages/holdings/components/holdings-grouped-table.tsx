@@ -147,29 +147,31 @@ export function HoldingsGroupedTable({
           open={!collapsedGroups.has(group.name)}
           onOpenChange={() => toggleGroup(group.name)}
         >
-          <CollapsibleTrigger asChild>
-            <Button
-              variant="ghost"
-              className="hover:bg-muted/50 flex w-full items-center justify-between px-3 py-2"
-            >
-              <div className="flex items-center gap-2">
-                <Icons.ChevronDown
-                  className={cn(
-                    "h-4 w-4 transition-transform duration-200",
-                    collapsedGroups.has(group.name) && "-rotate-90",
-                  )}
-                />
-                <span className="font-medium">{getGroupLabel(t, group.name)}</span>
-                <span className="text-muted-foreground text-sm">({group.holdings.length})</span>
-              </div>
-              <AmountDisplay
-                value={group.totalValue}
-                currency={group.holdings[0]?.baseCurrency ?? baseCurrency}
-                isHidden={isBalanceHidden}
-                colorFormat={group.name === "Liabilities"}
-                className="font-medium"
+          <CollapsibleTrigger
+            render={
+              <Button
+                variant="ghost"
+                className="hover:bg-muted/50 flex w-full items-center justify-between px-3 py-2"
               />
-            </Button>
+            }
+          >
+            <div className="flex items-center gap-2">
+              <Icons.ChevronDown
+                className={cn(
+                  "h-4 w-4 transition-transform duration-200",
+                  collapsedGroups.has(group.name) && "-rotate-90",
+                )}
+              />
+              <span className="font-medium">{getGroupLabel(t, group.name)}</span>
+              <span className="text-muted-foreground text-sm">({group.holdings.length})</span>
+            </div>
+            <AmountDisplay
+              value={group.totalValue}
+              currency={group.holdings[0]?.baseCurrency ?? baseCurrency}
+              isHidden={isBalanceHidden}
+              colorFormat={group.name === "Liabilities"}
+              className="font-medium"
+            />
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div className="divide-y">
@@ -262,7 +264,7 @@ function HoldingRow({
         className={cn(
           "flex items-center gap-4 px-3 py-3",
           isClickable && "hover:bg-muted/50 cursor-pointer transition-colors",
-          isIndented && "pl-10",
+          isIndented && "ps-10",
         )}
         onClick={isClickable ? handleNavigate : undefined}
       >
@@ -291,12 +293,12 @@ function HoldingRow({
         </div>
 
         {/* Quantity Column */}
-        <div className="hidden w-24 flex-shrink-0 text-right md:block">
+        <div className="hidden w-24 flex-shrink-0 text-end md:block">
           <QuantityDisplay value={holding.quantity} isHidden={isBalanceHidden} />
         </div>
 
         {/* Value Column */}
-        <div className="w-28 flex-shrink-0 text-right">
+        <div className="w-28 flex-shrink-0 text-end">
           <AmountDisplay
             value={displayValue}
             currency={currency}
@@ -307,7 +309,7 @@ function HoldingRow({
         </div>
 
         {/* Gain/Loss Column */}
-        <div className="hidden w-28 flex-shrink-0 text-right sm:block">
+        <div className="hidden w-28 flex-shrink-0 text-end sm:block">
           {!holding.isLiability && (
             <>
               <AmountDisplay
@@ -324,7 +326,9 @@ function HoldingRow({
 
         {/* Actions Column */}
         <div className="w-8 flex-shrink-0">
-          {isClickable && <Icons.ChevronRight className="text-muted-foreground h-4 w-4" />}
+          {isClickable && (
+            <Icons.ChevronRight className="text-muted-foreground h-4 w-4 rtl:rotate-180" />
+          )}
         </div>
       </div>
 

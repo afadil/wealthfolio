@@ -144,7 +144,7 @@ export const BudgetGaugeCard: React.FC<BudgetGaugeCardProps> = ({
         <div className="mt-3 space-y-1 border-t pt-2">
           {subcategories.slice(0, 3).map((sub, idx) => (
             <div key={idx} className="text-muted-foreground flex items-center justify-between text-xs">
-              <span className="truncate pr-2">{sub.name}</span>
+              <span className="truncate pe-2">{sub.name}</span>
               <span className="shrink-0">
                 <PrivacyAmount value={sub.amount} currency={currency} />
               </span>

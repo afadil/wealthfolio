@@ -87,13 +87,13 @@ describe("dialog overflow containment", () => {
       <Sheet open>
         <SheetContent>
           <SheetTitle>Side sheet</SheetTitle>
-          <SheetDescription>Opens from the right by default</SheetDescription>
+          <SheetDescription>Opens from the inline end by default</SheetDescription>
         </SheetContent>
       </Sheet>,
     );
 
     expect(screen.getByRole("dialog")).toHaveAttribute("data-slot", "sheet-content");
-    expect(screen.getByRole("dialog")).toHaveAttribute("data-side", "right");
+    expect(screen.getByRole("dialog")).toHaveAttribute("data-side", "inline-end");
     sideSheet.unmount();
 
     render(

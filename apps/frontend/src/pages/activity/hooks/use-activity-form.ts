@@ -159,6 +159,7 @@ export function useActivityForm({
               }
 
               await saveInternalTransferPairMutation.mutateAsync({
+                editedActivityId: isEditing ? activity?.id : undefined,
                 transferOutId: isEditing ? transferOutId : undefined,
                 transferInId: isEditing ? transferInId : undefined,
                 fromAccountId: transferData.fromAccountId,

@@ -219,6 +219,7 @@ export function QuoteHistoryDataGrid({
                     size="icon"
                     className="text-muted-foreground hover:text-destructive h-7 w-7"
                     onClick={() => handleDeleteRow(row.original)}
+                    aria-label={t("common:delete")}
                   >
                     <Icons.X className="h-4 w-4" />
                   </Button>
@@ -582,7 +583,7 @@ export function QuoteHistoryDataGrid({
                         {t("common:cancel")}
                       </Button>
                       <Button className="h-11" disabled={isPersisting} onClick={handleMobileSave}>
-                        <Icons.Save className="mr-2 h-4 w-4" aria-hidden="true" />
+                        <Icons.Save className="me-2 h-4 w-4" aria-hidden="true" />
                         {t("common:save")}
                       </Button>
                     </div>
@@ -642,7 +643,7 @@ export function QuoteHistoryDataGrid({
                 <div key={entry.id} className="flex items-center gap-1 p-1.5">
                   <button
                     type="button"
-                    className="active:bg-muted/40 min-w-0 flex-1 space-y-1.5 rounded-md p-1.5 text-left disabled:opacity-50"
+                    className="active:bg-muted/40 min-w-0 flex-1 space-y-1.5 rounded-md p-1.5 text-start disabled:opacity-50"
                     aria-label={t("asset:valueHistory.edit_entry_aria", {
                       date: dateLabel,
                       value: closeLabel,
@@ -717,10 +718,10 @@ export function QuoteHistoryDataGrid({
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isPersisting}>{t("common:cancel")}</AlertDialogCancel>
               <AlertDialogAction
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                variant="destructive"
                 disabled={isPersisting}
                 onClick={(event) => {
-                  event.preventDefault();
+                  event.preventBaseUIHandler();
                   void handleMobileDelete();
                 }}
               >
@@ -747,7 +748,7 @@ export function QuoteHistoryDataGrid({
         onChangeDataSource={onChangeDataSource}
       />
 
-      <div className="min-h-0 flex-1 overflow-hidden rounded-md border">
+      <div className="min-h-0 flex-1">
         <DataGrid {...dataGrid} stretchColumns height="calc(100vh - 340px)" />
       </div>
     </div>

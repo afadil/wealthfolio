@@ -109,7 +109,7 @@ function CoverageProjectionTooltip({
               {t("goals:coverage_chart.unfunded_spending_yr")}
             </span>
           </div>
-          <span className="text-xs font-semibold tabular-nums text-red-500">
+          <span className="text-destructive text-xs font-semibold tabular-nums">
             {formatting.formatCompactAmount(point.shortfall, currency)}
           </span>
         </div>
@@ -131,10 +131,10 @@ function CoverageProjectionTooltip({
         <span
           className={`text-xs font-semibold tabular-nums ${
             coveragePct >= 100
-              ? "text-green-600"
+              ? "text-success"
               : coveragePct >= 75
-                ? "text-amber-600"
-                : "text-red-500"
+                ? "text-warning"
+                : "text-destructive"
           }`}
         >
           {numberFormatting.formatPercent(coveragePct / 100, { digits: 0 })}
@@ -182,14 +182,14 @@ export function RetirementCoverageChart({
           type="number"
           domain={["dataMin", "dataMax"]}
           ticks={ticks}
-          tick={{ fontSize: 11 }}
+          tick={{ fontSize: "0.6875rem" }}
           tickFormatter={(age: number) => String(Math.round(age))}
           axisLine={false}
           tickLine={false}
           allowDataOverflow={false}
         />
         <YAxis
-          tick={{ fontSize: 10 }}
+          tick={{ fontSize: "0.6875rem" }}
           tickFormatter={(v: number) => formatting.formatCompactAmount(v, currency)}
           width={60}
           axisLine={false}
@@ -208,7 +208,7 @@ export function RetirementCoverageChart({
           label={{
             value: `${referenceLabelPrefix} · ${fireAgeForBudget}`,
             position: "top",
-            fontSize: 10,
+            fontSize: "0.6875rem",
             fontWeight: 600,
             fill: "#888",
           }}

@@ -13,7 +13,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Input } from "@wealthfolio/ui/components/ui/input";
-import { Icons } from "@wealthfolio/ui";
+import { Icons, Spinner } from "@wealthfolio/ui";
 import { cn } from "@/lib/utils";
 import {
   useTaxonomy,
@@ -255,17 +255,19 @@ export function MultiSelectTaxonomy({
             }}
             modal={true}
           >
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors"
-                disabled={isPending}
-              >
-                <Icons.Plus className="h-3.5 w-3.5" />
-                {t("asset:classification.add")}
-              </button>
+            <PopoverTrigger
+              render={
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors"
+                  disabled={isPending}
+                />
+              }
+            >
+              <Icons.Plus className="h-3.5 w-3.5" />
+              {t("asset:classification.add")}
             </PopoverTrigger>
-            <PopoverContent className="w-[450px] p-0" align="end" sideOffset={4}>
+            <PopoverContent className="w-112.5 p-0" align="end" sideOffset={4}>
               {/* Pending category weight input */}
               {pendingCategory && (
                 <div className="border-b p-3">
@@ -295,10 +297,10 @@ export function MultiSelectTaxonomy({
                         }}
                         onFocus={(e) => e.target.select()}
                         autoFocus
-                        className="h-8 pr-6 text-sm"
+                        className="h-8 pe-6 text-sm"
                         placeholder="100"
                       />
-                      <span className="text-muted-foreground pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-sm">
+                      <span className="text-muted-foreground pointer-events-none absolute end-2 top-1/2 -translate-y-1/2 text-sm">
                         %
                       </span>
                     </div>
@@ -307,9 +309,10 @@ export function MultiSelectTaxonomy({
                       className="h-8"
                       onClick={handleConfirmCategory}
                       disabled={isPending}
+                      aria-label={t("common:confirm")}
                     >
                       {isPending ? (
-                        <Icons.Loader className="h-3 w-3 animate-spin" />
+                        <Spinner className="h-3 w-3" />
                       ) : (
                         <Icons.Check className="h-3 w-3" />
                       )}
@@ -319,6 +322,7 @@ export function MultiSelectTaxonomy({
                       variant="ghost"
                       className="h-8 w-8 p-0"
                       onClick={handleCancelPending}
+                      aria-label={t("common:cancel")}
                     >
                       <Icons.Close className="h-3 w-3" />
                     </Button>
@@ -358,7 +362,7 @@ export function MultiSelectTaxonomy({
                               hasChildren && "font-medium",
                               isPendingThis && "bg-accent",
                             )}
-                            style={{ paddingLeft: `${category.level * 16 + 8}px` }}
+                            style={{ paddingInlineStart: `${category.level * 16 + 8}px` }}
                           >
                             <span
                               className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -401,6 +405,7 @@ export function MultiSelectTaxonomy({
                 {editingId === assignment.id ? (
                   <Input
                     type="text"
+                    aria-label={t("holdings:weight")}
                     value={editingValue}
                     onChange={(e) => setEditingValue(e.target.value)}
                     onBlur={() => handleWeightBlur(assignment)}
@@ -411,7 +416,7 @@ export function MultiSelectTaxonomy({
                         setEditingValue("");
                       }
                     }}
-                    className="h-7 pr-5 text-right text-sm"
+                    className="h-7 pe-5 text-end text-sm"
                     autoFocus
                   />
                 ) : (
@@ -438,6 +443,7 @@ export function MultiSelectTaxonomy({
                   className="h-7 w-7 shrink-0"
                   onClick={() => handleRemoveCategory(assignment.id)}
                   disabled={isPending}
+                  aria-label={t("common:remove")}
                 >
                   <Icons.Close className="h-3.5 w-3.5 opacity-60" />
                 </Button>
@@ -448,17 +454,17 @@ export function MultiSelectTaxonomy({
           {/* Total row */}
           {assignedCategories.length > 1 && (
             <div className="bg-muted/50 flex items-center gap-2 px-3 py-2">
-              <span className="text-muted-foreground flex-1 text-right text-xs font-medium">
+              <span className="text-muted-foreground flex-1 text-end text-xs font-medium">
                 {t("asset:classification.total")}
               </span>
               <div
                 className={cn(
-                  "w-20 text-right text-sm font-semibold",
+                  "w-20 text-end text-sm font-semibold",
                   totalWeight === 100
-                    ? "text-green-600 dark:text-green-400"
+                    ? "text-success"
                     : totalWeight > 100
-                      ? "text-red-600 dark:text-red-400"
-                      : "text-amber-600 dark:text-amber-400",
+                      ? "text-destructive"
+                      : "text-warning",
                 )}
               >
                 {totalWeight % 1 === 0 ? totalWeight : totalWeight.toFixed(1)}%

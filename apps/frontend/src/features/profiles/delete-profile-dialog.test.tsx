@@ -18,6 +18,15 @@ it("requires the exact profile name and explains server scope", () => {
   fireEvent.click(button);
   expect(onDelete).toHaveBeenCalledWith("Personal", "");
 });
+it("accepts a name copied with bidi isolation marks from a right-to-left label", () => {
+  const onDelete = vi.fn();
+  render(<DeleteProfileDialog profile={profile} onClose={vi.fn()} onDelete={onDelete} />);
+  fireEvent.change(screen.getByLabelText("Type Personal to confirm"), {
+    target: { value: "\u2068Personal\u2069" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Delete profile" }));
+  expect(onDelete).toHaveBeenCalledWith("Personal", "");
+});
 it("requires fresh proof for a protected profile", () => {
   const onDelete = vi.fn();
   render(

@@ -47,7 +47,17 @@
   "search_accounts": "Search accounts...",
   "no_accounts_found": "No accounts found.",
   "holdings": "Holdings",
-  "click_to_update_cash_balance": "Click to update the cash balance",
+  "balance_edit": {
+    "title": "Adjust cash balance",
+    "description": "Adjust one currency at a time. The difference is recorded as a deposit or withdrawal in that currency.",
+    "current_balance": "Current balance",
+    "new_balance": "New balance",
+    "no_change": "No balance change",
+    "unavailable": "Cash balances are unavailable. Wait for them to load or refresh the page.",
+    "invalid_amount": "Enter a valid balance of zero or more.",
+    "success": "Balance updated",
+    "error": "Error updating balance. Please try again."
+  },
   "investments": "Investments",
   "net_contribution": "Net Contribution",
   "cost_basis": "Cost Basis",

@@ -7,13 +7,13 @@ export function QuoteImportHelpPopover() {
   const { t } = useTranslation();
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button type="button" variant="link" className="flex items-center gap-1 text-sm">
-          <Icons.HelpCircle className="mr-1 h-5 w-5" />
-          {t("settings:market_data_page.how_to_import")}
-        </Button>
+      <PopoverTrigger
+        render={<Button type="button" variant="link" className="flex items-center gap-1 text-sm" />}
+      >
+        <Icons.HelpCircle className="me-1 h-5 w-5" />
+        {t("settings:market_data_page.how_to_import")}
       </PopoverTrigger>
-      <PopoverContent className="m-3 max-h-[min(85vh,680px)] w-[min(90vw,900px)] overflow-y-auto rounded-lg p-4 text-sm sm:m-4 sm:p-6">
+      <PopoverContent className="m-3 max-h-[min(85vh,42.5rem)] w-[min(90vw,56.25rem)] overflow-y-auto p-4 text-sm sm:m-4 sm:p-6">
         <h4 className="text-lg font-semibold">
           {t("settings:market_data_page.importing_historical_quotes")}
         </h4>
@@ -30,18 +30,18 @@ export function QuoteImportHelpPopover() {
               <li>{t("settings:market_data_page.import_step_4")}</li>
             </ol>
             <div className="mt-4 space-y-3">
-              <div className="rounded-md border border-blue-500 bg-blue-50 p-3 dark:border-blue-500/40 dark:bg-blue-900/40">
+              <div className="border-info bg-info-subtle rounded-md border p-3">
                 <p className="text-sm">
-                  <strong className="text-blue-700 dark:text-blue-300">
+                  <strong className="text-info-subtle-foreground">
                     {t("settings:market_data_page.import_tip_label")}
                   </strong>{" "}
                   {t("settings:market_data_page.import_tip_text")}
                 </p>
               </div>
 
-              <div className="rounded-md border border-green-500 bg-green-50 p-3 dark:border-green-500/40 dark:bg-green-900/40">
+              <div className="border-success bg-success-subtle rounded-md border p-3">
                 <p className="text-sm">
-                  <strong className="text-green-700 dark:text-green-300">
+                  <strong className="text-success-subtle-foreground">
                     {t("settings:market_data_page.import_required_label")}
                   </strong>{" "}
                   {t("settings:market_data_page.import_required_text")}
@@ -120,9 +120,9 @@ export function QuoteImportHelpPopover() {
                 </ul>
               </div>
 
-              <div className="rounded-md border border-yellow-500 bg-yellow-50 p-3 dark:border-yellow-500/40 dark:bg-yellow-900/40">
+              <div className="border-warning bg-warning-subtle rounded-md border p-3">
                 <p className="text-sm">
-                  <strong className="text-yellow-700 dark:text-yellow-300">
+                  <strong className="text-warning-subtle-foreground">
                     {t("settings:market_data_page.import_warning_label")}
                   </strong>{" "}
                   {t("settings:market_data_page.import_warning_text")}

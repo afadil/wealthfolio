@@ -8,18 +8,21 @@ pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Err
     let app_menu = SubmenuBuilder::new(app, "Wealthfolio")
         .item(&MenuItemBuilder::with_id("open_settings", "Settings...").build(app)?)
         .separator();
-    // muda 0.20 shows the predefined Hide, Hide Others, Show All, Quit, Undo and
-    // Redo disabled on GTK 3. Linux leaves out the Hide items and handles the
-    // others in handle_menu_event.
-    #[cfg(target_os = "linux")]
-    let app_menu = app_menu.item(&MenuItemBuilder::with_id("quit", "Quit").build(app)?);
-    #[cfg(not(target_os = "linux"))]
+    // Only macOS gets the predefined Hide, Hide Others and Show All. On Windows,
+    // muda 0.20 shows Hide Others and Show All disabled, and Hide hides the
+    // window with nothing to show it again. On GTK 3 it shows all three
+    // disabled, along with Quit, Undo and Redo, which Linux handles in
+    // handle_menu_event.
+    #[cfg(target_os = "macos")]
     let app_menu = app_menu
         .item(&PredefinedMenuItem::hide(app, None)?)
         .item(&PredefinedMenuItem::hide_others(app, None)?)
         .item(&PredefinedMenuItem::show_all(app, None)?)
-        .separator()
-        .item(&PredefinedMenuItem::quit(app, None)?);
+        .separator();
+    #[cfg(target_os = "linux")]
+    let app_menu = app_menu.item(&MenuItemBuilder::with_id("quit", "Quit").build(app)?);
+    #[cfg(not(target_os = "linux"))]
+    let app_menu = app_menu.item(&PredefinedMenuItem::quit(app, None)?);
     let app_menu = app_menu.build()?;
 
     let edit_menu = SubmenuBuilder::new(app, "Edit");
@@ -143,7 +146,10 @@ pub fn handle_menu_event(app: &AppHandle, event_id: &str) {
                         // Error - show native dialog
                         app_handle
                             .dialog()
-                            .message(format!("Failed to check for updates: {}", e))
+                            .message(native_dialog_text(&format!(
+                                "Failed to check for updates: {}",
+                                e
+                            )))
                             .title("Update Check Failed")
                             .show(|_| {});
                     }
@@ -161,5 +167,32 @@ pub fn handle_menu_event(app: &AppHandle, event_id: &str) {
                 .show(|_| {});
         }
         _ => {}
+    }
+}
+
+/// rfd's GTK backend passes dialog text to GTK as a printf format string
+/// (PolyMeilex/rfd#343), so a literal `%` (in an error message, say) must be
+/// doubled there. Remove this once tauri-plugin-dialog uses an rfd with
+/// that fixed, or the doubled `%%` will show.
+fn native_dialog_text(text: &str) -> String {
+    if cfg!(target_os = "linux") {
+        text.replace('%', "%%")
+    } else {
+        text.to_owned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn native_dialog_text_keeps_percent_signs_literal() {
+        let expected = if cfg!(target_os = "linux") {
+            "Run %%s or 100%% with apt."
+        } else {
+            "Run %s or 100% with apt."
+        };
+        assert_eq!(native_dialog_text("Run %s or 100% with apt."), expected);
     }
 }

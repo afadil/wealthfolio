@@ -22,6 +22,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  buttonVariants,
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -246,10 +247,12 @@ const AccountPage = () => {
     return account.trackingMode === "HOLDINGS";
   }, [account]);
 
-  // A cash or credit-card account reads like a statement: the balance after
-  // each row, while the list runs in date order.
-  const showsRunningBalance =
-    isCashOnlyAccount && !isHoldingsMode && (accountActivitiesSorting[0]?.id ?? "date") === "date";
+  // The list heads each day with its date while it runs in date order. Then it
+  // also shows the account's cash: a cash or credit-card account reads like a
+  // statement, with the balance after each row; the others close each day with
+  // their cash. Holdings-tracked accounts enter their cash rather than derive it.
+  const isActivitiesDateOrder = (accountActivitiesSorting[0]?.id ?? "date") === "date";
+  const showsCashBalances = !isHoldingsMode && isActivitiesDateOrder;
 
   // Check if user can directly edit holdings (manual HOLDINGS-mode accounts only)
   const canEditHoldingsDirectly = useMemo(() => {
@@ -348,7 +351,7 @@ const AccountPage = () => {
     },
     searchQuery: "",
     sorting: accountActivitiesSorting,
-    includeCashBalances: showsRunningBalance,
+    includeCashBalances: showsCashBalances,
   });
 
   const activityFormAccounts = useMemo<AccountSelectOption[]>(
@@ -676,6 +679,7 @@ const AccountPage = () => {
         activities={accountActivitiesSearch.data}
         isLoading={accountActivitiesSearch.isLoading}
         isCompactView={true}
+        groupByDay={isActivitiesDateOrder}
         handleEdit={handleActivityEdit}
         handleDelete={handleActivityDelete}
         onDuplicate={handleActivityDuplicate}
@@ -699,6 +703,7 @@ const AccountPage = () => {
         isLoading={accountActivitiesSearch.isLoading}
         sorting={accountActivitiesSorting}
         onSortingChange={setAccountActivitiesSorting}
+        groupByDay={isActivitiesDateOrder}
         handleEdit={handleActivityEdit}
         handleDelete={handleActivityDelete}
         onAdd={() => navigate(`/activities/manage?account=${id}`)}
@@ -733,12 +738,17 @@ const AccountPage = () => {
           )}
 
           {activeAccountDetailTab === "activities" && (
-            <Button variant="ghost" size="sm" className="shrink-0" asChild>
-              <Link to={`/activities?account=${id}`} className="inline-flex items-center gap-1.5">
-                {t("account:explore")}
-                <Icons.ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </Button>
+            <Link
+              to={`/activities?account=${id}`}
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "sm" }),
+                "inline-flex items-center gap-1.5",
+                "shrink-0",
+              )}
+            >
+              {t("account:explore")}
+              <Icons.ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" />
+            </Link>
           )}
         </div>
       )}
@@ -871,29 +881,31 @@ const AccountPage = () => {
               {/* Desktop account selector */}
               <div className="hidden min-w-0 sm:block">
                 <Popover open={desktopSelectorOpen} onOpenChange={setDesktopSelectorOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className="-ml-2 h-auto min-w-0 justify-start rounded-md px-2 py-1 text-left"
-                      aria-label={t("account:switch_account")}
-                    >
-                      <span className="flex min-w-0 items-center gap-1.5">
-                        {account?.group ? (
-                          <>
-                            <span className="text-muted-foreground truncate text-base font-semibold leading-tight md:text-lg">
-                              {account.group}
-                            </span>
-                            <span className="text-muted-foreground text-sm" aria-hidden="true">
-                              &gt;
-                            </span>
-                          </>
-                        ) : null}
-                        <span className="truncate text-base font-semibold leading-tight md:text-lg">
-                          {account?.name ?? t("account:account")}
-                        </span>
-                        <Icons.ChevronDown className="text-muted-foreground size-5 shrink-0" />
+                  <PopoverTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        className="-ms-2 h-auto min-w-0 justify-start rounded-md px-2 py-1 text-start"
+                        aria-label={t("account:switch_account")}
+                      />
+                    }
+                  >
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      {account?.group ? (
+                        <>
+                          <span className="text-muted-foreground truncate text-base font-semibold leading-tight md:text-lg">
+                            {account.group}
+                          </span>
+                          <span className="text-muted-foreground text-sm" aria-hidden="true">
+                            &gt;
+                          </span>
+                        </>
+                      ) : null}
+                      <span className="truncate text-base font-semibold leading-tight md:text-lg">
+                        {account?.name ?? t("account:account")}
                       </span>
-                    </Button>
+                      <Icons.ChevronDown className="text-muted-foreground size-5 shrink-0" />
+                    </span>
                   </PopoverTrigger>
                   <PopoverContent className="w-60 p-0" align="start">
                     <Command>
@@ -912,13 +924,13 @@ const AccountPage = () => {
                                   onSelect={() => handleAccountSwitch(acc)}
                                   className="flex items-center py-1.5"
                                 >
-                                  <IconComponent className="mr-2 h-4 w-4" />
+                                  <IconComponent className="me-2 h-4 w-4" />
                                   <span>
                                     {acc.name} ({acc.currency})
                                   </span>
                                   <Icons.Check
                                     className={cn(
-                                      "ml-auto h-4 w-4",
+                                      "ms-auto h-4 w-4",
                                       account?.id === acc.id ? "opacity-100" : "opacity-0",
                                     )}
                                   />
@@ -936,19 +948,21 @@ const AccountPage = () => {
               {/* Mobile account selector */}
               <div className="block min-w-0 sm:hidden">
                 <Sheet open={mobileSelectorOpen} onOpenChange={setMobileSelectorOpen}>
-                  <SheetTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className="-ml-2 h-auto min-w-0 justify-start rounded-md px-2 py-1 text-left"
-                      aria-label={t("account:switch_account")}
-                    >
-                      <span className="flex min-w-0 items-center gap-1.5">
-                        <span className="truncate text-base font-semibold leading-tight">
-                          {account?.name ?? t("account:account")}
-                        </span>
-                        <Icons.ChevronDown className="text-muted-foreground h-5 w-5 shrink-0" />
+                  <SheetTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        className="-ms-2 h-auto min-w-0 justify-start rounded-md px-2 py-1 text-start"
+                        aria-label={t("account:switch_account")}
+                      />
+                    }
+                  >
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate text-base font-semibold leading-tight">
+                        {account?.name ?? t("account:account")}
                       </span>
-                    </Button>
+                      <Icons.ChevronDown className="text-muted-foreground h-5 w-5 shrink-0" />
+                    </span>
                   </SheetTrigger>
                   <SheetContent side="bottom" className="rounded-t-4xl mx-1 h-[80vh] p-0">
                     <SheetHeader className="border-border border-b px-6 py-4">
@@ -971,7 +985,7 @@ const AccountPage = () => {
                                     key={acc.id}
                                     onClick={() => handleAccountSwitch(acc)}
                                     className={cn(
-                                      "hover:bg-accent active:bg-accent/80 flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors focus:outline-none",
+                                      "hover:bg-accent active:bg-accent/80 flex w-full items-center gap-3 rounded-lg border p-3 text-start transition-colors focus:outline-none",
                                       account?.id === acc.id
                                         ? "border-primary bg-accent"
                                         : "border-transparent",
@@ -1014,8 +1028,8 @@ const AccountPage = () => {
       <PageContent>
         {hasHoldings && !isHoldingsLoading ? (
           <>
-            <div className="grid grid-cols-1 gap-4 pt-0 md:grid-cols-3">
-              <Card className="col-span-1 md:col-span-2">
+            <div className="grid grid-cols-1 gap-4 pt-0 lg:grid-cols-3">
+              <Card className="col-span-1 lg:col-span-2">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
                   <CardTitle className="text-md">
                     <PortfolioUpdateTrigger
@@ -1073,18 +1087,25 @@ const AccountPage = () => {
                     <PrivacyToggle />
                     <TooltipProvider>
                       <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant={showSnapshotMarkers ? "default" : "secondary"}
-                            size="icon-xs"
-                            className={cn(
-                              "rounded-full",
-                              !showSnapshotMarkers && "bg-secondary/50",
-                            )}
-                            onClick={() => setShowSnapshotMarkers(!showSnapshotMarkers)}
-                          >
-                            <Icons.History className="size-5" />
-                          </Button>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              variant={showSnapshotMarkers ? "default" : "secondary"}
+                              size="icon-xs"
+                              className={cn(
+                                "rounded-full",
+                                !showSnapshotMarkers && "bg-secondary/50",
+                              )}
+                              onClick={() => setShowSnapshotMarkers(!showSnapshotMarkers)}
+                              aria-label={
+                                showSnapshotMarkers
+                                  ? t("account:hide_snapshot_markers")
+                                  : t("account:show_snapshot_markers")
+                              }
+                            />
+                          }
+                        >
+                          <Icons.History className="size-5" />
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>
@@ -1119,7 +1140,7 @@ const AccountPage = () => {
                           }}
                         />
                         <IntervalSelector
-                          className="relative bottom-10 left-0 right-0 z-10"
+                          className="relative bottom-10 end-0 start-0 z-10"
                           onIntervalSelect={handleIntervalSelect}
                           isLoading={isValuationHistoryLoading}
                           defaultValue={INITIAL_INTERVAL_CODE}
@@ -1141,6 +1162,7 @@ const AccountPage = () => {
                   isPerformanceLoading={isPerformanceHistoryLoading}
                   performanceError={hasPerformanceError ? performanceErrorMessages[0] : undefined}
                   hideBalanceEdit={isHoldingsMode || isLiabilityAccount}
+                  balanceEditDisabled={isCurrentValuationLoading || Boolean(currentValuationError)}
                   isHoldingsMode={isHoldingsMode}
                   balanceLabel={
                     isLiabilityAccount ? t("account:balance_label") : t("account:cash_balance")
@@ -1185,7 +1207,7 @@ const AccountPage = () => {
       {/* Holdings Edit Mode Sheet for manual HOLDINGS-mode accounts */}
       {account && canEditHoldingsDirectly && (
         <Sheet open={isEditingHoldings} onOpenChange={setIsEditingHoldings}>
-          <SheetContent side="right" className="flex h-full w-full flex-col p-0 sm:max-w-2xl">
+          <SheetContent side="inline-end" className="flex h-full w-full flex-col p-0 sm:max-w-2xl">
             <SheetHeader className="border-b px-6 py-4">
               <SheetTitle>{t("account:update_holdings_title")}</SheetTitle>
               <SheetDescription>

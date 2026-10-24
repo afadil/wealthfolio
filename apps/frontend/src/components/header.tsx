@@ -1,6 +1,7 @@
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 
 interface ApplicationHeaderProps {
@@ -22,6 +23,7 @@ export function ApplicationHeader({
   displayBack,
   backUrl,
 }: ApplicationHeaderProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   return (
     <div
@@ -34,13 +36,18 @@ export function ApplicationHeader({
         {displayBack ? (
           backUrl ? (
             <Link to={backUrl}>
-              <Button variant="ghost" size="icon">
-                <Icons.ArrowLeft />
+              <Button variant="ghost" size="icon" aria-label={t("common:back")}>
+                <Icons.ArrowLeft className="rtl:rotate-180" />
               </Button>
             </Link>
           ) : (
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-              <Icons.ArrowLeft />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate(-1)}
+              aria-label={t("common:back")}
+            >
+              <Icons.ArrowLeft className="rtl:rotate-180" />
             </Button>
           )
         ) : null}
@@ -50,12 +57,12 @@ export function ApplicationHeader({
               <h1 className="font-heading text-muted-foreground text-xl font-bold tracking-tight md:text-2xl">
                 {headingPrefix}
               </h1>
-              <span className="h-6 border-l-2"></span>
+              <span className="h-6 border-s-2"></span>
             </>
           )}
 
           <h1 className="font-heading text-xl font-bold tracking-tight md:text-2xl">{heading}</h1>
-          {text && <p className="text-muted-foreground ml-4 text-lg font-light">{text}</p>}
+          {text && <p className="text-muted-foreground ms-4 text-lg font-light">{text}</p>}
         </div>
       </div>
       <div className="flex-shrink-0">{children}</div>

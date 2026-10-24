@@ -432,6 +432,28 @@ describe("AccountsSummary", () => {
     expect(screen.queryByText("Solo Account")).not.toBeInTheDocument();
   });
 
+  it("draws account and group cards without a backdrop filter", async () => {
+    const user = userEvent.setup();
+
+    const { container } = renderAccountsSummary({
+      accounts: [
+        createAccount({ id: "group-a-1", name: "Group A One", group: "Group A" }),
+        createAccount({ id: "group-a-2", name: "Group A Two", group: "Group A" }),
+        createAccount({ id: "standalone", name: "Standalone" }),
+      ],
+      valuations: [
+        createValuation({ accountId: "group-a-1", totalValue: 100 }),
+        createValuation({ accountId: "group-a-2", totalValue: 200 }),
+        createValuation({ accountId: "standalone", totalValue: 300 }),
+      ],
+    });
+    await user.click(screen.getByText("Group A"));
+
+    expect(screen.getByText("Group A One")).toBeInTheDocument();
+    expect(screen.getByText("Standalone")).toBeInTheDocument();
+    expect(container.querySelector('[class*="backdrop-"]')).toBeNull();
+  });
+
   it("counts hidden accounts in group totals without rendering them", async () => {
     const user = userEvent.setup();
 

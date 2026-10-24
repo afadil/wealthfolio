@@ -186,20 +186,22 @@ export function BenchmarkSymbolSelectorMobile({
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button
-          variant="outline"
-          aria-label={iconOnly ? t("common:component.add_benchmark") : undefined}
-          className={cn(
-            "bg-secondary/30 hover:bg-muted/80 flex items-center gap-1.5 rounded-md border-[1.5px] border-none text-sm font-medium",
-            iconOnly ? "h-9 w-9 p-0" : "h-8 px-3 py-1",
-            className,
-          )}
-          size={iconOnly ? "icon" : "sm"}
-        >
-          <Icons.TrendingUp className="h-4 w-4" />
-          {!iconOnly && t("common:component.add_benchmark")}
-        </Button>
+      <SheetTrigger
+        render={
+          <Button
+            variant="outline"
+            aria-label={iconOnly ? t("common:component.add_benchmark") : undefined}
+            className={cn(
+              "bg-secondary/30 hover:bg-muted/80 flex items-center gap-1.5 rounded-md border-[1.5px] border-none text-sm font-medium",
+              iconOnly ? "h-9 w-9 p-0" : "h-8 px-3 py-1",
+              className,
+            )}
+            size={iconOnly ? "icon" : "sm"}
+          />
+        }
+      >
+        <Icons.TrendingUp className="h-4 w-4" />
+        {!iconOnly && t("common:component.add_benchmark")}
       </SheetTrigger>
       <SheetContent side="bottom" className="rounded-t-4xl mx-1 h-[85vh] p-0">
         <SheetHeader className="border-border border-b px-6 py-4">
@@ -211,13 +213,13 @@ export function BenchmarkSymbolSelectorMobile({
           {/* Search Input */}
           <div className="border-border border-b px-6 py-3">
             <div className="relative">
-              <Icons.Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+              <Icons.Search className="text-muted-foreground absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder={t("common:search_benchmarks")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-background border-input ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring h-10 w-full rounded-md border px-3 py-2 pl-9 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                className="bg-background border-input ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring h-10 w-full rounded-md border px-3 py-2 ps-9 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
               />
             </div>
           </div>
@@ -257,7 +259,7 @@ export function BenchmarkSymbolSelectorMobile({
                       <button
                         key={ticker.symbol}
                         onClick={() => handleSearchResultSelect(ticker)}
-                        className="hover:bg-accent active:bg-accent/80 focus:border-primary flex w-full items-center gap-3 rounded-lg border border-transparent p-3 text-left transition-colors focus:outline-none"
+                        className="hover:bg-accent active:bg-accent/80 focus:border-primary flex w-full items-center gap-3 rounded-lg border border-transparent p-3 text-start transition-colors focus:outline-none"
                       >
                         <div className="bg-primary/10 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full">
                           <Icons.TrendingUp className="text-primary h-5 w-5" />
@@ -275,7 +277,7 @@ export function BenchmarkSymbolSelectorMobile({
                             </div>
                           )}
                         </div>
-                        <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0" />
+                        <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0 rtl:rotate-180" />
                       </button>
                     ))}
                   </div>
@@ -308,7 +310,7 @@ export function BenchmarkSymbolSelectorMobile({
                           <button
                             key={benchmark.symbol}
                             onClick={() => handleBenchmarkSelect(benchmark)}
-                            className="hover:bg-accent active:bg-accent/80 focus:border-primary flex w-full items-center gap-3 rounded-lg border border-transparent p-3 text-left transition-colors focus:outline-none"
+                            className="hover:bg-accent active:bg-accent/80 focus:border-primary flex w-full items-center gap-3 rounded-lg border border-transparent p-3 text-start transition-colors focus:outline-none"
                           >
                             <div className="bg-primary/10 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full">
                               <Icons.TrendingUp className="text-primary h-5 w-5" />
@@ -326,7 +328,7 @@ export function BenchmarkSymbolSelectorMobile({
                                 {t(`common:component.${benchmark.descriptionKey}`)}
                               </div>
                             </div>
-                            <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0" />
+                            <Icons.ChevronRight className="text-muted-foreground h-5 w-5 flex-shrink-0 rtl:rotate-180" />
                           </button>
                         ))}
                       </div>

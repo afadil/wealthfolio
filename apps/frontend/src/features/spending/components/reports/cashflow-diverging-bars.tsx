@@ -76,11 +76,11 @@ export function CashflowDivergingBars({ points, currency, isLoading }: CashflowD
   }, [data]);
 
   if (isLoading && visibleData.every((d) => d.income === 0 && d.spending === 0)) {
-    return <Skeleton className="h-[260px] w-full rounded-lg" />;
+    return <Skeleton className="h-65 w-full rounded-lg" />;
   }
 
   return (
-    <div className="h-[260px] w-full">
+    <div className="h-65 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart
           data={visibleData}
@@ -100,7 +100,7 @@ export function CashflowDivergingBars({ points, currency, isLoading }: CashflowD
             dataKey="label"
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            tick={{ fontSize: "0.6875rem", fill: "var(--muted-foreground)" }}
           />
           <YAxis
             axisLine={false}
@@ -108,7 +108,7 @@ export function CashflowDivergingBars({ points, currency, isLoading }: CashflowD
             tickFormatter={(v: number) =>
               isBalanceHidden ? "••" : formatting.formatCompactAmount(Math.abs(v), currency)
             }
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            tick={{ fontSize: "0.6875rem", fill: "var(--muted-foreground)" }}
             width={56}
           />
           {/* Zero baseline — solid, slightly stronger than the gridlines */}
@@ -119,7 +119,7 @@ export function CashflowDivergingBars({ points, currency, isLoading }: CashflowD
               if (!active || !payload?.length) return null;
               const d = payload[0].payload as CashflowDatum;
               return (
-                <div className="bg-background min-w-[180px] rounded-md border px-3 py-2 text-xs shadow-sm">
+                <div className="bg-background min-w-45 rounded-md border px-3 py-2 text-xs shadow-sm">
                   <div className="text-foreground mb-1 font-semibold">{d.label}</div>
                   <Row
                     label={t("spending:cashFlow.income")}
@@ -152,7 +152,7 @@ export function CashflowDivergingBars({ points, currency, isLoading }: CashflowD
             height={28}
             iconType="circle"
             iconSize={8}
-            wrapperStyle={{ fontSize: 11 }}
+            wrapperStyle={{ fontSize: "0.6875rem" }}
           />
           {/* Same `stackId` on both bars + parent `stackOffset="sign"`:
               recharts puts them in the same x slot and lets each grow in its

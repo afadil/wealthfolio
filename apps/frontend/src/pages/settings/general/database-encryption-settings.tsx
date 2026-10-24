@@ -14,6 +14,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Switch } from "@wealthfolio/ui/components/ui/switch";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemTitle,
+} from "@wealthfolio/ui/components/ui/item";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -57,24 +64,28 @@ export function DatabaseEncryptionSettings() {
           <CardTitle className="text-lg">{t("settings:database_encryption_title")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="space-y-0.5">
-              <Label htmlFor="database-encryption" className="text-base">
-                {t("settings:database_encryption_enable")}
-              </Label>
-              <p className="text-muted-foreground text-xs">
+          <Item className="p-0">
+            <ItemContent>
+              <ItemTitle>
+                <Label htmlFor="database-encryption">
+                  {t("settings:database_encryption_enable")}
+                </Label>
+              </ItemTitle>
+              <ItemDescription className="line-clamp-none">
                 {isWeb
                   ? t("settings:database_encryption_server_managed")
                   : t("settings:database_encryption_description")}
-              </p>
-            </div>
-            <Switch
-              id="database-encryption"
-              checked={status.enabled}
-              onCheckedChange={(next) => setPendingValue(next)}
-              disabled={!status.supported || isBusy}
-            />
-          </div>
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Switch
+                id="database-encryption"
+                checked={status.enabled}
+                onCheckedChange={(next) => setPendingValue(next)}
+                disabled={!status.supported || isBusy}
+              />
+            </ItemActions>
+          </Item>
           <p className="text-muted-foreground text-xs">
             {isWeb
               ? t("settings:database_encryption_server_backup_warning")

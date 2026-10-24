@@ -7,6 +7,7 @@ import {
   MoneyInput,
   useAmountFormatting,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Sheet, SheetDescription, SheetTitle } from "@wealthfolio/ui/components/ui/sheet";
@@ -91,7 +92,7 @@ export function CloseLoanDialog({
             onClick={handleSubmit}
             disabled={isSubmitting || isDateInvalid}
           >
-            {isSubmitting && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+            {isSubmitting && <Spinner className="me-2 h-4 w-4" />}
             {t("asset:loanActions.confirm_close")}
           </Button>
         </LoanSheetFooter>
@@ -204,7 +205,7 @@ export function RecalculateScheduleDialog({
             <span className="text-muted-foreground">
               {t("asset:loanActions.recalculate_current_balance")}
             </span>
-            <span className="text-right font-medium">
+            <span className="text-end font-medium">
               {calculation ? (
                 <AmountDisplay value={calculation.currentBalance} currency={currency} />
               ) : (
@@ -214,13 +215,13 @@ export function RecalculateScheduleDialog({
             <span className="text-muted-foreground">
               {t("asset:loanActions.remaining_payments")}
             </span>
-            <span className="text-right font-medium">
+            <span className="text-end font-medium">
               {calculation ? calculation.remainingPayments : unavailable}
             </span>
             {endDate && (
               <>
                 <span className="text-muted-foreground">{t("asset:altContent.end_date")}</span>
-                <span className="text-right font-medium">
+                <span className="text-end font-medium">
                   {endDate.toLocaleDateString(i18n.language, {
                     month: "short",
                     year: "numeric",
@@ -269,7 +270,7 @@ export function RecalculateScheduleDialog({
               newPayment <= 0
             }
           >
-            {isSubmitting && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+            {isSubmitting && <Spinner className="me-2 h-4 w-4" />}
             {t("asset:loanActions.recalculate_confirm")}
           </Button>
         </LoanSheetFooter>
@@ -444,7 +445,7 @@ export function LoanBalanceEventDialog({
             {t("common:cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={invalid || isSubmitting}>
-            {isSubmitting && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+            {isSubmitting && <Spinner className="me-2 h-4 w-4" />}
             {t(
               isCorrection
                 ? "asset:loanActions.confirm_balance"

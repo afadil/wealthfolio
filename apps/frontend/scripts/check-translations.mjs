@@ -16,8 +16,9 @@ const flatten = (value, prefix = "") => {
 };
 const read = (language, file) =>
   flatten(JSON.parse(readFileSync(path.join(root, language, file), "utf8")));
-const placeholders = (text) =>
+const placeholders = (text, omitCount = false) =>
   [...new Set([...text.matchAll(/{{\s*-?\s*([^},\s]+)[^}]*}}/g)].map((m) => m[1]))]
+    .filter((name) => !omitCount || name !== "count")
     .sort()
     .join(",");
 const plural = /_(zero|one|two|few|many|other)$/;
@@ -35,6 +36,7 @@ for (const language of readdirSync(root).filter((l) => l !== "en")) {
     const source = read("en", file),
       target = read(language, file);
     const expected = new Map();
+    const implicitCounts = new Set();
     for (const [key, value] of Object.entries(source)) {
       const match = key.match(plural);
       // A suffix alone can be a label such as type_other, not a plural family.
@@ -47,6 +49,11 @@ for (const language of readdirSync(root).filter((l) => l !== "en")) {
         // Validate retained English plural forms too, without requiring them.
         if (key in target) expected.set(key, value);
         for (const category of categories) {
+          // Arabic can express exact counts in the words themselves (e.g. the
+          // dual noun for two). Other variables and open-ended counts stay required.
+          if (language === "ar" && ["zero", "one", "two"].includes(category)) {
+            implicitCounts.add(`${base}_${category}`);
+          }
           expected.set(
             `${base}_${category}`,
             source[`${base}_${category}`] ?? source[`${base}_other`],
@@ -63,7 +70,9 @@ for (const language of readdirSync(root).filter((l) => l !== "en")) {
         errors.push(`${file}:${key}: type mismatch`);
       else if (
         typeof value === "string" &&
-        ((!target[key].trim() && value.trim()) || placeholders(value) !== placeholders(target[key]))
+        ((!target[key].trim() && value.trim()) ||
+          (placeholders(value) !== placeholders(target[key]) &&
+            !(implicitCounts.has(key) && placeholders(value, true) === placeholders(target[key]))))
       )
         errors.push(`${file}:${key}: empty text or interpolation mismatch`);
     }

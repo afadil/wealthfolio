@@ -1,5 +1,6 @@
 import { CloudWarningIcon } from "@phosphor-icons/react/dist/csr/CloudWarning";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Spinner } from "@wealthfolio/ui/components/ui/spinner";
 import { cn } from "@wealthfolio/ui/lib/utils";
 import type { AggregatedSyncStatus } from "../types";
 
@@ -13,12 +14,7 @@ export function SyncStatusIcon({ status, className }: SyncStatusIconProps) {
 
   if (status === "restoring")
     return (
-      <Icons.Spinner
-        className={cn(
-          iconClassName,
-          "text-muted-foreground animate-spin motion-reduce:animate-none",
-        )}
-      />
+      <Spinner className={cn(iconClassName, "text-muted-foreground motion-reduce:animate-none")} />
     );
   if (status === "subscription_required" || status === "unavailable") {
     return <CloudWarningIcon weight="duotone" className={cn(iconClassName, "text-warning")} />;
@@ -43,8 +39,8 @@ function StatusIndicator({ status }: { status: AggregatedSyncStatus }) {
   if (status === "needs_review") {
     // Yellow/warning dot
     return (
-      <span className="absolute -right-0.5 -top-0.5 flex h-1.5 w-1.5">
-        <span className="absolute inline-flex h-full w-full rounded-full bg-yellow-500/80" />
+      <span className="absolute -end-0.5 -top-0.5 flex h-1.5 w-1.5">
+        <span className="bg-warning/80 absolute inline-flex h-full w-full rounded-full" />
       </span>
     );
   }
@@ -52,8 +48,8 @@ function StatusIndicator({ status }: { status: AggregatedSyncStatus }) {
   if (status === "failed") {
     // Red/error dot
     return (
-      <span className="absolute -right-0.5 -top-0.5 flex h-1.5 w-1.5">
-        <span className="absolute inline-flex h-full w-full rounded-full bg-red-500/80" />
+      <span className="absolute -end-0.5 -top-0.5 flex h-1.5 w-1.5">
+        <span className="bg-destructive/80 absolute inline-flex h-full w-full rounded-full" />
       </span>
     );
   }

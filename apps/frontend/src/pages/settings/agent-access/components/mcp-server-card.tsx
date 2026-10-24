@@ -58,11 +58,9 @@ function ConnectHelp({ serverUrl }: { serverUrl: string }) {
   const { t } = useTranslation();
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-          <Icons.HelpCircle className="text-muted-foreground h-4 w-4" />
-          <span className="sr-only">{t("settings:agentAccess.help_aria")}</span>
-        </Button>
+      <PopoverTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" />}>
+        <Icons.HelpCircle className="text-muted-foreground h-4 w-4" />
+        <span className="sr-only">{t("settings:agentAccess.help_aria")}</span>
       </PopoverTrigger>
       <PopoverContent
         align="end"
@@ -70,7 +68,7 @@ function ConnectHelp({ serverUrl }: { serverUrl: string }) {
       >
         <div className="space-y-1.5">
           <p className="font-medium">{t("settings:agentAccess.help_title")}</p>
-          <ol className="text-muted-foreground list-decimal space-y-1 pl-4 text-xs">
+          <ol className="text-muted-foreground list-decimal space-y-1 ps-4 text-xs">
             <li>{t("settings:agentAccess.help_step_enable")}</li>
             <li>{t("settings:agentAccess.help_step_token")}</li>
             <li>
@@ -121,7 +119,7 @@ function SettingRow({
         checked={checked}
         disabled={disabled}
         onCheckedChange={onCheckedChange}
-        className="data-[state=checked]:bg-success data-[state=unchecked]:bg-muted-foreground/40"
+        className="data-checked:bg-success data-unchecked:bg-muted-foreground/40"
       />
     </div>
   );

@@ -3,7 +3,7 @@
 // confirms it; the claimer shows it and waits for that confirmation.
 // ==================================================================
 
-import { Icons, Skeleton } from "@wealthfolio/ui";
+import { Icons, Skeleton, Spinner } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
@@ -50,7 +50,7 @@ export function SASVerification({ sas, onConfirm, onReject, isLoading }: SASVeri
       actions={
         <>
           <Button className="w-full gap-2" onClick={onConfirm} disabled={disabled}>
-            {isLoading && <Icons.Spinner className="size-4 animate-spin" aria-hidden />}
+            {isLoading && <Spinner className="size-4" aria-hidden />}
             {t("sync:sas.codesMatch")}
           </Button>
           <Button variant="ghost" className="w-full" onClick={onReject} disabled={disabled}>
@@ -84,7 +84,7 @@ export function SASWaiting({ sas, onCancel }: { sas: string | null; onCancel: ()
           role="status"
           className="text-muted-foreground flex items-center justify-center gap-2 text-sm"
         >
-          <Icons.Spinner className="size-3.5 animate-spin" aria-hidden />
+          <Spinner className="size-3.5" aria-hidden />
           {t("sync:waiting.waitingForConfirmation")}
         </p>
       </div>

@@ -27,7 +27,7 @@ baseline:
             contributions: "700"
             distributions: "0"
             fees: "0"
-            fx_effect: "0"
+            fx_effect: "40"
             income: "0"
             realized_pnl: "0"
             residual: "0"
@@ -39,7 +39,7 @@ baseline:
           method: timeWeighted
           period_end: 2025-01-12
           period_start: 2025-01-06
-          quality: partial
+          quality: ok
           returns:
             annualized_irr: "28.45355724"
             annualized_twr: ~
@@ -70,14 +70,14 @@ baseline:
             - date: 2025-01-12
               value: "0.05714286"
           summary:
-            amount: "0"
+            amount: "40"
             amount_status: complete
             basis: marketValue
             basis_status: notApplicable
             method: timeWeighted
             percent: "0.05714286"
             percent_status: complete
-            quality: partial
+            quality: ok
       tracking_mode: TRANSACTIONS
       valuations:
         - basis_status: notApplicable
@@ -227,7 +227,7 @@ baseline:
         contributions: "700"
         distributions: "0"
         fees: "0"
-        fx_effect: "0"
+        fx_effect: "40"
         income: "0"
         realized_pnl: "0"
         residual: "0"
@@ -239,7 +239,7 @@ baseline:
       method: timeWeighted
       period_end: 2025-01-12
       period_start: 2025-01-06
-      quality: partial
+      quality: ok
       returns:
         annualized_irr: "28.45355724"
         annualized_twr: ~
@@ -270,13 +270,13 @@ baseline:
         - date: 2025-01-12
           value: "0.05714286"
       summary:
-        amount: "0"
+        amount: "40"
         amount_status: complete
         basis: marketValue
         basis_status: notApplicable
         method: timeWeighted
         percent: "0.05714286"
         percent_status: complete
-        quality: partial
+        quality: ok
   portfolio_flows: []
 scenario: EDGE-FX-03

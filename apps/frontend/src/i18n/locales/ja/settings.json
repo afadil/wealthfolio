@@ -47,6 +47,7 @@
   "nav_about_subtitle": "Wealthfolioについて",
   "general_page_description": "アプリケーションの一般設定と各種オプションを管理します。",
   "currency_select_error": "基準通貨を選択してください。",
+  "currency_code_error": "USD などの有効な3文字の通貨コードを入力してください。",
   "currency_title": "基準通貨",
   "currency_description": "ポートフォリオの基準通貨を選択します。",
   "currency_save_button": "通貨を保存",
@@ -1035,7 +1036,9 @@
     "review_first_rows_other": "CSVデータの先頭{{count}}行を確認してください",
     "import_quotes_count_other": "{{count}}件の価格をインポート",
     "imported_count_other": "{{count}}件インポート",
-    "failed_count_other": "{{count}}件失敗"
+    "failed_count_other": "{{count}}件失敗",
+    "priority_decrease": "優先度の数値を下げる",
+    "priority_increase": "優先度の数値を上げる"
   },
   "addon_permission_none_detected": "データへのアクセス権限は検出されませんでした。このアドオンのシステムアクセスは最小限のようです。",
   "addon_permission_list_title": "権限",

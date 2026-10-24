@@ -110,6 +110,7 @@
     "description": "選取帳戶，比較一段期間內的績效。"
   },
   "attribution": {
+    "partial_data": "資料不完整",
     "title": "歸因",
     "close": "關閉歸因",
     "period_gain_loss": "期間損益",

@@ -14,7 +14,7 @@ const SUPPORTED_FORMATTING_REGIONS: &[&str] = &[
     "JP", "KR", "IT", "RO", "BG",
 ];
 const SUPPORTED_UI_LANGUAGES: &[&str] = &[
-    "en", "fr", "de", "es", "pt", "zh", "zh-Hant", "ja", "ko", "it",
+    "en", "fr", "de", "es", "pt", "zh", "zh-Hant", "ja", "ko", "it", "ar",
 ];
 
 /// Traditional Chinese is written in Taiwan, Hong Kong and Macau. Match the
@@ -111,6 +111,18 @@ fn is_currency_code(code: &str) -> bool {
         && get_normalization_rule(code).is_none()
 }
 
+/// A quote unit such as GBp is priced in its major currency, so it cannot be the
+/// base either.
+fn validate_base_currency(code: &str) -> Result<()> {
+    if is_currency_code(code) {
+        Ok(())
+    } else {
+        Err(Error::InvalidConfigValue(format!(
+            "Unsupported base currency: {code}"
+        )))
+    }
+}
+
 /// A currency override names a concrete region; following the system locale is
 /// what `formatting_region` is for.
 fn is_currency_formatting_region(region: &str) -> bool {
@@ -200,6 +212,9 @@ impl SettingsServiceTrait for SettingsService {
         }
         if let Some(ref language) = normalized_settings.language {
             normalized_settings.language = Some(validate_ui_language(language)?);
+        }
+        if let Some(ref base_currency) = normalized_settings.base_currency {
+            validate_base_currency(base_currency)?;
         }
 
         // Validate the whole update first: a rejected update must not change the
@@ -324,6 +339,7 @@ mod tests {
         assert_eq!(normalize_ui_language("fr_CA"), "fr");
         assert_eq!(normalize_ui_language("ja-JP"), "ja");
         assert_eq!(normalize_ui_language("ko_KR"), "ko");
+        assert_eq!(normalize_ui_language("ar-SA"), "ar");
     }
 
     #[test]

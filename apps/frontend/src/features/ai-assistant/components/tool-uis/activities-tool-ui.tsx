@@ -25,6 +25,7 @@ import { useTranslation } from "react-i18next";
 import {
   CompactToolCard,
   createActivityAmountFormatter,
+  createActivityPriceFormatter,
   createActivityQuantityFormatter,
   formatActivityAmount,
   formatActivityDate,
@@ -193,6 +194,10 @@ function ActivitiesContentImpl({ args, result, status }: ActivitiesContentProps)
     () => createActivityAmountFormatter(amountFormatting),
     [amountFormatting],
   );
+  const priceFormatter = useMemo(
+    () => createActivityPriceFormatter(amountFormatting),
+    [amountFormatting],
+  );
   const quantityFormatter = useMemo(
     () => createActivityQuantityFormatter(numberFormatting),
     [numberFormatting],
@@ -228,16 +233,16 @@ function ActivitiesContentImpl({ args, result, status }: ActivitiesContentProps)
           </div>
         </CardHeader>
         <CardContent className="px-0 pb-0">
-          <div className="max-h-[320px] overflow-y-auto">
+          <div className="max-h-80 overflow-y-auto">
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="pl-4 text-xs">{t("ai:activities.date")}</TableHead>
+                  <TableHead className="ps-4 text-xs">{t("ai:activities.date")}</TableHead>
                   <TableHead className="text-xs">{t("ai:activities.type")}</TableHead>
                   <TableHead className="text-xs">{t("ai:activities.symbol")}</TableHead>
-                  <TableHead className="text-right text-xs">{t("ai:activities.qty")}</TableHead>
-                  <TableHead className="text-right text-xs">{t("ai:activities.price")}</TableHead>
-                  <TableHead className="pr-4 text-right text-xs">
+                  <TableHead className="text-end text-xs">{t("ai:activities.qty")}</TableHead>
+                  <TableHead className="text-end text-xs">{t("ai:activities.price")}</TableHead>
+                  <TableHead className="pe-4 text-end text-xs">
                     {t("ai:activities.amount")}
                   </TableHead>
                 </TableRow>
@@ -245,7 +250,7 @@ function ActivitiesContentImpl({ args, result, status }: ActivitiesContentProps)
               <TableBody>
                 {Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i} className="text-xs">
-                    <TableCell className="py-2 pl-4">
+                    <TableCell className="py-2 ps-4">
                       <Skeleton className="h-4 w-20" />
                     </TableCell>
                     <TableCell className="py-2">
@@ -254,14 +259,14 @@ function ActivitiesContentImpl({ args, result, status }: ActivitiesContentProps)
                     <TableCell className="py-2">
                       <Skeleton className="h-4 w-12" />
                     </TableCell>
-                    <TableCell className="py-2 text-right">
-                      <Skeleton className="ml-auto h-4 w-10" />
+                    <TableCell className="py-2 text-end">
+                      <Skeleton className="ms-auto h-4 w-10" />
                     </TableCell>
-                    <TableCell className="py-2 text-right">
-                      <Skeleton className="ml-auto h-4 w-12" />
+                    <TableCell className="py-2 text-end">
+                      <Skeleton className="ms-auto h-4 w-12" />
                     </TableCell>
-                    <TableCell className="py-2 pr-4 text-right">
-                      <Skeleton className="ml-auto h-4 w-16" />
+                    <TableCell className="py-2 pe-4 text-end">
+                      <Skeleton className="ms-auto h-4 w-16" />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -321,18 +326,16 @@ function ActivitiesContentImpl({ args, result, status }: ActivitiesContentProps)
         </div>
       </CardHeader>
       <CardContent className="px-0 pb-0">
-        <div className="max-h-[320px] overflow-y-auto">
+        <div className="max-h-80 overflow-y-auto">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4 text-xs">{t("ai:activities.date")}</TableHead>
+                <TableHead className="ps-4 text-xs">{t("ai:activities.date")}</TableHead>
                 <TableHead className="text-xs">{t("ai:activities.type")}</TableHead>
                 <TableHead className="text-xs">{t("ai:activities.symbol")}</TableHead>
-                <TableHead className="text-right text-xs">{t("ai:activities.qty")}</TableHead>
-                <TableHead className="text-right text-xs">{t("ai:activities.price")}</TableHead>
-                <TableHead className="pr-4 text-right text-xs">
-                  {t("ai:activities.amount")}
-                </TableHead>
+                <TableHead className="text-end text-xs">{t("ai:activities.qty")}</TableHead>
+                <TableHead className="text-end text-xs">{t("ai:activities.price")}</TableHead>
+                <TableHead className="pe-4 text-end text-xs">{t("ai:activities.amount")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -340,13 +343,13 @@ function ActivitiesContentImpl({ args, result, status }: ActivitiesContentProps)
                 const badgeProps = getActivityTypeBadge(activity.activityType);
                 return (
                   <TableRow key={activity.id} className="text-xs">
-                    <TableCell className="py-2 pl-4 font-medium tabular-nums">
+                    <TableCell className="py-2 ps-4 font-medium tabular-nums">
                       {formatActivityDate(activity.date, dateFormatting)}
                     </TableCell>
                     <TableCell className="py-2">
                       <Badge
                         variant={badgeProps.variant}
-                        className={cn("text-[10px] uppercase", badgeProps.className)}
+                        className={cn("text-2xs uppercase", badgeProps.className)}
                       >
                         {formatActivityType(activity.activityType)}
                       </Badge>
@@ -358,23 +361,23 @@ function ActivitiesContentImpl({ args, result, status }: ActivitiesContentProps)
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
-                    <TableCell className="py-2 text-right tabular-nums">
+                    <TableCell className="py-2 text-end tabular-nums">
                       {formatActivityQuantity(
                         activity.quantity,
                         quantityFormatter,
                         isBalanceHidden,
                       )}
                     </TableCell>
-                    <TableCell className="py-2 text-right tabular-nums">
+                    <TableCell className="py-2 text-end tabular-nums">
                       {formatActivityAmount(
                         activity.unitPrice,
-                        formatter,
+                        priceFormatter,
                         isBalanceHidden,
                         activity.currency,
                         { showCurrency: false },
                       )}
                     </TableCell>
-                    <TableCell className="py-2 pr-4 text-right font-medium tabular-nums">
+                    <TableCell className="py-2 pe-4 text-end font-medium tabular-nums">
                       {formatActivityAmount(
                         activity.amount,
                         formatter,

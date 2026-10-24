@@ -30,6 +30,12 @@ const mocks = vi.hoisted(() => ({
         props: ComponentProps<typeof import("../components/renew-loan-dialog").RenewLoanDialog>,
       ) => void
     >(),
+  rateSheet:
+    vi.fn<
+      (
+        props: ComponentProps<typeof import("../components/change-rate-sheet").ChangeRateSheet>,
+      ) => void
+    >(),
 }));
 vi.mock("@/lib/settings-provider", () => ({
   useSettingsContext: () => ({ settings: { timezone: "UTC" } }),
@@ -87,6 +93,14 @@ vi.mock("../components/loan-action-dialogs", () => ({
   },
   RecalculateScheduleDialog: (props: ComponentProps<Dialogs["RecalculateScheduleDialog"]>) => {
     mocks.recalcSheet(props);
+    return null;
+  },
+}));
+vi.mock("../components/change-rate-sheet", () => ({
+  ChangeRateSheet: (
+    props: ComponentProps<typeof import("../components/change-rate-sheet").ChangeRateSheet>,
+  ) => {
+    mocks.rateSheet(props);
     return null;
   },
 }));
@@ -245,6 +259,37 @@ describe("loan actions are single backend calls", () => {
         balance: 640,
       },
     ]);
+  });
+
+  it("sends a rate change with the payment only when one was entered", async () => {
+    show();
+    expect(availability.changeRate).toBe(true);
+    act(() => actions.changeRate());
+    expect(mocks.rateSheet.mock.lastCall![0].open).toBe(true);
+    await act(async () => {
+      await mocks.rateSheet.mock.lastCall![0].onSubmit({
+        effectiveDate: new Date(2026, 5, 1),
+        annualRate: 5.25,
+      });
+    });
+    expect(sent()).toEqual(["loan", { type: "change_rate", date: "2026-06-01", annualRate: 5.25 }]);
+    expect(mocks.rateSheet.mock.lastCall![0].open).toBe(false);
+    await act(async () => {
+      await mocks.rateSheet.mock.lastCall![0].onSubmit({
+        effectiveDate: new Date(2026, 5, 1),
+        annualRate: 5.25,
+        paymentAmount: 512.4,
+      });
+    });
+    expect(sent()).toEqual([
+      "loan",
+      { type: "change_rate", date: "2026-06-01", annualRate: 5.25, paymentAmount: 512.4 },
+    ]);
+  });
+
+  it("offers a rate change only while the loan is calculated", () => {
+    show(holding({ tracking_mode: "manual" }));
+    expect(availability.changeRate).toBe(false);
   });
 
   it("sends recalculation, confirmation and repayment on their calendar day", async () => {

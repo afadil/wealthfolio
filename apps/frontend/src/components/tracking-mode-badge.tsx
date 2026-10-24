@@ -38,12 +38,9 @@ export function TrackingModeBadge({ account, syncEnabled, className }: TrackingM
       return (
         <Badge
           variant="outline"
-          className={cn(
-            "rounded-sm border-blue-500/30 text-blue-600 dark:text-blue-400",
-            className,
-          )}
+          className={cn("border-info-subtle-border text-info rounded-sm", className)}
         >
-          <Icons.Receipt className="mr-1 h-3 w-3" />
+          <Icons.Receipt className="me-1 h-3 w-3" />
           {t("common:component.tracking_transactions")}
         </Badge>
       );
@@ -53,7 +50,7 @@ export function TrackingModeBadge({ account, syncEnabled, className }: TrackingM
           variant="outline"
           className={cn("border-success/30 text-success rounded-sm", className)}
         >
-          <Icons.Holdings className="mr-1 h-3 w-3" />
+          <Icons.Holdings className="me-1 h-3 w-3" />
           {t("common:component.tracking_holdings")}
         </Badge>
       );
@@ -64,7 +61,7 @@ export function TrackingModeBadge({ account, syncEnabled, className }: TrackingM
           variant="outline"
           className={cn("border-warning/30 text-warning rounded-sm", className)}
         >
-          <Icons.AlertTriangle className="mr-1 h-3 w-3" />
+          <Icons.AlertTriangle className="me-1 h-3 w-3" />
           {t("common:component.tracking_needs_setup")}
         </Badge>
       );

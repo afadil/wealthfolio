@@ -2,6 +2,7 @@ import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
+import { Spinner } from "@wealthfolio/ui";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -63,7 +64,7 @@ export function StepNavigation({
           disabled={!canGoBack}
           className="w-full sm:w-auto"
         >
-          <Icons.ArrowLeft className="mr-2 h-4 w-4" />
+          <Icons.ArrowLeft className="me-2 h-4 w-4 rtl:rotate-180" />
           {resolvedBackLabel}
         </Button>
       </motion.div>
@@ -83,13 +84,13 @@ export function StepNavigation({
           >
             {isNextLoading ? (
               <>
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="me-2 h-4 w-4" />
                 {resolvedNextLoadingLabel}
               </>
             ) : (
               <>
                 {resolvedNextLabel}
-                <Icons.ArrowRight className="ml-2 h-4 w-4" />
+                <Icons.ArrowRight className="ms-2 h-4 w-4 rtl:rotate-180" />
               </>
             )}
           </Button>

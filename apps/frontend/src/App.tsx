@@ -8,9 +8,11 @@ import { Toaster } from "@/components/sonner";
 import { AuthGate, AuthProvider } from "@/context/auth-context";
 import { EventDialogProvider } from "@/features/spending/components/event-dialog-provider";
 import { WealthfolioConnectProvider } from "@/features/wealthfolio-connect";
+import { AppDirectionProvider } from "@/i18n/direction";
 import { SettingsProvider } from "@/lib/settings-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@wealthfolio/ui";
+import { MotionConfig } from "motion/react";
 import { useState } from "react";
 import { PrivacyProvider } from "./context/privacy-context";
 import { LoginPage } from "./pages/auth/login-page";
@@ -52,21 +54,25 @@ function App() {
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        {isWebEnv ? (
-          <AuthGate fallback={<LoginPage />}>
-            <ProfileShell>
-              <NativeDatabaseGate>{content}</NativeDatabaseGate>
-            </ProfileShell>
-          </AuthGate>
-        ) : (
-          <ProfileShell>
-            <NativeDatabaseGate>{content}</NativeDatabaseGate>
-          </ProfileShell>
-        )}
-      </AuthProvider>
-    </QueryClientProvider>
+    <AppDirectionProvider>
+      <MotionConfig reducedMotion="user">
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            {isWebEnv ? (
+              <AuthGate fallback={<LoginPage />}>
+                <ProfileShell>
+                  <NativeDatabaseGate>{content}</NativeDatabaseGate>
+                </ProfileShell>
+              </AuthGate>
+            ) : (
+              <ProfileShell>
+                <NativeDatabaseGate>{content}</NativeDatabaseGate>
+              </ProfileShell>
+            )}
+          </AuthProvider>
+        </QueryClientProvider>
+      </MotionConfig>
+    </AppDirectionProvider>
   );
 }
 

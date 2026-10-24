@@ -9,6 +9,7 @@ import {
   removeAddonRoute,
 } from "@/addons/addons-runtime-context";
 import { loadAddonAsset, logger } from "@/adapters";
+import { generateId, generateSecureUuid } from "@/lib/id";
 import { toast } from "sonner";
 import { collectAddonThemeSnapshot, type AddonThemeSnapshot } from "./addon-sandbox-theme";
 import {
@@ -126,7 +127,7 @@ interface SandboxMessage {
 }
 
 function createNonce() {
-  return crypto.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36)}`;
+  return generateSecureUuid();
 }
 
 function createAddonLoadCancelledError(addonId: string, reason = "was unloaded before it loaded") {
@@ -161,11 +162,14 @@ function createSandboxBootstrapParams(
   if (localization.uiLocale) {
     params.set("uiLocale", localization.uiLocale);
   }
+  if (localization.direction) {
+    params.set("direction", localization.direction);
+  }
   return params.toString();
 }
 
 function makeRequestId() {
-  return crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
+  return generateId();
 }
 
 function formatUnknownError(error: unknown) {
@@ -473,11 +477,11 @@ export class AddonIframeManager {
     if (input.isCurrent?.() === false) {
       throw createAddonLoadCancelledError(input.addonId, "load was superseded by a reload");
     }
+    const nonce = createNonce();
     this.ensureListener();
     this.ensureThemeObserver();
     this.ensureLocalizationListener();
 
-    const nonce = createNonce();
     const initialTheme = collectAddonThemeSnapshot();
     const initialLocalization = collectAddonLocalizationSnapshot();
     const sandboxBootstrapParams = createSandboxBootstrapParams(

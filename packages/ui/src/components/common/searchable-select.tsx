@@ -1,9 +1,18 @@
-import * as React from "react";
-import { Icons } from "../ui/icons";
 import { cn } from "../../lib/utils";
+import { Icons } from "../ui/icons";
+import { InputGroupAddon } from "../ui/input-group";
 import { Button } from "../ui/button";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "../ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxSeparator,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "../ui/combobox";
 
 interface Option {
   value: string;
@@ -21,8 +30,13 @@ interface SearchableSelectProps {
   emptyMessage?: string;
   className?: string;
   contentClassName?: string;
+  "data-testid"?: string;
+  /** Names the trigger when no visible label is tied to it. */
+  "aria-label"?: string;
 }
 
+// A select-style field whose list has a search box: shadcn's Combobox with the
+// input inside the popup, filtering on the option labels.
 export function SearchableSelect({
   options = [],
   value,
@@ -33,47 +47,53 @@ export function SearchableSelect({
   emptyMessage = "No results found.",
   className = "",
   contentClassName = "",
+  "data-testid": testId,
+  "aria-label": ariaLabel,
 }: SearchableSelectProps) {
-  const [open, setOpen] = React.useState(false);
-
-  const selectedOption = options?.find((option) => option.value === value);
+  const selectedOption = options.find((option) => option.value === value) ?? null;
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className={cn("w-full justify-between rounded-md font-normal", className)}
-          disabled={disabled}
-        >
-          <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
-          <Icons.ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className={cn("w-[var(--radix-popover-trigger-width)] p-0", contentClassName)}>
-        <Command>
-          <CommandInput placeholder={searchPlaceholder} className="h-9" />
-          <CommandEmpty>{emptyMessage}</CommandEmpty>
-          <CommandGroup className="max-h-64 overflow-auto">
-            {options.map((option) => (
-              <CommandItem
-                key={option.value}
-                value={option.label}
-                onSelect={() => {
-                  onValueChange(option.value);
-                  setOpen(false);
-                }}
-                className={option.className}
-              >
-                {option.label}
-                <Icons.Check className={cn("ml-auto h-4 w-4", value === option.value ? "opacity-100" : "opacity-0")} />
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <Combobox<Option>
+      items={options}
+      value={selectedOption}
+      onValueChange={(option) => {
+        if (option) onValueChange(option.value);
+      }}
+      itemToStringLabel={(option) => option.label}
+      isItemEqualToValue={(item, selected) => item.value === selected.value}
+      disabled={disabled}
+    >
+      <ComboboxTrigger
+        render={
+          <Button
+            variant="field"
+            className={cn("w-full justify-between", className)}
+            disabled={disabled}
+            data-testid={testId}
+            aria-label={ariaLabel}
+          />
+        }
+      >
+        <span className={cn("truncate", !selectedOption && "text-muted-foreground")}>
+          <ComboboxValue placeholder={placeholder} />
+        </span>
+      </ComboboxTrigger>
+      <ComboboxContent className={cn("w-(--anchor-width)", contentClassName)}>
+        <ComboboxInput showTrigger={false} placeholder={searchPlaceholder} className="w-full">
+          <InputGroupAddon>
+            <Icons.Search className="opacity-50" />
+          </InputGroupAddon>
+        </ComboboxInput>
+        <ComboboxSeparator className="mx-0 my-0" />
+        <ComboboxEmpty>{emptyMessage}</ComboboxEmpty>
+        <ComboboxList>
+          {(option: Option) => (
+            <ComboboxItem key={option.value} value={option} className={option.className}>
+              {option.label}
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
   );
 }

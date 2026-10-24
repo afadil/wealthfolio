@@ -55,6 +55,7 @@ export function RateCell({ rate, onUpdate }: RateCellProps) {
       <div className="w-24">
         {isManual && isEditing ? (
           <Input
+            aria-label={t("settings:exchange_rates_rate")}
             value={editedRate}
             onChange={(e) => setEditedRate(e.target.value)}
             className="w-full"
@@ -67,15 +68,25 @@ export function RateCell({ rate, onUpdate }: RateCellProps) {
         <div className="flex space-x-1">
           {isEditing ? (
             <>
-              <Button variant="outline" size="icon" onClick={handleCancelEdit}>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleCancelEdit}
+                aria-label={t("common:cancel")}
+              >
                 <Icons.Close className="h-4 w-4" />
               </Button>
-              <Button size="icon" onClick={handleSubmit}>
+              <Button size="icon" onClick={handleSubmit} aria-label={t("common:save")}>
                 <Icons.Check className="h-4 w-4" />
               </Button>
             </>
           ) : (
-            <Button variant="outline" size="icon" onClick={handleEdit}>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleEdit}
+              aria-label={t("common:edit")}
+            >
               <Icons.Pencil className="h-4 w-4" />
             </Button>
           )}

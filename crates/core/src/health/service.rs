@@ -10,7 +10,7 @@ use rust_decimal::Decimal;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::portfolio::coordinator::ProjectionFreshnessTrait;
+use crate::portfolio::coordinator::{blocking, ProjectionFreshnessTrait};
 use crate::portfolio::projection::{ActivityIssue, ActivityIssueKind};
 use tokio::sync::RwLock;
 
@@ -467,185 +467,39 @@ impl HealthService {
             .iter()
             .map(|a| (a.id.clone(), a.tracking_mode))
             .collect();
-        let negative_balance_accounts = valuation_service
-            .get_accounts_with_negative_balance(&account_ids)
-            .unwrap_or_else(|e| {
-                warn!("Failed to check for negative account balances: {}", e);
-                Vec::new()
-            });
-        let mut consistency_issues: Vec<ConsistencyIssueInfo> = negative_balance_accounts
-            .into_iter()
-            .map(|info| {
-                let name = account_name_map
-                    .get(&info.account_id)
-                    .cloned()
-                    .unwrap_or_else(|| info.account_id.clone());
-                ConsistencyIssueInfo {
-                    issue_type: super::checks::ConsistencyIssueType::NegativeAccountBalance,
-                    record_id: info.account_id.clone(),
-                    description: name,
-                    account_id: Some(info.account_id),
-                    asset_id: None,
-                    first_negative_date: Some(info.first_negative_date),
-                    cash_balance: Some(info.cash_balance),
-                    total_value_at_date: Some(info.total_value),
-                    account_currency: Some(info.account_currency),
-                    activity_date: None,
-                    asset_symbol: None,
-                    asset_name: None,
-                    quantity: None,
-                    proceeds: None,
-                    reason: None,
-                    activity_id: None,
-                    snapshot_date_raw: None,
-                    snapshot_source: None,
-                    snapshot_min_date: None,
-                    snapshot_max_date: None,
-                }
-            })
-            .collect();
-
-        // Check CASH accounts separately — negative balance may be a normal overdraft (INFO only)
-        let cash_account_ids: Vec<String> = accounts
-            .iter()
-            .filter(|a| a.account_type == account_types::CASH)
-            .map(|a| a.id.clone())
-            .collect();
-        if !cash_account_ids.is_empty() {
-            let negative_cash_accounts = valuation_service
-                .get_accounts_with_negative_balance(&cash_account_ids)
+        // Keep history reads and their analysis off the async workers. Holdings
+        // are awaited above, so this work does not wait on another blocking job.
+        let timezone = effective_timezone(configured_timezone, client_timezone).map(str::to_owned);
+        let today = user_today(parse_user_timezone_or_default(
+            timezone.as_deref().unwrap_or_default(),
+        ));
+        let projection_freshness = self.projection_freshness.clone();
+        let handle = tokio::runtime::Handle::current();
+        let gather_history = async move {
+            let effective_timezone = timezone.as_deref();
+            let negative_balance_accounts = valuation_service
+                .get_accounts_with_negative_balance(&account_ids)
                 .unwrap_or_else(|e| {
-                    warn!("Failed to check for negative cash balances: {}", e);
+                    warn!("Failed to check for negative account balances: {}", e);
                     Vec::new()
                 });
-            for info in negative_cash_accounts {
-                let name = account_name_map
-                    .get(&info.account_id)
-                    .cloned()
-                    .unwrap_or_else(|| info.account_id.clone());
-                consistency_issues.push(ConsistencyIssueInfo {
-                    issue_type: super::checks::ConsistencyIssueType::NegativeCashBalance,
-                    record_id: info.account_id.clone(),
-                    description: name,
-                    account_id: Some(info.account_id),
-                    asset_id: None,
-                    first_negative_date: Some(info.first_negative_date),
-                    cash_balance: Some(info.cash_balance),
-                    total_value_at_date: Some(info.total_value),
-                    account_currency: Some(info.account_currency),
-                    activity_date: None,
-                    asset_symbol: None,
-                    asset_name: None,
-                    quantity: None,
-                    proceeds: None,
-                    reason: None,
-                    activity_id: None,
-                    snapshot_date_raw: None,
-                    snapshot_source: None,
-                    snapshot_min_date: None,
-                    snapshot_max_date: None,
-                });
-            }
-        }
-
-        // Gather accounts without tracking mode set
-        let unconfigured_accounts: Vec<UnconfiguredAccountInfo> = accounts
-            .iter()
-            .filter(|acc| acc.tracking_mode == crate::accounts::TrackingMode::NotSet)
-            .map(|acc| UnconfiguredAccountInfo {
-                account_id: acc.id.clone(),
-                account_name: acc.name.clone(),
-            })
-            .collect();
-
-        // Detect invalid, incomplete, or unreviewed transfer flows across all
-        // activities so the Health Center can surface them.
-        let effective_timezone = effective_timezone(configured_timezone, client_timezone);
-        let today = user_today(parse_user_timezone_or_default(
-            effective_timezone.unwrap_or_default(),
-        ));
-        let snapshot_health_accounts = account_service.get_non_archived_accounts()?;
-        // A transfer's other side can sit in an archived account, so pairs are
-        // resolved over every account; the checks read non-archived accounts.
-        let every_activity = activity_service
-            .get_activities_including_archived_accounts()
-            .unwrap_or_else(|e| {
-                warn!("Failed to load activities for Health checks: {}", e);
-                Vec::new()
-            });
-        let invalid_transfer_groups = invalid_transfer_groups_from_activities(
-            &every_activity,
-            &account_name_map,
-            effective_timezone,
-        );
-        let non_archived_account_ids: HashSet<&str> = snapshot_health_accounts
-            .iter()
-            .map(|account| account.id.as_str())
-            .collect();
-        let health_activities: Vec<Activity> = every_activity
-            .into_iter()
-            .filter(|activity| non_archived_account_ids.contains(activity.account_id.as_str()))
-            .collect();
-        consistency_issues.extend(gather_invalid_snapshot_date_issues(
-            snapshot_service.as_ref(),
-            &snapshot_health_accounts,
-            today,
-        ));
-        consistency_issues.extend(gather_invalid_activity_date_issues(
-            &health_activities,
-            &account_name_map,
-            effective_timezone,
-            today,
-        ));
-        let valuation_quality_issues = gather_valuation_quality_issues(
-            valuation_service.as_ref(),
-            snapshot_service.as_ref(),
-            asset_service.as_ref(),
-            quote_service.as_ref(),
-            &all_account_ids,
-            &account_name_map,
-            &account_tracking_map,
-        )
-        .await;
-        consistency_issues.extend(valuation_quality_issues);
-        let missing_lot_disposal_sells = gather_missing_lot_disposal_sells(
-            lot_repository.as_ref(),
-            asset_service.as_ref(),
-            &accounts,
-            &health_activities,
-            effective_timezone,
-        )
-        .await;
-        consistency_issues.extend(missing_lot_disposal_sells);
-        let incomplete_basis_trades = gather_incomplete_basis_trade_activities(
-            asset_service.as_ref(),
-            &accounts,
-            &health_activities,
-            effective_timezone,
-        )
-        .await;
-        consistency_issues.extend(incomplete_basis_trades);
-        consistency_issues.extend(missing_currency_activities_from_data(
-            &accounts,
-            &health_activities,
-            effective_timezone,
-        ));
-        if let Some(freshness) = &self.projection_freshness {
-            match freshness.stale_accounts() {
-                Ok(stale) => consistency_issues.extend(stale.into_iter().map(|stale| {
+            let mut consistency_issues: Vec<ConsistencyIssueInfo> = negative_balance_accounts
+                .into_iter()
+                .map(|info| {
+                    let name = account_name_map
+                        .get(&info.account_id)
+                        .cloned()
+                        .unwrap_or_else(|| info.account_id.clone());
                     ConsistencyIssueInfo {
-                        issue_type: ConsistencyIssueType::StaleProjection,
-                        record_id: stale.account_id.clone(),
-                        description: account_name_map
-                            .get(&stale.account_id)
-                            .cloned()
-                            .unwrap_or_else(|| stale.account_id.clone()),
-                        account_id: Some(stale.account_id),
+                        issue_type: super::checks::ConsistencyIssueType::NegativeAccountBalance,
+                        record_id: info.account_id.clone(),
+                        description: name,
+                        account_id: Some(info.account_id),
                         asset_id: None,
-                        first_negative_date: None,
-                        cash_balance: None,
-                        total_value_at_date: None,
-                        account_currency: None,
+                        first_negative_date: Some(info.first_negative_date),
+                        cash_balance: Some(info.cash_balance),
+                        total_value_at_date: Some(info.total_value),
+                        account_currency: Some(info.account_currency),
                         activity_date: None,
                         asset_symbol: None,
                         asset_name: None,
@@ -658,39 +512,203 @@ impl HealthService {
                         snapshot_min_date: None,
                         snapshot_max_date: None,
                     }
-                })),
-                Err(error) => warn!("Failed to check projection freshness: {}", error),
-            }
-            match freshness.activity_issues() {
-                Ok(issues) => consistency_issues.extend(engine_activity_issues(
-                    issues,
-                    &accounts,
-                    &health_activities,
-                    effective_timezone,
-                )),
-                Err(error) => warn!("Failed to read the engine's activity issues: {}", error),
-            }
-        }
-        let fx_conflicts: Vec<FxConflictInfo> = match &self.projection_freshness {
-            Some(freshness) => match freshness.fx_conflicts() {
-                Ok(conflicts) => conflicts
-                    .into_iter()
-                    .map(|c| FxConflictInfo {
-                        pair_id: format!("{}:{}", c.from, c.to),
-                        from_currency: c.from.as_str().to_string(),
-                        to_currency: c.to.as_str().to_string(),
-                        days: c.days,
-                        first_day: c.first_day,
-                        last_day: c.last_day,
-                    })
-                    .collect(),
-                Err(error) => {
-                    warn!("Failed to check FX rate conflicts: {}", error);
-                    Vec::new()
+                })
+                .collect();
+
+            // Check CASH accounts separately — negative balance may be a normal overdraft (INFO only)
+            let cash_account_ids: Vec<String> = accounts
+                .iter()
+                .filter(|a| a.account_type == account_types::CASH)
+                .map(|a| a.id.clone())
+                .collect();
+            if !cash_account_ids.is_empty() {
+                let negative_cash_accounts = valuation_service
+                    .get_accounts_with_negative_balance(&cash_account_ids)
+                    .unwrap_or_else(|e| {
+                        warn!("Failed to check for negative cash balances: {}", e);
+                        Vec::new()
+                    });
+                for info in negative_cash_accounts {
+                    let name = account_name_map
+                        .get(&info.account_id)
+                        .cloned()
+                        .unwrap_or_else(|| info.account_id.clone());
+                    consistency_issues.push(ConsistencyIssueInfo {
+                        issue_type: super::checks::ConsistencyIssueType::NegativeCashBalance,
+                        record_id: info.account_id.clone(),
+                        description: name,
+                        account_id: Some(info.account_id),
+                        asset_id: None,
+                        first_negative_date: Some(info.first_negative_date),
+                        cash_balance: Some(info.cash_balance),
+                        total_value_at_date: Some(info.total_value),
+                        account_currency: Some(info.account_currency),
+                        activity_date: None,
+                        asset_symbol: None,
+                        asset_name: None,
+                        quantity: None,
+                        proceeds: None,
+                        reason: None,
+                        activity_id: None,
+                        snapshot_date_raw: None,
+                        snapshot_source: None,
+                        snapshot_min_date: None,
+                        snapshot_max_date: None,
+                    });
                 }
-            },
-            None => Vec::new(),
+            }
+
+            // Gather accounts without tracking mode set
+            let unconfigured_accounts: Vec<UnconfiguredAccountInfo> = accounts
+                .iter()
+                .filter(|acc| acc.tracking_mode == crate::accounts::TrackingMode::NotSet)
+                .map(|acc| UnconfiguredAccountInfo {
+                    account_id: acc.id.clone(),
+                    account_name: acc.name.clone(),
+                })
+                .collect();
+
+            // Detect invalid, incomplete, or unreviewed transfer flows across all
+            // activities so the Health Center can surface them.
+            let snapshot_health_accounts = account_service.get_non_archived_accounts()?;
+            // A transfer's other side can sit in an archived account, so pairs are
+            // resolved over every account; the checks read non-archived accounts.
+            let every_activity = activity_service
+                .get_activities_including_archived_accounts()
+                .unwrap_or_else(|e| {
+                    warn!("Failed to load activities for Health checks: {}", e);
+                    Vec::new()
+                });
+            let invalid_transfer_groups = invalid_transfer_groups_from_activities(
+                &every_activity,
+                &account_name_map,
+                effective_timezone,
+            );
+            let non_archived_account_ids: HashSet<&str> = snapshot_health_accounts
+                .iter()
+                .map(|account| account.id.as_str())
+                .collect();
+            let health_activities: Vec<Activity> = every_activity
+                .into_iter()
+                .filter(|activity| non_archived_account_ids.contains(activity.account_id.as_str()))
+                .collect();
+            consistency_issues.extend(gather_invalid_snapshot_date_issues(
+                snapshot_service.as_ref(),
+                &snapshot_health_accounts,
+                today,
+            ));
+            consistency_issues.extend(gather_invalid_activity_date_issues(
+                &health_activities,
+                &account_name_map,
+                effective_timezone,
+                today,
+            ));
+            let valuation_quality_issues = gather_valuation_quality_issues(
+                valuation_service.as_ref(),
+                snapshot_service.as_ref(),
+                asset_service.as_ref(),
+                quote_service.as_ref(),
+                &all_account_ids,
+                &account_name_map,
+                &account_tracking_map,
+            )
+            .await;
+            consistency_issues.extend(valuation_quality_issues);
+            let missing_lot_disposal_sells = gather_missing_lot_disposal_sells(
+                lot_repository.as_ref(),
+                asset_service.as_ref(),
+                &accounts,
+                &health_activities,
+                effective_timezone,
+            )
+            .await;
+            consistency_issues.extend(missing_lot_disposal_sells);
+            let incomplete_basis_trades = gather_incomplete_basis_trade_activities(
+                asset_service.as_ref(),
+                &accounts,
+                &health_activities,
+                effective_timezone,
+            )
+            .await;
+            consistency_issues.extend(incomplete_basis_trades);
+            consistency_issues.extend(missing_currency_activities_from_data(
+                &accounts,
+                &health_activities,
+                effective_timezone,
+            ));
+            if let Some(freshness) = &projection_freshness {
+                match freshness.stale_accounts() {
+                    Ok(stale) => consistency_issues.extend(stale.into_iter().map(|stale| {
+                        ConsistencyIssueInfo {
+                            issue_type: ConsistencyIssueType::StaleProjection,
+                            record_id: stale.account_id.clone(),
+                            description: account_name_map
+                                .get(&stale.account_id)
+                                .cloned()
+                                .unwrap_or_else(|| stale.account_id.clone()),
+                            account_id: Some(stale.account_id),
+                            asset_id: None,
+                            first_negative_date: None,
+                            cash_balance: None,
+                            total_value_at_date: None,
+                            account_currency: None,
+                            activity_date: None,
+                            asset_symbol: None,
+                            asset_name: None,
+                            quantity: None,
+                            proceeds: None,
+                            reason: None,
+                            activity_id: None,
+                            snapshot_date_raw: None,
+                            snapshot_source: None,
+                            snapshot_min_date: None,
+                            snapshot_max_date: None,
+                        }
+                    })),
+                    Err(error) => warn!("Failed to check projection freshness: {}", error),
+                }
+                match freshness.activity_issues() {
+                    Ok(issues) => consistency_issues.extend(engine_activity_issues(
+                        issues,
+                        &accounts,
+                        &health_activities,
+                        effective_timezone,
+                    )),
+                    Err(error) => {
+                        warn!("Failed to read the engine's activity issues: {}", error)
+                    }
+                }
+            }
+            let fx_conflicts: Vec<FxConflictInfo> = match &projection_freshness {
+                Some(freshness) => match freshness.fx_conflicts() {
+                    Ok(conflicts) => conflicts
+                        .into_iter()
+                        .map(|c| FxConflictInfo {
+                            pair_id: format!("{}:{}", c.from, c.to),
+                            from_currency: c.from.as_str().to_string(),
+                            to_currency: c.to.as_str().to_string(),
+                            days: c.days,
+                            first_day: c.first_day,
+                            last_day: c.last_day,
+                        })
+                        .collect(),
+                    Err(error) => {
+                        warn!("Failed to check FX rate conflicts: {}", error);
+                        Vec::new()
+                    }
+                },
+                None => Vec::new(),
+            };
+
+            Ok((
+                consistency_issues,
+                unconfigured_accounts,
+                invalid_transfer_groups,
+                fx_conflicts,
+            ))
         };
+        let (consistency_issues, unconfigured_accounts, invalid_transfer_groups, fx_conflicts) =
+            blocking(move || handle.block_on(gather_history)).await?;
 
         // Run checks with gathered data
         self.run_checks_with_data(

@@ -3,7 +3,7 @@ import {
   DatePickerInput,
   MoneyInput,
   QuantityInput,
-  useAmountFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import {
   AlertDialog,
@@ -38,7 +38,6 @@ import { getAssetIdFromSearchResult } from "@/lib/asset-utils";
 import { HoldingType } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { Account, Holding, SymbolSearchResult } from "@/lib/types";
-import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface EditableHolding {
@@ -47,6 +46,10 @@ interface EditableHolding {
   name?: string;
   quantity: string;
   averageCost: string;
+  /** Total cost basis (shares × cost per share). */
+  totalCost: string;
+  /** How to reconcile the two cost fields when the share count changes. */
+  reconcileShares?: CostReconciler;
   currency: string;
   /** Exchange MIC code (e.g., "XNAS", "XTSE") for new holdings from search */
   exchangeMic?: string;
@@ -70,6 +73,48 @@ interface EditableCashBalance {
   amount: string;
 }
 
+type CostMath = (shares: number, value: number) => number;
+
+/** shares × cost-per-share = total cost. */
+const totalCostFrom: CostMath = (shares, averageCost) => shares * averageCost;
+
+/** total cost ÷ shares = cost-per-share. */
+const averageCostFrom: CostMath = (shares, totalCost) => totalCost / shares;
+
+/** 15 sig figs for state and persistence; inputs localize their own display. */
+const CANONICAL_DECIMAL = new Intl.NumberFormat("en-US", {
+  useGrouping: false,
+  maximumSignificantDigits: 15,
+});
+const formatCost = (value: number): string => CANONICAL_DECIMAL.format(value);
+
+/** Total ÷ shares can be far below the money default of 8 decimals; show more. */
+const AVERAGE_COST_DISPLAY_DECIMALS = 15;
+
+/** Blank clears the linked field; without a share count it returns null (leave it). */
+const deriveCostText = (sharesText: string, text: string, derive: CostMath): string | null => {
+  if (text === "") return "";
+  const shares = parseFloat(sharesText);
+  const value = parseFloat(text);
+  if (!Number.isFinite(shares) || shares <= 0 || !Number.isFinite(value)) return null;
+  return formatCost(derive(shares, value));
+};
+
+/** Recomputes the cost field the user did not edit last, from the one held. */
+type CostReconciler = (holding: EditableHolding) => EditableHolding;
+
+/** Cost per share was edited last: keep it and re-derive the total. */
+const recomputeTotalCost: CostReconciler = (holding) => {
+  const totalCost = deriveCostText(holding.quantity, holding.averageCost, totalCostFrom);
+  return totalCost === null ? holding : { ...holding, totalCost };
+};
+
+/** Total cost was edited last: keep it and re-derive the cost per share. */
+const recomputeAverageCost: CostReconciler = (holding) => {
+  const averageCost = deriveCostText(holding.quantity, holding.totalCost, averageCostFrom);
+  return averageCost === null ? holding : { ...holding, averageCost };
+};
+
 interface HoldingsEditModeProps {
   holdings: Holding[];
   account: Account;
@@ -86,7 +131,6 @@ export const HoldingsEditMode = ({
   onClose,
   existingSnapshotDate,
 }: HoldingsEditModeProps) => {
-  const amountFormatting = useAmountFormatting();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
@@ -125,9 +169,10 @@ export const HoldingsEditMode = ({
       .filter((h) => h.holdingType?.toLowerCase() !== HoldingType.CASH)
       .map((h) => {
         let averageCost = "";
+        let totalCost = "";
         if (h.costBasis?.local && h.quantity > 0) {
-          const avgCostValue = h.costBasis.local / h.quantity;
-          averageCost = avgCostValue.toFixed(8).replace(/\.?0+$/, "");
+          averageCost = formatCost(h.costBasis.local / h.quantity);
+          totalCost = formatCost(h.costBasis.local);
         }
         return {
           assetId: h.instrument?.id ?? h.id,
@@ -135,6 +180,7 @@ export const HoldingsEditMode = ({
           name: h.instrument?.name ?? undefined,
           quantity: String(h.quantity),
           averageCost,
+          totalCost,
           currency: h.localCurrency,
           exchangeMic: h.instrument?.exchangeMic ?? undefined,
           instrumentType: h.instrument?.instrumentType ?? undefined,
@@ -187,6 +233,7 @@ export const HoldingsEditMode = ({
       if (!original) return true;
       if (original.quantity !== holding.quantity) return true;
       if (original.averageCost !== holding.averageCost) return true;
+      if (original.totalCost !== holding.totalCost) return true;
     }
     if (cashBalances.length !== initialCashBalances.length) return true;
     for (const cash of cashBalances) {
@@ -200,16 +247,43 @@ export const HoldingsEditMode = ({
   const handleQuantityChange = useCallback((assetId: string, value: number | undefined) => {
     const quantity = value === undefined ? "" : String(value);
     setEditableHoldings((prev) =>
-      prev.map((h) => (h.assetId === assetId ? { ...h, quantity } : h)),
+      prev.map((h) =>
+        h.assetId === assetId ? (h.reconcileShares ?? recomputeTotalCost)({ ...h, quantity }) : h,
+      ),
     );
   }, []);
 
-  const handleAverageCostChange = useCallback((assetId: string, value: number | undefined) => {
-    const averageCost = value === undefined ? "" : String(value);
-    setEditableHoldings((prev) =>
-      prev.map((h) => (h.assetId === assetId ? { ...h, averageCost } : h)),
-    );
-  }, []);
+  const handleAverageCostChange = useCallback(
+    (assetId: string, value: number | undefined, isUserEdit?: boolean) => {
+      // Ignore echoed updates from the linked total-cost input.
+      if (!isUserEdit) return;
+      const averageCost = value === undefined ? "" : String(value);
+      setEditableHoldings((prev) =>
+        prev.map((h) =>
+          h.assetId === assetId
+            ? recomputeTotalCost({ ...h, averageCost, reconcileShares: recomputeTotalCost })
+            : h,
+        ),
+      );
+    },
+    [],
+  );
+
+  const handleTotalCostChange = useCallback(
+    (assetId: string, value: number | undefined, isUserEdit?: boolean) => {
+      // Ignore echoed updates from the linked average-cost input.
+      if (!isUserEdit) return;
+      const totalCost = value === undefined ? "" : String(value);
+      setEditableHoldings((prev) =>
+        prev.map((h) =>
+          h.assetId === assetId
+            ? recomputeAverageCost({ ...h, totalCost, reconcileShares: recomputeAverageCost })
+            : h,
+        ),
+      );
+    },
+    [],
+  );
 
   const handleCashAmountChange = useCallback((currency: string, value: number | undefined) => {
     const amount = value === undefined ? "" : String(value);
@@ -244,6 +318,7 @@ export const HoldingsEditMode = ({
         name: searchResult.longName || searchResult.shortName,
         quantity: "",
         averageCost: "",
+        totalCost: "",
         currency: searchResult.currency ?? account.currency,
         exchangeMic: canonicalExchangeMic,
         dataSource: searchResult.dataSource,
@@ -406,13 +481,6 @@ export const HoldingsEditMode = ({
     }
   }, [hasChanges, onClose]);
 
-  // Calculate total value for a holding
-  const getTotalValue = (holding: EditableHolding) => {
-    const qty = parseFloat(holding.quantity) || 0;
-    const cost = parseFloat(holding.averageCost) || 0;
-    return qty * cost;
-  };
-
   if (isLoading || (isEditingExistingSnapshot && isLoadingSnapshot)) {
     return (
       <div className="space-y-4 p-4">
@@ -449,9 +517,9 @@ export const HoldingsEditMode = ({
               {/* Table Header */}
               <div className="text-muted-foreground grid grid-cols-12 gap-2 border-b pb-2 text-xs font-medium">
                 <div className="col-span-5">{t("holdings:symbol")}</div>
-                <div className="col-span-2 text-right">{t("holdings:shares")}</div>
-                <div className="col-span-2 text-right">{t("holdings:avg_cost")}</div>
-                <div className="col-span-2 text-right">{t("holdings:total")}</div>
+                <div className="col-span-2 text-end">{t("holdings:shares")}</div>
+                <div className="col-span-2 text-end">{t("holdings:avg_cost")}</div>
+                <div className="col-span-2 text-end">{t("holdings:total")}</div>
                 <div className="col-span-1"></div>
               </div>
 
@@ -463,7 +531,6 @@ export const HoldingsEditMode = ({
                   </div>
                 ) : (
                   editableHoldings.map((holding) => {
-                    const totalValue = getTotalValue(holding);
                     return (
                       <div
                         key={holding.assetId}
@@ -499,6 +566,7 @@ export const HoldingsEditMode = ({
                             value={holding.quantity}
                             onValueChange={(value) => handleQuantityChange(holding.assetId, value)}
                             placeholder="0"
+                            data-testid={`holding-shares-${holding.assetId}`}
                             className="h-8 text-sm"
                           />
                         </div>
@@ -506,27 +574,28 @@ export const HoldingsEditMode = ({
                         {/* Avg Cost */}
                         <div className="col-span-2">
                           <MoneyInput
+                            aria-label={t("holdings:avg_cost")}
                             value={holding.averageCost}
-                            onValueChange={(value) =>
-                              handleAverageCostChange(holding.assetId, value)
+                            onValueChange={(value, isUserEdit) =>
+                              handleAverageCostChange(holding.assetId, value, isUserEdit)
                             }
+                            maxDecimalPlaces={AVERAGE_COST_DISPLAY_DECIMALS}
+                            data-testid={`holding-average-cost-${holding.assetId}`}
                             className="h-8 text-sm"
                           />
                         </div>
 
-                        {/* Total */}
-                        <div className="col-span-2 text-right">
-                          <span
-                            className={cn(
-                              "text-sm font-medium",
-                              totalValue > 0 ? "text-foreground" : "text-muted-foreground",
-                            )}
-                          >
-                            {amountFormatting.formatDecimalAmount(totalValue, holding.currency, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </span>
+                        {/* Total cost */}
+                        <div className="col-span-2">
+                          <MoneyInput
+                            aria-label={t("holdings:total")}
+                            value={holding.totalCost}
+                            onValueChange={(value, isUserEdit) =>
+                              handleTotalCostChange(holding.assetId, value, isUserEdit)
+                            }
+                            data-testid={`holding-total-cost-${holding.assetId}`}
+                            className="h-8 text-sm"
+                          />
                         </div>
 
                         {/* Delete */}
@@ -536,7 +605,8 @@ export const HoldingsEditMode = ({
                             variant="ghost"
                             size="sm"
                             onClick={() => handleRemoveHolding(holding.assetId)}
-                            className="hover:bg-destructive/20 hover:text-destructive h-7 w-7 p-0"
+                            aria-label={t("common:remove")}
+                            className="hover:bg-destructive-subtle hover:text-destructive-subtle-foreground h-7 w-7 p-0"
                           >
                             <Icons.Trash className="h-3.5 w-3.5" />
                           </Button>
@@ -583,7 +653,7 @@ export const HoldingsEditMode = ({
                   onClick={openAddHolding}
                   className="border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground h-10 w-full border border-dashed"
                 >
-                  <Icons.PlusCircle className="mr-2 h-4 w-4" />
+                  <Icons.PlusCircle className="me-2 h-4 w-4" />
                   {t("holdings:add_another_holding")}
                 </Button>
               )}
@@ -606,7 +676,7 @@ export const HoldingsEditMode = ({
               {cashBalances.length > 0 && (
                 <div className="text-muted-foreground grid grid-cols-12 gap-2 border-b pb-2 text-xs font-medium">
                   <div className="col-span-6">{t("holdings:currency")}</div>
-                  <div className="col-span-5 text-right">{t("holdings:amount")}</div>
+                  <div className="col-span-5 text-end">{t("holdings:amount")}</div>
                   <div className="col-span-1"></div>
                 </div>
               )}
@@ -634,6 +704,7 @@ export const HoldingsEditMode = ({
                       {/* Amount */}
                       <div className="col-span-5">
                         <MoneyInput
+                          aria-label={t("holdings:amount")}
                           ref={(el) => {
                             cashAmountInputRefs.current[cash.currency] = el;
                           }}
@@ -650,7 +721,8 @@ export const HoldingsEditMode = ({
                           variant="ghost"
                           size="sm"
                           onClick={() => handleRemoveCashBalance(cash.currency)}
-                          className="hover:bg-destructive/20 hover:text-destructive h-7 w-7 p-0"
+                          aria-label={t("common:remove")}
+                          className="hover:bg-destructive-subtle hover:text-destructive-subtle-foreground h-7 w-7 p-0"
                         >
                           <Icons.Trash className="h-3.5 w-3.5" />
                         </Button>
@@ -662,7 +734,7 @@ export const HoldingsEditMode = ({
                 {/* Add Currency Input */}
                 {showAddCurrency && (
                   <div className="flex items-center gap-2 py-2">
-                    <div className="w-[160px]">
+                    <div className="w-40">
                       <CurrencyInput
                         placeholder={t("holdings:select_currency")}
                         valueDisplay="code"
@@ -699,7 +771,7 @@ export const HoldingsEditMode = ({
                   onClick={openAddCurrency}
                   className="border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground h-10 w-full border border-dashed"
                 >
-                  <Icons.PlusCircle className="mr-2 h-4 w-4" />
+                  <Icons.PlusCircle className="me-2 h-4 w-4" />
                   {t("holdings:add_cash_balance")}
                 </Button>
               )}
@@ -718,9 +790,9 @@ export const HoldingsEditMode = ({
                 variant="outline"
                 onClick={() => setShowDeleteDialog(true)}
                 disabled={isSaving || isDeleting}
-                className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                className="text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"
               >
-                <Icons.Trash className="mr-2 h-4 w-4" />
+                <Icons.Trash className="me-2 h-4 w-4" />
                 {t("holdings:delete_snapshot")}
               </Button>
             )}
@@ -732,12 +804,12 @@ export const HoldingsEditMode = ({
             <Button onClick={handleSave} disabled={isSaving || isDeleting || !hasChanges}>
               {isSaving ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {t("holdings:saving")}
                 </>
               ) : (
                 <>
-                  <Icons.Check className="mr-2 h-4 w-4" />
+                  <Icons.Check className="me-2 h-4 w-4" />
                   {t("holdings:save_changes")}
                 </>
               )}
@@ -778,11 +850,11 @@ export const HoldingsEditMode = ({
             <AlertDialogAction
               onClick={handleDeleteSnapshot}
               disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
             >
               {isDeleting ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {t("holdings:deleting")}
                 </>
               ) : (

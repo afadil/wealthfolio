@@ -26,7 +26,6 @@
     "core:app:allow-set-app-theme",
     "core:window:allow-set-theme",
     "core:window:allow-theme",
-    "updater:default",
     "log:default",
     "window-state:default",
     "fs:deny-default",

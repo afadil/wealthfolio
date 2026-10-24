@@ -1,9 +1,10 @@
 // Export all UI components
 export * from "./components/ui/accordion";
 export * from "./components/ui/alert";
+export * from "./components/ui/status-surface";
 export * from "./components/ui/alert-dialog";
 export * from "./components/ui/animated-toggle-group";
-export * from "./components/ui/autocomplete";
+export * from "./components/ui/combobox";
 export * from "./components/ui/avatar";
 export * from "./components/ui/badge";
 export * from "./components/ui/budget-gauge";
@@ -21,7 +22,10 @@ export * from "./components/ui/data-table";
 export * from "./components/ui/date-picker-input";
 export * from "./components/ui/date-range-picker";
 export * from "./components/ui/dialog";
+export * from "./components/ui/direction";
 export * from "./components/ui/dropdown-menu";
+export * from "./components/ui/empty";
+// Deprecated: kept so addons built against earlier SDKs still load.
 export * from "./components/ui/empty-placeholder";
 export * from "./components/ui/faceted-filter";
 export * from "./components/ui/faceted-search-input";
@@ -43,6 +47,7 @@ export * from "./components/ui/separator";
 export * from "./components/ui/sheet";
 export * from "./components/ui/shell";
 export * from "./components/ui/skeleton";
+export * from "./components/ui/spinner";
 export * from "./components/ui/star-rating";
 export * from "./components/ui/swipable-view";
 export * from "./components/ui/switch";

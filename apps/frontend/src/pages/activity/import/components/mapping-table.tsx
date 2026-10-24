@@ -7,6 +7,7 @@ import {
   TableRow,
 } from "@wealthfolio/ui/components/ui/table";
 import { TooltipProvider } from "@wealthfolio/ui/components/ui/tooltip";
+import { Card } from "@wealthfolio/ui/components/ui/card";
 import { IMPORT_REQUIRED_FIELDS } from "@/lib/constants";
 import {
   Account,
@@ -72,10 +73,10 @@ export function MappingTable({
   };
 
   return (
-    <div
+    <Card
       className={cn(
         // `isolate` stops WebKitGTK painting rows over this scrollbar inside a scrolling parent
-        "border-border bg-card isolate h-full w-full overflow-auto rounded-md border shadow-sm",
+        "isolate h-full w-full overflow-auto",
         className,
       )}
     >
@@ -84,7 +85,7 @@ export function MappingTable({
           <Table>
             <TableHeader className="sticky top-0 z-20">
               <TableRow>
-                <TableHead className="border-border sticky left-0 z-30 w-12 min-w-12 border-r">
+                <TableHead className="border-border sticky start-0 z-30 w-12 min-w-12 border-e">
                   <div className="bg-muted/50 flex items-center justify-center rounded-sm p-1">
                     <span className="text-muted-foreground text-xs font-semibold">#</span>
                   </div>
@@ -93,10 +94,10 @@ export function MappingTable({
                   <TableHead
                     key={field}
                     className={cn(
-                      "border-border whitespace-nowrap border-r p-2 transition-colors last:border-r-0",
+                      "border-border whitespace-nowrap border-e p-2 transition-colors last:border-e-0",
                       requiredFields.includes(field)
                         ? !checkFieldMapped(field)
-                          ? "bg-amber-50 dark:bg-amber-950/20"
+                          ? "bg-warning-subtle"
                           : ""
                         : "",
                     )}
@@ -125,7 +126,7 @@ export function MappingTable({
                       index % 2 === 0 ? "bg-background" : "bg-muted/20",
                     )}
                   >
-                    <TableCell className="border-border bg-muted/30 text-muted-foreground sticky left-0 z-20 w-12 border-r font-mono text-xs font-medium">
+                    <TableCell className="border-border bg-muted/30 text-muted-foreground sticky start-0 z-20 w-12 border-e font-mono text-xs font-medium">
                       {row.lineNumber}
                     </TableCell>
                     {visibleFields.map((field) => {
@@ -133,7 +134,7 @@ export function MappingTable({
                         <TableCell
                           key={field}
                           className={cn(
-                            "border-border border-r p-2 text-xs transition-colors last:border-r-0",
+                            "border-border border-e p-2 text-xs transition-colors last:border-e-0",
                             "group-hover:bg-muted/50",
                           )}
                         >
@@ -161,6 +162,6 @@ export function MappingTable({
           </Table>
         </TooltipProvider>
       </div>
-    </div>
+    </Card>
   );
 }
