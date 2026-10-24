@@ -67,14 +67,12 @@ export function MonthSwitcher({
         disabled={!canGoPrev}
         className="h-8 w-8"
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
       </Button>
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button variant="outline" className="h-8 w-[160px] justify-between">
-            <span>{displayLabel}</span>
-            <ChevronDown className="h-4 w-4 opacity-50" />
-          </Button>
+        <PopoverTrigger render={<Button variant="outline" className="h-8 w-40 justify-between" />}>
+          <span>{displayLabel}</span>
+          <ChevronDown className="h-4 w-4 opacity-50" />
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="center">
           <MonthYearPicker
@@ -95,7 +93,7 @@ export function MonthSwitcher({
         disabled={!canGoNext}
         className="h-8 w-8"
       >
-        <ChevronRight className="h-4 w-4" />
+        <ChevronRight className="h-4 w-4 rtl:rotate-180" />
       </Button>
     </div>
   );

@@ -10,8 +10,12 @@ import {
 import type { SymbolSearchResult } from "@/lib/types";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useFormContext, type FieldPath, type FieldValues } from "react-hook-form";
+import { get, useFormContext, type FieldPath, type FieldValues } from "react-hook-form";
 import { resolveSymbolQuote } from "@/adapters";
+
+function normalizeSymbol(value: unknown): string {
+  return typeof value === "string" ? value.trim().toUpperCase() : "";
+}
 
 function canUseResolvedCurrency(searchResult: SymbolSearchResult | undefined): boolean {
   if (!searchResult || searchResult.isExisting || isManualSearchResult(searchResult)) {
@@ -60,12 +64,28 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
 }: SymbolSearchProps<TFieldValues>) {
   const { t } = useTranslation(["activity"]);
   const resolvedLabel = label ?? t("activity:form.label_symbol");
-  const { control, setValue, watch, getValues } = useFormContext<TFieldValues>();
+  const { control, setValue, watch, getValues, formState } = useFormContext<TFieldValues>();
   const [quoteDisplay, setQuoteDisplay] = useState<{
     price: number | null;
     isLoading: boolean;
   } | null>(null);
   const latestResolveRequestId = useRef(0);
+  // Fields that describe the security the symbol was loaded or picked with.
+  const selectionHintNames = [
+    exchangeMicName,
+    quoteCcyName,
+    instrumentTypeName,
+    existingAssetIdName,
+    ...(assetMetadataName
+      ? ["name", "kind", "providerId", "providerSymbol"].map(
+          (key) => `${assetMetadataName}.${key}` as FieldPath<TFieldValues>,
+        )
+      : []),
+  ].filter((fieldName): fieldName is FieldPath<TFieldValues> => Boolean(fieldName));
+  const clearSelectionHints = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    selectionHintNames.forEach((fieldName) => setValue(fieldName, undefined as any));
+  };
   const selectedExchangeMic = exchangeMicName
     ? (watch(exchangeMicName as any) as string | undefined)
     : undefined;
@@ -234,18 +254,24 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
     latestResolveRequestId.current += 1;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setValue(name, "" as any, { shouldValidate: true, shouldDirty: true });
-    if (exchangeMicName) setValue(exchangeMicName, undefined as any);
     if (currencyName) setValue(currencyName, "" as any);
-    if (quoteCcyName) setValue(quoteCcyName, undefined as any);
-    if (instrumentTypeName) setValue(instrumentTypeName, undefined as any);
-    if (existingAssetIdName) setValue(existingAssetIdName, undefined as any);
-    if (assetMetadataName) {
-      setValue(`${assetMetadataName}.name` as any, undefined as any);
-      setValue(`${assetMetadataName}.kind` as any, undefined as any);
-      setValue(`${assetMetadataName}.providerId` as any, undefined as any);
-      setValue(`${assetMetadataName}.providerSymbol` as any, undefined as any);
-    }
+    clearSelectionHints();
     setQuoteDisplay(null);
+  };
+
+  // A typed symbol names a different security, so the previous one's details no
+  // longer apply. Typing the form's original symbol back restores its details.
+  // The activity currency and quote mode stay.
+  const handleManualSymbolChange = (value: string, previousValue: unknown) => {
+    const symbol = normalizeSymbol(value);
+    if (symbol === normalizeSymbol(previousValue)) return;
+
+    const defaults = formState.defaultValues;
+    if (symbol === normalizeSymbol(get(defaults, name))) {
+      selectionHintNames.forEach((fieldName) => setValue(fieldName, get(defaults, fieldName)));
+    } else {
+      clearSelectionHints();
+    }
   };
 
   return (
@@ -261,7 +287,10 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
                 placeholder={t("activity:symbol_placeholder")}
                 className="h-10"
                 {...field}
-                onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  handleManualSymbolChange(e.target.value, field.value);
+                  field.onChange(e.target.value.toUpperCase());
+                }}
                 aria-label={resolvedLabel}
                 data-testid="symbol-input"
               />

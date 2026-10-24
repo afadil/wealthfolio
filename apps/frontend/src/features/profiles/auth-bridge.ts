@@ -1,6 +1,7 @@
 import { deferProfileReload } from "./session";
 import { reloadApplication } from "@/lib/reload-application";
 import { profileCommand } from "./api";
+import { generateSecureUuid } from "@/lib/id";
 let flowId: string | undefined;
 let nativePending = false;
 export const isNativeAuthPending = () => nativePending;
@@ -43,7 +44,7 @@ export function createProfilePkceStorage(storageKey: string) {
   };
 }
 export function beginProfileLogin(redirect: string): string {
-  flowId = crypto.randomUUID();
+  flowId = generateSecureUuid();
   const url = new URL(redirect);
   const fragment = new URLSearchParams(url.hash.slice(1));
   fragment.set("wf_profile_flow", flowId);

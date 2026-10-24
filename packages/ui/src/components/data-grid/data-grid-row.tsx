@@ -193,7 +193,7 @@ function DataGridRowImpl<TData>({
       tabIndex={-1}
       {...props}
       ref={rowRef}
-      className={cn("absolute flex w-full border-b will-change-transform", className)}
+      className={cn("group/row absolute flex w-full border-b will-change-transform", className)}
       style={{
         height: `${getRowHeightValue(rowHeight)}px`,
         transform: `translateY(${virtualItem.start}px)`,

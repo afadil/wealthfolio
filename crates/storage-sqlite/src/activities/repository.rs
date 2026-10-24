@@ -592,15 +592,16 @@ impl ActivityRepository {
                     activities::metadata,
                 ),
                 assets::metadata.nullable(),
+                assets::quote_ccy.nullable(),
             ))
             .limit(page_size)
             .offset(offset)
-            .load::<(ActivityDetailsDB, Option<String>)>(&mut conn)
+            .load::<(ActivityDetailsDB, Option<String>, Option<String>)>(&mut conn)
             .map_err(StorageError::from)?;
 
         let results: Vec<ActivityDetails> = results_db
             .into_iter()
-            .map(|(db, asset_metadata)| {
+            .map(|(db, asset_metadata, asset_quote_ccy)| {
                 let has_asset = db.asset_id.is_some();
                 let instrument_type = db
                     .instrument_type
@@ -610,6 +611,7 @@ impl ActivityRepository {
                     .as_deref()
                     .and_then(|value| serde_json::from_str(value).ok());
                 let mut activity = ActivityDetails::from(db);
+                activity.asset_quote_ccy = asset_quote_ccy;
                 activity.asset_contract_multiplier = has_asset.then(|| {
                     contract_multiplier_from_asset_metadata(
                         instrument_type.as_ref(),
@@ -2454,7 +2456,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
         let effective_type = effective_type_sql("a");
         let query = format!(
             "SELECT a.id as activity_id,
-             strftime('%Y-%m', a.activity_date) as date,
+             CAST(strftime('%s', a.activity_date) AS INTEGER) as activity_timestamp,
              {effective_type} as income_type,
              COALESCE(a.asset_id, 'CASH') as asset_id,
              COALESCE(ast.kind, 'CASH') as asset_kind,
@@ -2485,8 +2487,8 @@ impl ActivityRepositoryTrait for ActivityRepository {
         struct RawIncomeData {
             #[diesel(sql_type = diesel::sql_types::Text)]
             pub activity_id: String,
-            #[diesel(sql_type = diesel::sql_types::Text)]
-            pub date: String,
+            #[diesel(sql_type = diesel::sql_types::BigInt)]
+            pub activity_timestamp: i64,
             #[diesel(sql_type = diesel::sql_types::Text)]
             pub income_type: String,
             #[diesel(sql_type = diesel::sql_types::Text)]
@@ -2543,8 +2545,16 @@ impl ActivityRepositoryTrait for ActivityRepository {
             };
             let fee = Decimal::from_str(&raw.fee).unwrap_or_else(|_| Decimal::zero());
             let tax = Decimal::from_str(&raw.tax).unwrap_or_else(|_| Decimal::zero());
+            let Some(activity_date) = DateTime::from_timestamp(raw.activity_timestamp, 0) else {
+                log::warn!(
+                    "Skipping {} activity {} with invalid date in income report",
+                    raw.income_type,
+                    raw.activity_id
+                );
+                continue;
+            };
             results.push(IncomeData {
-                date: raw.date,
+                activity_date,
                 income_type: raw.income_type,
                 asset_id: raw.asset_id,
                 asset_kind: raw.asset_kind,
@@ -4035,6 +4045,63 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn search_activities_returns_the_asset_quote_currency() {
+        let (pool, writer) = setup_db();
+        let repo = ActivityRepository::new(pool.clone(), writer);
+
+        {
+            let mut conn = get_connection(&pool).expect("conn");
+            insert_account(&mut conn, "quote-account");
+            diesel::sql_query(
+                "INSERT INTO assets
+                 (id, kind, name, display_code, is_active, quote_mode, quote_ccy,
+                  instrument_type, instrument_symbol, created_at, updated_at)
+                 VALUES
+                 ('option-usd', 'INVESTMENT', 'USD option', 'AAPL', 1, 'MARKET', 'USD',
+                  'OPTION', 'AAPL 261218C00150000', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            )
+            .execute(&mut conn)
+            .expect("insert option asset");
+            diesel::sql_query(
+                "INSERT INTO activities
+                 (id, account_id, asset_id, activity_type, status, activity_date, quantity,
+                  unit_price, amount, currency, is_user_modified, needs_review, created_at, updated_at)
+                 VALUES
+                 ('cad-option-buy', 'quote-account', 'option-usd', 'BUY', 'POSTED',
+                  '2026-01-01T00:00:00Z', '1', '7', '700', 'CAD', 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                 ('assetless-deposit', 'quote-account', NULL, 'DEPOSIT', 'POSTED',
+                  '2026-01-02T00:00:00Z', NULL, NULL, '100', 'CAD', 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            )
+            .execute(&mut conn)
+            .expect("insert activities");
+        }
+
+        let results = repo
+            .search_activities(
+                0,
+                10,
+                Some(vec!["quote-account".to_string()]),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("search activities");
+
+        let quote_ccys: HashMap<&str, Option<&str>> = results
+            .data
+            .iter()
+            .map(|activity| (activity.id.as_str(), activity.asset_quote_ccy.as_deref()))
+            .collect();
+        assert_eq!(quote_ccys.get("cad-option-buy"), Some(&Some("USD")));
+        assert_eq!(quote_ccys.get("assetless-deposit"), Some(&None));
+    }
+
+    #[tokio::test]
     async fn category_queries_use_effective_broker_activity_type() {
         let (pool, writer) = setup_db();
         let repo = ActivityRepository::new(pool.clone(), writer);
@@ -5181,6 +5248,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn income_report_reads_when_each_income_was_received() {
+        // The income page converts each row at the rate on that day.
+        let (pool, writer) = setup_db();
+        let repo = ActivityRepository::new(pool.clone(), writer);
+        let mut conn = get_connection(&pool).expect("conn");
+        insert_account(&mut conn, "acc-income");
+        for (id, stored) in [
+            ("synced", "2025-05-03T20:15:00+00:00"),
+            ("legacy", "2025-05-02 10:00:00"),
+        ] {
+            insert_activity_with_subtype(&mut conn, id, "acc-income", "DIVIDEND", None, None);
+            diesel::update(activities::table.find(id))
+                .set(activities::activity_date.eq(stored))
+                .execute(&mut conn)
+                .expect("activity date");
+        }
+
+        let rows = repo
+            .get_income_activities_data(Some(&[String::from("acc-income")]))
+            .expect("income data");
+        let instant = |value: &str| {
+            DateTime::parse_from_rfc3339(value)
+                .unwrap()
+                .with_timezone(&Utc)
+        };
+        assert_eq!(
+            rows.iter().map(|row| row.activity_date).collect::<Vec<_>>(),
+            vec![
+                instant("2025-05-02T10:00:00Z"),
+                instant("2025-05-03T20:15:00Z"),
+            ]
+        );
+    }
+
+    #[tokio::test]
     async fn edits_store_type_overrides_as_they_read() {
         let (pool, writer) = setup_db();
         let repo = ActivityRepository::new(pool.clone(), writer);
@@ -5536,6 +5638,96 @@ mod tests {
         assert_eq!(mapping.template_id.as_deref(), Some("acct_acc-map"));
         assert_eq!(mapping.name, "Third");
         assert_eq!(mapping.config, r#"{"v":3}"#);
+    }
+
+    #[tokio::test]
+    async fn linking_sourced_transfer_legs_preserves_identity_through_broker_refresh() {
+        let (pool, writer) = setup_db();
+        let repo = ActivityRepository::new(pool.clone(), writer);
+        let mut conn = get_connection(&pool).expect("conn");
+        insert_account(&mut conn, "checking");
+        insert_account(&mut conn, "card");
+        let rows: Vec<_> = [
+            (
+                "checking-leg",
+                "checking",
+                "TRANSFER_OUT",
+                "2026-01-18",
+                "TRN-test-1",
+            ),
+            (
+                "card-leg",
+                "card",
+                "TRANSFER_IN",
+                "2026-01-15",
+                "TRN-test-2",
+            ),
+        ]
+        .into_iter()
+        .map(|(id, account, kind, date, record)| ActivityUpsert {
+            id: id.into(),
+            account_id: account.into(),
+            asset_id: None,
+            activity_type: kind.into(),
+            subtype: None,
+            activity_date: format!("{date}T00:00:00Z"),
+            quantity: None,
+            unit_price: None,
+            currency: "USD".into(),
+            fee: None,
+            tax: None,
+            amount: Some(Decimal::new(10000, 2)),
+            status: None,
+            notes: Some(format!("Payment · {record}")),
+            fx_rate: None,
+            metadata: Some(r#"{"flow":{"is_external":true}}"#.into()),
+            needs_review: None,
+            source_system: Some("SIMPLEFIN".into()),
+            source_record_id: Some(record.into()),
+            source_group_id: None,
+            idempotency_key: Some(format!("key-{record}")),
+            import_run_id: None,
+        })
+        .collect();
+        assert_eq!(repo.bulk_upsert(rows.clone()).await.unwrap().created, 2);
+        let before = repo.get_activities().unwrap();
+        repo.link_transfer_activities("checking-leg".into(), "card-leg".into())
+            .await
+            .unwrap();
+        // Linking the same pair again repairs metadata without merging records.
+        repo.link_transfer_activities("card-leg".into(), "checking-leg".into())
+            .await
+            .unwrap();
+        let linked = repo.get_activities().unwrap();
+        assert_eq!(linked.len(), 2);
+        assert!(linked[0].source_group_id.is_some());
+        assert_eq!(linked[0].source_group_id, linked[1].source_group_id);
+        for after in &linked {
+            let original = before.iter().find(|row| row.id == after.id).unwrap();
+            assert_eq!(after.activity_date, original.activity_date);
+            assert_eq!(after.notes, original.notes);
+            assert_eq!(after.source_system, original.source_system);
+            assert_eq!(after.source_record_id, original.source_record_id);
+            assert_eq!(after.idempotency_key, original.idempotency_key);
+            assert!(after.is_user_modified);
+        }
+        // A subsequent provider refresh must respect the user's link even
+        // if the provider still calls the outgoing record a withdrawal.
+        let mut refreshed = rows;
+        for row in &mut refreshed {
+            row.id = format!("refreshed-{}", row.id);
+            row.idempotency_key = Some(format!("refreshed-{}", row.id));
+            row.notes = Some("Provider refresh".into());
+        }
+        refreshed[0].activity_type = "WITHDRAWAL".into();
+        let result = repo.bulk_upsert(refreshed).await.unwrap();
+        assert_eq!(result.skipped, 2);
+        assert_eq!(result.upserted, 0);
+        let after = repo.get_activities().unwrap();
+        assert_eq!(
+            serde_json::to_value(after).unwrap(),
+            serde_json::to_value(linked).unwrap()
+        );
     }
 
     #[tokio::test]

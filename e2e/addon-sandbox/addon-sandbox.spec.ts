@@ -68,6 +68,10 @@ function PackagedAssetProbe({ logoUrl }) {
 }
 
 export async function enable(context) {
+  // Sandboxed request and route IDs must work even without the crypto object.
+  Object.defineProperty(globalThis, "crypto", { configurable: true, value: undefined });
+  await context.router.add({ path: "", render() {} });
+  await context.router.add({ path: "", render() {} });
   if (!addonCss.includes("packaged-background")) {
     throw new Error("Native CSS import did not resolve to its packaged source");
   }
@@ -174,7 +178,7 @@ test("boots the opaque sandbox from parent-delivered Blobs without child request
         .querySelector('meta[http-equiv="Content-Security-Policy"]')
         ?.getAttribute("content");
 
-      return new Promise<{ csp: string; embedderCsp: string; sandbox: string }>(
+      return new Promise<{ csp: string; embedderCsp: string; sandbox: string; routeIds: string[] }>(
         (resolve, reject) => {
           const iframe = document.createElement("iframe");
           iframe.setAttribute("sandbox", "allow-scripts");
@@ -188,6 +192,7 @@ test("boots the opaque sandbox from parent-delivered Blobs without child request
           const timer = window.setTimeout(() => reject(new Error("Sandbox did not load")), 15_000);
           let addonLoaded = false;
           const packagedAssetsReturned = new Set<string>();
+          const routeIds: string[] = [];
           let packagedAssetLoaded = false;
           let tickerLogoReturned = false;
           let tickerAvatarLoaded = false;
@@ -208,6 +213,7 @@ test("boots the opaque sandbox from parent-delivered Blobs without child request
               csp: csp || "",
               embedderCsp: embedderCsp || "",
               sandbox: iframe.getAttribute("sandbox") || "",
+              routeIds,
             });
           };
 
@@ -263,6 +269,9 @@ test("boots the opaque sandbox from parent-delivered Blobs without child request
                   },
                 ],
               });
+            } else if (message.type === "router.add") {
+              routeIds.push(message.route.routeId);
+              post("rpcResponse", { ok: true, requestId: message.requestId });
             } else if (message.type === "addonAssetRequest") {
               const result =
                 message.assetId === "packaged-pixel"
@@ -316,6 +325,9 @@ test("boots the opaque sandbox from parent-delivered Blobs without child request
   );
 
   expect(result.sandbox).toBe("allow-scripts");
+  expect(result.routeIds).toHaveLength(2);
+  expect(result.routeIds.every((id) => /^[A-Za-z0-9_-]{21}$/.test(id))).toBe(true);
+  expect(result.routeIds[0]).not.toBe(result.routeIds[1]);
   expect(result.embedderCsp).toContain(`'${SANDBOX_BOOTSTRAP_HASH}'`);
   expect(result.embedderCsp).toContain("'wasm-unsafe-eval'");
   expect(result.embedderCsp).toContain("frame-src 'none'");
@@ -553,4 +565,106 @@ test("formats addon amounts with the host's per-currency formats", async ({ base
   }, FORMATTING_ADDON_CODE);
 
   expect(formatted).toEqual(["₹12,34,567.89 | 12,34,568", "₹1,234,567.89 | 1,234,568"]);
+});
+
+const DIRECTION_ADDON_CODE = `
+import React from "react";
+import { createRoot } from "react-dom/client";
+import { useAmountFormatting, useDirection } from "@wealthfolio/ui";
+
+function DirectionProbe() {
+  const direction = useDirection();
+  const { formatAmount } = useAmountFormatting();
+  const amount = formatAmount(-1, "USD");
+  React.useEffect(() => {
+    const init = new URLSearchParams(window.name);
+    parent.postMessage({
+      addonId: init.get("addonId"),
+      channel: "wealthfolio:addon-sandbox:v1",
+      nonce: init.get("nonce"),
+      type: "direction",
+      report: { document: document.documentElement.dir, context: direction, amount },
+    }, "*");
+  }, [direction, amount]);
+  return null;
+}
+
+export function enable(context) {
+  createRoot(context.ui.root).render(React.createElement(DirectionProbe));
+}
+`;
+
+test("follows the host's reading direction, including a live switch", async ({ baseURL, page }) => {
+  const harnessUrl = new URL("/__addon-sandbox-direction-test__", baseURL).toString();
+  await page.route(harnessUrl, (route) =>
+    route.fulfill({
+      body: HARNESS_HTML,
+      contentType: "text/html",
+    }),
+  );
+  await page.goto(harnessUrl);
+
+  const reports = await page.evaluate(async (addonCode) => {
+    const addonId = "sandbox-direction-test";
+    const channel = "wealthfolio:addon-sandbox:v1";
+    const nonce = crypto.randomUUID();
+    const [script, stylesheet, sandboxHtml] = await Promise.all([
+      fetch("/__generated__/addon-sandbox-runtime.js").then((response) => response.blob()),
+      fetch("/__generated__/addon-sandbox-runtime.css").then((response) => response.blob()),
+      fetch("/addon-sandbox.html").then((response) => response.text()),
+    ]);
+
+    return new Promise<unknown[]>((resolve, reject) => {
+      const iframe = document.createElement("iframe");
+      iframe.setAttribute("sandbox", "allow-scripts");
+      iframe.name = new URLSearchParams({
+        addonId,
+        hostBaseUrl: new URL("/", window.location.href).toString(),
+        locale: "en-US",
+        uiLocale: "en",
+        direction: "rtl",
+        nonce,
+      }).toString();
+      iframe.srcdoc = sandboxHtml;
+      const seen: unknown[] = [];
+      const timer = window.setTimeout(
+        () => reject(new Error(`Addon did not report twice: ${JSON.stringify(seen)}`)),
+        15_000,
+      );
+      const post = (type: string, payload: Record<string, unknown> = {}) => {
+        iframe.contentWindow?.postMessage({ addonId, channel, nonce, type, ...payload }, "*");
+      };
+      window.addEventListener("message", function onMessage(event) {
+        const message = event.data;
+        if (event.source !== iframe.contentWindow || message?.addonId !== addonId) return;
+        if (message.type === "bootstrapReady") {
+          post("loadRuntime", { protocolVersion: 1, script, stylesheet });
+        } else if (message.type === "ready") {
+          post("loadAddon", {
+            code: addonCode,
+            localization: { locale: "en-US", uiLocale: "en", direction: "rtl" },
+          });
+        } else if (message.type === "direction") {
+          seen.push(message.report);
+          if (seen.length === 1) {
+            post("localizationUpdate", {
+              localization: { locale: "en-US", uiLocale: "en", direction: "ltr" },
+            });
+          } else {
+            window.clearTimeout(timer);
+            window.removeEventListener("message", onMessage);
+            resolve(seen);
+          }
+        } else if (message.type === "loadError") {
+          reject(new Error(`${message.phase || "load"}: ${message.error || "unknown error"}`));
+        }
+      });
+      document.body.appendChild(iframe);
+    });
+  }, DIRECTION_ADDON_CODE);
+
+  expect(reports).toEqual([
+    { document: "rtl", context: "rtl", amount: "⁨-$1.00⁩" },
+    { document: "ltr", context: "ltr", amount: "-$1.00" },
+  ]);
 });

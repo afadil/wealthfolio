@@ -40,47 +40,49 @@ export function DataTableFacetedFilter<TData, TValue>({
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className={cn(
-            'hover:bg-muted/80" bg-secondary/30 h-8 gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium',
-            selectedValues?.size > 0 ? "bg-muted/40" : "shadow-inner-xs bg-muted/90",
-          )}
-        >
-          <Icons.PlusCircle className="mr-2 h-4 w-4 shrink-0" />
-          {title}
-          {selectedValues?.size > 0 && (
-            <>
-              <Separator orientation="vertical" className="mx-2 h-4 shrink-0" />
-              <Badge variant="secondary" className="shrink-0 rounded-sm px-1 font-normal lg:hidden">
-                {selectedValues.size}
-              </Badge>
-              <div className="hidden space-x-1 lg:flex">
-                {selectedValues.size > 2 ? (
-                  <Badge variant="secondary" className="text-foreground rounded-sm px-1 font-normal">
-                    {t("ui:faceted.selected", "{{count}} selected", { count: selectedValues.size })}
-                  </Badge>
-                ) : (
-                  options
-                    .filter((option) => selectedValues.has(option.value))
-                    .map((option) => (
-                      <Badge
-                        variant="secondary"
-                        key={option.value}
-                        className="text-foreground rounded-sm px-1 font-normal"
-                      >
-                        {option.label}
-                      </Badge>
-                    ))
-                )}
-              </div>
-            </>
-          )}
-        </Button>
+      <PopoverTrigger
+        render={
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(
+              'hover:bg-muted/80" bg-secondary/30 h-8 gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium',
+              selectedValues?.size > 0 ? "bg-muted/40" : "shadow-inner-xs bg-muted/90",
+            )}
+          />
+        }
+      >
+        <Icons.PlusCircle className="me-2 h-4 w-4 shrink-0" />
+        {title}
+        {selectedValues?.size > 0 && (
+          <>
+            <Separator orientation="vertical" className="mx-2 h-4 shrink-0" />
+            <Badge variant="secondary" className="shrink-0 rounded-sm px-1 font-normal lg:hidden">
+              {selectedValues.size}
+            </Badge>
+            <div className="hidden space-x-1 lg:flex">
+              {selectedValues.size > 2 ? (
+                <Badge variant="secondary" className="text-foreground rounded-sm px-1 font-normal">
+                  {t("ui:faceted.selected", "{{count}} selected", { count: selectedValues.size })}
+                </Badge>
+              ) : (
+                options
+                  .filter((option) => selectedValues.has(option.value))
+                  .map((option) => (
+                    <Badge
+                      variant="secondary"
+                      key={option.value}
+                      className="text-foreground rounded-sm px-1 font-normal"
+                    >
+                      {option.label}
+                    </Badge>
+                  ))
+              )}
+            </div>
+          </>
+        )}
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0" align="start">
+      <PopoverContent className="w-50 p-0" align="start">
         <Command>
           <CommandInput placeholder={title} />
           <CommandList>
@@ -103,16 +105,16 @@ export function DataTableFacetedFilter<TData, TValue>({
                   >
                     <div
                       className={cn(
-                        "border-primary mr-2 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border",
+                        "border-primary me-2 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border",
                         isSelected ? "bg-primary text-primary-foreground" : "opacity-50 [&_svg]:invisible",
                       )}
                     >
                       <Icons.Check className={cn("h-4 w-4")} />
                     </div>
-                    {option.icon && <option.icon className="text-muted-foreground mr-2 h-4 w-4 shrink-0" />}
+                    {option.icon && <option.icon className="text-muted-foreground me-2 h-4 w-4 shrink-0" />}
                     <span className="min-w-0 truncate">{option.label}</span>
                     {facets?.get(option.value) && (
-                      <span className="ml-auto flex h-4 w-4 shrink-0 items-center justify-center font-mono text-xs">
+                      <span className="ms-auto flex h-4 w-4 shrink-0 items-center justify-center font-mono text-xs">
                         {facets.get(option.value)}
                       </span>
                     )}
@@ -126,7 +128,7 @@ export function DataTableFacetedFilter<TData, TValue>({
                 <CommandGroup>
                   <CommandItem
                     onSelect={() => column?.setFilterValue(undefined)}
-                    className="text-destructive hover:bg-destructive/10 justify-center text-center text-sm"
+                    className="text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground justify-center text-center text-sm"
                   >
                     {t("ui:faceted.clearFilters", "Clear filters")}
                   </CommandItem>

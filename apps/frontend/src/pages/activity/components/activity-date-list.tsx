@@ -19,17 +19,23 @@ import type { CashAuditReviewTarget } from "@/pages/account/cash-audit";
 import {
   Button,
   Card,
-  EmptyPlaceholder,
   Icons,
   useAmountFormatting,
   useDateFormatting,
   type FormattingApi,
-  useNumberFormatting,
+  buttonVariants,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { buildActivityFilterUrl } from "../utils/activity-links";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
+import { statusSurfaceVariants } from "@wealthfolio/ui/components/ui/status-surface";
 
 type CashAuditFilter = "all" | "cash-impacting" | "possible-missing";
 
@@ -87,13 +93,15 @@ export function ActivityDateList({
     return (
       <div className="space-y-3">
         {cashAuditTarget ? <CashAuditCallout cashAuditTarget={cashAuditTarget} /> : null}
-        <EmptyPlaceholder>
-          <EmptyPlaceholder.Icon name="Activity" />
-          <EmptyPlaceholder.Title>{t("activity:date_list.no_activities")}</EmptyPlaceholder.Title>
-          <EmptyPlaceholder.Description>
-            {t("activity:date_list.no_activities_desc")}
-          </EmptyPlaceholder.Description>
-        </EmptyPlaceholder>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Icons.Activity />
+            </EmptyMedia>
+            <EmptyTitle>{t("activity:date_list.no_activities")}</EmptyTitle>
+            <EmptyDescription>{t("activity:date_list.no_activities_desc")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       </div>
     );
   }
@@ -138,12 +146,14 @@ export function ActivityDateList({
       ) : null}
 
       {filteredLedgerRows.length === 0 ? (
-        <EmptyPlaceholder>
-          <EmptyPlaceholder.Icon name="Activity" />
-          <EmptyPlaceholder.Title>
-            {t("activity:date_list.no_matching_activities")}
-          </EmptyPlaceholder.Title>
-        </EmptyPlaceholder>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Icons.Activity />
+            </EmptyMedia>
+            <EmptyTitle>{t("activity:date_list.no_matching_activities")}</EmptyTitle>
+          </EmptyHeader>
+        </Empty>
       ) : null}
 
       {filteredLedgerRows.map((row) => (
@@ -172,7 +182,6 @@ function ActivityDateListItem({
   currency,
   showCashLedger,
 }: ActivityDateListItemProps) {
-  const numberFormatting = useNumberFormatting();
   const dateFormatting = useDateFormatting();
   const formatting = useAmountFormatting();
   const { t } = useTranslation();
@@ -194,7 +203,10 @@ function ActivityDateListItem({
       : symbol;
   const avatarSymbol = isCash ? "$CASH" : symbol;
   const optionSubtitle = parsedOption
-    ? formatOptionSubtitle(parsedOption, { ...numberFormatting, ...dateFormatting })
+    ? formatOptionSubtitle(parsedOption, activity.assetQuoteCcy ?? activity.currency, {
+        ...formatting,
+        ...dateFormatting,
+      })
     : null;
   const formattedDate = formatDateTime(activity.date, dateFormatting, appTimezone);
   const displayValue = calculateActivityValue(activity);
@@ -223,7 +235,7 @@ function ActivityDateListItem({
         <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] gap-x-3">
           <p className="truncate text-base font-semibold leading-5">{displaySymbol}</p>
           {activity.activityType !== ActivityType.SPLIT ? (
-            <p className="text-right text-base font-semibold leading-5">
+            <p className="text-end text-base font-semibold leading-5">
               {formatting.formatAmount(displayValue, activity.currency)}
             </p>
           ) : (
@@ -244,7 +256,7 @@ function ActivityDateListItem({
             ) : null}
           </div>
           {activity.activityType !== ActivityType.SPLIT ? (
-            <p className="text-muted-foreground text-right text-sm leading-5">{quantityLabel}</p>
+            <p className="text-muted-foreground text-end text-sm leading-5">{quantityLabel}</p>
           ) : null}
         </div>
       </div>
@@ -255,7 +267,7 @@ function ActivityDateListItem({
   return (
     <Card
       key={activity.id}
-      className={cn("p-0", row.crossesNegative && "border-destructive/40 bg-destructive/5")}
+      className={cn("p-0", row.crossesNegative && statusSurfaceVariants({ status: "destructive" }))}
     >
       <Link to={activityFilterUrl} className="block p-4">
         {content}
@@ -323,7 +335,9 @@ function CashAuditSummary({
   const redirectTo = accountId ? `/accounts/${encodeURIComponent(accountId)}` : undefined;
 
   return (
-    <Card className={cn("p-3", isEndingNegative && "border-destructive/30 bg-destructive/5")}>
+    <Card
+      className={cn("p-3", isEndingNegative && statusSurfaceVariants({ status: "destructive" }))}
+    >
       <div className="space-y-3">
         {cashAuditTarget ? <CashAuditCallout cashAuditTarget={cashAuditTarget} /> : null}
         <div className="grid grid-cols-3 gap-2 text-xs">
@@ -360,16 +374,18 @@ function CashAuditSummary({
         ) : null}
         {isEndingNegative && accountId ? (
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" asChild>
-              <Link to={buildActivityManagerUrl(accountId, ActivityType.DEPOSIT, redirectTo)}>
-                {t("activity:date_list.add_deposit")}
-              </Link>
-            </Button>
-            <Button size="sm" variant="outline" asChild>
-              <Link to={buildActivityManagerUrl(accountId, ActivityType.TRANSFER_IN, redirectTo)}>
-                {t("activity:date_list.add_transfer")}
-              </Link>
-            </Button>
+            <Link
+              to={buildActivityManagerUrl(accountId, ActivityType.DEPOSIT, redirectTo)}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              {t("activity:date_list.add_deposit")}
+            </Link>
+            <Link
+              to={buildActivityManagerUrl(accountId, ActivityType.TRANSFER_IN, redirectTo)}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              {t("activity:date_list.add_transfer")}
+            </Link>
           </div>
         ) : null}
       </div>
@@ -384,23 +400,19 @@ function CashAuditCallout({ cashAuditTarget }: { cashAuditTarget: CashAuditRevie
   const activityDate = formatAuditDate(cashAuditTarget.activityDate, formatting);
 
   return (
-    <div className="border-warning/10 bg-warning/10 rounded-md border p-3">
-      <div className="flex items-start gap-2">
-        <Icons.AlertCircle className="text-warning mt-0.5 size-4 shrink-0" />
-        <div className="min-w-0 space-y-1 text-sm">
-          <p className="font-medium">
-            {t("activity:date_list.cash_went_negative_on", { date: valuationDate })}
-          </p>
-          <p className="text-muted-foreground text-xs">
-            {cashAuditTarget.hasExplainingActivity
-              ? cashAuditTarget.isCarryForwardDate
-                ? t("activity:date_list.carry_forward", { date: activityDate })
-                : t("activity:date_list.review_to_identify")
-              : t("activity:date_list.no_activity_found")}
-          </p>
-        </div>
-      </div>
-    </div>
+    <Alert variant="warning" role="note" className="p-3">
+      <Icons.AlertCircle />
+      <AlertTitle>
+        {t("activity:date_list.cash_went_negative_on", { date: valuationDate })}
+      </AlertTitle>
+      <AlertDescription className="text-xs">
+        {cashAuditTarget.hasExplainingActivity
+          ? cashAuditTarget.isCarryForwardDate
+            ? t("activity:date_list.carry_forward", { date: activityDate })
+            : t("activity:date_list.review_to_identify")
+          : t("activity:date_list.no_activity_found")}
+      </AlertDescription>
+    </Alert>
   );
 }
 

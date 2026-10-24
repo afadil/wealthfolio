@@ -122,7 +122,8 @@ describe("needs-review state", () => {
   it("announces review state on a table row that needs it", () => {
     renderRow(true);
 
-    expect(screen.getByText("Review")).toBeInTheDocument();
+    // The row's review icon is a button; its name carries the state.
+    expect(screen.getByRole("button", { name: "Review" })).toBeInTheDocument();
   });
 
   it("says nothing about review on a row that does not need it", () => {

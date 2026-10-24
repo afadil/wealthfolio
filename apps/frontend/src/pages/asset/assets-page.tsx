@@ -74,7 +74,7 @@ export default function AssetsPage() {
     <div className="space-y-6">
       <SettingsHeader heading={t("asset:securities.heading")} text={t("asset:securities.subtitle")}>
         <Button onClick={() => setCreateDialogOpen(true)} size="sm">
-          <Icons.Plus className="mr-2 h-4 w-4" />
+          <Icons.Plus className="me-2 h-4 w-4" />
           {t("asset:securities.add_security")}
         </Button>
       </SettingsHeader>

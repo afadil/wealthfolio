@@ -9,12 +9,12 @@ export function LoanSheetContent({ className, ...props }: ComponentProps<typeof 
   return (
     <SheetContent
       {...props}
-      side={isMobile ? "bottom" : "right"}
+      side={isMobile ? "bottom" : "inline-end"}
       className={cn(
         "flex w-full flex-col gap-0 overflow-hidden",
         isMobile
           ? "rounded-t-4xl max-h-[90dvh] pb-[max(1.5rem,env(safe-area-inset-bottom))]"
-          : "sm:max-w-[625px]",
+          : "sm:max-w-[39.0625rem]",
         className,
       )}
     />
@@ -26,7 +26,7 @@ export function LoanSheetHeader({ className, ...props }: ComponentProps<typeof S
     <SheetHeader
       data-testid="loan-sheet-header"
       {...props}
-      className={cn("shrink-0 border-b pb-4 pr-10", className)}
+      className={cn("shrink-0 border-b pb-4 pe-10", className)}
     />
   );
 }

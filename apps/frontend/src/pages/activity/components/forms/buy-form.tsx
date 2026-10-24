@@ -4,7 +4,7 @@ import { ACTIVITY_SUBTYPES, ActivityType, QuoteMode } from "@/lib/constants";
 import { buildOccSymbol, isValidOptionExpiration } from "@/lib/occ-symbol";
 import { normalizeCurrency } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useNumberFormatting } from "@wealthfolio/ui";
+import { useNumberFormatting, Spinner } from "@wealthfolio/ui";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -573,27 +573,23 @@ export function BuyForm({
           />
 
           {isBuyWhileShortWithoutCover && (
-            <Alert variant="default" className="border-warning bg-warning/10">
-              <Icons.AlertTriangle className="text-warning h-4 w-4" />
-              <AlertDescription className="text-warning text-sm">
-                {t("activity:form.warn_buy_while_short")}
-              </AlertDescription>
+            <Alert variant="warning">
+              <Icons.AlertTriangle />
+              <AlertDescription>{t("activity:form.warn_buy_while_short")}</AlertDescription>
             </Alert>
           )}
 
           {isCoverWithoutShort && (
-            <Alert variant="default" className="border-warning bg-warning/10">
-              <Icons.AlertTriangle className="text-warning h-4 w-4" />
-              <AlertDescription className="text-warning text-sm">
-                {t("activity:form.warn_cover_without_short")}
-              </AlertDescription>
+            <Alert variant="warning">
+              <Icons.AlertTriangle />
+              <AlertDescription>{t("activity:form.warn_cover_without_short")}</AlertDescription>
             </Alert>
           )}
 
           {isCoverQuantityExcess && (
-            <Alert variant="default" className="border-warning bg-warning/10">
-              <Icons.AlertTriangle className="text-warning h-4 w-4" />
-              <AlertDescription className="text-warning text-sm">
+            <Alert variant="warning">
+              <Icons.AlertTriangle />
+              <AlertDescription>
                 {t("activity:form.warn_cover_quantity_excess", {
                   covering: formatting.formatDecimal(Number(optQuantity)),
                   short: formatting.formatDecimal(currentShortQuantity),
@@ -630,11 +626,11 @@ export function BuyForm({
             </Button>
           )}
           <Button type="submit" disabled={isLoading}>
-            {isLoading && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+            {isLoading && <Spinner className="me-2 h-4 w-4" />}
             {isEditing ? (
-              <Icons.Check className="mr-2 h-4 w-4" />
+              <Icons.Check className="me-2 h-4 w-4" />
             ) : (
-              <Icons.Plus className="mr-2 h-4 w-4" />
+              <Icons.Plus className="me-2 h-4 w-4" />
             )}
             {isEditing
               ? t("activity:form.button_update")

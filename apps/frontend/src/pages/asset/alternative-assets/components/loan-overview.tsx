@@ -55,7 +55,7 @@ export function LoanOverview({
         currency={holding.currency}
       />
       <LoanTimeline
-        className="min-h-[400px]"
+        className="min-h-100"
         calculation={calculation}
         quotes={quotes}
         metadata={metadata}

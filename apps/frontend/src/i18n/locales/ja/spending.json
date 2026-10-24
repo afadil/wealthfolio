@@ -1020,6 +1020,7 @@
     "dataUnavailable": "予算データを利用できません",
     "migrationNeeded": "現在のローカルデータベースは、支出機能の更新マイグレーション適用前に作成されています。",
     "addSource_other": "収入源を追加({{count}}件利用可能)",
-    "overridesTitle_other": "個別設定 · {{count}}"
+    "overridesTitle_other": "個別設定 · {{count}}",
+    "sourceMonth": "コピー元の月"
   }
 }

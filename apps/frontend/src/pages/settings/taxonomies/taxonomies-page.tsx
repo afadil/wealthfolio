@@ -1,5 +1,14 @@
 import { useState, useMemo } from "react";
-import { Icons, ScrollArea, Card, Button, Tabs, TabsList, TabsTrigger } from "@wealthfolio/ui";
+import {
+  Icons,
+  ScrollArea,
+  Card,
+  Button,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  Spinner,
+} from "@wealthfolio/ui";
 import {
   TreeView,
   buildCategoryTree,
@@ -172,22 +181,22 @@ export default function TaxonomiesPage() {
             <div className="flex items-center gap-2">
               {isEditableTaxonomy && (
                 <Button variant="default" size="sm" onClick={handleAddCategory}>
-                  <Icons.Plus className="mr-2 h-4 w-4" />
+                  <Icons.Plus className="me-2 h-4 w-4" />
                   {t("settings:tax_add_category")}
                 </Button>
               )}
               <Button variant="outline" size="sm" onClick={handleExport}>
-                <Icons.Download className="mr-2 h-4 w-4" />
+                <Icons.Download className="me-2 h-4 w-4" />
                 {t("settings:tax_export")}
               </Button>
             </div>
           </div>
 
           {/* Categories and details */}
-          <div className="flex min-h-[500px] flex-col lg:flex-row">
+          <div className="min-h-125 flex flex-col lg:flex-row">
             {/* Category tree */}
-            <div className="w-full border-b lg:w-80 lg:border-b-0 lg:border-r">
-              <ScrollArea className="h-[300px] lg:h-[500px]">
+            <div className="w-full border-b lg:w-80 lg:border-b-0 lg:border-e">
+              <ScrollArea className="h-75 lg:h-125">
                 {isLoadingCategories ? (
                   <div className="text-muted-foreground p-4 text-center text-sm">
                     {t("settings:tax_loading_generic")}
@@ -238,7 +247,7 @@ export default function TaxonomiesPage() {
       ) : isLoading ? (
         <Card className="flex h-64 items-center justify-center">
           <div className="text-muted-foreground text-center">
-            <Icons.Loader className="mx-auto mb-2 h-6 w-6 animate-spin" />
+            <Spinner className="mx-auto mb-2 h-6 w-6" />
             <p>{t("settings:tax_loading")}</p>
           </div>
         </Card>

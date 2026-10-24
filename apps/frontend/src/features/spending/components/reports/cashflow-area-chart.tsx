@@ -49,11 +49,11 @@ export function CashflowAreaChart({ months, currency, isLoading }: CashflowAreaC
   );
 
   if (isLoading && data.every((d) => d.income === 0 && d.spending === 0)) {
-    return <Skeleton className="h-[260px] w-full rounded-lg" />;
+    return <Skeleton className="h-65 w-full rounded-lg" />;
   }
 
   return (
-    <div className="h-[260px] w-full">
+    <div className="h-65 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
           <defs>
@@ -76,7 +76,7 @@ export function CashflowAreaChart({ months, currency, isLoading }: CashflowAreaC
             dataKey="label"
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            tick={{ fontSize: "0.6875rem", fill: "var(--muted-foreground)" }}
           />
           <YAxis
             axisLine={false}
@@ -84,7 +84,7 @@ export function CashflowAreaChart({ months, currency, isLoading }: CashflowAreaC
             tickFormatter={(v: number) =>
               isBalanceHidden ? "••" : formatting.formatCompactAmount(v, currency)
             }
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            tick={{ fontSize: "0.6875rem", fill: "var(--muted-foreground)" }}
             width={56}
           />
           <Tooltip
@@ -93,7 +93,7 @@ export function CashflowAreaChart({ months, currency, isLoading }: CashflowAreaC
               if (!active || !payload?.length) return null;
               const d = payload[0].payload as CashflowDatum;
               return (
-                <div className="bg-background min-w-[180px] rounded-md border px-3 py-2 text-xs shadow-sm">
+                <div className="bg-background min-w-45 rounded-md border px-3 py-2 text-xs shadow-sm">
                   <div className="text-foreground mb-1 font-semibold">{d.label}</div>
                   <Row
                     label={t("spending:cashFlow.income")}
@@ -124,7 +124,7 @@ export function CashflowAreaChart({ months, currency, isLoading }: CashflowAreaC
             height={28}
             iconType="circle"
             iconSize={8}
-            wrapperStyle={{ fontSize: 11 }}
+            wrapperStyle={{ fontSize: "0.6875rem" }}
           />
           <Area
             type="monotone"

@@ -44,11 +44,11 @@ export function LoanDurationInput({
         onValueChange={onChange}
         maxDecimalPlaces={0}
         placeholder="0"
-        className={cn("pr-14", className)}
+        className={cn("pe-14", className)}
       />
       <span
         aria-hidden="true"
-        className="text-muted-foreground pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm"
+        className="text-muted-foreground pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-sm"
       >
         {t(`asset:loanActions.${unit}_short`)}
       </span>

@@ -395,13 +395,13 @@ impl PerformanceService {
         let lots = rows::stored_lots(&lot_rows);
         let disposals = rows::stored_disposals(&disposal_rows);
         let rejected = rows::stored_rejections(&self.sources, &measured)?;
-        let inputs = measured.measure_inputs(&series, &lots, &disposals, &rejected);
         let window = engine::Window { start, end };
         let kernel_profile = match profile {
             PerformanceSummaryProfile::Full => engine::MeasureProfile::Full,
             PerformanceSummaryProfile::Summary => engine::MeasureProfile::Summary,
             PerformanceSummaryProfile::Dashboard => engine::MeasureProfile::Dashboard,
         };
+        let inputs = measured.measure_inputs(&series, &lots, &disposals, &rejected, kernel_profile);
         let result = match target {
             MeasureTarget::Account(id) => engine::measure_account(
                 &inputs,

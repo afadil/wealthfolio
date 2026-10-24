@@ -2,7 +2,7 @@ import { profileErrorMessage } from "./error-messages";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { backupDatabase, isWeb } from "@/adapters";
-import { Button, Input, Label } from "@wealthfolio/ui";
+import { Button, Input, Label, stripBidiControls } from "@wealthfolio/ui";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +31,9 @@ export function DeleteProfileDialog({
 }: DeleteProfileDialogProps) {
   const { t } = useTranslation("common");
   const [confirmation, setConfirmation] = useState("");
+  // The label shows the name isolated in a right-to-left language, so a name copied
+  // from it carries bidi isolation marks: compare without them.
+  const nameConfirmed = stripBidiControls(confirmation) === stripBidiControls(profile.name);
   const [proof, setProof] = useState("");
   const [exporting, setExporting] = useState(false);
   const [backup, setBackup] = useState<string>();
@@ -58,7 +61,7 @@ export function DeleteProfileDialog({
         className="gap-6 rounded-3xl sm:!max-w-md"
         mobileClassName="h-[90vh] space-y-6 overflow-y-auto"
       >
-        <DialogHeader className="gap-3 text-left">
+        <DialogHeader className="gap-3 text-start">
           <span className="profile-lock-avatar mx-auto mb-1 w-fit [--avatar-rim:3px]">
             <ProfileAvatar id={profile.avatarId} className="size-14 rounded-full" />
           </span>
@@ -96,9 +99,9 @@ export function DeleteProfileDialog({
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            if (confirmation === profile.name && (!profile.lockEnabled || proof)) {
+            if (nameConfirmed && (!profile.lockEnabled || proof)) {
               setProofEdited(false);
-              onDelete(confirmation, proof);
+              onDelete(profile.name, proof);
             }
           }}
           className="space-y-4"
@@ -152,9 +155,7 @@ export function DeleteProfileDialog({
             <Button
               type="submit"
               variant="destructive"
-              disabled={
-                exporting || confirmation !== profile.name || (profile.lockEnabled && !proof)
-              }
+              disabled={exporting || !nameConfirmed || (profile.lockEnabled && !proof)}
             >
               {t("profiles.delete")}
             </Button>

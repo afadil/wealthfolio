@@ -1020,6 +1020,7 @@
     "dataUnavailable": "예산 데이터를 사용할 수 없습니다",
     "migrationNeeded": "현재 로컬 데이터베이스는 업데이트된 지출 마이그레이션 이전에 생성되었습니다.",
     "addSource_other": "수입원 추가 (사용 가능 {{count}}개)",
-    "overridesTitle_other": "재정의 · {{count}}개"
+    "overridesTitle_other": "재정의 · {{count}}개",
+    "sourceMonth": "원본 월"
   }
 }

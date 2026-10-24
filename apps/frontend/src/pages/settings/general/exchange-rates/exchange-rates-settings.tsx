@@ -129,8 +129,8 @@ export function ExchangeRatesSettings() {
                     components={{ b: <strong /> }}
                   />
                 </p>
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  <Icons.AlertTriangle className="mr-1 inline h-3 w-3" />
+                <p className="text-warning text-xs">
+                  <Icons.AlertTriangle className="me-1 inline h-3 w-3" />
                   {t("settings:fx_delete_warning", { currency: rate.fromCurrency })}
                 </p>
               </>
@@ -160,11 +160,9 @@ export function ExchangeRatesSettings() {
             <CardDescription>{t("settings:fx_description")}</CardDescription>
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Icons.PlusCircle className="mr-2 h-4 w-4" />
-                {t("settings:fx_add")}
-              </Button>
+            <DialogTrigger render={<Button />}>
+              <Icons.PlusCircle className="me-2 h-4 w-4" />
+              {t("settings:fx_add")}
             </DialogTrigger>
             <DialogContent className="max-h-[90vh] overflow-y-auto">
               <AddExchangeRateForm
@@ -186,14 +184,14 @@ export function ExchangeRatesSettings() {
             ))}
           </div>
         ) : exchangeRates && exchangeRates.length > 0 ? (
-          <DataTable columns={columns} data={exchangeRates} />
+          <DataTable columns={columns} data={exchangeRates} card={false} />
         ) : (
           <div className="flex flex-col items-center justify-center py-10 text-center">
             <Icons.DollarSign className="text-muted-foreground h-12 w-12" />
             <h3 className="mt-4 text-lg font-semibold">{t("settings:fx_empty")}</h3>
 
             <Button className="mt-4" onClick={() => setIsAddDialogOpen(true)}>
-              <Icons.PlusCircle className="mr-2 h-4 w-4" />
+              <Icons.PlusCircle className="me-2 h-4 w-4" />
               {t("settings:fx_add")}
             </Button>
           </div>

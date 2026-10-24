@@ -6,7 +6,7 @@
 // ==========================================================================
 
 import { cn } from "@/lib/utils";
-import { Icons } from "@wealthfolio/ui";
+import { Icons, Spinner } from "@wealthfolio/ui";
 import { MotionConfig, motion } from "motion/react";
 import type { ReactNode } from "react";
 
@@ -16,17 +16,17 @@ export type FlowTone = "primary" | "success" | "error" | "warning" | "neutral";
 
 const TONE_CLASS: Record<FlowTone, string> = {
   primary: "bg-primary/10 text-primary",
-  success: "bg-success/10 text-success",
-  error: "bg-destructive/10 text-destructive",
-  warning: "bg-warning/10 text-warning",
+  success: "text-success-subtle-foreground bg-current/15",
+  error: "text-destructive-subtle-foreground bg-current/15",
+  warning: "text-warning-subtle-foreground bg-current/15",
   neutral: "bg-muted text-muted-foreground",
 };
 
 const HALO_CLASS: Record<FlowTone, string> = {
   primary: "bg-primary/10",
-  success: "bg-success/10",
-  error: "bg-destructive/10",
-  warning: "bg-warning/10",
+  success: "text-success-subtle-foreground bg-current/15",
+  error: "text-destructive-subtle-foreground bg-current/15",
+  warning: "text-warning-subtle-foreground bg-current/15",
   neutral: "bg-muted",
 };
 
@@ -88,7 +88,7 @@ function DrawnCheck() {
 export function FlowIcon({ kind }: { kind: "working" | "success" | "error" }) {
   switch (kind) {
     case "working":
-      return <Icons.Spinner className="size-8 animate-spin" aria-hidden />;
+      return <Spinner className="size-8" aria-hidden />;
     case "success":
       return <DrawnCheck />;
     case "error":
@@ -196,10 +196,7 @@ export function FlowFrame({ children, fill = false }: { children: ReactNode; fil
     <MotionConfig reducedMotion="user">
       {/* The negative margin keeps focus rings and the corner control unclipped. */}
       <div
-        className={cn(
-          "-m-2 flex flex-col",
-          fill ? "min-h-0 flex-1 overflow-y-auto" : "min-h-[544px]",
-        )}
+        className={cn("-m-2 flex flex-col", fill ? "min-h-0 flex-1 overflow-y-auto" : "min-h-136")}
       >
         <div className="flex flex-1 flex-col p-2">{children}</div>
       </div>

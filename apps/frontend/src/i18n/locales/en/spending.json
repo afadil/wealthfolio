@@ -1031,6 +1031,7 @@
     "addSource_one": "Add source ({{count}} available)",
     "addSource_other": "Add source ({{count}} available)",
     "overridesTitle_one": "Override · {{count}}",
-    "overridesTitle_other": "Overrides · {{count}}"
+    "overridesTitle_other": "Overrides · {{count}}",
+    "sourceMonth": "Source month"
   }
 }

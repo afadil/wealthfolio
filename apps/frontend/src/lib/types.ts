@@ -257,6 +257,8 @@ export interface ActivityDetails {
   assetSymbol: string;
   assetName?: string;
   assetQuoteMode?: QuoteMode;
+  /** Currency the asset is quoted in, which can differ from the activity currency. */
+  assetQuoteCcy?: string | null;
   /** Canonical exchange MIC code for asset identification */
   exchangeMic?: string;
   instrumentType?: string;
@@ -397,6 +399,7 @@ export interface ActivityBulkMutationResult {
 }
 
 export interface InternalTransferPairRequest {
+  editedActivityId?: string;
   transferOutId?: string;
   transferInId?: string;
   sourceGroupId?: string;
@@ -1067,7 +1070,8 @@ export interface IncomeSummary {
   byMonth: Record<string, number>;
   byType: Record<string, number>;
   byAsset: Record<string, IncomeByAsset>;
-  byCurrency: Record<string, number>;
+  byCurrency: Record<string, number>; // In each currency
+  byCurrencyBase: Record<string, number>; // Converted to the base currency
   byAccount: Record<string, IncomeByAccount>;
   totalIncome: number;
   currency: string;
@@ -1459,7 +1463,15 @@ export interface UpdateInfo {
   storeUrl?: string;
   changelogUrl?: string;
   screenshots?: string[];
+  /** Set when something other than the app installs updates. */
+  externalUpdateSource?: ExternalUpdateSource | null;
 }
+
+/** How updates arrive when the in-app updater must leave them to something else. */
+export type ExternalUpdateSource =
+  | { kind: "packager"; explanation: string }
+  | { kind: "flatpak" }
+  | { kind: "packageManager" };
 
 // Platform/Broker type
 export interface Platform {

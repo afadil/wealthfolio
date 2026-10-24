@@ -1,6 +1,7 @@
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useTranslation } from "react-i18next";
+import { Spinner } from "@wealthfolio/ui";
 
 interface StartupErrorProps {
   error?: Error | null;
@@ -13,8 +14,8 @@ export function StartupError({ error, isRetrying = false, onRetry }: StartupErro
   return (
     <div className="bg-background text-foreground flex min-h-screen items-center justify-center p-6 supports-[min-height:100dvh]:min-h-dvh">
       <div className="flex w-full max-w-md flex-col items-center text-center">
-        <div className="bg-destructive/10 mb-6 flex h-16 w-16 items-center justify-center rounded-full">
-          <Icons.AlertTriangle className="text-destructive h-8 w-8" strokeWidth={1.5} />
+        <div className="text-destructive-subtle-foreground bg-current/15 mb-6 flex h-16 w-16 items-center justify-center rounded-full">
+          <Icons.AlertTriangle className="h-8 w-8" strokeWidth={1.5} />
         </div>
 
         <div className="mb-6 space-y-2">
@@ -31,9 +32,9 @@ export function StartupError({ error, isRetrying = false, onRetry }: StartupErro
 
         <Button onClick={onRetry} disabled={isRetrying}>
           {isRetrying ? (
-            <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+            <Spinner className="me-2 h-4 w-4" />
           ) : (
-            <Icons.RefreshCw className="mr-2 h-4 w-4" />
+            <Icons.RefreshCw className="me-2 h-4 w-4" />
           )}
           {t("common:retry")}
         </Button>

@@ -64,7 +64,7 @@ export function AmountInput({ value, onCommit, variant = "default" }: AmountInpu
           if (event.key === "Enter") event.currentTarget.blur();
         }}
         placeholder="0"
-        className="text-foreground placeholder:text-muted-foreground/70 min-w-0 flex-1 bg-transparent text-right text-xs tabular-nums outline-none"
+        className="text-foreground placeholder:text-muted-foreground/70 min-w-0 flex-1 bg-transparent text-end text-xs tabular-nums outline-none"
       />
     </div>
   );

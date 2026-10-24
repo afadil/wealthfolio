@@ -47,7 +47,17 @@
   "search_accounts": "Buscar cuentas...",
   "no_accounts_found": "No se encontraron cuentas.",
   "holdings": "Posiciones",
-  "click_to_update_cash_balance": "Haz clic para actualizar el saldo en efectivo",
+  "balance_edit": {
+    "title": "Ajustar saldo en efectivo",
+    "description": "Ajusta una moneda a la vez. La diferencia se registra como un depósito o retiro en esa moneda.",
+    "current_balance": "Saldo actual",
+    "new_balance": "Nuevo saldo",
+    "no_change": "Sin cambios en el saldo",
+    "unavailable": "Los saldos en efectivo no están disponibles. Espera a que se carguen o actualiza la página.",
+    "invalid_amount": "Introduce un saldo válido igual o mayor que cero.",
+    "success": "Saldo actualizado",
+    "error": "Error al actualizar el saldo. Inténtalo de nuevo."
+  },
   "investments": "Inversiones",
   "net_contribution": "Aportación neta",
   "cost_basis": "Base de coste",

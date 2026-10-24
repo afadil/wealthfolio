@@ -1,4 +1,5 @@
 import i18next, { type TFunction } from "i18next";
+import { generateId } from "@/lib/id";
 import type { ExpenseBudget, ExpenseItem } from "../types";
 
 const DEFAULT_ITEM_LABELS = ["Living", "Healthcare", "Housing", "Travel", "Other spending"];
@@ -24,7 +25,7 @@ export function createExpenseItem(
   patch: Partial<ExpenseItem> = {},
 ): ExpenseItem {
   return {
-    id: patch.id ?? crypto.randomUUID?.() ?? `expense-${Date.now()}`,
+    id: patch.id ?? generateId(),
     label,
     monthlyAmount,
     essential: true,

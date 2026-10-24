@@ -57,5 +57,5 @@ expected_notes: >
   01-08 investment 722.22 (520/0.72), cash 305.56, total 1027.78, base 740;
   01-09 investment 732.39 (520/0.71), cash 295.77, total 1028.17, base
   730. net_contribution 1000 CAD / 700 USD. Performance (base): TWR 4.29%
-  (700 -> 730), attribution unrealized 12.86 + fx_effect 7.14 leaves a 10
-  residual ("attribution is incomplete", quality partial).
+  (700 -> 730), attribution unrealized 12.85714286 + investment FX
+  7.14285714 + cash FX 10 = 30, with no unreconciled amount.

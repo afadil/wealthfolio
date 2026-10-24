@@ -19,6 +19,7 @@ import {
   NotesInput,
   type AccountSelectOption,
 } from "./fields";
+import { Spinner } from "@wealthfolio/ui";
 
 type MsgFn = TFunction | undefined;
 const msg = (t: MsgFn, key: string, en: string) => (t ? t(key) : en);
@@ -151,11 +152,11 @@ export function CreditForm({
             </Button>
           )}
           <Button type="submit" disabled={isLoading}>
-            {isLoading && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+            {isLoading && <Spinner className="me-2 h-4 w-4" />}
             {isEditing ? (
-              <Icons.Check className="mr-2 h-4 w-4" />
+              <Icons.Check className="me-2 h-4 w-4" />
             ) : (
-              <Icons.Plus className="mr-2 h-4 w-4" />
+              <Icons.Plus className="me-2 h-4 w-4" />
             )}
             {isEditing
               ? t("activity:form.button_update")

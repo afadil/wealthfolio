@@ -10,6 +10,7 @@ import type {
   ListAssetTaxonomiesArgs,
   ListAssetTaxonomiesOutput,
 } from "../../types";
+import { Spinner } from "@wealthfolio/ui";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -145,7 +146,7 @@ function InlineToolError({ label }: { label: string }) {
 function InlineLoading({ label }: { label: string }) {
   return (
     <div className="text-muted-foreground flex items-center gap-2 px-1 text-xs">
-      <Icons.Spinner className="h-3 w-3 animate-spin" />
+      <Spinner className="h-3 w-3" />
       <span>{label}</span>
     </div>
   );

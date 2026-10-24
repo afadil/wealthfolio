@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import type { CashActivity } from "../types/cash-activity";
 import {
-  flattenDayGroups,
   getTransactionDisplay,
   getTransferLinkStatus,
   groupRowsByDay,
@@ -129,7 +128,7 @@ describe("groupRowsByDay", () => {
 
     // 2026-06-07T02:00Z is still Jun 6 in New York, so all three land together.
     expect(groups.map((g) => g.key)).toEqual(["2026-06-06"]);
-    expect(groups[0].rows.map((r) => r.activity.id)).toEqual(["a", "b", "c"]);
+    expect(groups[0].items.map((r) => r.activity.id)).toEqual(["a", "b", "c"]);
   });
 
   it("nets outflows against income for a single-currency day", () => {
@@ -173,51 +172,6 @@ describe("groupRowsByDay", () => {
     const groups = groupRowsByDay([row({ id: "a", cashFlowBucket: "neutral" })], undefined);
 
     expect(groups[0].net).toBeNull();
-  });
-});
-
-describe("flattenDayGroups", () => {
-  function row(overrides: Partial<CashActivity>) {
-    return toRowVM(cashActivity(overrides), new Map());
-  }
-
-  const groups = groupRowsByDay(
-    [
-      row({ id: "a", activityDate: "2026-06-07T12:00:00.000Z" }),
-      row({ id: "b", activityDate: "2026-06-06T12:00:00.000Z" }),
-      row({ id: "c", activityDate: "2026-06-06T09:00:00.000Z" }),
-    ],
-    "UTC",
-  );
-
-  it("puts each header immediately before its own rows", () => {
-    const items = flattenDayGroups(groups);
-
-    expect(
-      items.map((item) => (item.kind === "header" ? item.group.key : item.row.activity.id)),
-    ).toEqual(["2026-06-07", "a", "2026-06-06", "b", "c"]);
-  });
-
-  it("marks only the trailing group as last", () => {
-    const items = flattenDayGroups(groups);
-
-    // Rows fetched so far can stop mid-day, so only that day's header has to
-    // describe itself as partial.
-    expect(items.filter((item) => item.kind === "header" && item.isLastGroup)).toHaveLength(1);
-    expect(items.at(-3)).toMatchObject({ kind: "header", isLastGroup: true });
-  });
-
-  it("keys headers apart from rows so an id collision cannot merge them", () => {
-    const items = flattenDayGroups(groups);
-    const keys = items.map((item) => item.key);
-
-    expect(new Set(keys).size).toBe(keys.length);
-    expect(keys[0]).toBe("day:2026-06-07");
-    expect(keys[1]).toBe("a");
-  });
-
-  it("returns nothing for no groups", () => {
-    expect(flattenDayGroups([])).toEqual([]);
   });
 });
 

@@ -3,7 +3,7 @@ import { ExternalLink } from "@/components/external-link";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@wealthfolio/ui";
+import { RadioGroup, RadioGroupItem, Spinner } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import {
   Sheet,
@@ -126,7 +126,7 @@ export function NewAccountsFoundModal({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex h-full w-full flex-col p-0 sm:max-w-xl">
+      <SheetContent side="inline-end" className="flex h-full w-full flex-col p-0 sm:max-w-xl">
         <SheetHeader className="border-b px-6 py-4">
           <SheetTitle className="flex items-center gap-2">
             <Icons.Users className="h-5 w-5" />
@@ -136,12 +136,9 @@ export function NewAccountsFoundModal({
         </SheetHeader>
 
         <div className="flex-1 overflow-hidden">
-          <ScrollArea className="h-[calc(100vh-220px)]">
+          <ScrollArea className="h-[calc(100vh-13.75rem)]">
             <div className="space-y-6 p-6">
-              <Alert
-                variant="warning"
-                className="px-3 py-2.5 [&>svg]:left-3 [&>svg]:top-2.5 [&>svg~*]:pl-6"
-              >
+              <Alert variant="warning" className="px-3 py-2.5">
                 <Icons.AlertTriangle className="h-4 w-4" />
                 <AlertDescription className="text-sm">
                   <Trans
@@ -260,12 +257,12 @@ export function NewAccountsFoundModal({
           <Button onClick={handleSaveAndSync} disabled={isSaving}>
             {isSaving ? (
               <>
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="me-2 h-4 w-4" />
                 {t("connect:newAccounts.saving")}
               </>
             ) : (
               <>
-                <Icons.Check className="mr-2 h-4 w-4" />
+                <Icons.Check className="me-2 h-4 w-4" />
                 {t("connect:newAccounts.saveAndSync")}
               </>
             )}

@@ -31,7 +31,8 @@
     "addModels": "Modelle hinzufügen..."
   },
   "provider": {
-    "noProvidersConfigured": "Keine Anbieter konfiguriert"
+    "noProvidersConfigured": "Keine Anbieter konfiguriert",
+    "label": "KI-Anbieter"
   },
   "reasoning": {
     "thinking": "Denkt nach...",
@@ -127,6 +128,7 @@
   "tools": {
     "calling": "{{toolName}} wird aufgerufen...",
     "cancelled": "{{toolName}} abgebrochen",
+    "notUsed": "Tool nicht verwendet: {{toolName}}",
     "used": "Verwendetes Tool: {{toolName}}"
   },
   "accounts": {

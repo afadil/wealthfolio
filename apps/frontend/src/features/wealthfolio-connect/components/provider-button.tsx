@@ -2,6 +2,7 @@ import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
+import { Spinner } from "@wealthfolio/ui";
 
 interface ProviderButtonProps {
   provider: "google" | "apple" | "email";
@@ -51,14 +52,10 @@ export function ProviderButton({
       disabled={disabled || isLoading}
       className={cn("relative h-12 w-full max-w-sm justify-start gap-3", className)}
     >
-      {isLoading ? (
-        <Icons.Spinner className="h-5 w-5 animate-spin" />
-      ) : (
-        <Icon className="h-5 w-5" />
-      )}
+      {isLoading ? <Spinner className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
       <span className="flex-1 text-center">{config.label}</span>
       {isLastUsed && !isLoading && (
-        <span className="text-muted-foreground absolute right-3 text-xs">
+        <span className="text-muted-foreground absolute end-3 text-xs">
           {t("connect:providers.lastUsed")}
         </span>
       )}

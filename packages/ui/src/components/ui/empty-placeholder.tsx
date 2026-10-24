@@ -1,7 +1,7 @@
 import * as React from "react";
 
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "./empty";
 import { Icons } from "./icons";
-import { cn } from "../../lib/utils";
 
 interface EmptyPlaceholderProps extends React.HTMLAttributes<HTMLDivElement> {
   icon?: React.ReactNode;
@@ -9,22 +9,22 @@ interface EmptyPlaceholderProps extends React.HTMLAttributes<HTMLDivElement> {
   description?: string;
 }
 
+/**
+ * @deprecated Use `Empty` with `EmptyHeader`, `EmptyMedia`, `EmptyTitle`, `EmptyDescription`
+ * and `EmptyContent`. Kept so addons built against earlier SDKs still load.
+ */
 export function EmptyPlaceholder({ className, children, icon, title, description, ...props }: EmptyPlaceholderProps) {
   return (
-    <div
-      className={cn(
-        "animate-in fade-in-50 flex flex-col items-center justify-center rounded-md p-8 text-center",
-        className,
+    <Empty className={className} {...props}>
+      {(icon || title || description) && (
+        <EmptyHeader>
+          {icon && <EmptyMedia variant="icon">{icon}</EmptyMedia>}
+          {title && <EmptyTitle>{title}</EmptyTitle>}
+          {description && <EmptyDescription>{description}</EmptyDescription>}
+        </EmptyHeader>
       )}
-      {...props}
-    >
-      <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
-        {icon && <div className="bg-muted flex size-20 items-center justify-center rounded-full">{icon}</div>}
-        {title && <EmptyPlaceholder.Title>{title}</EmptyPlaceholder.Title>}
-        {description && <EmptyPlaceholder.Description>{description}</EmptyPlaceholder.Description>}
-        {children}
-      </div>
-    </div>
+      {children}
+    </Empty>
   );
 }
 
@@ -32,39 +32,20 @@ interface EmptyPlaceholderIconProps extends Partial<React.SVGProps<SVGSVGElement
   name: keyof typeof Icons;
 }
 
-EmptyPlaceholder.Icon = function EmptyPlaceHolderIcon({ name, className, ...props }: EmptyPlaceholderIconProps) {
+EmptyPlaceholder.Icon = function EmptyPlaceholderIcon({ name, className }: EmptyPlaceholderIconProps) {
   const Icon = Icons[name];
-
-  if (!Icon) {
-    return null;
-  }
-
-  // Filter out problematic props that might cause type issues
-  const { children: _children, dominantBaseline: _dominantBaseline, ...validProps } = props;
-
+  if (!Icon) return null;
   return (
-    <div className="bg-muted flex h-20 w-20 items-center justify-center rounded-full">
-      <Icon className={cn("h-10 w-10", className)} {...validProps} />
-    </div>
+    <EmptyMedia variant="icon">
+      <Icon className={className} />
+    </EmptyMedia>
   );
 };
 
-type EmptyPlacholderTitleProps = React.HTMLAttributes<HTMLHeadingElement>;
-
-EmptyPlaceholder.Title = function EmptyPlaceholderTitle({ className, ...props }: EmptyPlacholderTitleProps) {
-  return <h2 className={cn("mt-6 text-xl font-semibold", className)} {...props} />;
+EmptyPlaceholder.Title = function EmptyPlaceholderTitle(props: React.ComponentProps<"div">) {
+  return <EmptyTitle {...props} />;
 };
 
-type EmptyPlacholderDescriptionProps = React.HTMLAttributes<HTMLParagraphElement>;
-
-EmptyPlaceholder.Description = function EmptyPlaceholderDescription({
-  className,
-  ...props
-}: EmptyPlacholderDescriptionProps) {
-  return (
-    <p
-      className={cn("text-muted-foreground mb-8 mt-2 text-center text-sm font-normal leading-6", className)}
-      {...props}
-    />
-  );
+EmptyPlaceholder.Description = function EmptyPlaceholderDescription(props: React.ComponentProps<"p">) {
+  return <EmptyDescription {...props} />;
 };

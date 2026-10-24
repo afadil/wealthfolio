@@ -95,21 +95,16 @@ test.describe("Symbol Mapping Validation", () => {
 
     // Symbol Mapping section is only visible when pricing is Automatic.
     // If the asset is in Manual mode, enable Automatic pricing first.
-    const pricingSwitch = editSheet.getByRole("switch").first();
-    if (await pricingSwitch.isVisible({ timeout: 2000 }).catch(() => false)) {
-      const isChecked = await pricingSwitch.getAttribute("aria-checked");
-      if (isChecked === "false") {
-        await pricingSwitch.click();
-        // Confirm if a confirmation dialog appears
-        // Using broad regex because the exact button label varies by app state
-        const confirmBtn = page
-          .getByRole("button")
-          .filter({ hasText: /confirm|enable|yes/i })
-          .first();
-        if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await confirmBtn.click();
-        }
-      }
+    // The switch is decorative; the named popover trigger owns the interaction.
+    const pricingToggle = editSheet.getByRole("button", { name: "Automatic Updates" });
+    await expect(pricingToggle).toBeVisible();
+    if (
+      await editSheet
+        .getByText("Automatic syncing is off. You manage prices manually.", { exact: true })
+        .isVisible()
+    ) {
+      await pricingToggle.click();
+      await page.getByRole("button", { name: "Confirm", exact: true }).click();
     }
 
     // Wait for the Symbol Mapping "Add" button to be visible

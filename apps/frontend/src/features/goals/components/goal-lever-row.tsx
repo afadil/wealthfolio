@@ -1,6 +1,6 @@
 import { MoneyInput } from "@wealthfolio/ui";
 import type { ReactNode } from "react";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 export function sliderMaxFor(value: number, baseMax: number, increment: number) {
   const valueInclusiveMax = Math.ceil((value + increment) / increment) * increment;
@@ -50,6 +50,7 @@ export function GoalLeverRow({
   warning,
   inputWidthClassName,
 }: GoalLeverRowProps) {
+  const labelId = useId();
   const inputScale = suffix === "%" ? 100 : 1;
   // Money fields have no natural hard cap (currencies vary by orders of
   // magnitude, e.g. IDR vs USD), so typed amounts stay unclamped unless the
@@ -115,7 +116,9 @@ export function GoalLeverRow({
     <div className="py-4 first:pt-1 last:pb-1">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-foreground text-sm font-semibold leading-tight">{label}</div>
+          <div id={labelId} className="text-foreground text-sm font-semibold leading-tight">
+            {label}
+          </div>
           {hint && <div className="text-muted-foreground mt-1 text-xs leading-tight">{hint}</div>}
         </div>
         <div
@@ -135,6 +138,7 @@ export function GoalLeverRow({
           {prefix && <span className="text-muted-foreground text-xs tabular-nums">{prefix}</span>}
           {kind === "money" ? (
             <MoneyInput
+              aria-labelledby={labelId}
               value={moneyInputFocused ? moneyDraftValue : value}
               onValueChange={setMoneyDraftValue}
               thousandSeparator
@@ -149,11 +153,12 @@ export function GoalLeverRow({
                   event.currentTarget.blur();
                 }
               }}
-              className="text-foreground dark:bg-input/0 h-auto min-w-0 flex-1 rounded-none border-0 bg-transparent p-0 text-right text-sm tabular-nums shadow-none outline-none ring-0 focus-visible:ring-0"
+              className="text-foreground dark:bg-input/0 h-auto min-w-0 flex-1 rounded-none border-0 bg-transparent p-0 text-end text-sm tabular-nums shadow-none outline-none ring-0 focus-visible:outline-none"
             />
           ) : (
             <input
               type="text"
+              aria-labelledby={labelId}
               inputMode={suffix === "%" ? "decimal" : "numeric"}
               value={displayValue}
               onFocus={() => {
@@ -179,7 +184,7 @@ export function GoalLeverRow({
                   setDraftValue(null);
                 }
               }}
-              className="text-foreground w-full min-w-0 bg-transparent text-right text-sm tabular-nums outline-none"
+              className="text-foreground w-full min-w-0 bg-transparent text-end text-sm tabular-nums outline-none"
             />
           )}
           {suffix && <span className="text-muted-foreground text-xs tabular-nums">{suffix}</span>}
@@ -187,6 +192,7 @@ export function GoalLeverRow({
       </div>
       <input
         type="range"
+        aria-labelledby={labelId}
         value={clampedValue}
         min={min}
         max={sliderUpperBound}
@@ -196,7 +202,7 @@ export function GoalLeverRow({
         style={{ ["--lever-pct" as string]: `${pct}%` }}
       />
       {warning && (
-        <p className="mt-2 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-xs leading-snug text-amber-800 dark:text-amber-300">
+        <p className="bg-warning-subtle text-warning-subtle-foreground mt-2 rounded-md px-2.5 py-1.5 text-xs leading-snug">
           {warning}
         </p>
       )}

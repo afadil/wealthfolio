@@ -12,6 +12,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
+import { stripBidiControls } from "@wealthfolio/ui/lib/formatting";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -49,6 +50,7 @@ import {
 
 import { shouldResolveImportAsset } from "@/lib/activity-utils";
 import { ImportFormat, type ActivityType } from "@/lib/constants";
+import { generateId } from "@/lib/id";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, CsvRowData, ImportTemplateData } from "@/lib/types";
 import { ImportType } from "@/lib/types";
@@ -707,7 +709,7 @@ export function MappingStepUnified() {
     const templateId =
       state.selectedTemplateId && state.selectedTemplateScope === "USER"
         ? state.selectedTemplateId
-        : crypto.randomUUID();
+        : generateId();
 
     saveTemplateMutation.mutate(buildTemplatePayload(templateId));
   }, [
@@ -726,7 +728,7 @@ export function MappingStepUnified() {
       return;
     }
 
-    saveTemplateMutation.mutate(buildTemplatePayload(crypto.randomUUID()));
+    saveTemplateMutation.mutate(buildTemplatePayload(generateId()));
   }, [buildTemplatePayload, saveTemplateMutation, templateName, t]);
 
   const handleDeleteTemplate = useCallback(() => {
@@ -734,8 +736,11 @@ export function MappingStepUnified() {
       return;
     }
     if (
+      // A native dialog draws its own text: no bidi isolation marks.
       !window.confirm(
-        t("activity:import.template.deleteConfirm", { name: templateName || localMapping.name }),
+        stripBidiControls(
+          t("activity:import.template.deleteConfirm", { name: templateName || localMapping.name }),
+        ),
       )
     ) {
       return;
@@ -913,7 +918,7 @@ export function MappingStepUnified() {
               </div>
               <TabsList className="bg-secondary flex space-x-1 rounded-full p-1">
                 <TabsTrigger
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
+                  className="data-active:bg-primary data-active:text-primary data-active:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                   value="preview"
                 >
                   {importProfile.kind === "transaction"
@@ -921,7 +926,7 @@ export function MappingStepUnified() {
                     : t("activity:import.mapping.activityPreview")}
                 </TabsTrigger>
                 <TabsTrigger
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
+                  className="data-active:bg-primary data-active:text-primary data-active:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                   value="raw"
                 >
                   {t("activity:import.mapping.filePreview")}

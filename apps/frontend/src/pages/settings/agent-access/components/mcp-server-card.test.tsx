@@ -39,9 +39,14 @@ describe("McpServerCard help", () => {
       ),
     ).toBeInTheDocument();
 
+    // The picker shows the option's label, not its id.
+    expect(screen.getByRole("combobox", { name: "Choose an app" })).toHaveTextContent("Command");
     await user.click(screen.getByRole("combobox", { name: "Choose an app" }));
     await user.click(screen.getByRole("option", { name: "Project .mcp.json" }));
     expect(screen.getByText(/Bearer \$\{WEALTHFOLIO_TOKEN\}/)).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Choose an app" })).toHaveTextContent(
+      "Project .mcp.json",
+    );
 
     await user.click(screen.getByRole("button", { name: "Codex / ChatGPT" }));
     expect(screen.getByText(/\[mcp_servers\.wealthfolio\]/)).toBeInTheDocument();

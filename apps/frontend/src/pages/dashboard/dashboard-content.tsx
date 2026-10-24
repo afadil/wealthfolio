@@ -211,7 +211,7 @@ export function DashboardContent({
             {isPortfolioPerformanceLoading ? (
               <div className="flex items-center gap-3">
                 <Skeleton className="h-4 w-24" />
-                <div className="border-secondary my-1 border-r pr-2" />
+                <div className="border-secondary my-1 border-e pe-2" />
                 <Skeleton className="h-4 w-16" />
               </div>
             ) : (
@@ -226,7 +226,7 @@ export function DashboardContent({
                     displayCurrency={false}
                   />
                 )}
-                <div className="border-secondary my-1 border-r pr-2" />
+                <div className="border-secondary my-1 border-e pe-2" />
                 {simpleReturn == null ? (
                   <span className="text-muted-foreground lg:text-md text-sm font-light">N/A</span>
                 ) : (
@@ -239,7 +239,7 @@ export function DashboardContent({
               </>
             )}
             {selectedInterval && (
-              <span className="lg:text-md text-muted-foreground ml-1 text-sm font-light">
+              <span className="lg:text-md text-muted-foreground ms-1 text-sm font-light">
                 {t(`ui:interval.${selectedInterval}`)}
               </span>
             )}

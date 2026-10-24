@@ -1,9 +1,10 @@
 import { Button } from "@wealthfolio/ui/components/ui/button";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
+
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 import { cn } from "@/lib/utils";
+import { Spinner } from "@wealthfolio/ui";
 
 export interface InfiniteScrollTriggerProps {
   onLoadMore: () => void;
@@ -58,7 +59,7 @@ export function InfiniteScrollTrigger({
       >
         {isFetchingNextPage ? (
           <>
-            <Icons.Spinner className="h-4 w-4 animate-spin" aria-hidden="true" />
+            <Spinner className="h-4 w-4" aria-hidden="true" />
             {t("common:loading")}
           </>
         ) : hasLoadMoreError ? (

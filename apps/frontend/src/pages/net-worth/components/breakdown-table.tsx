@@ -30,7 +30,7 @@ const SHARED_GRID =
 const ROW_GRID = `${SHARED_GRID} items-baseline gap-y-1`;
 const NAME_CELL = "col-span-full min-w-0 @min-[28rem]/breakdown:col-span-1";
 const AMOUNT_CELL =
-  "min-w-0 text-right text-xs tabular-nums [overflow-wrap:anywhere] @min-[40rem]/breakdown:text-sm";
+  "min-w-0 text-end text-xs tabular-nums [overflow-wrap:anywhere] @min-[40rem]/breakdown:text-sm";
 
 function ChangeCell({ change, currency }: { change: Change; currency: string }) {
   const formatting = useNumberFormatting();
@@ -43,7 +43,7 @@ function ChangeCell({ change, currency }: { change: Change; currency: string }) 
       : "text-destructive";
   const sign = isZero ? "" : change.amount > 0 ? "+" : "-";
   return (
-    <div className="@min-[48rem]/breakdown:flex-row @min-[48rem]/breakdown:flex-wrap @min-[48rem]/breakdown:items-baseline @min-[48rem]/breakdown:justify-end flex min-w-0 flex-col items-end gap-x-2 gap-y-0.5 text-right">
+    <div className="@min-[48rem]/breakdown:flex-row @min-[48rem]/breakdown:flex-wrap @min-[48rem]/breakdown:items-baseline @min-[48rem]/breakdown:justify-end flex min-w-0 flex-col items-end gap-x-2 gap-y-0.5 text-end">
       <span className={`${AMOUNT_CELL} ${color} inline-flex items-baseline justify-end`}>
         {sign}
         <CompactAmount className="min-w-0" value={Math.abs(change.amount)} currency={currency} />
@@ -102,7 +102,7 @@ function BreakdownRow({
           {name}
         </span>
       </div>
-      <span className="text-muted-foreground/70 @min-[40rem]/breakdown:block hidden text-right text-sm tabular-nums">
+      <span className="text-muted-foreground/70 @min-[40rem]/breakdown:block hidden text-end text-sm tabular-nums">
         {percentOfSection.toFixed(1)}%
       </span>
       <span className={`text-foreground ${AMOUNT_CELL} inline-flex items-baseline justify-end`}>
@@ -147,10 +147,10 @@ export function BreakdownTable({
         <div className="grid-cols-(--breakdown-columns) @min-[28rem]/breakdown:[--breakdown-fallback-columns:repeat(3,minmax(0,1fr))] @min-[40rem]/breakdown:[--breakdown-fallback-columns:minmax(0,2fr)_4rem_minmax(0,1.5fr)_minmax(0,2fr)] supports-[grid-template-columns:subgrid]:@min-[28rem]/breakdown:[--breakdown-columns:minmax(0,1fr)_minmax(0,max-content)_minmax(0,max-content)] supports-[grid-template-columns:subgrid]:@min-[40rem]/breakdown:[--breakdown-columns:minmax(0,1fr)_max-content_minmax(0,max-content)_minmax(0,max-content)] @min-[40rem]/breakdown:gap-x-4 grid gap-x-3 [--breakdown-columns:var(--breakdown-fallback-columns)] [--breakdown-fallback-columns:repeat(2,minmax(0,1fr))]">
           {/* Assets — collapsible */}
           <Collapsible className={SHARED_GRID} open={assetsOpen} onOpenChange={setAssetsOpen}>
-            <CollapsibleTrigger className="col-span-full flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-left">
+            <CollapsibleTrigger className="col-span-full flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-start">
               <span className="flex items-center gap-1.5 text-sm font-semibold">
                 <Icons.ChevronRight
-                  className={`text-muted-foreground h-3.5 w-3.5 transition-transform ${assetsOpen ? "rotate-90" : ""}`}
+                  className={`text-muted-foreground h-3.5 w-3.5 transition-transform ${assetsOpen ? "rotate-90" : "rtl:rotate-180"}`}
                 />
                 {t("insights:networth.breakdown_table.assets")}
               </span>
@@ -169,13 +169,13 @@ export function BreakdownTable({
                 <span className={`${CARD_LABEL} ${NAME_CELL}`}>
                   {t("insights:networth.breakdown_table.category")}
                 </span>
-                <span className={`${CARD_LABEL} @min-[40rem]/breakdown:block hidden text-right`}>
+                <span className={`${CARD_LABEL} @min-[40rem]/breakdown:block hidden text-end`}>
                   %
                 </span>
-                <span className={`${CARD_LABEL} min-w-0 text-right [overflow-wrap:anywhere]`}>
+                <span className={`${CARD_LABEL} min-w-0 text-end [overflow-wrap:anywhere]`}>
                   {t("insights:networth.breakdown_table.value")}
                 </span>
-                <span className={`${CARD_LABEL} min-w-0 text-right [overflow-wrap:anywhere]`}>
+                <span className={`${CARD_LABEL} min-w-0 text-end [overflow-wrap:anywhere]`}>
                   {t("insights:networth.breakdown_table.delta_period", { period: periodLabel })}
                 </span>
               </div>
@@ -225,10 +225,10 @@ export function BreakdownTable({
               open={liabilitiesOpen}
               onOpenChange={setLiabilitiesOpen}
             >
-              <CollapsibleTrigger className="col-span-full flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-left">
+              <CollapsibleTrigger className="col-span-full flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-start">
                 <span className="flex items-center gap-1.5 text-sm font-semibold">
                   <Icons.ChevronRight
-                    className={`text-muted-foreground h-3.5 w-3.5 transition-transform ${liabilitiesOpen ? "rotate-90" : ""}`}
+                    className={`text-muted-foreground h-3.5 w-3.5 transition-transform ${liabilitiesOpen ? "rotate-90" : "rtl:rotate-180"}`}
                   />
                   {t("insights:networth.breakdown_table.liabilities")}
                 </span>

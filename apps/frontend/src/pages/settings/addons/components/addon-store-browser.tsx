@@ -6,7 +6,6 @@ import {
   Card,
   CardContent,
   CardHeader,
-  EmptyPlaceholder,
   Icons,
   Input,
   Select,
@@ -16,6 +15,12 @@ import {
   SelectValue,
   Separator,
   Skeleton,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -163,8 +168,8 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
         <div className="relative flex-1">
           <Skeleton className="h-10 w-full" />
         </div>
-        <Skeleton className="h-10 w-full sm:w-[180px]" />
-        <Skeleton className="h-10 w-full sm:w-[180px]" />
+        <Skeleton className="sm:w-45 h-10 w-full" />
+        <Skeleton className="sm:w-45 h-10 w-full" />
         <Skeleton className="h-10 w-10" />
       </div>
 
@@ -213,23 +218,29 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         {/* Search */}
         <div className="relative flex-1">
-          <Icons.Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+          <Icons.Search className="text-muted-foreground absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2" />
           <Input
             placeholder={t("settings:addon_store_search")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="ps-9"
           />
         </div>
 
         {/* Sort */}
         <Select
           value={sortBy}
-          onValueChange={(value: string) =>
-            setSortBy(value as "popular" | "rating" | "recent" | "name")
-          }
+          items={{
+            popular: t("settings:addon_store_sort_popular"),
+            rating: t("settings:addon_store_sort_rating"),
+            recent: t("settings:addon_store_sort_recent"),
+            name: t("settings:addon_store_sort_name"),
+          }}
+          onValueChange={(value) => {
+            if (value !== null) setSortBy(value as "popular" | "rating" | "recent" | "name");
+          }}
         >
-          <SelectTrigger className="w-full sm:w-[180px]">
+          <SelectTrigger className="sm:w-45 w-full" aria-label={t("holdings:sort_by")}>
             <SelectValue placeholder={t("settings:addon_store_sort_placeholder")} />
           </SelectTrigger>
           <SelectContent>
@@ -243,9 +254,17 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
         {/* Filter */}
         <Select
           value={filterBy}
-          onValueChange={(value: string) => setFilterBy(value as "all" | "uninstalled")}
+          items={{
+            all: t("settings:addon_store_filter_all", { count: counts.total }),
+            uninstalled: t("settings:addon_store_filter_uninstalled", {
+              count: counts.uninstalled,
+            }),
+          }}
+          onValueChange={(value) => {
+            if (value !== null) setFilterBy(value as "all" | "uninstalled");
+          }}
         >
-          <SelectTrigger className="w-full sm:w-[180px]">
+          <SelectTrigger className="sm:w-45 w-full" aria-label={t("common:filter")}>
             <SelectValue placeholder={t("settings:addon_store_filter_placeholder")} />
           </SelectTrigger>
           <SelectContent>
@@ -289,7 +308,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
               onClick={() => setSearchQuery("")}
               className="h-auto p-1 text-xs"
             >
-              <Icons.Close className="mr-1 h-3 w-3" />
+              <Icons.Close className="me-1 h-3 w-3" />
               {t("settings:addon_store_clear_search")}
             </Button>
           )}
@@ -297,25 +316,31 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
 
         {/* Addon Grid */}
         {filteredAndSortedListings.length === 0 ? (
-          <EmptyPlaceholder>
-            <EmptyPlaceholder.Icon name="Search" />
-            <EmptyPlaceholder.Title>{t("settings:addon_store_no_addons")}</EmptyPlaceholder.Title>
-            <EmptyPlaceholder.Description>
-              {searchQuery
-                ? t("settings:addon_store_no_match", { query: searchQuery })
-                : t("settings:addon_store_no_filters")}
-            </EmptyPlaceholder.Description>
-            <div className="flex gap-2">
-              {searchQuery && (
-                <Button variant="outline" onClick={() => setSearchQuery("")}>
-                  {t("settings:addon_store_clear_search_button")}
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Icons.Search />
+              </EmptyMedia>
+              <EmptyTitle>{t("settings:addon_store_no_addons")}</EmptyTitle>
+              <EmptyDescription>
+                {searchQuery
+                  ? t("settings:addon_store_no_match", { query: searchQuery })
+                  : t("settings:addon_store_no_filters")}
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <div className="flex gap-2">
+                {searchQuery && (
+                  <Button variant="outline" onClick={() => setSearchQuery("")}>
+                    {t("settings:addon_store_clear_search_button")}
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => setFilterBy("all")}>
+                  {t("settings:addon_store_show_all")}
                 </Button>
-              )}
-              <Button variant="outline" onClick={() => setFilterBy("all")}>
-                {t("settings:addon_store_show_all")}
-              </Button>
-            </div>
-          </EmptyPlaceholder>
+              </div>
+            </EmptyContent>
+          </Empty>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2">
             {filteredAndSortedListings.map((listing) => (

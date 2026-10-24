@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
+import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui";
+import { Card, CardContent, CardHeader, CardTitle, Spinner } from "@wealthfolio/ui";
 
 export interface ToolCardProps {
   title: string;
@@ -39,16 +40,16 @@ export function ToolCard({
       <CardContent>
         <div className="relative overflow-y-auto" style={{ maxHeight: `${maxHeight}px` }}>
           {error ? (
-            <div className="border-destructive/50 bg-destructive/10 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
-              <Icons.AlertCircle className="size-4 shrink-0" />
-              <span>{error}</span>
-            </div>
+            <Alert variant="destructive" className="px-3 py-2">
+              <Icons.AlertCircle />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           ) : (
             <>
               {children}
               {isLoading && (
                 <div className="bg-background/60 absolute inset-0 flex items-center justify-center backdrop-blur-sm">
-                  <Icons.Spinner className="text-muted-foreground size-6 animate-spin" />
+                  <Spinner className="text-muted-foreground size-6" />
                 </div>
               )}
             </>

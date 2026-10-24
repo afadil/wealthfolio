@@ -2,13 +2,14 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
-import { Button, Icons, useAmountFormatting } from "@wealthfolio/ui";
+import { Icons, useAmountFormatting, buttonVariants } from "@wealthfolio/ui";
 
 import { useBudget } from "@/features/spending/hooks/use-budget";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { cn } from "@/lib/utils";
 
 import { formatAmountWhole } from "./format";
+import { badgeVariants } from "@wealthfolio/ui";
 
 export function BudgetOverviewCard() {
   const formatting = useAmountFormatting();
@@ -57,12 +58,10 @@ export function BudgetOverviewCard() {
               {t("settings:spending.budget_overview.empty_description")}
             </p>
           </div>
-          <Button asChild size="sm">
-            <Link to="/settings/spending/setup">
-              <Icons.Plus className="mr-1.5 h-3.5 w-3.5" />
-              {t("settings:spending.budget_overview.setup_cta")}
-            </Link>
-          </Button>
+          <Link to="/settings/spending/setup" className={buttonVariants({ size: "sm" })}>
+            <Icons.Plus className="me-1.5 h-3.5 w-3.5" />
+            {t("settings:spending.budget_overview.setup_cta")}
+          </Link>
         </div>
       </div>
     );
@@ -91,12 +90,12 @@ export function BudgetOverviewCard() {
                 {fmt(spendingPlanned, currency)}
               </span>
               {incomePlanned > 0 && (
-                <span className="text-muted-foreground ml-1 text-sm font-normal sm:text-base">
+                <span className="text-muted-foreground ms-1 text-sm font-normal sm:text-base">
                   / {fmt(incomePlanned, currency)}
                 </span>
               )}
             </div>
-            <div className="text-muted-foreground mt-1.5 text-[10px] font-medium uppercase tracking-widest">
+            <div className="text-muted-foreground text-2xs mt-1.5 font-medium uppercase tracking-widest">
               {incomePlanned > 0
                 ? t("settings:spending.budget_overview.planned_vs_income")
                 : t("settings:spending.budget_overview.planned_spending")}
@@ -105,8 +104,8 @@ export function BudgetOverviewCard() {
           {pctOfIncome !== null && (
             <span
               className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium",
-                isOver ? "bg-destructive/15 text-destructive" : "bg-success/15 text-success",
+                badgeVariants({ variant: isOver ? "destructive-subtle" : "success-subtle" }),
+                "gap-1.5 px-2.5 py-1.5",
               )}
             >
               <Icons.AlertCircle className="h-3 w-3" />
@@ -158,9 +157,9 @@ export function BudgetOverviewCard() {
       </div>
 
       {/* CTA — bottom bar on mobile, right rail on desktop */}
-      <div className="bg-muted/30 group-hover:bg-foreground group-hover:text-background text-muted-foreground flex shrink-0 items-center justify-center gap-1.5 border-t px-4 py-3 text-xs font-medium uppercase tracking-widest transition-colors sm:w-24 sm:flex-col sm:gap-2 sm:border-l sm:border-t-0 sm:px-0 sm:py-0">
+      <div className="bg-muted/30 group-hover:bg-foreground group-hover:text-background text-muted-foreground flex shrink-0 items-center justify-center gap-1.5 border-t px-4 py-3 text-xs font-medium uppercase tracking-widest transition-colors sm:w-24 sm:flex-col sm:gap-2 sm:border-s sm:border-t-0 sm:px-0 sm:py-0">
         <span>{t("settings:spending.budget_overview.open")}</span>
-        <Icons.ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+        <Icons.ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
       </div>
     </Link>
   );

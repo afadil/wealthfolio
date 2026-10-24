@@ -848,6 +848,9 @@ pub struct ActivityFinalCashMigrationResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InternalTransferPairRequest {
+    /// The record whose date and notes the existing activity form is editing.
+    #[serde(default)]
+    pub edited_activity_id: Option<String>,
     #[serde(default)]
     pub transfer_out_id: Option<String>,
     #[serde(default)]
@@ -1038,6 +1041,10 @@ pub struct ActivityDetails {
     pub import_run_id: Option<String>,
     pub is_user_modified: bool,
     pub metadata: Option<Value>,
+    /// Currency the asset is quoted in, which can differ from the activity
+    /// currency. Kept after the released fields so exports keep their column
+    /// positions.
+    pub asset_quote_ccy: Option<String>,
     /// The cash of the row's account, in `cash_balance_currency`, as
     /// `cash_balance_scope` says: filled only when the search asked for
     /// balances and the account's holdings come from its activities.
@@ -1937,7 +1944,8 @@ mod optional_decimal_format {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IncomeData {
-    pub date: String,
+    /// When the income was received.
+    pub activity_date: DateTime<Utc>,
     pub income_type: String,
     pub asset_id: String,
     pub asset_kind: String,

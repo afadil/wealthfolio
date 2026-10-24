@@ -96,6 +96,12 @@ enums. For Rust domain errors, follow the existing `Result`/`Option` and
 return an error with `?`, or use `expect("why it cannot fail")` for a proven
 invariant.
 
+UI must work right-to-left: logical classes and inline styles (`ms-`, `start-`,
+`text-end`, `insetInlineStart`), physical only where the side is literal;
+`rtl:rotate-180` on forward/back icons; `inline-start`/`inline-end` popup sides;
+`useDirection()` for key or scroll handling; values via the formatting hooks.
+Details in `apps/frontend/src/i18n/README.md`.
+
 ## Persisted identifiers and security
 
 - Reuse named constants for secret-store keys and identifiers shared across code
@@ -158,7 +164,7 @@ check.
   packages in the command above. CI runs Clippy across `--workspace`.
 - **UI text/translations:** update affected keys and plural forms in every
   supported locale; run `pnpm --filter frontend i18n:check`.
-- **UI behavior/layout:** exercise the changed flow. Run
+- **UI behavior/layout:** exercise the changed flow, also with `?dir=rtl`. Run
   `pnpm test:e2e:net-worth` for relevant net-worth layout changes and
   `pnpm test:e2e:addon-sandbox` for addon sandbox changes. For application
   flows, use `pnpm test:e2e` or focused specs. Before running E2E tests, consult

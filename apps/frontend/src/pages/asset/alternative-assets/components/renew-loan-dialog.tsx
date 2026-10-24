@@ -6,12 +6,12 @@ import type { LoanInterestMethod, LoanPaymentFrequency } from "../lib/loan-event
 import {
   Button,
   DatePickerInput,
-  Icons,
   MoneyInput,
   QuantityInput,
   ResponsiveSelect,
   useAmountFormatting,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { buttonVariants } from "@wealthfolio/ui/components/ui/button-variants";
@@ -285,9 +285,9 @@ export function RenewLoanDialog({
                   value={newRate}
                   onValueChange={(value) => setNewRate(value == null ? "" : String(value))}
                   maxDecimalPlaces={3}
-                  className="pr-8"
+                  className="pe-8"
                 />
-                <span className="text-muted-foreground pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm">
+                <span className="text-muted-foreground pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-sm">
                   %
                 </span>
               </div>
@@ -310,7 +310,7 @@ export function RenewLoanDialog({
                 maxDecimalPlaces={2}
                 placeholder={t("asset:loanActions.payment_unchanged")}
                 value={payment ?? null}
-                onValueChange={(value) => setPayment(value || undefined)}
+                onValueChange={(value) => setPayment(value)}
               />
               {paymentMissing && (
                 <p className="text-warning text-xs">
@@ -386,7 +386,7 @@ export function RenewLoanDialog({
             {t("common:cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={isSubmitting || blocked}>
-            {isSubmitting && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+            {isSubmitting && <Spinner className="me-2 h-4 w-4" />}
             {title}
           </Button>
         </LoanSheetFooter>

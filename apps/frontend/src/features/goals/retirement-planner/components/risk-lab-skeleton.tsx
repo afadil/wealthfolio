@@ -1,5 +1,5 @@
-import { Card, CardContent, CardHeader, Skeleton } from "@wealthfolio/ui";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Card, CardContent, CardHeader, Skeleton, Spinner } from "@wealthfolio/ui";
+
 import { useTranslation } from "react-i18next";
 
 export function RiskLabSkeleton() {
@@ -17,8 +17,8 @@ export function RiskLabSkeleton() {
                 <Skeleton className="h-2.5 w-24 rounded" />
                 <Skeleton className="h-7 w-[70%] rounded" />
                 <div className="space-y-2 pt-1">
-                  <Skeleton className="h-3 w-full max-w-[580px] rounded" />
-                  <Skeleton className="h-3 w-4/5 max-w-[480px] rounded" />
+                  <Skeleton className="max-w-145 h-3 w-full rounded" />
+                  <Skeleton className="max-w-120 h-3 w-4/5 rounded" />
                 </div>
               </div>
             </div>
@@ -40,8 +40,8 @@ export function RiskLabSkeleton() {
               <Skeleton className="h-2.5 w-20 rounded" />
               <Skeleton className="h-7 w-[55%] rounded" />
               <div className="space-y-2 pt-1">
-                <Skeleton className="h-3 w-full max-w-[820px] rounded" />
-                <Skeleton className="h-3 w-3/4 max-w-[640px] rounded" />
+                <Skeleton className="max-w-205 h-3 w-full rounded" />
+                <Skeleton className="max-w-160 h-3 w-3/4 rounded" />
               </div>
             </div>
           </div>
@@ -67,7 +67,7 @@ export function RiskLabSkeleton() {
       <section className="space-y-4">
         <div className="space-y-2">
           <Skeleton className="h-2.5 w-48 rounded" />
-          <Skeleton className="h-7 w-[45%] max-w-[360px] rounded" />
+          <Skeleton className="max-w-90 h-7 w-[45%] rounded" />
         </div>
         <div className="grid gap-3 lg:grid-cols-2">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -80,9 +80,9 @@ export function RiskLabSkeleton() {
       <section className="space-y-4">
         <div className="space-y-2">
           <Skeleton className="h-2.5 w-40 rounded" />
-          <Skeleton className="h-7 w-[40%] max-w-[320px] rounded" />
+          <Skeleton className="h-7 w-[40%] max-w-80 rounded" />
           <div className="space-y-2 pt-1">
-            <Skeleton className="h-3 w-full max-w-[680px] rounded" />
+            <Skeleton className="max-w-170 h-3 w-full rounded" />
           </div>
         </div>
         <div className="grid gap-3 lg:grid-cols-2">
@@ -100,11 +100,11 @@ function CalculatingBanner() {
   return (
     <div className="bg-muted/20 flex items-start gap-4 rounded-xl border px-5 py-4 md:px-6">
       <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[hsl(91,34%,29%)]/10 text-[hsl(91,34%,29%)]">
-        <Icons.Spinner className="size-5 animate-spin" />
+        <Spinner className="size-5" />
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold">{t("goals:skeleton.calculating_title")}</p>
-        <p className="text-muted-foreground mt-1 max-w-[720px] text-sm leading-relaxed">
+        <p className="text-muted-foreground max-w-180 mt-1 text-sm leading-relaxed">
           {t("goals:skeleton.calculating_desc")}
         </p>
       </div>
@@ -114,7 +114,7 @@ function CalculatingBanner() {
 
 function HeroMetricSkeleton() {
   return (
-    <div className="space-y-2 border-t p-4 first:border-t-0 md:border-l md:border-t-0 md:first:border-l-0">
+    <div className="space-y-2 border-t p-4 first:border-t-0 md:border-s md:border-t-0 md:first:border-s-0">
       <Skeleton className="h-2.5 w-20 rounded" />
       <Skeleton className="h-6 w-24 rounded" />
       <Skeleton className="h-2.5 w-16 rounded" />
@@ -124,7 +124,7 @@ function HeroMetricSkeleton() {
 
 function SimMetricSkeleton() {
   return (
-    <div className="space-y-2 border-t p-4 first:border-t-0 md:border-l md:border-t-0 md:first:border-l-0">
+    <div className="space-y-2 border-t p-4 first:border-t-0 md:border-s md:border-t-0 md:first:border-s-0">
       <Skeleton className="h-2.5 w-20 rounded" />
       <Skeleton className="h-6 w-20 rounded" />
       <Skeleton className="h-2.5 w-24 rounded" />
@@ -135,7 +135,7 @@ function SimMetricSkeleton() {
 export function StressCardSkeleton() {
   return (
     <div className="bg-card relative overflow-hidden rounded-xl border shadow-sm">
-      <div className="bg-muted/60 absolute inset-y-5 left-0 w-0.5 rounded-r-full" />
+      <div className="bg-muted/60 absolute inset-y-5 start-0 w-0.5 rounded-e-full" />
       <div className="space-y-5 p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 space-y-3">
@@ -173,7 +173,7 @@ function HeatmapCardSkeleton() {
             <Skeleton className="h-4 w-40 rounded" />
             <Skeleton className="h-3 w-56 rounded" />
           </div>
-          <Icons.Spinner className="text-muted-foreground mt-1 size-4 animate-spin" />
+          <Spinner className="text-muted-foreground mt-1 size-4" />
         </div>
       </CardHeader>
       <CardContent className="p-5">

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import {
@@ -9,6 +10,7 @@ import {
   PopoverContent,
   PopoverTrigger,
   Switch,
+  buttonVariants,
 } from "@wealthfolio/ui";
 
 interface QuoteHistoryToolbarProps {
@@ -41,6 +43,7 @@ export function QuoteHistoryToolbar({
 }: QuoteHistoryToolbarProps) {
   const { t } = useTranslation();
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const trackingRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className="flex items-center justify-between gap-2">
@@ -49,26 +52,27 @@ export function QuoteHistoryToolbar({
         {isManualDataSource && (
           <>
             <Button variant="default" size="sm" onClick={onAddRow} disabled={isAddDisabled}>
-              <Icons.Plus className="mr-1.5 h-4 w-4" />
+              <Icons.Plus className="me-1.5 h-4 w-4" />
               {t("asset:quoteToolbar.add")}
             </Button>
 
-            <Button asChild variant="outline" size="sm">
-              <Link
-                to="/settings/market-data/import"
-                className="flex items-center gap-1.5"
-                aria-label={t("asset:quoteToolbar.import")}
-              >
-                <Icons.Import className="h-4 w-4" />
-                <span className="hidden sm:inline">{t("asset:quoteToolbar.import")}</span>
-              </Link>
-            </Button>
+            <Link
+              to="/settings/market-data/import"
+              aria-label={t("asset:quoteToolbar.import")}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "flex items-center gap-1.5",
+              )}
+            >
+              <Icons.Import className="h-4 w-4" />
+              <span className="hidden sm:inline">{t("asset:quoteToolbar.import")}</span>
+            </Link>
           </>
         )}
 
         {selectedRowCount > 0 && isManualDataSource && (
           <Button variant="outline" size="sm" onClick={onDeleteSelected}>
-            <Icons.Trash className="mr-1.5 h-4 w-4" />
+            <Icons.Trash className="me-1.5 h-4 w-4" />
             {t("asset:quoteToolbar.delete_count", { count: selectedRowCount })}
           </Button>
         )}
@@ -80,9 +84,9 @@ export function QuoteHistoryToolbar({
               {t("common:cancel")}
             </Button>
             <Button variant="default" size="sm" onClick={onSave}>
-              <Icons.Save className="mr-1.5 h-4 w-4" />
+              <Icons.Save className="me-1.5 h-4 w-4" />
               {t("asset:quoteToolbar.save")}
-              <span className="text-primary-foreground/70 ml-1 text-xs">
+              <span className="text-primary-foreground/70 ms-1 text-xs">
                 ({dirtyCount + deletedCount})
               </span>
             </Button>
@@ -92,15 +96,25 @@ export function QuoteHistoryToolbar({
 
       {/* Right: manual tracking toggle */}
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-        <PopoverTrigger asChild>
-          <div className="flex shrink-0 cursor-pointer items-center space-x-2">
-            <Switch id="manual-tracking" checked={isManualDataSource} />
-            <Label htmlFor="manual-tracking" className="cursor-pointer text-xs sm:text-sm">
-              {t("asset:quoteToolbar.manual")}
-            </Label>
-          </div>
-        </PopoverTrigger>
-        <PopoverContent className="w-[320px] p-4 sm:w-[360px]" align="end">
+        <div ref={trackingRef} className="flex shrink-0 items-center space-x-2">
+          {/* The switch shows the mode and opens the confirmation; it never
+              toggles itself, so it is read-only. The trigger would make it a
+              button, so it keeps its switch role. */}
+          <PopoverTrigger
+            nativeButton={false}
+            render={
+              <Switch id="manual-tracking" role="switch" checked={isManualDataSource} readOnly />
+            }
+          />
+          <Label
+            htmlFor="manual-tracking"
+            className="cursor-pointer text-xs sm:text-sm"
+            onClick={() => setPopoverOpen(true)}
+          >
+            {t("asset:quoteToolbar.manual")}
+          </Label>
+        </div>
+        <PopoverContent className="sm:w-90 w-80 p-4" align="end" anchor={trackingRef}>
           <div className="space-y-4">
             <h4 className="font-medium">{t("asset:quoteToolbar.change_tracking_mode")}</h4>
             {isManualDataSource ? (
@@ -108,7 +122,7 @@ export function QuoteHistoryToolbar({
                 <p className="text-muted-foreground text-sm">
                   {t("asset:quoteToolbar.to_auto_description")}
                 </p>
-                <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                <p className="text-warning text-sm font-medium">
                   {t("asset:quoteToolbar.to_auto_warning")}
                 </p>
               </>
@@ -117,7 +131,7 @@ export function QuoteHistoryToolbar({
                 <p className="text-muted-foreground text-sm">
                   {t("asset:quoteToolbar.to_manual_description")}
                 </p>
-                <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                <p className="text-warning text-sm font-medium">
                   {t("asset:quoteToolbar.to_manual_warning")}
                 </p>
               </>

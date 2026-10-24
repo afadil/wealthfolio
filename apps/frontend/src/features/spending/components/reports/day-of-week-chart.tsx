@@ -55,14 +55,14 @@ export function DayOfWeekChart({
   const peak = useMemo(() => Math.max(0, ...data.map((d) => d.total)), [data]);
 
   return (
-    <div className="h-[180px] w-full">
+    <div className="h-45 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <XAxis
             dataKey="day"
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            tick={{ fontSize: "0.6875rem", fill: "var(--muted-foreground)" }}
           />
           <Tooltip
             cursor={{ fill: "var(--chart-cursor)" }}
@@ -96,7 +96,7 @@ export function DayOfWeekChart({
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-      <div className="text-muted-foreground/70 mt-1 flex justify-between text-[10px] tabular-nums">
+      <div className="text-muted-foreground/70 text-2xs mt-1 flex justify-between tabular-nums">
         <span>
           {t("spending:dayOfWeek.min")}{" "}
           {isBalanceHidden

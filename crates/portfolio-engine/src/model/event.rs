@@ -69,6 +69,24 @@ pub struct CashEffect {
     pub booking: Booking,
 }
 
+impl CashEffect {
+    /// The bucket and signed units actually booked, shared by projection
+    /// and cash-exposure pricing. A broker trade rate settles cash in the
+    /// account currency; other postings retain their activity currency.
+    pub(crate) fn booked<'a>(
+        &self,
+        activity_currency: &'a Currency,
+        account_currency: &'a Currency,
+    ) -> Option<(&'a Currency, Decimal)> {
+        match self.booking {
+            Booking::ActivityCurrency => Some((activity_currency, self.amount)),
+            Booking::AccountCurrency { rate } => {
+                crate::arith::mul(self.amount, rate).map(|amount| (account_currency, amount))
+            }
+        }
+    }
+}
+
 /// Which cash bucket the movement lands in.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Booking {

@@ -137,14 +137,14 @@ export function AuditLogTable({ disabledNotice }: { disabledNotice?: string }) {
 
         {(logHasData || hasFilters) && (
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative w-[150px] lg:w-[250px]">
-              <Icons.Search className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
+            <div className="w-37.5 lg:w-62.5 relative">
+              <Icons.Search className="text-muted-foreground pointer-events-none absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
               <input
                 type="text"
                 value={search}
                 onChange={(event) => onFilter(setSearch, event.target.value)}
                 placeholder={t("settings:agentAccess.audit_search_placeholder")}
-                className="shadow-inner-xs bg-muted/90 hover:bg-muted/80 placeholder:text-muted-foreground focus:ring-ring/50 h-8 w-full rounded-md pl-8 pr-3 text-sm outline-none transition-colors focus:ring-2"
+                className="shadow-inner-xs bg-muted/90 hover:bg-muted/80 placeholder:text-muted-foreground focus:ring-ring/50 h-8 w-full rounded-md pe-3 ps-8 text-sm outline-none transition-colors focus:ring-2"
               />
             </div>
             <FacetedFilter
@@ -246,7 +246,7 @@ export function AuditLogTable({ disabledNotice }: { disabledNotice?: string }) {
                   disabled={page <= 1}
                   onClick={() => setPage((current) => Math.max(1, current - 1))}
                 >
-                  <Icons.ChevronLeft className="h-4 w-4" />
+                  <Icons.ChevronLeft className="h-4 w-4 rtl:rotate-180" />
                   <span className="sr-only">{t("settings:agentAccess.audit_prev_page")}</span>
                 </Button>
                 <Button
@@ -255,7 +255,7 @@ export function AuditLogTable({ disabledNotice }: { disabledNotice?: string }) {
                   disabled={page >= pageCount}
                   onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
                 >
-                  <Icons.ChevronRight className="h-4 w-4" />
+                  <Icons.ChevronRight className="h-4 w-4 rtl:rotate-180" />
                   <span className="sr-only">{t("settings:agentAccess.audit_next_page")}</span>
                 </Button>
               </div>
@@ -277,7 +277,7 @@ export function AuditLogTable({ disabledNotice }: { disabledNotice?: string }) {
               {t("common:cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
               disabled={purgeMutation.isPending}
               onClick={() => {
                 purgeMutation.mutate(undefined, {
@@ -288,7 +288,7 @@ export function AuditLogTable({ disabledNotice }: { disabledNotice?: string }) {
                 });
               }}
             >
-              <Icons.Trash className="mr-2 h-4 w-4" />
+              <Icons.Trash className="me-2 h-4 w-4" />
               {t("settings:agentAccess.audit_clear_log")}
             </AlertDialogAction>
           </AlertDialogFooter>

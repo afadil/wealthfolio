@@ -33,7 +33,8 @@ pub use engine::Engine;
 pub use error::EngineError;
 pub use impact::{impact, FactChange, Impact, BEGINNING};
 pub use measure::{
-    measure_account, measure_price_series, measure_scope, MeasureInputs, MeasureProfile,
+    measure_account, measure_price_series, measure_scope, CashFxEffect, MeasureInputs,
+    MeasureProfile,
 };
 pub use normalize::{
     fx_conflicts, normalize, normalize_fx_rates, normalize_quotes, FxConflict, Normalized,
@@ -46,4 +47,6 @@ pub use resolve::{
     ResolvedSurfaces, SplitEvent, SplitRow,
 };
 pub use scope::{facts_needed, FactsRequest};
-pub use value::{aggregate_scope, effects, value, value_window, Resolved, ValueInputs, Window};
+pub use value::{
+    aggregate_scope, effects, measure_inputs, value, value_window, Resolved, ValueInputs, Window,
+};
