@@ -23,6 +23,7 @@ import {
   FormDescription,
   DatePickerInput,
   Input,
+  Spinner,
 } from "@wealthfolio/ui";
 
 import { newContributionLimitSchema } from "@/lib/schemas";
@@ -130,7 +131,7 @@ export function ContributionLimitForm({
                   name="groupName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-base font-medium">
+                      <FormLabel className="text-base font-medium leading-none">
                         {t("settings:limits_form_group_name_label")}
                       </FormLabel>
                       <FormControl>
@@ -153,7 +154,7 @@ export function ContributionLimitForm({
                   name="limitAmount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-base font-medium">
+                      <FormLabel className="text-base font-medium leading-none">
                         {t("settings:limits_form_limit_amount_label")}
                       </FormLabel>
                       <FormControl>
@@ -177,7 +178,7 @@ export function ContributionLimitForm({
                       name="contributionYear"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-medium">
+                          <FormLabel className="text-base font-medium leading-none">
                             {t("settings:limits_form_year_label")}
                           </FormLabel>
                           <FormControl>
@@ -199,7 +200,7 @@ export function ContributionLimitForm({
                       name="startDate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-medium">
+                          <FormLabel className="text-base font-medium leading-none">
                             {t("settings:limits_form_start_date_label")}
                           </FormLabel>
                           <div className="h-11">
@@ -221,7 +222,7 @@ export function ContributionLimitForm({
                       name="endDate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-medium">
+                          <FormLabel className="text-base font-medium leading-none">
                             {t("settings:limits_form_end_date_label")}
                           </FormLabel>
                           <div className="h-11">
@@ -250,10 +251,12 @@ export function ContributionLimitForm({
 
         <DialogFooter className="px-1 pt-2">
           <div className="flex w-full justify-end gap-3">
-            <DialogTrigger asChild>
-              <Button variant="outline" type="button" className="h-11 min-w-24 text-base">
-                {t("common:cancel")}
-              </Button>
+            <DialogTrigger
+              render={
+                <Button variant="outline" type="button" className="h-11 min-w-24 text-base" />
+              }
+            >
+              {t("common:cancel")}
             </DialogTrigger>
             <Button
               type="submit"
@@ -265,14 +268,14 @@ export function ContributionLimitForm({
               {addContributionLimitMutation.isPending ||
               updateContributionLimitMutation.isPending ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="me-2 h-4 w-4" />
                   {defaultValues?.id
                     ? t("settings:limits_form_updating")
                     : t("settings:limits_form_saving")}
                 </>
               ) : (
                 <>
-                  <Icons.Check className="mr-2 h-4 w-4" />
+                  <Icons.Check className="me-2 h-4 w-4" />
                   {defaultValues?.id
                     ? t("settings:limits_form_update_button")
                     : t("settings:limits_form_save_button")}

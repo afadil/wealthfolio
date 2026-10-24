@@ -291,6 +291,10 @@ impl OutboxStore for ServerEnginePorts {
     async fn has_pending_outbox(&self) -> Result<bool, String> {
         self.db.has_pending_outbox().await
     }
+
+    async fn next_outbox_retry_at(&self) -> Result<Option<String>, String> {
+        self.db.next_outbox_retry_at().await
+    }
 }
 
 #[async_trait]

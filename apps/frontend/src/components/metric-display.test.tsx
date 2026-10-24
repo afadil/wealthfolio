@@ -27,4 +27,25 @@ describe("MetricDisplay", () => {
     expect(link).toHaveAttribute("title", reason);
     expect(link).toHaveTextContent(reason);
   });
+
+  it("keeps the tile's explanation trigger, info button and Health link apart", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <MetricDisplay
+          label="Time Weighted Return"
+          infoText="Time-weighted return"
+          emptyReason="TWR unavailable"
+        />
+      </MemoryRouter>,
+    );
+
+    const controls = [...container.querySelectorAll("button, a, [role='button']")];
+    for (const control of controls) {
+      expect(control.querySelector("button, a, [role='button']")).toBeNull();
+    }
+    // The mobile tile trigger and the desktop info button share the same name.
+    expect(
+      screen.getAllByRole("button", { name: "More info about Time Weighted Return" }),
+    ).toHaveLength(2);
+  });
 });

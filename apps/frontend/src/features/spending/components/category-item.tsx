@@ -95,7 +95,7 @@ export function CategoryItem({
   ];
 
   return (
-    <div className={isSubcategory ? "ml-6 border-l pl-4" : ""}>
+    <div className={isSubcategory ? "ms-6 border-s ps-4" : ""}>
       <div className="flex items-center justify-between gap-2 py-2.5">
         <div
           className={`flex min-w-0 flex-1 items-center gap-2.5 ${isExcluded ? "opacity-60" : ""}`}
@@ -106,11 +106,13 @@ export function CategoryItem({
               size="sm"
               className="h-6 w-6 shrink-0 p-0"
               onClick={() => setIsExpanded(!isExpanded)}
+              aria-label={category.name}
+              aria-expanded={isExpanded}
             >
               {isExpanded ? (
                 <Icons.ChevronDown className="h-4 w-4" />
               ) : (
-                <Icons.ChevronRight className="h-4 w-4" />
+                <Icons.ChevronRight className="h-4 w-4 rtl:rotate-180" />
               )}
             </Button>
           )}
@@ -136,10 +138,12 @@ export function CategoryItem({
           {activityCount > 0 && (
             <TooltipProvider>
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="text-muted-foreground shrink-0 cursor-default text-xs">
-                    ({activityCount})
-                  </span>
+                <TooltipTrigger
+                  render={
+                    <span className="text-muted-foreground shrink-0 cursor-default text-xs" />
+                  }
+                >
+                  ({activityCount})
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>{t("spending:category.transactionCount", { count: activityCount })}</p>
@@ -150,15 +154,17 @@ export function CategoryItem({
           {isExcluded && (
             <TooltipProvider>
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="text-muted-foreground flex shrink-0 items-center gap-1.5">
-                    <Icons.EyeOff className="h-3.5 w-3.5" />
-                    {parentExcluded && (
-                      <span className="hidden text-xs sm:inline">
-                        {t("spending:category.excludedWithParent", { name: parentName })}
-                      </span>
-                    )}
-                  </span>
+                <TooltipTrigger
+                  render={
+                    <span className="text-muted-foreground flex shrink-0 items-center gap-1.5" />
+                  }
+                >
+                  <Icons.EyeOff className="h-3.5 w-3.5" />
+                  {parentExcluded && (
+                    <span className="hidden text-xs sm:inline">
+                      {t("spending:category.excludedWithParent", { name: parentName })}
+                    </span>
+                  )}
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>
@@ -237,10 +243,7 @@ export function CategoryItem({
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>{t("common:cancel")}</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => onDelete(category)}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
+              <AlertDialogAction onClick={() => onDelete(category)} variant="destructive">
                 {t("common:delete")}
               </AlertDialogAction>
             </AlertDialogFooter>

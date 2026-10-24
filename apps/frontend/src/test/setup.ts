@@ -5,6 +5,8 @@ import * as matchers from "@testing-library/jest-dom/matchers";
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 
+import { reactInterpolation } from "@/i18n/interpolation";
+
 import enAccount from "@/i18n/locales/en/account.json";
 import enActivity from "@/i18n/locales/en/activity.json";
 import enCommon from "@/i18n/locales/en/common.json";
@@ -80,7 +82,7 @@ if (!i18n.isInitialized) {
         connect: enConnect,
       },
     },
-    interpolation: { escapeValue: false },
+    interpolation: reactInterpolation(i18n),
     react: { useSuspense: false },
   });
 }
@@ -108,4 +110,13 @@ if (typeof window !== "undefined") {
       dispatchEvent: vi.fn(),
     })),
   });
+}
+
+// jsdom has no Web Animations API. Base UI's scroll area reads running
+// animations without checking for it, so give elements an empty list, and keep
+// popups closing synchronously as they do without the API, through Base UI's own
+// switch for tests.
+if (typeof Element !== "undefined" && typeof Element.prototype.getAnimations !== "function") {
+  Element.prototype.getAnimations = () => [];
+  (globalThis as { BASE_UI_ANIMATIONS_DISABLED?: boolean }).BASE_UI_ANIMATIONS_DISABLED = true;
 }

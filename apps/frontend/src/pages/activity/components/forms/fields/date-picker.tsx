@@ -42,6 +42,7 @@ export function DatePicker<TFieldValues extends FieldValues = FieldValues>({
         <FormItem className="flex flex-col">
           <FormLabel>{resolvedLabel}</FormLabel>
           <DatePickerInput
+            aria-label={resolvedLabel}
             onChange={(date: Date | undefined) => field.onChange(date)}
             value={field.value}
             disabled={field.disabled}

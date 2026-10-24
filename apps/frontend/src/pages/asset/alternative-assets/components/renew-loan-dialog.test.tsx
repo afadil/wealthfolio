@@ -118,4 +118,21 @@ describe("renewal", () => {
     expect(screen.getByText("Enter the payment for the new frequency.")).toBeInTheDocument();
     expect(submit).toBeDisabled();
   });
+
+  it("refuses a payment of zero instead of keeping the current one", () => {
+    const client = new QueryClient();
+    render(<RenewLoanDialog {...props} />, {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    });
+    const submit = screen.getByRole("button", { name: "Renew mortgage" });
+    const payment = screen.getByLabelText("Payment", { selector: "input" });
+    fireEvent.change(payment, { target: { value: "0" } });
+    expect(submit).toBeDisabled();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    // An empty field keeps the current payment.
+    fireEvent.change(payment, { target: { value: "" } });
+    expect(submit).toBeEnabled();
+  });
 });

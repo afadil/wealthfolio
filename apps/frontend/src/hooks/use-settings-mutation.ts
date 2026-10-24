@@ -7,6 +7,9 @@ import { Settings } from "@/lib/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+// Appearance changes show the moment they apply, so saving them needs no confirmation.
+const appearanceKeys = new Set(["theme", "font", "menuBarVisible"]);
+
 export function useSettingsMutation(
   setSettings: React.Dispatch<React.SetStateAction<Settings | null>>,
   applySettingsToDocument: (newSettings: Settings) => void | Promise<void>,
@@ -48,7 +51,8 @@ export function useSettingsMutation(
       // Don't show toast during onboarding
       const isOnboarding =
         "onboardingCompleted" in variables || !updatedSettings.onboardingCompleted;
-      if (!isOnboarding) {
+      const appearanceOnly = Object.keys(variables).every((key) => appearanceKeys.has(key));
+      if (!isOnboarding && !appearanceOnly) {
         try {
           await i18n.loadLanguages(updatedSettings.language);
         } catch {

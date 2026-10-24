@@ -309,6 +309,8 @@
     "screenshot_alt": "Capture d'écran {{number}}",
     "downloading_update": "Téléchargement de la mise à jour...",
     "installing_update": "Installation de la mise à jour...",
+    "update_external_flatpak": "Cette copie de Wealthfolio a été installée avec Flatpak. Mettez-la à jour avec Flatpak ou votre centre de logiciels.",
+    "update_external_package_manager": "Cette installation ne peut pas être mise à jour depuis Wealthfolio. Mettez-la à jour de la même manière que vous l'avez installée.",
     "update_failed": "La mise à jour a échoué. Veuillez réessayer.",
     "remind_me_later": "Me le rappeler plus tard",
     "view_changelog": "Voir le journal des modifications",
@@ -520,5 +522,9 @@
       "rebind": "Reconnectez Wealthfolio Connect pour confirmer le compte et le foyer de ce profil.",
       "cooldown_many": "Trop de tentatives. Réessayez dans {{count}} secondes."
     }
-  }
+  },
+  "remove": "Supprimer",
+  "remove_item": "Retirer {{name}}",
+  "actions_for": "Actions pour {{name}}",
+  "settings_for": "Paramètres de {{name}}"
 }

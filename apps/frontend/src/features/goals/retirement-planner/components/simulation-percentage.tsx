@@ -7,8 +7,8 @@ import { simulationReferenceBand } from "../lib/simulation-reference";
 
 const BAND_COLORS = {
   low: "text-destructive",
-  middle: "text-amber-700 dark:text-amber-400",
-  high: "text-[hsl(102,32%,39%)] dark:text-green-400",
+  middle: "text-warning-subtle-foreground",
+  high: "text-success",
 };
 
 export function SimulationPercentage({
@@ -24,17 +24,19 @@ export function SimulationPercentage({
   const percent = Math.round(rate * 100);
   return (
     <Tooltip open={open} onOpenChange={setOpen}>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          className={`rounded-sm underline decoration-dotted underline-offset-4 focus-visible:outline focus-visible:outline-2 ${BAND_COLORS[simulationReferenceBand(rate)]}`}
-          onClick={(event) => {
-            event.preventDefault();
-            setOpen((previous) => !previous);
-          }}
-        >
-          {formatting.formatPercent(percent / 100, { digits: 0 })}
-        </button>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            className={`rounded-sm underline decoration-dotted underline-offset-4 focus-visible:outline focus-visible:outline-2 ${BAND_COLORS[simulationReferenceBand(rate)]}`}
+            onClick={(event) => {
+              event.preventDefault();
+              setOpen((previous) => !previous);
+            }}
+          />
+        }
+      >
+        {formatting.formatPercent(percent / 100, { digits: 0 })}
       </TooltipTrigger>
       <TooltipContent
         className="text-xs"

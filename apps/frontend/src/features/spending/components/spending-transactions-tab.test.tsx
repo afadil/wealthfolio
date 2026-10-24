@@ -116,6 +116,7 @@ vi.mock("@/hooks/use-accounts", () => ({
 }));
 vi.mock("@/hooks/use-platform", () => ({ useIsMobileViewport: () => false }));
 vi.mock("@/hooks/use-virtual-scroll-container", () => ({
+  observeCurrentScrollOffset: vi.fn(),
   useVirtualScrollContainer: () => ({
     listRef: { current: null },
     scrollElement: null,

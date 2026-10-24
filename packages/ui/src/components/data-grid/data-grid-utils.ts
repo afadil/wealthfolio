@@ -113,7 +113,8 @@ export function getCommonPinningStyles<TData>(params: {
     right: isRtl ? leftPosition : rightPosition,
     opacity: isPinned ? 0.97 : 1,
     position: isPinned ? "sticky" : "relative",
-    background: isPinned ? "var(--background)" : "var(--background)",
+    // Cells sit on the grid's Card; pinned ones must be opaque to cover what scrolls under them.
+    background: "var(--card)",
     width: column.getSize(),
     zIndex: isPinned ? 1 : undefined,
   };

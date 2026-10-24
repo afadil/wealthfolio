@@ -311,14 +311,14 @@ function AllocationContentImpl({ args, result, status }: AllocationContentProps)
           </div>
         </CardHeader>
         <CardContent className="pb-4">
-          <div className="max-h-[250px] overflow-y-auto">
+          <div className="max-h-62.5 overflow-y-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-muted-foreground border-b text-left">
+                <tr className="text-muted-foreground border-b text-start">
                   <th className="pb-2 font-medium">{t("ai:allocation.colSymbol")}</th>
                   <th className="pb-2 font-medium">{t("ai:allocation.colName")}</th>
-                  <th className="pb-2 text-right font-medium">{t("ai:allocation.colValue")}</th>
-                  <th className="pb-2 text-right font-medium">{t("ai:allocation.colWeight")}</th>
+                  <th className="pb-2 text-end font-medium">{t("ai:allocation.colValue")}</th>
+                  <th className="pb-2 text-end font-medium">{t("ai:allocation.colWeight")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -326,8 +326,8 @@ function AllocationContentImpl({ args, result, status }: AllocationContentProps)
                   <tr key={`${holding.symbol}-${index}`} className="border-border/50 border-b">
                     <td className="py-2 font-medium">{holding.symbol}</td>
                     <td className="text-muted-foreground truncate py-2">{holding.name ?? "-"}</td>
-                    <td className="py-2 text-right tabular-nums">{formatValue(holding.value)}</td>
-                    <td className="text-muted-foreground py-2 text-right tabular-nums">
+                    <td className="py-2 text-end tabular-nums">{formatValue(holding.value)}</td>
+                    <td className="text-muted-foreground py-2 text-end tabular-nums">
                       {formatting.formatPercent(holding.weight / 100)}
                     </td>
                   </tr>
@@ -372,31 +372,34 @@ function AllocationContentImpl({ args, result, status }: AllocationContentProps)
               if (widthPercent < 0.5) return null;
 
               return (
-                <Tooltip key={category.categoryId} delayDuration={100}>
-                  <TooltipTrigger asChild>
-                    <div
-                      className="flex h-full cursor-default items-center justify-center transition-opacity hover:opacity-80"
-                      style={{
-                        width: `${widthPercent}%`,
-                        backgroundColor: category.color || `var(--chart-${(index % 5) + 1})`,
-                        minWidth: widthPercent >= 1 ? "4px" : undefined,
-                      }}
-                    >
-                      {widthPercent > 12 && (
-                        <span className="text-background truncate px-1 text-[10px] font-medium">
-                          {formatting.formatPercent(percent)}
-                        </span>
-                      )}
-                    </div>
+                <Tooltip key={category.categoryId}>
+                  <TooltipTrigger
+                    delay={100}
+                    render={
+                      <div
+                        className="flex h-full cursor-default items-center justify-center transition-opacity hover:opacity-80"
+                        style={{
+                          width: `${widthPercent}%`,
+                          backgroundColor: category.color || `var(--chart-${(index % 5) + 1})`,
+                          minWidth: widthPercent >= 1 ? "4px" : undefined,
+                        }}
+                      />
+                    }
+                  >
+                    {widthPercent > 12 && (
+                      <span className="text-background text-2xs truncate px-1 font-medium">
+                        {formatting.formatPercent(percent)}
+                      </span>
+                    )}
                   </TooltipTrigger>
                   <TooltipContent side="top" align="center">
                     <div className="text-center">
-                      <span className="text-muted-foreground text-[0.70rem] uppercase">
+                      <span className="text-background/70 text-2xs uppercase">
                         {category.categoryName}
                       </span>
                       <div className="font-medium">{formatting.formatPercent(percent)}</div>
                       {!isBalanceHidden && (
-                        <div className="text-muted-foreground text-xs">
+                        <div className="text-background/70 text-xs">
                           {formatValue(category.value)}
                         </div>
                       )}
@@ -408,7 +411,7 @@ function AllocationContentImpl({ args, result, status }: AllocationContentProps)
           </div>
 
           {/* Legend list */}
-          <div className="max-h-[200px] space-y-1.5 overflow-y-auto">
+          <div className="max-h-50 space-y-1.5 overflow-y-auto">
             {sortedCategories.map((category, index) => {
               const percent = computedTotal > 0 ? category.value / computedTotal : 0;
 
@@ -427,10 +430,10 @@ function AllocationContentImpl({ args, result, status }: AllocationContentProps)
                     <span className="text-foreground truncate">{category.categoryName}</span>
                   </div>
                   <div className="flex flex-shrink-0 items-center gap-3 tabular-nums">
-                    <span className="text-muted-foreground w-12 text-right">
+                    <span className="text-muted-foreground w-12 text-end">
                       {formatting.formatPercent(percent)}
                     </span>
-                    <span className="text-foreground w-20 text-right font-medium">
+                    <span className="text-foreground w-20 text-end font-medium">
                       {formatValue(category.value)}
                     </span>
                   </div>

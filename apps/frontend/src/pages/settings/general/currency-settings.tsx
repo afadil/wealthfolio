@@ -12,6 +12,7 @@ import {
   FormMessage,
 } from "@wealthfolio/ui/components/ui/form";
 import { CurrencyInput } from "@wealthfolio/ui";
+import { getQuoteUnitCurrency } from "@wealthfolio/ui/lib/currencies";
 import { useSettingsContext } from "@/lib/settings-provider";
 import {
   Card,
@@ -25,12 +26,20 @@ interface BaseCurrencyFormValues {
   baseCurrency: string;
 }
 
+// Matches the server's check. The picker also offers custom codes, but only
+// three capital letters that aren't a quote unit such as GBX can be the base.
+function isBaseCurrencyCode(code: string) {
+  return /^[A-Z]{3}$/.test(code) && !getQuoteUnitCurrency(code);
+}
+
 // Extracted form component
 export function BaseCurrencyForm() {
   const { t } = useTranslation();
   const { settings, updateBaseCurrency } = useSettingsContext();
   const baseCurrencyFormSchema = z.object({
-    baseCurrency: z.string({ required_error: t("settings:currency_select_error") }),
+    baseCurrency: z
+      .string({ required_error: t("settings:currency_select_error") })
+      .refine(isBaseCurrencyCode, t("settings:currency_code_error")),
   });
   const defaultValues: Partial<BaseCurrencyFormValues> = {
     baseCurrency: settings?.baseCurrency || "USD",
@@ -57,9 +66,13 @@ export function BaseCurrencyForm() {
           control={form.control}
           name="baseCurrency"
           render={({ field }) => (
-            <FormItem className="flex flex-col">
-              <FormControl className="w-[300px]">
-                <CurrencyInput value={field.value} onChange={field.onChange} />
+            <FormItem>
+              <FormControl className="w-[min(100%,18.75rem)]">
+                <CurrencyInput
+                  value={field.value}
+                  onChange={field.onChange}
+                  aria-label={t("settings:base_currency")}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

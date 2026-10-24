@@ -1,4 +1,5 @@
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@wealthfolio/ui";
+import { NeedsReviewIcon } from "@/components/needs-review";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { LocalTransaction } from "./types";
 import { getProviderMappingReasons, isPendingReview } from "./types";
@@ -7,54 +8,38 @@ interface StatusIndicatorProps {
   transaction: LocalTransaction;
 }
 
+/** What review means, for a row whose source gave no reasons. */
+export function useReviewExplanation(): string[] {
+  const { t } = useTranslation();
+  return useMemo(
+    () => [
+      t("activity:datagrid.status_tooltip_line1"),
+      t("activity:datagrid.status_tooltip_line2"),
+    ],
+    [t],
+  );
+}
+
 /**
- * Shows a visual indicator for transactions that are pending review
- * (synced from broker but not yet approved by the user)
+ * Marks a transaction pending review (synced from a broker, not yet approved)
+ * with the same icon and tooltip as the activity and spending lists.
  */
 export function StatusIndicator({ transaction }: StatusIndicatorProps) {
   const { t } = useTranslation();
+  const explanation = useReviewExplanation();
 
   if (!isPendingReview(transaction)) {
     return null;
   }
 
-  const mappingReasons = getProviderMappingReasons(transaction);
-  const genericReason = [
-    t("activity:datagrid.status_tooltip_line1"),
-    t("activity:datagrid.status_tooltip_line2"),
-  ].join(" ");
-  const accessibleLabel = `${t("activity:detail.needs_review")}: ${
-    mappingReasons.length > 0 ? mappingReasons.join("; ") : genericReason
-  }`;
-
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            aria-label={accessibleLabel}
-            className="text-destructive focus-visible:ring-ring flex size-full cursor-help items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2"
-          >
-            <span aria-hidden="true">●</span>
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="right" className="max-w-80">
-          {mappingReasons.length > 0 ? (
-            <ul className="list-disc space-y-1 pl-4">
-              {mappingReasons.map((reason) => (
-                <li key={reason}>{reason}</li>
-              ))}
-            </ul>
-          ) : (
-            <>
-              <p>{t("activity:datagrid.status_tooltip_line1")}</p>
-              <p>{t("activity:datagrid.status_tooltip_line2")}</p>
-            </>
-          )}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <div className="flex items-center">
+      <NeedsReviewIcon
+        label={t("activity:detail.needs_review")}
+        reasons={getProviderMappingReasons(transaction)}
+        explanation={explanation}
+      />
+    </div>
   );
 }
 
@@ -62,38 +47,18 @@ interface StatusHeaderIndicatorProps {
   hasRowsToReview: boolean;
 }
 
-/**
- * Shows a visual indicator in the header when any visible rows need review
- */
+/** Shows the same icon in the header when any visible rows need review. */
 export function StatusHeaderIndicator({ hasRowsToReview }: StatusHeaderIndicatorProps) {
   const { t } = useTranslation();
+  const explanation = useReviewExplanation();
 
   if (!hasRowsToReview) {
     return null;
   }
 
-  const accessibleLabel = [
-    t("activity:datagrid.status_tooltip_line1"),
-    t("activity:datagrid.status_tooltip_line2"),
-  ].join(" ");
-
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            aria-label={accessibleLabel}
-            className="text-destructive focus-visible:ring-ring w-full cursor-help rounded-sm text-center focus-visible:outline-none focus-visible:ring-2"
-          >
-            <span aria-hidden="true">●</span>
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom">
-          <p>{t("activity:datagrid.status_tooltip_line1")}</p>
-          <p>{t("activity:datagrid.status_tooltip_line2")}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <div className="flex items-center">
+      <NeedsReviewIcon label={t("activity:detail.needs_review")} explanation={explanation} />
+    </div>
   );
 }

@@ -1031,6 +1031,7 @@
     "addSource_one": "Quelle hinzufügen ({{count}} verfügbar)",
     "addSource_other": "Quelle hinzufügen ({{count}} verfügbar)",
     "overridesTitle_one": "Anpassung · {{count}}",
-    "overridesTitle_other": "Anpassungen · {{count}}"
+    "overridesTitle_other": "Anpassungen · {{count}}",
+    "sourceMonth": "Quellmonat"
   }
 }

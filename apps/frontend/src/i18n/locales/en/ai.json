@@ -31,7 +31,8 @@
     "addModels": "Add models..."
   },
   "provider": {
-    "noProvidersConfigured": "No providers configured"
+    "noProvidersConfigured": "No providers configured",
+    "label": "AI provider"
   },
   "reasoning": {
     "thinking": "Thinking...",
@@ -127,6 +128,7 @@
   "tools": {
     "calling": "Calling {{toolName}}...",
     "cancelled": "Cancelled {{toolName}}",
+    "notUsed": "Tool not used: {{toolName}}",
     "used": "Used tool: {{toolName}}"
   },
   "accounts": {

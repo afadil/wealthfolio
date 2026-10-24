@@ -1,8 +1,10 @@
-import type { CurrencyFormattingRegions } from "@wealthfolio/ui";
+import type { CurrencyFormattingRegions, TextDirection } from "@wealthfolio/ui";
 
 export interface AddonLocalizationSnapshot {
   locale: string;
   uiLocale?: string;
+  /** The host document's reading direction, so addon surfaces mirror with it. */
+  direction?: TextDirection;
   timezone?: string;
   /** Formatting regions for amounts in specific currencies, keyed by currency code. */
   currencyFormattingRegions?: CurrencyFormattingRegions;
@@ -33,6 +35,7 @@ export function isSameAddonLocalization(
   return (
     left.locale === right.locale &&
     left.uiLocale === right.uiLocale &&
+    left.direction === right.direction &&
     left.timezone === right.timezone &&
     Object.keys(leftRegions).length === Object.keys(rightRegions).length &&
     Object.entries(leftRegions).every(([currency, region]) => rightRegions[currency] === region)

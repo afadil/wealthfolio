@@ -73,18 +73,18 @@ function ActivitiesHelpContent({ transactionImport }: { transactionImport: boole
         </div>
 
         <div className="space-y-3">
-          <div className="border-blue-500 bg-blue-50 p-3 dark:bg-blue-900/50">
+          <div className="border-info bg-info-subtle p-3">
             <p className="text-sm">
-              <strong className="text-blue-700 dark:text-blue-300">
+              <strong className="text-info-subtle-foreground">
                 {t("activity:import.help.tipBold")}
               </strong>
               {t("activity:import.help.activitiesTip")}
             </p>
           </div>
 
-          <div className="border-green-500 bg-green-50 p-3 dark:bg-green-900/50">
+          <div className="border-success bg-success-subtle p-3">
             <p className="text-sm">
-              <strong className="text-green-700 dark:text-green-300">
+              <strong className="text-success-subtle-foreground">
                 {t("activity:import.help.amountBold")}
               </strong>
               {t("activity:import.help.activitiesAmount")}
@@ -202,7 +202,7 @@ function HoldingsHelpContent() {
             <li>{t("activity:import.help.holdingsStep2")}</li>
             <li>
               {t("activity:import.help.holdingsStep3")}
-              <span className="text-muted-foreground ml-2 text-xs">
+              <span className="text-muted-foreground ms-2 text-xs">
                 {t("activity:import.help.holdingsStep3Fields")}
               </span>
             </li>
@@ -240,18 +240,18 @@ function HoldingsHelpContent() {
         </div>
 
         <div className="space-y-3">
-          <div className="border-blue-500 bg-blue-50 p-3 dark:bg-blue-900/50">
+          <div className="border-info bg-info-subtle p-3">
             <p className="text-sm">
-              <strong className="text-blue-700 dark:text-blue-300">
+              <strong className="text-info-subtle-foreground">
                 {t("activity:import.help.tipBold")}
               </strong>
               {t("activity:import.help.holdingsTip")}
             </p>
           </div>
 
-          <div className="border-green-500 bg-green-50 p-3 dark:bg-green-900/50">
+          <div className="border-success bg-success-subtle p-3">
             <p className="text-sm">
-              <strong className="text-green-700 dark:text-green-300">
+              <strong className="text-success-subtle-foreground">
                 {t("activity:import.help.cashBalancesBold")}
               </strong>{" "}
               {t("activity:import.help.holdingsCashBalancesUse")}{" "}
@@ -365,16 +365,24 @@ export function ImportHelpPopover({
   if (isMobile) {
     return (
       <Sheet>
-        <SheetTrigger asChild>
-          <Button type="button" variant="ghost" size="icon" className="h-9 w-9">
-            <Icons.HelpCircle className="h-6 w-6" />
-          </Button>
+        <SheetTrigger
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              aria-label={t("activity:import.help.mobileTitle")}
+            />
+          }
+        >
+          <Icons.HelpCircle className="h-6 w-6" />
         </SheetTrigger>
         <SheetContent side="bottom" className="rounded-t-4xl mx-1 h-[85vh]">
           <SheetHeader>
             <SheetTitle>{t("activity:import.help.mobileTitle")}</SheetTitle>
           </SheetHeader>
-          <ScrollArea className="h-[calc(85vh-4rem)] pr-4">{helpContent}</ScrollArea>
+          <ScrollArea className="h-[calc(85vh-4rem)] pe-4">{helpContent}</ScrollArea>
         </SheetContent>
       </Sheet>
     );
@@ -382,13 +390,13 @@ export function ImportHelpPopover({
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button type="button" variant="link" className="flex items-center">
-          <Icons.HelpCircle className="mr-1 h-5 w-5" />
-          {t("activity:import.help.button")}
-        </Button>
+      <PopoverTrigger
+        render={<Button type="button" variant="link" className="flex items-center" />}
+      >
+        <Icons.HelpCircle className="me-1 h-5 w-5" />
+        {t("activity:import.help.button")}
       </PopoverTrigger>
-      <PopoverContent className="m-4 max-h-[80vh] w-[900px] max-w-[calc(100vw-2rem)] overflow-y-auto p-6 text-sm">
+      <PopoverContent className="w-225 m-4 max-h-[80vh] max-w-[calc(100vw-2rem)] overflow-y-auto p-6 text-sm">
         {helpContent}
       </PopoverContent>
     </Popover>

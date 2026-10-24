@@ -46,7 +46,7 @@ export function OverallBudgetMeter({
   }, [pct]);
 
   if (isLoading) {
-    return <Skeleton className="h-[88px] w-full rounded-xl" />;
+    return <Skeleton className="h-22 w-full rounded-xl" />;
   }
 
   if (monthlyTarget <= 0) {
@@ -88,13 +88,13 @@ export function OverallBudgetMeter({
             {t("spending:overallBudget.perMonthTimes", { count: monthsInRange })}
           </p>
         </div>
-        <div className="text-right">
+        <div className="text-end">
           <div className="text-foreground text-xl font-semibold tabular-nums">
             {numberFormatting.formatPercent(pct, { digits: 0 })}
           </div>
           <div
             className={cn(
-              "text-[11px] font-medium tabular-nums",
+              "text-2xs font-medium tabular-nums",
               isOver ? "text-destructive" : "text-success",
             )}
           >
@@ -118,7 +118,7 @@ export function OverallBudgetMeter({
         />
         {overflowPct > 0 && (
           <div
-            className="absolute inset-y-0 right-0 rounded-r-full"
+            className="absolute inset-y-0 end-0 rounded-e-full"
             style={{
               width: `${overflowPct}%`,
               backgroundColor: "var(--destructive)",
@@ -130,7 +130,7 @@ export function OverallBudgetMeter({
         )}
       </div>
 
-      <div className="text-muted-foreground/70 mt-1.5 flex justify-between text-[11px] tabular-nums">
+      <div className="text-muted-foreground/70 text-2xs mt-1.5 flex justify-between tabular-nums">
         <span>
           <PrivacyAmount value={spent} currency={currency} /> {t("spending:overallBudget.spent")}
         </span>

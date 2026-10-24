@@ -18,6 +18,7 @@ import { RadioGroup, RadioGroupItem } from "@wealthfolio/ui/components/ui/radio-
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { generateBackupPassword, isValidBackupPassword } from "./backup-password";
 import { BackupAlert, PendingIcon } from "./backup-ui";
+import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 
 interface BackupExportDialogProps {
   filename: string;
@@ -87,7 +88,7 @@ export function BackupExportDialog({ filename, displayName, onClose }: BackupExp
       }}
     >
       <DialogContent className="sm:max-w-md" mobileClassName="h-auto max-h-[85dvh] overflow-y-auto">
-        <DialogHeader className="text-left">
+        <DialogHeader className="text-start">
           <DialogTitle>{t("settings:backup_export_dialog_title")}</DialogTitle>
           <DialogDescription>{t("settings:backup_export_description")}</DialogDescription>
         </DialogHeader>
@@ -108,13 +109,13 @@ export function BackupExportDialog({ filename, displayName, onClose }: BackupExp
               setError(null);
             }}
           >
-            <div className="has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-muted/50 flex items-center gap-2 rounded-lg border p-3">
+            <div className="has-[[data-checked]]:border-primary has-[[data-checked]]:bg-muted/50 flex items-center gap-2 rounded-lg border p-3">
               <RadioGroupItem value="protected" id={`${id}-protected`} />
               <Label className="flex-1 cursor-pointer leading-relaxed" htmlFor={`${id}-protected`}>
                 {t("settings:backup_export_protected")}
               </Label>
             </div>
-            <div className="has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-muted/50 flex items-center gap-2 rounded-lg border p-3">
+            <div className="has-[[data-checked]]:border-primary has-[[data-checked]]:bg-muted/50 flex items-center gap-2 rounded-lg border p-3">
               <RadioGroupItem value="plain" id={`${id}-plain`} />
               <Label className="flex-1 cursor-pointer leading-relaxed" htmlFor={`${id}-plain`}>
                 {t("settings:backup_export_plain")}
@@ -122,13 +123,12 @@ export function BackupExportDialog({ filename, displayName, onClose }: BackupExp
             </div>
           </RadioGroup>
           {unencrypted ? (
-            <p
-              className="border-warning/30 bg-warning/10 flex gap-3 rounded-lg border p-3 text-sm leading-relaxed"
-              role="note"
-            >
-              <Icons.AlertTriangle className="text-warning mt-0.5 size-4 shrink-0" aria-hidden />
-              {t("settings:backup_export_plain_warning")}
-            </p>
+            <Alert variant="warning" role="note" className="p-3">
+              <Icons.AlertTriangle aria-hidden />
+              <AlertDescription className="leading-relaxed">
+                {t("settings:backup_export_plain_warning")}
+              </AlertDescription>
+            </Alert>
           ) : (
             <>
               <div className="grid gap-4">
@@ -177,7 +177,7 @@ export function BackupExportDialog({ filename, displayName, onClose }: BackupExp
                     setConfirmation(generated);
                   }}
                 >
-                  <Icons.Sparkles className="mr-1.5 size-3.5" aria-hidden />
+                  <Icons.Sparkles className="me-1.5 size-3.5" aria-hidden />
                   {t("settings:backup_export_generate")}
                 </Button>
                 <Button
@@ -197,7 +197,7 @@ export function BackupExportDialog({ filename, displayName, onClose }: BackupExp
                     }
                   }}
                 >
-                  <Icons.Copy className="size-4 md:mr-1.5 md:size-3.5" aria-hidden />
+                  <Icons.Copy className="size-4 md:me-1.5 md:size-3.5" aria-hidden />
                   <span className="hidden md:inline">{t("settings:backup_export_copy")}</span>
                 </Button>
               </div>

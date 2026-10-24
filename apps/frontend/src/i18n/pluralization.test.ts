@@ -6,6 +6,7 @@ import itActivity from "./locales/it/activity.json";
 import ptActivity from "./locales/pt/activity.json";
 import zhHantActivity from "./locales/zh-Hant/activity.json";
 import zhHantAi from "./locales/zh-Hant/ai.json";
+import arCommon from "./locales/ar/common.json";
 import deCommon from "./locales/de/common.json";
 import enCommon from "./locales/en/common.json";
 import esCommon from "./locales/es/common.json";
@@ -65,6 +66,7 @@ describe("global event translations", () => {
     ["zh-Hant", zhHantCommon],
     ["it", itCommon],
     ["pt", ptCommon],
+    ["ar", arCommon],
   ])("resolves asset-count messages for %s", async (locale, common) => {
     const i18n = i18next.createInstance();
     await i18n.init({

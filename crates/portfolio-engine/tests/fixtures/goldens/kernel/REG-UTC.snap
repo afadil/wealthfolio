@@ -99,7 +99,7 @@ baseline:
             contributions: "1574"
             distributions: "0"
             fees: "0"
-            fx_effect: "0"
+            fx_effect: "1"
             income: "0"
             realized_pnl: "0"
             residual: "0"
@@ -144,7 +144,7 @@ baseline:
             - date: 2025-06-08
               value: "0.0133418"
           summary:
-            amount: "20"
+            amount: "21"
             amount_status: complete
             basis: marketValue
             basis_status: notApplicable
@@ -321,7 +321,7 @@ baseline:
         contributions: "1574"
         distributions: "0"
         fees: "0"
-        fx_effect: "0"
+        fx_effect: "1"
         income: "0"
         realized_pnl: "0"
         residual: "0"
@@ -366,7 +366,7 @@ baseline:
         - date: 2025-06-08
           value: "0.0133418"
       summary:
-        amount: "20"
+        amount: "21"
         amount_status: complete
         basis: marketValue
         basis_status: notApplicable

@@ -47,6 +47,7 @@
   "nav_about_subtitle": "Informazioni su Wealthfolio",
   "general_page_description": "Gestisci le impostazioni e le preferenze generali dell'applicazione.",
   "currency_select_error": "Seleziona una valuta base.",
+  "currency_code_error": "Inserisci un codice valuta valido di 3 lettere, ad esempio USD.",
   "currency_title": "Valuta base",
   "currency_description": "Seleziona la valuta base del tuo portafoglio.",
   "currency_save_button": "Salva valuta",
@@ -1074,7 +1075,9 @@
     "imported_count_other": "{{count}} importate",
     "failed_count_one": "{{count}} non riuscita",
     "failed_count_many": "{{count}} non riuscite",
-    "failed_count_other": "{{count}} non riuscite"
+    "failed_count_other": "{{count}} non riuscite",
+    "priority_decrease": "Riduci il numero di priorità",
+    "priority_increase": "Aumenta il numero di priorità"
   },
   "addon_permission_none_detected": "Nessun permesso di accesso ai dati rilevato. Questo add-on sembra avere un accesso minimo al sistema.",
   "addon_permission_list_title": "Permessi",

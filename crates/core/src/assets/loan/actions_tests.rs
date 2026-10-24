@@ -351,45 +351,219 @@ fn only_renewable_loans_renew() {
     );
 }
 
+fn rate(day: &str, annual_rate: f64) -> LoanEvent {
+    LoanEvent::RateChange {
+        effective_date: date(day),
+        annual_rate,
+        note: None,
+    }
+}
+
+fn payment(day: &str, payment_amount: f64) -> LoanEvent {
+    LoanEvent::PaymentChange {
+        effective_date: date(day),
+        payment_amount,
+        note: None,
+    }
+}
+
+fn solved_payment(loan: &LoanRecord, day: &str, annual_rate: f64) -> f64 {
+    recalculate_loan(&LoanRecalculationRequest {
+        loan: LoanCalculationRequest {
+            metadata: loan.metadata.clone(),
+            balances: loan.balances.iter().map(LoanBalance::from).collect(),
+            as_of: date(day),
+            payments: loan.payments.clone(),
+        },
+        annual_rate,
+    })
+    .unwrap()
+    .payment_amount
+}
+
+fn recalculate(day: &str, annual_rate: f64) -> LoanAction {
+    LoanAction::Recalculate {
+        date: date(day),
+        annual_rate,
+    }
+}
+
+fn change_rate(day: &str, annual_rate: f64, payment_amount: Option<f64>) -> LoanAction {
+    LoanAction::ChangeRate {
+        date: date(day),
+        annual_rate,
+        payment_amount,
+    }
+}
+
 #[test]
-fn recalculation_stores_the_engines_solved_payment() {
+fn recalculation_stores_the_new_rate_and_the_engines_solved_payment() {
     let loan = record(
         json!({ "loan_projection": terms() }),
         &[("2026-04-01", 500.0, None)],
     );
-    let update = apply(
-        &loan,
-        LoanAction::Recalculate {
-            date: date("2026-04-01"),
-            annual_rate: 0.0,
-        },
-    )
-    .unwrap();
-    let solved = recalculate_loan(&LoanRecalculationRequest {
-        loan: LoanCalculationRequest {
-            metadata: loan.metadata.clone(),
-            balances: loan.balances.iter().map(LoanBalance::from).collect(),
-            as_of: date("2026-04-01"),
-            payments: loan.payments.clone(),
-        },
-        annual_rate: 0.0,
-    })
-    .unwrap();
+    let update = apply(&loan, recalculate("2026-04-01", 6.0)).unwrap();
     assert_eq!(
         events(update.metadata.as_ref().unwrap()),
         vec![
-            LoanEvent::RateChange {
-                effective_date: date("2026-04-01"),
-                annual_rate: 0.0,
-                note: None
-            },
-            LoanEvent::PaymentChange {
-                effective_date: date("2026-04-01"),
-                payment_amount: solved.payment_amount,
-                note: None
-            },
+            rate("2026-04-01", 6.0),
+            payment("2026-04-01", solved_payment(&loan, "2026-04-01", 6.0)),
         ]
     );
+}
+
+#[test]
+fn recalculating_at_the_rate_in_effect_records_only_the_payment() {
+    // A recast after a lump sum: the rate stays and the payment is solved again.
+    let loan = record(
+        with_events(
+            json!({ "loan_projection": terms() }),
+            &[rate("2026-03-01", 4.0)],
+        ),
+        &[("2026-04-01", 500.0, None)],
+    );
+    let update = apply(&loan, recalculate("2026-04-01", 4.0)).unwrap();
+    assert_eq!(
+        events(update.metadata.as_ref().unwrap()),
+        vec![
+            rate("2026-03-01", 4.0),
+            payment("2026-04-01", solved_payment(&loan, "2026-04-01", 4.0)),
+        ]
+    );
+}
+
+#[test]
+fn a_rate_change_keeps_the_payment_unless_one_is_given() {
+    let loan = record(
+        json!({ "loan_projection": terms() }),
+        &[("2026-01-01", 1200.0, None)],
+    );
+    let kept = apply(&loan, change_rate("2026-06-01", 12.0, None)).unwrap();
+    assert_eq!(
+        events(kept.metadata.as_ref().unwrap()),
+        vec![rate("2026-06-01", 12.0)]
+    );
+    assert!(!kept.changes_balances());
+    let from_letter = apply(&loan, change_rate("2026-06-01", 12.0, Some(104.5))).unwrap();
+    assert_eq!(
+        events(from_letter.metadata.as_ref().unwrap()),
+        vec![rate("2026-06-01", 12.0), payment("2026-06-01", 104.5)]
+    );
+}
+
+#[test]
+fn a_kept_payment_changes_only_the_schedule_from_the_new_rate() {
+    let loan = record(
+        json!({ "loan_projection": terms() }),
+        &[("2026-01-01", 1200.0, None)],
+    );
+    let update = apply(&loan, change_rate("2026-06-01", 12.0, None)).unwrap();
+    let end = date("2027-01-01");
+    let before = loan.calculation(&loan.metadata, end).unwrap();
+    let after = loan
+        .calculation(update.metadata.as_ref().unwrap(), end)
+        .unwrap();
+    let earlier = |calculation: &LoanCalculation| -> Vec<(NaiveDate, f64, f64, f64)> {
+        calculation
+            .rows
+            .iter()
+            .filter(|row| row.date < date("2026-06-01"))
+            .map(|row| (row.date, row.balance, row.payment, row.interest))
+            .collect()
+    };
+    assert!(!earlier(&before).is_empty());
+    assert_eq!(earlier(&after), earlier(&before));
+    assert_eq!((after.annual_rate, after.payment_amount), (12.0, 100.0));
+    // At 0% the payments repaid it exactly.
+    assert_eq!(before.residual_balance, 0.0);
+    // Worked out independently of this engine: from June 1, 1% a month on the
+    // balance, rounded to the cent, while 100 is still paid each month.
+    let worksheet: Vec<_> = [
+        ("2026-07-01", 7.00, 607.00),
+        ("2026-08-01", 6.07, 513.07),
+        ("2026-09-01", 5.13, 418.20),
+        ("2026-10-01", 4.18, 322.38),
+        ("2026-11-01", 3.22, 225.60),
+        ("2026-12-01", 2.26, 127.86),
+        ("2027-01-01", 1.28, 29.14),
+    ]
+    .iter()
+    .map(|(day, interest, balance)| (date(day), *interest, *balance))
+    .collect();
+    let schedule: Vec<_> = after
+        .rows
+        .iter()
+        .filter(|row| row.scheduled_payment && row.date > date("2026-06-01"))
+        .map(|row| (row.date, row.interest, row.balance))
+        .collect();
+    assert_eq!(schedule, worksheet);
+    assert_eq!(after.residual_balance, 29.14);
+}
+
+#[test]
+fn a_letters_rate_is_kept_with_its_payment_even_when_unchanged() {
+    let loan = record(
+        with_events(
+            json!({ "loan_projection": terms() }),
+            &[renewal("2026-05-01", 5.0, None)],
+        ),
+        &[("2026-01-01", 1200.0, None)],
+    );
+    // The renewal already set 5%; the letter's rate is recorded with its payment.
+    let update = apply(&loan, change_rate("2026-06-01", 5.0, Some(110.0))).unwrap();
+    assert_eq!(
+        events(update.metadata.as_ref().unwrap()),
+        vec![
+            renewal("2026-05-01", 5.0, None),
+            rate("2026-06-01", 5.0),
+            payment("2026-06-01", 110.0)
+        ]
+    );
+    // Deleting the renewal later doesn't carry the original 0% past the letter.
+    let letter = record(update.metadata.unwrap(), &[("2026-01-01", 1200.0, None)]);
+    let without = apply(&letter, edit(0, renewal("2026-05-01", 5.0, None), None)).unwrap();
+    let after = letter
+        .calculation(without.metadata.as_ref().unwrap(), date("2026-07-15"))
+        .unwrap();
+    assert_eq!(after.annual_rate, 5.0);
+    // The rate already in effect with no payment would record nothing.
+    assert_eq!(
+        apply(&loan, change_rate("2026-06-01", 5.0, None)).unwrap_err(),
+        LoanError::Invalid
+    );
+    // Before the renewal the original 0% was in effect.
+    let backdated = apply(&loan, change_rate("2026-04-01", 5.0, None)).unwrap();
+    assert_eq!(
+        events(backdated.metadata.as_ref().unwrap()),
+        vec![rate("2026-04-01", 5.0), renewal("2026-05-01", 5.0, None)]
+    );
+}
+
+#[test]
+fn rate_changes_need_calculated_terms_valid_dates_and_amounts() {
+    let manual = record(
+        json!({ "loan_projection": terms(), "tracking_mode": "manual" }),
+        &[("2026-01-01", 1200.0, None)],
+    );
+    assert_eq!(
+        apply(&manual, change_rate("2026-06-01", 5.0, None)).unwrap_err(),
+        LoanError::Invalid
+    );
+    let loan = record(
+        json!({ "loan_projection": terms(), "origination_date": "2026-01-01" }),
+        &[("2026-01-01", 1200.0, None)],
+    );
+    for action in [
+        change_rate("2025-12-31", 5.0, None),
+        // One day of tolerance for a device ahead of the settings timezone.
+        change_rate("2026-10-04", 5.0, None),
+        change_rate("2026-06-01", 100.5, None),
+        change_rate("2026-06-01", -1.0, None),
+        change_rate("2026-06-01", 5.0, Some(0.0)),
+        change_rate("2026-06-01", 5.0, Some(-10.0)),
+    ] {
+        assert_eq!(apply(&loan, action).unwrap_err(), LoanError::Invalid);
+    }
 }
 
 fn edit(index: usize, original: LoanEvent, replacement: Option<LoanEvent>) -> LoanAction {
@@ -606,6 +780,16 @@ fn actions_read_the_shape_the_frontend_sends() {
             ..
         }
     ));
+    let action: LoanAction = serde_json::from_value(json!({
+        "type": "change_rate", "date": "2026-03-10", "annualRate": 4.5
+    }))
+    .unwrap();
+    assert_eq!(action, change_rate("2026-03-10", 4.5, None));
+    let action: LoanAction = serde_json::from_value(json!({
+        "type": "change_rate", "date": "2026-03-10", "annualRate": 4.5, "paymentAmount": 120
+    }))
+    .unwrap();
+    assert_eq!(action, change_rate("2026-03-10", 4.5, Some(120.0)));
 }
 
 #[test]

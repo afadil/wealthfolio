@@ -16,6 +16,8 @@ import { useTranslation } from "react-i18next";
 import { useContributionLimitProgress } from "../use-contribution-limit-mutations";
 import { AccountSelection } from "./account-selection";
 import { ContributionLimitOperations } from "./contribution-limit-operations";
+import { statusSurfaceVariants } from "@wealthfolio/ui/components/ui/status-surface";
+import { cn } from "@/lib/utils";
 
 interface ContributionLimitItemProps {
   limit: ContributionLimit;
@@ -65,7 +67,12 @@ export function ContributionLimitItem({
 
   return (
     <Card
-      className={`w-full ${progressPercentageNumber === 100 ? "border-success/20 bg-success/10 shadow-sm" : isOverLimit ? "border-destructive/20 bg-destructive/10 shadow-sm" : ""}`}
+      className={cn(
+        "w-full",
+        progressPercentageNumber === 100
+          ? statusSurfaceVariants({ status: "success" })
+          : isOverLimit && statusSurfaceVariants({ status: "destructive" }),
+      )}
     >
       <CardHeader className="cursor-pointer pb-3" onClick={toggleExpanded}>
         {/* Mobile Layout */}
@@ -78,7 +85,14 @@ export function ContributionLimitItem({
               <CardTitle className="text-base">{limit.groupName}</CardTitle>
             </div>
             <div className="flex items-center">
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleExpanded}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={toggleExpanded}
+                aria-label={limit.groupName}
+                aria-expanded={isExpanded}
+              >
                 <Icons.ChevronDown
                   className={`h-4 w-4 transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`}
                 />
@@ -141,7 +155,9 @@ export function ContributionLimitItem({
               {daysRemaining !== null && daysRemaining > 0 && daysRemaining <= 60 && (
                 <span
                   className={`shrink-0 rounded-full px-2 py-0.5 ${
-                    daysRemaining <= 30 ? "bg-amber-100 text-amber-800" : "bg-blue-50 text-blue-700"
+                    daysRemaining <= 30
+                      ? "bg-warning-subtle text-warning-subtle-foreground"
+                      : "bg-info-subtle text-info-subtle-foreground"
                   }`}
                 >
                   {t("settings:limits.day_left", { days: daysRemaining })}
@@ -155,24 +171,24 @@ export function ContributionLimitItem({
         <div className="hidden sm:flex sm:items-center sm:justify-between">
           <div className="space-y-1">
             <div className="flex items-center">
-              {isComplete && <Icons.CheckCircle className="text-success mr-2 h-5 w-5" />}
-              {isOverLimit && <Icons.AlertTriangle className="text-destructive mr-2 h-5 w-5" />}
+              {isComplete && <Icons.CheckCircle className="text-success me-2 h-5 w-5" />}
+              {isOverLimit && <Icons.AlertTriangle className="text-destructive me-2 h-5 w-5" />}
               <CardTitle className="text-lg">{limit.groupName}</CardTitle>
             </div>
 
             {limit.startDate && limit.endDate && (
               <div className="text-muted-foreground flex items-center text-xs">
-                <Icons.Calendar className="mr-1 h-3 w-3" />
+                <Icons.Calendar className="me-1 h-3 w-3" />
                 <span>
                   {dateFormatting.formatCalendarDate(limit.startDate.slice(0, 10))} →{" "}
                   {dateFormatting.formatCalendarDate(limit.endDate.slice(0, 10))}
                 </span>
                 {daysRemaining !== null && daysRemaining > 0 && daysRemaining <= 60 && (
                   <span
-                    className={`ml-2 rounded-full px-2 py-0.5 text-xs ${
+                    className={`ms-2 rounded-full px-2 py-0.5 text-xs ${
                       daysRemaining <= 30
-                        ? "bg-amber-100 text-amber-800"
-                        : "bg-blue-50 text-blue-700"
+                        ? "bg-warning-subtle text-warning-subtle-foreground"
+                        : "bg-info-subtle text-info-subtle-foreground"
                     }`}
                   >
                     {t("settings:limits_days_left", { days: daysRemaining })}
@@ -201,7 +217,7 @@ export function ContributionLimitItem({
                     / {amountFormatting.formatAmount(limit.limitAmount, baseCurrency)}
                   </span>
                 </div>
-                <span className="text-muted-foreground text-right text-xs">
+                <span className="text-muted-foreground text-end text-xs">
                   {isComplete
                     ? t("settings:limits_completed")
                     : isOverLimit
@@ -214,7 +230,14 @@ export function ContributionLimitItem({
             )}
 
             <div className="flex items-center space-x-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleExpanded}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={toggleExpanded}
+                aria-label={limit.groupName}
+                aria-expanded={isExpanded}
+              >
                 <Icons.ChevronDown
                   className={`h-4 w-4 transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`}
                 />

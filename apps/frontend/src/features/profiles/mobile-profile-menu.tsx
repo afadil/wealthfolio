@@ -17,7 +17,7 @@ export function MobileProfileMenu({ onAction }: MobileProfileMenuProps) {
     action();
   };
   const rowClassName =
-    "hover:bg-muted flex min-h-16 w-full items-center gap-4 rounded-lg py-3 text-left text-base font-medium";
+    "hover:bg-muted flex min-h-16 w-full items-center gap-4 rounded-lg py-3 text-start text-base font-medium";
 
   return (
     <div className="divide-border/70 divide-y">

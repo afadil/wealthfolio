@@ -306,6 +306,20 @@ test("loan estimates, dated actions and net worth stay consistent", async ({ pag
     ).json();
   };
   const before = await calculate();
+  // A rate set by the lender keeps the payment unless a new one is entered.
+  await page.getByRole("button", { name: "Add event", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Change interest rate", exact: true }).click();
+  await dialog.getByLabel("Interest rate", { exact: true }).fill("6");
+  await dialog.getByRole("button", { name: "Change interest rate", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+  const rateChanged = await calculate();
+  expect(rateChanged.annualRate).toBe(6);
+  expect(rateChanged.paymentAmount).toBe(before.paymentAmount);
+  expect(rateChanged.rows.filter((r: { date: string }) => r.date < day(now))).toEqual(
+    before.rows.filter((r: { date: string }) => r.date < day(now)),
+  );
+  expect(await quotes()).toHaveLength(1);
+
   await openActions();
   await page.getByRole("button", { name: "Recalculate Schedule", exact: true }).click();
   await dialog.getByLabel("New Annual Rate (%)", { exact: true }).fill("12");
@@ -571,7 +585,9 @@ test("mortgage presentation stays separate from other assets and manual liabilit
   const todayMarker = terms.getByTestId("loan-term-today");
   await expect(todayMarker).toContainText("Today");
   await expect(terms).toContainText("Current term");
-  const markerPosition = await todayMarker.evaluate((element) => parseFloat(element.style.left));
+  const markerPosition = await todayMarker.evaluate((element) =>
+    parseFloat(element.style.insetInlineStart),
+  );
   expect(markerPosition).toBeGreaterThan(0);
   expect(markerPosition).toBeLessThan(100);
   await terms.screenshot({ path: test.info().outputPath("car-term-desktop.png") });

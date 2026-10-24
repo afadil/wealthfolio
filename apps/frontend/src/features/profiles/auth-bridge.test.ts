@@ -1,10 +1,61 @@
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const command = vi.hoisted(() => vi.fn());
 vi.mock("./api", () => ({ profileCommand: command }));
 beforeEach(() => {
   vi.resetModules();
   command.mockReset();
 });
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+it("uses secure random bytes for a UUID when randomUUID is unavailable", async () => {
+  const getRandomValues = vi.fn((bytes: Uint8Array) => {
+    bytes.set(Array.from({ length: 16 }, (_, index) => index));
+    return bytes;
+  });
+  vi.stubGlobal("crypto", { getRandomValues });
+  const { beginProfileLogin, createProfilePkceStorage, ownsProfileCallback } =
+    await import("./auth-bridge");
+  const redirect = new URL(beginProfileLogin("https://connect.example/deeplink#existing=value"));
+  const fragment = new URLSearchParams(redirect.hash.slice(1));
+  const flow = "00010203-0405-4607-8809-0a0b0c0d0e0f";
+  expect(fragment.get("wf_profile_flow")).toBe(flow);
+  expect(fragment.get("existing")).toBe("value");
+  expect(getRandomValues).toHaveBeenCalledWith(expect.any(Uint8Array));
+
+  command.mockResolvedValueOnce(flow);
+  await createProfilePkceStorage("auth").setItem("auth-code-verifier", "test-verifier");
+  expect(command).toHaveBeenLastCalledWith(
+    "profile_auth_storage",
+    { operation: "set", key: "auth-code-verifier", value: "test-verifier", flowId: flow },
+    true,
+  );
+  command.mockResolvedValueOnce(true);
+  expect(await ownsProfileCallback(`wealthfolio://auth/callback?code=test${redirect.hash}`)).toBe(
+    true,
+  );
+  expect(command).toHaveBeenLastCalledWith(
+    "profile_auth_storage",
+    { operation: "validate", flowId: flow },
+    true,
+  );
+});
+
+it.each([undefined, {}])(
+  "refuses to start login without secure randomness (%j)",
+  async (crypto) => {
+    vi.stubGlobal("crypto", crypto);
+    const random = vi.spyOn(Math, "random");
+    const { beginProfileLogin } = await import("./auth-bridge");
+    expect(() => beginProfileLogin("https://connect.example/deeplink")).toThrow(
+      "Secure randomness",
+    );
+    expect(random).not.toHaveBeenCalled();
+    expect(command).not.toHaveBeenCalled();
+  },
+);
 it("late SDK cleanup keeps the verifier owned by its original flow", async () => {
   const { createProfilePkceStorage } = await import("./auth-bridge");
   const a = createProfilePkceStorage("auth");

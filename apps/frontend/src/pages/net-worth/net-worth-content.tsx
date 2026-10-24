@@ -205,8 +205,8 @@ export function NetWorthContent() {
     return (
       <div className="flex min-h-[50vh] items-center justify-center p-8">
         <div className="text-center">
-          <div className="bg-destructive/10 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full">
-            <Icons.AlertTriangle className="text-destructive h-6 w-6" />
+          <div className="text-destructive-subtle-foreground bg-current/15 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full">
+            <Icons.AlertTriangle className="h-6 w-6" />
           </div>
           <p className="text-destructive text-lg font-medium">
             {t("insights:networth.failed_to_load")}
@@ -235,12 +235,14 @@ export function NetWorthContent() {
               {hasStaleValuations && (
                 <TooltipProvider>
                   <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="bg-warning/10 flex h-8 w-8 items-center justify-center rounded-full">
-                        <Icons.AlertCircle className="text-warning h-4 w-4" />
-                      </div>
+                    <TooltipTrigger
+                      render={
+                        <div className="text-warning-subtle-foreground bg-current/15 flex h-8 w-8 items-center justify-center rounded-full" />
+                      }
+                    >
+                      <Icons.AlertCircle className="h-4 w-4" />
                     </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[280px]">
+                    <TooltipContent side="bottom" className="max-w-70">
                       <p className="mb-2 text-xs font-medium">
                         {t("insights:networth.stale_valuations_tooltip")}
                       </p>
@@ -251,7 +253,7 @@ export function NetWorthContent() {
                             className="flex items-center justify-between gap-2"
                           >
                             <span className="truncate">{asset.name ?? asset.assetId}</span>
-                            <span className="text-muted-foreground shrink-0">
+                            <span className="text-background/70 shrink-0">
                               {t("insights:networth.days_ago", { count: asset.daysStale })}
                             </span>
                           </li>
@@ -266,7 +268,7 @@ export function NetWorthContent() {
               {isHistoryLoading ? (
                 <div className="flex items-center gap-3 pt-1">
                   <Skeleton className="h-4 w-24" />
-                  <div className="border-secondary my-1 border-r pr-2" />
+                  <div className="border-secondary my-1 border-e pe-2" />
                   <Skeleton className="h-4 w-16" />
                 </div>
               ) : (
@@ -279,7 +281,7 @@ export function NetWorthContent() {
                   />
                   {showChangeRatio && (
                     <>
-                      <div className="border-secondary my-1 border-r pr-2" />
+                      <div className="border-secondary my-1 border-e pe-2" />
                       {isPlainPercent(netWorthChange.percent) ? (
                         <GainPercent
                           className="lg:text-md text-sm font-light"
@@ -302,7 +304,7 @@ export function NetWorthContent() {
                 </>
               )}
               {periodCode && (
-                <span className="lg:text-md text-muted-foreground ml-1 text-sm font-light">
+                <span className="lg:text-md text-muted-foreground ms-1 text-sm font-light">
                   {t(`ui:interval.${periodCode}`)}
                 </span>
               )}
@@ -319,7 +321,7 @@ export function NetWorthContent() {
         }}
       >
         {/* Chart section */}
-        <div className="h-[280px]">
+        <div className="h-70">
           {isHistoryLoading ? (
             <div className="flex h-full items-center justify-center">
               <Skeleton className="h-full w-full" />
@@ -372,7 +374,7 @@ export function NetWorthContent() {
                 />
               ) : (
                 <div
-                  className="rounded-xl border border-orange-200/50 p-6 text-center md:p-8 dark:border-orange-800/50"
+                  className="border-warning-subtle-border rounded-xl border p-6 text-center md:p-8"
                   style={{ backgroundColor: THEME_COLOR_LIGHT }}
                 >
                   <p className="text-sm">{t("insights:networth.no_assets_found")}</p>
@@ -381,7 +383,7 @@ export function NetWorthContent() {
                     className="text-muted-foreground hover:text-foreground mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
                   >
                     {t("insights:networth.add_first_asset")}
-                    <Icons.ChevronRight className="h-3 w-3" />
+                    <Icons.ChevronRight className="h-3 w-3 rtl:rotate-180" />
                   </Link>
                 </div>
               )}

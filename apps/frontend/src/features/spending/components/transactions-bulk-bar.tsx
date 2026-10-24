@@ -45,7 +45,7 @@ export function TransactionsBulkBar({
             onSelect={onCategorize}
             trigger={
               <Button size="sm" variant="default">
-                <Icons.Tag className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                <Icons.Tag className="me-1.5 h-3.5 w-3.5" aria-hidden="true" />
                 {t("spending:transactions.categorize")}
               </Button>
             }
@@ -57,7 +57,7 @@ export function TransactionsBulkBar({
             disabled
             title={t("spending:transactions.categorizeHint")}
           >
-            <Icons.Tag className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+            <Icons.Tag className="me-1.5 h-3.5 w-3.5" aria-hidden="true" />
             {t("spending:transactions.categorize")}
           </Button>
         )}
@@ -67,7 +67,7 @@ export function TransactionsBulkBar({
           onClear={() => onTagEvent(null)}
           trigger={
             <Button size="sm" variant="outline">
-              <Icons.Calendar className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+              <Icons.Calendar className="me-1.5 h-3.5 w-3.5" aria-hidden="true" />
               {t("spending:transactions.tagEvent")}
             </Button>
           }
@@ -75,10 +75,10 @@ export function TransactionsBulkBar({
         <Button
           size="sm"
           variant="outline"
-          className="text-destructive hover:bg-destructive/10"
+          className="text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"
           onClick={onDelete}
         >
-          <Icons.Trash className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+          <Icons.Trash className="me-1.5 h-3.5 w-3.5" aria-hidden="true" />
           {t("common:delete")}
         </Button>
         <Button size="sm" variant="ghost" onClick={onClearSelection}>

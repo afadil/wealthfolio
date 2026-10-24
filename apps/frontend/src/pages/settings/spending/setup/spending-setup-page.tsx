@@ -27,10 +27,10 @@ export default function SpendingSetupPage() {
           variant="ghost"
           size="sm"
           onClick={() => navigate("/settings/spending")}
-          className="text-muted-foreground hover:text-foreground -ml-1 h-8 w-8 shrink-0 p-0 sm:hidden"
+          className="text-muted-foreground hover:text-foreground -ms-1 h-8 w-8 shrink-0 p-0 sm:hidden"
           aria-label={t("settings:spending.back_to_tracker")}
         >
-          <Icons.ArrowLeft className="h-5 w-5" />
+          <Icons.ArrowLeft className="h-5 w-5 rtl:rotate-180" />
         </Button>
         <div className="min-w-0 flex-1">
           <h1 className="text-foreground text-base font-semibold tracking-tight sm:text-lg lg:text-xl">

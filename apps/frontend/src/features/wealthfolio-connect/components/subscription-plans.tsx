@@ -2,7 +2,7 @@ import { openUrlInBrowser } from "@/adapters";
 import { useConnectUrl } from "../hooks/use-connect-url";
 import { QueryKeys } from "@/lib/query-keys";
 import { useQuery } from "@tanstack/react-query";
-import { useAmountFormatting } from "@wealthfolio/ui";
+import { useAmountFormatting, Spinner } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
@@ -15,7 +15,7 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { ToggleGroup, ToggleGroupItem } from "@wealthfolio/ui/components/ui/toggle-group";
+import { AnimatedToggleGroup } from "@wealthfolio/ui/components/ui/animated-toggle-group";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -23,6 +23,7 @@ import { getDisplayablePlans } from "../lib/plan-visibility";
 import { useWealthfolioConnect } from "../providers/wealthfolio-connect-provider";
 import { getSubscriptionPlans } from "../services/broker-service";
 import type { BillingPeriod, SubscriptionPlan } from "../types";
+import { statusSurfaceVariants } from "@wealthfolio/ui/components/ui/status-surface";
 
 // Helper to detect if error is an auth/token issue
 function isAuthError(error: Error | null): boolean {
@@ -142,7 +143,7 @@ function PlanCard({ plan, billingPeriod, isDefault, isComingSoon }: PlanCardProp
           </span>
         </div>
         {billingPeriod === "yearly" && yearlySavings > 0 && (
-          <p className="mt-0.5 text-xs text-green-600 dark:text-green-400">
+          <p className="text-success mt-0.5 text-xs">
             {t("connect:subscription.savings", { percent: yearlySavings })}
           </p>
         )}
@@ -151,7 +152,7 @@ function PlanCard({ plan, billingPeriod, isDefault, isComingSoon }: PlanCardProp
       <ul className="mb-4 flex-1 space-y-1.5">
         {plan.features.map((feature, index) => (
           <li key={index} className="flex items-start gap-2 text-xs">
-            <Icons.Check className="mt-0.5 h-3 w-3 shrink-0 text-green-500" />
+            <Icons.Check className="text-success mt-0.5 h-3 w-3 shrink-0" />
             <span className="text-muted-foreground">{feature}</span>
           </li>
         ))}
@@ -205,11 +206,11 @@ export function SubscriptionPlans({
     };
 
     return (
-      <Card className="border-warning/30 bg-warning/5">
+      <Card className={statusSurfaceVariants({ status: "warning" })}>
         <CardContent className="py-8">
           <div className="flex flex-col items-center justify-center text-center">
-            <div className="bg-warning/15 mb-4 rounded-full p-4">
-              <Icons.AlertCircle className="text-warning h-8 w-8" />
+            <div className="text-warning-subtle-foreground bg-current/15 mb-4 rounded-full p-4">
+              <Icons.AlertCircle className="h-8 w-8" />
             </div>
             <h3 className="text-foreground mb-2 text-base font-medium">
               {t("connect:subscription.connectionIssueTitle")}
@@ -217,10 +218,12 @@ export function SubscriptionPlans({
             <p className="text-muted-foreground mb-4 max-w-sm text-sm">
               {t("connect:subscription.connectionIssueDescription")}{" "}
               <Popover>
-                <PopoverTrigger asChild>
-                  <button className="text-muted-foreground hover:text-foreground underline underline-offset-2">
-                    {t("connect:subscription.contactSupport")}
-                  </button>
+                <PopoverTrigger
+                  render={
+                    <button className="text-muted-foreground hover:text-foreground underline underline-offset-2" />
+                  }
+                >
+                  {t("connect:subscription.contactSupport")}
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-3">
                   <div className="flex items-center gap-2">
@@ -243,18 +246,18 @@ export function SubscriptionPlans({
             </p>
             <div className="flex items-center gap-2">
               <Button size="sm" variant="outline" onClick={handleRefresh}>
-                <Icons.Refresh className="mr-2 h-4 w-4" />
+                <Icons.Refresh className="me-2 h-4 w-4" />
                 {t("common:refresh")}
               </Button>
               <Button size="sm" onClick={handleReconnect} disabled={isSigningOut}>
                 {isSigningOut ? (
                   <>
-                    <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                    <Spinner className="me-2 h-4 w-4" />
                     {t("connect:subscription.reconnecting")}
                   </>
                 ) : (
                   <>
-                    <Icons.LogOut className="mr-2 h-4 w-4" />
+                    <Icons.LogOut className="me-2 h-4 w-4" />
                     {t("connect:subscription.reconnect")}
                   </>
                 )}
@@ -269,11 +272,11 @@ export function SubscriptionPlans({
   // Handle other errors (service unavailable, network issues, etc.)
   if (error) {
     return (
-      <Card className="border-warning/30 bg-warning/5">
+      <Card className={statusSurfaceVariants({ status: "warning" })}>
         <CardContent className="py-8">
           <div className="flex flex-col items-center justify-center text-center">
-            <div className="bg-warning/15 mb-4 rounded-full p-4">
-              <Icons.CloudOff className="text-warning h-8 w-8" />
+            <div className="text-warning-subtle-foreground bg-current/15 mb-4 rounded-full p-4">
+              <Icons.CloudOff className="h-8 w-8" />
             </div>
             <h3 className="text-foreground mb-2 text-base font-medium">
               {t("connect:subscription.unableToLoadTitle")}
@@ -281,10 +284,12 @@ export function SubscriptionPlans({
             <p className="text-muted-foreground mb-4 max-w-sm text-sm">
               {t("connect:subscription.unableToLoadDescription")}{" "}
               <Popover>
-                <PopoverTrigger asChild>
-                  <button className="text-muted-foreground hover:text-foreground underline underline-offset-2">
-                    {t("connect:subscription.contactSupport")}
-                  </button>
+                <PopoverTrigger
+                  render={
+                    <button className="text-muted-foreground hover:text-foreground underline underline-offset-2" />
+                  }
+                >
+                  {t("connect:subscription.contactSupport")}
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-3">
                   <div className="flex items-center gap-2">
@@ -306,7 +311,7 @@ export function SubscriptionPlans({
               </Popover>
             </p>
             <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
-              <Icons.Refresh className="mr-2 h-4 w-4" />
+              <Icons.Refresh className="me-2 h-4 w-4" />
               {t("connect:subscription.refreshPage")}
             </Button>
           </div>
@@ -327,27 +332,23 @@ export function SubscriptionPlans({
               {t("connect:subscription.choosePlanDescription")}
             </CardDescription>
           </div>
-          <ToggleGroup
-            type="single"
+          <AnimatedToggleGroup<BillingPeriod>
+            size="xs"
             value={billingPeriod}
-            onValueChange={(value) => value && setBillingPeriod(value as BillingPeriod)}
-            className="bg-muted h-8 rounded-md p-0.5"
-          >
-            <ToggleGroupItem
-              value="monthly"
-              aria-label={t("connect:subscription.monthlyBilling")}
-              className="data-[state=on]:bg-background h-7 rounded px-3 text-xs data-[state=on]:shadow-sm"
-            >
-              {t("connect:subscription.monthly")}
-            </ToggleGroupItem>
-            <ToggleGroupItem
-              value="yearly"
-              aria-label={t("connect:subscription.yearlyBilling")}
-              className="data-[state=on]:bg-background h-7 rounded px-3 text-xs data-[state=on]:shadow-sm"
-            >
-              {t("connect:subscription.yearly")}
-            </ToggleGroupItem>
-          </ToggleGroup>
+            onValueChange={setBillingPeriod}
+            items={[
+              {
+                value: "monthly",
+                label: t("connect:subscription.monthly"),
+                "aria-label": t("connect:subscription.monthlyBilling"),
+              },
+              {
+                value: "yearly",
+                label: t("connect:subscription.yearly"),
+                "aria-label": t("connect:subscription.yearlyBilling"),
+              },
+            ]}
+          />
         </div>
       </CardHeader>
       <CardContent className="pt-0">
@@ -384,9 +385,9 @@ export function SubscriptionPlans({
               className="h-7 px-2 text-xs"
             >
               {isRefreshing ? (
-                <Icons.Spinner className="mr-1.5 h-3 w-3 animate-spin" />
+                <Spinner className="me-1.5 h-3 w-3" />
               ) : (
-                <Icons.Refresh className="mr-1.5 h-3 w-3" />
+                <Icons.Refresh className="me-1.5 h-3 w-3" />
               )}
               {t("common:refresh")}
             </Button>

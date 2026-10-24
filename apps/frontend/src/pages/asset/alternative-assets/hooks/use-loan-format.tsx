@@ -31,16 +31,19 @@ export function useLoanFormat(currency: string) {
       dates.formatCalendarDate(value, { day: "numeric", month: "short" }),
     month: (value: string) => dates.formatCalendarDate(value, { month: "short", year: "numeric" }),
     rate: (value: number) => `${numbers.formatDecimal(value, { maximumFractionDigits: 2 })}%`,
-    duration: (months: number) =>
-      [
+    duration: (months: number) => {
+      const years =
         months >= 12
           ? t("asset:loanActions.duration_year", { count: Math.floor(months / 12) })
-          : null,
+          : null;
+      const rest =
         months % 12 || months === 0
           ? t("asset:loanActions.duration_month", { count: months % 12 })
-          : null,
-      ]
-        .filter(Boolean)
-        .join(" "),
+          : null;
+      // Languages differ in how they join the parts (Arabic uses "و").
+      return years && rest
+        ? t("asset:loanActions.duration_years_months", { years, months: rest })
+        : (years ?? rest ?? "");
+    },
   };
 }

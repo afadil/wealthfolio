@@ -577,7 +577,7 @@ export default function SpendingInsightsPage() {
         {(insightErrored ||
           (stage === "changed" && mtdComparisonErrored) ||
           (stage === "when" && heatmapInsightErrored)) && (
-          <div className="flex items-center justify-between gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-300">
+          <div className="border-warning-subtle-border bg-warning-subtle text-warning-subtle-foreground flex items-center justify-between gap-2 rounded-md border px-3 py-1.5 text-xs">
             <span>
               <span className="font-semibold">{t("spending:insightsPage.loadError")}</span>{" "}
               {t("spending:insightsPage.showingZeros")}
@@ -782,7 +782,7 @@ function ForeignCurrencyBanner({
       </>
     );
   return (
-    <div className="text-muted-foreground border-border/60 bg-muted/30 rounded-md border px-3 py-2 text-[11px]">
+    <div className="text-muted-foreground border-border/60 bg-muted/30 text-2xs rounded-md border px-3 py-2">
       <span className="text-foreground/90 font-medium">
         {t("spending:insightsPage.multiCurrency")}
       </span>{" "}

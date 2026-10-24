@@ -31,7 +31,8 @@
     "addModels": "모델 추가..."
   },
   "provider": {
-    "noProvidersConfigured": "구성된 제공자가 없습니다"
+    "noProvidersConfigured": "구성된 제공자가 없습니다",
+    "label": "AI 제공자"
   },
   "reasoning": {
     "thinking": "생각 중...",
@@ -127,6 +128,7 @@
   "tools": {
     "calling": "{{toolName}} 호출 중...",
     "cancelled": "{{toolName}} 취소됨",
+    "notUsed": "사용되지 않은 도구: {{toolName}}",
     "used": "사용된 도구: {{toolName}}"
   },
   "accounts": {

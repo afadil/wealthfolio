@@ -1088,6 +1088,7 @@
     "addSource_many": "Adicionar fonte ({{count}} disponíveis)",
     "overridesTitle_one": "Exceção · {{count}}",
     "overridesTitle_other": "Exceções · {{count}}",
-    "overridesTitle_many": "Exceções · {{count}}"
+    "overridesTitle_many": "Exceções · {{count}}",
+    "sourceMonth": "Mês de origem"
   }
 }

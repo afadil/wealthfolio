@@ -31,7 +31,8 @@
     "addModels": "Ajouter des modèles..."
   },
   "provider": {
-    "noProvidersConfigured": "Aucun fournisseur configuré"
+    "noProvidersConfigured": "Aucun fournisseur configuré",
+    "label": "Fournisseur IA"
   },
   "reasoning": {
     "thinking": "Réflexion...",
@@ -128,6 +129,7 @@
   "tools": {
     "calling": "Appel de {{toolName}}...",
     "cancelled": "{{toolName}} annulé",
+    "notUsed": "Outil non utilisé : {{toolName}}",
     "used": "Outil utilisé : {{toolName}}"
   },
   "accounts": {

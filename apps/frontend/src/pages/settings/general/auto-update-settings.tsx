@@ -2,6 +2,13 @@ import { updateSettings } from "@/adapters";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Switch } from "@wealthfolio/ui/components/ui/switch";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemTitle,
+} from "@wealthfolio/ui/components/ui/item";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { QueryKeys } from "@/lib/query-keys";
 import { useSettingsContext } from "@/lib/settings-provider";
@@ -47,20 +54,24 @@ export function AutoUpdateSettings() {
         <CardTitle className="text-lg">{t("settings:auto_update_title")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label htmlFor="auto-update-check" className="text-base">
-              {t("settings:auto_update_enable")}
-            </Label>
-            <p className="text-muted-foreground text-xs">{t("settings:auto_update_description")}</p>
-          </div>
-          <Switch
-            id="auto-update-check"
-            checked={settings.autoUpdateCheckEnabled}
-            onCheckedChange={handleAutoUpdateToggle}
-            disabled={updateSettingsMutation.isPending}
-          />
-        </div>
+        <Item className="p-0">
+          <ItemContent>
+            <ItemTitle>
+              <Label htmlFor="auto-update-check">{t("settings:auto_update_enable")}</Label>
+            </ItemTitle>
+            <ItemDescription className="line-clamp-none">
+              {t("settings:auto_update_description")}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Switch
+              id="auto-update-check"
+              checked={settings.autoUpdateCheckEnabled}
+              onCheckedChange={handleAutoUpdateToggle}
+              disabled={updateSettingsMutation.isPending}
+            />
+          </ItemActions>
+        </Item>
       </CardContent>
     </Card>
   );

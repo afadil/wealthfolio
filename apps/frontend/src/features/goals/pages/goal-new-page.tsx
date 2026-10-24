@@ -260,7 +260,7 @@ export default function GoalNewPage() {
                       <div className="text-muted-foreground/25">{tmpl.icon}</div>
                     </div>
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent" />
-                    <div className="absolute bottom-3 left-4">
+                    <div className="absolute bottom-3 start-4">
                       <p className="text-base font-semibold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
                         {tmpl.title}
                       </p>
@@ -270,7 +270,7 @@ export default function GoalNewPage() {
                     <CardDescription className="text-xs leading-relaxed">
                       {tmpl.description}
                       {disabled && (
-                        <span className="text-muted-foreground mt-1 block text-[11px]">
+                        <span className="text-muted-foreground text-2xs mt-1 block">
                           {t("goals:new.retirement_exists_hint")}
                         </span>
                       )}
@@ -332,7 +332,7 @@ export default function GoalNewPage() {
                       <div className="grid grid-cols-2 gap-3">
                         <button
                           type="button"
-                          className={`rounded-xl border p-3 text-left transition-colors ${
+                          className={`rounded-xl border p-3 text-start transition-colors ${
                             plannerMode === "traditional"
                               ? "border-primary bg-primary/5"
                               : "border-border/60 hover:border-muted-foreground/60"
@@ -348,7 +348,7 @@ export default function GoalNewPage() {
                         </button>
                         <button
                           type="button"
-                          className={`rounded-xl border p-3 text-left transition-colors ${
+                          className={`rounded-xl border p-3 text-start transition-colors ${
                             plannerMode === "fire"
                               ? "border-primary bg-primary/5"
                               : "border-border/60 hover:border-muted-foreground/60"
@@ -415,6 +415,7 @@ export default function GoalNewPage() {
                         <Label htmlFor="goal-target-amount">{t("goals:new.target_amount")}</Label>
                         <MoneyInput
                           name="goal-target-amount"
+                          aria-label={t("goals:new.target_amount")}
                           value={targetAmount}
                           onValueChange={(value) => setTargetAmount(value ?? 0)}
                           thousandSeparator

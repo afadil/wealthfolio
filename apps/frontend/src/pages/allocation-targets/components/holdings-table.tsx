@@ -26,8 +26,8 @@ interface HoldingsTableProps {
 const EMPTY_DRIFT_ROWS: DriftHoldingRow[] = [];
 
 function driftColor(driftBps: number): string {
-  if (driftBps > 0) return "text-destructive";
-  if (driftBps < 0) return "text-blue-600 dark:text-blue-400";
+  if (driftBps > 0) return "text-allocation-over";
+  if (driftBps < 0) return "text-allocation-under";
   return "text-muted-foreground";
 }
 
@@ -58,7 +58,7 @@ function HoldingAvatar({
     return (
       <span
         className={cn(
-          "bg-primary/80 dark:bg-primary/20 flex shrink-0 items-center justify-center rounded-full text-[9px] font-semibold text-white",
+          "bg-primary/80 dark:bg-primary/20 text-2xs flex shrink-0 items-center justify-center rounded-full font-semibold text-white",
           className,
         )}
       >
@@ -163,7 +163,7 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
                 type="button"
                 disabled={!canNavigate}
                 className={cn(
-                  "focus-visible:ring-ring block w-full px-4 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset",
+                  "focus-visible:ring-ring block w-full px-4 py-2.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-inset",
                   canNavigate ? "hover:bg-muted/30" : "cursor-default",
                 )}
                 onClick={() => navigateToHolding(row)}
@@ -181,16 +181,16 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
                   </div>
 
                   <div className="flex min-w-0 items-baseline gap-1.5">
-                    <span className="text-foreground shrink-0 text-[12px] font-semibold">
+                    <span className="text-foreground shrink-0 text-xs font-semibold">
                       {row.symbol}
                     </span>
-                    <span className="text-muted-foreground truncate text-[12px]">{row.name}</span>
+                    <span className="text-muted-foreground truncate text-xs">{row.name}</span>
                   </div>
-                  <span className="text-foreground text-right text-[12px] font-medium tabular-nums">
+                  <span className="text-foreground text-end text-xs font-medium tabular-nums">
                     {formatting.formatAmount(row.value, baseCurrency)}
                   </span>
 
-                  <div className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-[11.5px]">
+                  <div className="text-muted-foreground text-2xs flex min-w-0 items-center gap-1.5">
                     {row.categoryColor && (
                       <span
                         className="h-1.5 w-1.5 shrink-0 rounded-full"
@@ -201,7 +201,7 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
                   </div>
                   <span
                     className={cn(
-                      "text-right text-[11.5px] font-medium tabular-nums",
+                      "text-2xs text-end font-medium tabular-nums",
                       row.driftBps != null ? driftColor(row.driftBps) : "text-muted-foreground",
                     )}
                   >
@@ -214,29 +214,29 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
         </div>
 
         <div className="hidden overflow-x-auto md:block">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="text-muted-foreground border-b text-[10px] uppercase tracking-wider">
-                <th className="py-2.5 pl-6 pr-3 text-left font-medium">
+              <tr className="text-muted-foreground text-2xs border-b uppercase tracking-wider">
+                <th className="py-2.5 pe-3 ps-6 text-start font-medium">
                   {t("allocation:holdings.colHolding")}
                 </th>
-                <th className="py-2.5 pr-3 text-left font-medium">
+                <th className="py-2.5 pe-3 text-start font-medium">
                   {t("allocation:holdings.colCategory")}
                 </th>
-                <th className="py-2.5 pr-3 text-right font-medium">
+                <th className="py-2.5 pe-3 text-end font-medium">
                   {t("allocation:holdings.colValue")}
                 </th>
-                <th className="py-2.5 pr-3 text-right font-medium">
+                <th className="py-2.5 pe-3 text-end font-medium">
                   {t("allocation:holdings.colCurrent")}
                 </th>
-                <th className="py-2.5 pr-3 text-right font-medium">
+                <th className="py-2.5 pe-3 text-end font-medium">
                   {t("allocation:holdings.colTarget")}
                 </th>
-                <th className="py-2.5 pr-3 text-right font-medium">
+                <th className="py-2.5 pe-3 text-end font-medium">
                   {t("allocation:holdings.colDrift")}
                 </th>
                 {showAccountCol && (
-                  <th className="py-2.5 pl-2 pr-6 text-right font-medium">
+                  <th className="py-2.5 pe-6 ps-2 text-end font-medium">
                     {t("allocation:holdings.colAccount")}
                   </th>
                 )}
@@ -264,8 +264,8 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
                       }
                     }}
                   >
-                    <td className="pl-6 pr-3">
-                      <div className="flex min-w-[280px] items-center gap-2">
+                    <td className="pe-3 ps-6">
+                      <div className="min-w-70 flex items-center gap-2">
                         <HoldingAvatar
                           isCash={row.isCash}
                           symbol={row.symbol}
@@ -274,16 +274,16 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
                           instrumentType={row.instrumentType}
                         />
                         <div className="flex min-w-0 items-baseline gap-2">
-                          <span className="text-foreground shrink-0 text-[12px] font-semibold">
+                          <span className="text-foreground shrink-0 text-xs font-semibold">
                             {row.symbol}
                           </span>
-                          <span className="text-muted-foreground max-w-[330px] truncate text-[12px]">
+                          <span className="text-muted-foreground max-w-82.5 truncate text-xs">
                             {row.name}
                           </span>
                         </div>
                       </div>
                     </td>
-                    <td className="pr-3">
+                    <td className="pe-3">
                       <div className="flex items-center gap-1.5">
                         {row.categoryColor && (
                           <span
@@ -292,38 +292,38 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
                           />
                         )}
                         <span className="min-w-0">
-                          <span className="text-muted-foreground block truncate text-[12px]">
+                          <span className="text-muted-foreground block truncate text-xs">
                             {row.categoryName}
                           </span>
                           {row.isUnknownCategory && (
-                            <span className="text-muted-foreground/80 block max-w-[220px] truncate text-[10.5px]">
+                            <span className="text-muted-foreground/80 text-2xs max-w-55 block truncate">
                               {t("allocation:holdings.notMapped")}
                             </span>
                           )}
                         </span>
                       </div>
                     </td>
-                    <td className="text-foreground pr-3 text-right tabular-nums">
+                    <td className="text-foreground pe-3 text-end tabular-nums">
                       {formatting.formatAmount(row.value, baseCurrency)}
                     </td>
-                    <td className="text-foreground pr-3 text-right font-medium tabular-nums">
+                    <td className="text-foreground pe-3 text-end font-medium tabular-nums">
                       {numberFormatting.formatPercent(row.currentPct / 100, { digits: 2 })}
                     </td>
-                    <td className="text-muted-foreground pr-3 text-right tabular-nums">
+                    <td className="text-muted-foreground pe-3 text-end tabular-nums">
                       {row.targetPct != null
                         ? numberFormatting.formatPercent(row.targetPct / 100, { digits: 2 })
                         : "—"}
                     </td>
                     <td
                       className={cn(
-                        "pr-3 text-right font-medium tabular-nums",
+                        "pe-3 text-end font-medium tabular-nums",
                         row.driftBps != null ? driftColor(row.driftBps) : "text-muted-foreground",
                       )}
                     >
                       {row.driftBps != null ? formatPp(row.driftBps) : "—"}
                     </td>
                     {showAccountCol && (
-                      <td className="text-muted-foreground pl-2 pr-6 text-right">
+                      <td className="text-muted-foreground pe-6 ps-2 text-end">
                         {accountLabelForRow(row, accountMap, t)}
                       </td>
                     )}

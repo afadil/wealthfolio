@@ -11,9 +11,12 @@
 //! - `provider_clients`: per-provider rig client factories + Ollama preflight + error remapping.
 
 mod attachments;
+mod csv_preview;
 mod history;
 pub(crate) mod provider_clients;
 mod request_params;
+#[cfg(test)]
+mod run_tests;
 mod streaming;
 mod working_context;
 
@@ -33,13 +36,11 @@ use crate::error::AiError;
 use crate::providers::ProviderService;
 use crate::title_generator::truncate_to_title;
 use crate::tools::constants::MAX_HISTORY_CHARS;
+use crate::tools::import_csv::find_csv_attachment;
 use crate::types::{
     AiStreamEvent, ChatMessage, ChatMessagePart, ChatMessageRole, ChatThread, ChatThreadConfig,
-    ListThreadsRequest, SendMessageRequest, SimpleChatMessage, ThreadPage,
+    ListThreadsRequest, MessageAttachment, SendMessageRequest, SimpleChatMessage, ThreadPage,
 };
-// Used only by the inline `mod tests` (test-only fixtures + redact tests).
-#[cfg(test)]
-use crate::types::MessageAttachment;
 
 /// Poll the bounded channel and its producer together, including when the
 /// producer is waiting for channel capacity. Neither outlives the returned stream.
@@ -182,6 +183,38 @@ fn redact_tool_arguments_for_persistence(
     }
 
     redacted
+}
+
+/// Arguments for the live `tool_call` event sent to the frontend. The model
+/// names the attached file in `import_csv` and the app adds that file's text
+/// as `csvContent`, so the review grid is built from the file itself. These
+/// arguments are never persisted (see `redact_tool_arguments_for_persistence`)
+/// and never sent back to the model.
+fn live_tool_call_arguments(
+    tool_name: &str,
+    args: &serde_json::Value,
+    attachments: &[MessageAttachment],
+) -> serde_json::Value {
+    let mut live = args.clone();
+    if tool_name != "import_csv" {
+        return live;
+    }
+    let Some(arguments) = live.as_object_mut() else {
+        return live;
+    };
+    // Only the attached file may reach the grid, never text the model wrote.
+    arguments.remove("csvContent");
+    let attachment = arguments
+        .get("attachmentName")
+        .and_then(serde_json::Value::as_str)
+        .and_then(|name| find_csv_attachment(attachments, name).ok());
+    if let Some(attachment) = attachment {
+        arguments.insert(
+            "csvContent".to_string(),
+            serde_json::Value::String(attachment.data.clone()),
+        );
+    }
+    live
 }
 
 // ============================================================================
@@ -429,16 +462,22 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
             skipped_empty,
         );
 
-        let effective_attachments = self
+        // The prompt carries only this message's attachments; the thread's
+        // earlier ones stay in the session cache for tools to read.
+        let session_attachments = self
             .session_attachments
             .resolve_for_thread(&thread_id, &incoming_attachments)?;
         let prior_attachment_content_unavailable = incoming_attachments.is_empty()
-            && effective_attachments.is_empty()
+            && session_attachments.is_empty()
             && messages_have_attachment_markers(&previous_messages);
         let working_context = ChatWorkingContext::from_messages_and_attachments(
             &previous_messages,
-            &effective_attachments,
+            &session_attachments,
         );
+        let session_csv_attachments: Vec<MessageAttachment> = session_attachments
+            .into_iter()
+            .filter(MessageAttachment::is_csv)
+            .collect();
 
         // Save user message with attachment placeholders (no binary data stored)
         let mut persist_text = request.content.clone();
@@ -475,7 +514,8 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
                 tx.clone(),
                 content,
                 history_messages,
-                effective_attachments,
+                incoming_attachments,
+                session_csv_attachments,
                 provider_id,
                 model_id,
                 thread_id_clone.clone(),
@@ -504,23 +544,6 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
         };
 
         Ok(owned_event_stream(rx, producer))
-    }
-
-    /// List available tool names.
-    pub fn list_tools(&self) -> Vec<String> {
-        vec![
-            "get_holdings".to_string(),
-            "get_accounts".to_string(),
-            "search_activities".to_string(),
-            "get_goals".to_string(),
-            "get_valuation_history".to_string(),
-            "get_income".to_string(),
-            "get_asset_allocation".to_string(),
-            "get_performance".to_string(),
-            "record_activity".to_string(),
-            "record_activities".to_string(),
-            "import_csv".to_string(),
-        ]
     }
 
     /// Get environment reference.
@@ -664,16 +687,6 @@ mod tests {
     }
 
     #[test]
-    fn test_chat_service_list_tools() {
-        let env = Arc::new(MockEnvironment::new());
-        let service = ChatService::new(env, ChatConfig::default());
-
-        let tools = service.list_tools();
-        assert!(tools.contains(&"get_accounts".to_string()));
-        assert!(tools.contains(&"get_holdings".to_string()));
-    }
-
-    #[test]
     fn test_redact_import_csv_tool_arguments_for_persistence() {
         let args = serde_json::json!({
             "csvContent": "Date,Symbol\n2025-01-01,AAPL",
@@ -686,6 +699,38 @@ mod tests {
         assert_eq!(redacted["accountId"], "acct-test");
         assert_eq!(redacted["csvContent"], REDACTED_CSV_CONTENT_PLACEHOLDER);
         assert!(!serialized.contains("2025-01-01,AAPL"));
+    }
+
+    #[test]
+    fn test_live_import_csv_arguments_carry_the_attached_file() {
+        let attachments = vec![test_attachment(
+            "trades.csv",
+            "Date,Symbol\n2025-01-01,AAPL",
+        )];
+        let args = serde_json::json!({
+            "attachmentName": "trades.csv",
+            "csvContent": "Date,Symbol\n2025-01-01,MSFT",
+            "accountId": "acct-test"
+        });
+
+        let live = live_tool_call_arguments("import_csv", &args, &attachments);
+
+        assert_eq!(live["attachmentName"], "trades.csv");
+        assert_eq!(live["accountId"], "acct-test");
+        assert_eq!(live["csvContent"], "Date,Symbol\n2025-01-01,AAPL");
+
+        let unknown = serde_json::json!({
+            "attachmentName": "other.csv",
+            "csvContent": "Date,Symbol\n2025-01-01,MSFT"
+        });
+        let live = live_tool_call_arguments("import_csv", &unknown, &attachments);
+        assert!(live.get("csvContent").is_none());
+
+        let other_tool = serde_json::json!({ "csvContent": "kept" });
+        assert_eq!(
+            live_tool_call_arguments("record_activity", &other_tool, &attachments),
+            other_tool
+        );
     }
 
     #[tokio::test]

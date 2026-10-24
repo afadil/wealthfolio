@@ -47,6 +47,7 @@
   "nav_about_subtitle": "Wealthfolio 정보",
   "general_page_description": "일반 애플리케이션 설정과 환경설정을 관리합니다.",
   "currency_select_error": "기본 통화를 선택하세요.",
+  "currency_code_error": "USD와 같은 유효한 3자리 통화 코드를 입력하세요.",
   "currency_title": "기본 통화",
   "currency_description": "포트폴리오의 기본 통화를 선택하세요.",
   "currency_save_button": "통화 저장",
@@ -1035,7 +1036,9 @@
     "review_first_rows_other": "CSV 데이터의 처음 {{count}}개 행을 확인하세요",
     "import_quotes_count_other": "시세 {{count}}건 가져오기",
     "imported_count_other": "{{count}}건 가져옴",
-    "failed_count_other": "{{count}}건 실패"
+    "failed_count_other": "{{count}}건 실패",
+    "priority_decrease": "우선순위 숫자 낮추기",
+    "priority_increase": "우선순위 숫자 높이기"
   },
   "addon_permission_none_detected": "감지된 데이터 접근 권한이 없습니다. 이 애드온은 시스템 접근 권한이 최소한인 것으로 보입니다.",
   "addon_permission_list_title": "권한",

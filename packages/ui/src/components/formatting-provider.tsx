@@ -8,8 +8,10 @@ import {
   type CurrencyFormattingRegions,
   type DateFormatting,
   type NumberFormatting,
+  isolateFormatting,
   resolveFormattingLocale,
 } from "../lib/formatting";
+import { useDirection } from "./ui/direction";
 
 export interface LocalizationSettings {
   locale: string;
@@ -36,18 +38,20 @@ function FormattingRuntime({
   currencyRegions: CurrencyFormattingRegions;
   children: React.ReactNode;
 }) {
-  const amountFormatting = React.useMemo<AmountFormatting>(
-    () => createAmountFormatting(settings.locale, undefined, currencyRegions),
-    [settings.locale, currencyRegions],
-  );
-  const numberFormatting = React.useMemo<NumberFormatting>(
-    () => createNumberFormatting(settings.locale),
-    [settings.locale],
-  );
-  const dateFormatting = React.useMemo<DateFormatting>(
-    () => createDateFormatting(settings.locale, settings.timezone),
-    [settings.locale, settings.timezone],
-  );
+  // Formatted values keep their own direction inside a right-to-left page.
+  const isolate = useDirection() === "rtl";
+  const amountFormatting = React.useMemo<AmountFormatting>(() => {
+    const formatting = createAmountFormatting(settings.locale, undefined, currencyRegions);
+    return isolate ? isolateFormatting(formatting) : formatting;
+  }, [settings.locale, currencyRegions, isolate]);
+  const numberFormatting = React.useMemo<NumberFormatting>(() => {
+    const formatting = createNumberFormatting(settings.locale);
+    return isolate ? isolateFormatting(formatting) : formatting;
+  }, [settings.locale, isolate]);
+  const dateFormatting = React.useMemo<DateFormatting>(() => {
+    const formatting = createDateFormatting(settings.locale, settings.timezone);
+    return isolate ? isolateFormatting(formatting) : formatting;
+  }, [settings.locale, settings.timezone, isolate]);
 
   return (
     <AmountFormattingContext.Provider value={amountFormatting}>

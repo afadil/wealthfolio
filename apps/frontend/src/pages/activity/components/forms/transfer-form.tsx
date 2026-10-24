@@ -11,6 +11,7 @@ import {
   FormMessage,
   MoneyInput,
   useAmountFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { AnimatedToggleGroup } from "@wealthfolio/ui/components/ui/animated-toggle-group";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -923,7 +924,7 @@ export function TransferForm({
                       <FormItem>
                         <FormLabel>
                           {t("activity:form.label_transfer_rate")}
-                          <span className="text-muted-foreground ml-2 text-xs font-normal">
+                          <span className="text-muted-foreground ms-2 text-xs font-normal">
                             {t("activity:form.fx_conversion", {
                               from: effectiveSourceCurrency,
                               rate: Number(field.value) > 0 ? field.value : "?",
@@ -990,11 +991,11 @@ export function TransferForm({
             </Button>
           )}
           <Button type="submit" disabled={isLoading}>
-            {isLoading && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+            {isLoading && <Spinner className="me-2 h-4 w-4" />}
             {isEditing ? (
-              <Icons.Check className="mr-2 h-4 w-4" />
+              <Icons.Check className="me-2 h-4 w-4" />
             ) : (
-              <Icons.Plus className="mr-2 h-4 w-4" />
+              <Icons.Plus className="me-2 h-4 w-4" />
             )}
             {getSubmitButtonText()}
           </Button>

@@ -64,7 +64,7 @@ export function AlternativeHoldingsListMobile({
                   <p className="text-muted-foreground truncate text-sm">{kindDisplay}</p>
                 </div>
               </div>
-              <div className="ml-2 text-right">
+              <div className="ms-2 text-end">
                 <AmountDisplay
                   value={parseFloat(holding.marketValue)}
                   currency={holding.currency}
