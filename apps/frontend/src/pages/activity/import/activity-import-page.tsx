@@ -4,6 +4,7 @@ import { shouldResolveImportAsset } from "@/lib/activity-utils";
 import { canImportCSV } from "@/lib/activity-restrictions";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { AlertFeedback, Page, PageContent, PageHeader } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -127,6 +128,10 @@ function useStepValidation(
 
         // Activity mode: existing validation logic
         if (!mapping) return false;
+        // Rows skipped in this step don't need their values mapped
+        const skippedRows = new Set(state.skippedRowIndexes);
+        const keptRows = parsedRows.filter((_, rowIndex) => !skippedRows.has(rowIndex));
+        if (keptRows.length === 0) return false;
         if (!state.accountId && !mapping.fieldMappings[ImportFormat.ACCOUNT]) {
           return false;
         }
@@ -139,7 +144,7 @@ function useStepValidation(
           }
 
           const validAccountIds = new Set((accounts ?? []).map((account) => account.id));
-          for (const row of parsedRows) {
+          for (const row of keptRows) {
             const rawAccount = row[accountHeaderIndex]?.trim();
             if (!rawAccount) {
               if (!state.accountId && !mapping.accountMappings?.[""]) {
@@ -172,7 +177,7 @@ function useStepValidation(
 
           if (atIndices.length > 0) {
             const uniqueValues = new Set<string>();
-            parsedRows.forEach((row) => {
+            keptRows.forEach((row) => {
               for (const idx of atIndices) {
                 const value = row[idx]?.trim();
                 if (value) {
@@ -221,7 +226,7 @@ function useStepValidation(
           if (symbolHeaderIndex !== -1) {
             const symbolsNeedingResolution = new Set<string>();
 
-            parsedRows.forEach((row) => {
+            keptRows.forEach((row) => {
               const symbol = row[symbolHeaderIndex]?.trim();
               if (!symbol) return;
 
@@ -535,7 +540,7 @@ function ImportWizardContent() {
           state.accountId,
           validAccountIds,
           accountTypeById,
-          { importProfile },
+          { importProfile, skippedRowIndexes: state.skippedRowIndexes },
         );
         dispatch(setDraftActivities(drafts));
         dispatch({ type: "SET_ASSET_PREVIEW_ITEMS", payload: [] });
@@ -586,6 +591,7 @@ function ImportWizardContent() {
     state.mapping,
     state.accountId,
     state.parsedRows,
+    state.skippedRowIndexes,
     state.parseConfig,
     state.draftActivities,
     state.draftRevision,
@@ -709,7 +715,7 @@ function ImportWizardContent() {
               )}
 
               {/* Step content — scrollable */}
-              <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={state.step}
@@ -717,7 +723,11 @@ function ImportWizardContent() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
                     transition={{ duration: 0.3 }}
-                    className="p-3 sm:p-6"
+                    className={cn(
+                      "p-3 sm:p-6",
+                      // The mapping step fits its previews to the space left in the step area
+                      CurrentStepComponent === MappingStepUnified && "flex min-h-0 flex-1 flex-col",
+                    )}
                   >
                     <CurrentStepComponent />
                   </motion.div>
