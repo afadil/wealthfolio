@@ -6,12 +6,8 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import { TickerAvatar } from "@/components/ticker-avatar";
-import {
-  Badge,
-  useAmountFormatting,
-  useNumberFormatting,
-  useDateFormatting,
-} from "@wealthfolio/ui";
+import { Badge, useAmountFormatting, useDateFormatting } from "@wealthfolio/ui";
+import { Card } from "@wealthfolio/ui/components/ui/card";
 import { DataTable } from "@wealthfolio/ui/components/ui/data-table";
 import { DataTableColumnHeader } from "@wealthfolio/ui/components/ui/data-table/data-table-column-header";
 import { DataTableFacetedFilterProps } from "@wealthfolio/ui/components/ui/data-table/data-table-faceted-filter";
@@ -66,7 +62,6 @@ export function AssetsTable({
   isRefetchingQuotes,
 }: AssetsTableProps) {
   const formatting = useAmountFormatting();
-  const numberFormatting = useNumberFormatting();
   const dateFormatting = useDateFormatting();
   const { t } = useTranslation();
   const { settings } = useSettingsContext();
@@ -107,7 +102,10 @@ export function AssetsTable({
             ? parsedOption.underlying
             : (asset.displayCode ?? asset.name ?? t("asset:table.unknown"));
           const subtitle = parsedOption
-            ? formatOptionSubtitle(parsedOption, { ...numberFormatting, ...dateFormatting })
+            ? formatOptionSubtitle(parsedOption, asset.quoteCcy, {
+                ...formatting,
+                ...dateFormatting,
+              })
             : (asset.name ?? "—");
           const avatarSymbol = parsedOption ? parsedOption.underlying : rawSymbol;
           return (
@@ -115,7 +113,7 @@ export function AssetsTable({
               type="button"
               data-testid={`security-${asset.instrumentType}-${asset.displayCode}`}
               onClick={() => navigate(`/holdings/${encodeURIComponent(asset.id)}`)}
-              className="hover:bg-muted/60 focus-visible:ring-ring group flex w-full items-center gap-2.5 rounded-md py-1 text-left transition"
+              className="hover:bg-muted/60 focus-visible:ring-ring group flex w-full items-center gap-2.5 rounded-md py-1 text-start transition"
             >
               <TickerAvatar
                 symbol={avatarSymbol}
@@ -128,7 +126,7 @@ export function AssetsTable({
                 <div className="group-hover:text-primary flex items-center gap-1.5 font-semibold leading-tight transition-colors">
                   {displaySymbol}
                   {parsedOption ? (
-                    <Badge variant="secondary" className="text-[10px]">
+                    <Badge variant="secondary" className="text-2xs">
                       {t("asset:table.option")}
                     </Badge>
                   ) : null}
@@ -163,7 +161,7 @@ export function AssetsTable({
               </div>
               {isManual ? (
                 <div>
-                  <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                  <Badge variant="outline" className="text-2xs px-1.5 py-0">
                     {t("asset:table.manual")}
                   </Badge>
                 </div>
@@ -229,7 +227,7 @@ export function AssetsTable({
           <DataTableColumnHeader
             column={column}
             title={t("asset:table.quote")}
-            className="text-right"
+            className="text-end"
           />
         ),
         size: 130,
@@ -242,15 +240,17 @@ export function AssetsTable({
 
           if (!quote) {
             return (
-              <div className="text-right">
+              <div className="text-end">
                 <div className="flex items-center justify-end gap-1.5">
                   <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Icons.AlertTriangle
-                        className="h-3.5 w-3.5 text-amber-500"
-                        aria-label={noQuoteReason}
-                      />
-                    </TooltipTrigger>
+                    <TooltipTrigger
+                      render={
+                        <Icons.AlertTriangle
+                          className="text-warning h-3.5 w-3.5"
+                          aria-label={noQuoteReason}
+                        />
+                      }
+                    />
                     <TooltipContent>{noQuoteReason}</TooltipContent>
                   </Tooltip>
                   <span className="text-muted-foreground text-sm">
@@ -262,16 +262,18 @@ export function AssetsTable({
           }
 
           return (
-            <div className="text-right">
+            <div className="text-end">
               <div className="flex items-center justify-end gap-1.5">
                 {stale ? (
                   <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Icons.AlertTriangle
-                        className="h-3.5 w-3.5 text-amber-500"
-                        aria-label={t("asset:table.quote_behind_aria")}
-                      />
-                    </TooltipTrigger>
+                    <TooltipTrigger
+                      render={
+                        <Icons.AlertTriangle
+                          className="text-warning h-3.5 w-3.5"
+                          aria-label={t("asset:table.quote_behind_aria")}
+                        />
+                      }
+                    />
                     <TooltipContent>{t("asset:table.quote_behind_tooltip")}</TooltipContent>
                   </Tooltip>
                 ) : null}
@@ -282,7 +284,7 @@ export function AssetsTable({
                   )}
                 </span>
               </div>
-              <div className="text-muted-foreground text-[11px]">
+              <div className="text-muted-foreground text-2xs">
                 {formatDate(quote.timestamp, dateFormatting)}
               </div>
             </div>
@@ -299,14 +301,16 @@ export function AssetsTable({
           return (
             <div className="flex justify-end">
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="hover:bg-muted text-muted-foreground inline-flex h-9 w-9 items-center justify-center rounded-md border transition"
-                    aria-label={t("asset:table.open_actions")}
-                  >
-                    <Icons.MoreVertical className="h-4 w-4" />
-                  </button>
+                <DropdownMenuTrigger
+                  render={
+                    <button
+                      type="button"
+                      className="hover:bg-muted text-muted-foreground inline-flex h-9 w-9 items-center justify-center rounded-md border transition"
+                      aria-label={t("asset:table.open_actions")}
+                    />
+                  }
+                >
+                  <Icons.MoreVertical className="h-4 w-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => onEdit(asset)}>
@@ -328,7 +332,7 @@ export function AssetsTable({
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
-                    onSelect={() => onDelete(asset)}
+                    onClick={() => onDelete(asset)}
                   >
                     {t("asset:table.delete")}
                   </DropdownMenuItem>
@@ -351,7 +355,6 @@ export function AssetsTable({
       isRefetchingQuotes,
       isUpdatingQuotes,
       navigate,
-      numberFormatting,
       t,
     ],
   );
@@ -417,13 +420,13 @@ export function AssetsTable({
         <div className="mb-2 shrink-0">
           <Skeleton className="h-10 w-full" />
         </div>
-        <div className="min-h-0 flex-1 overflow-auto rounded-md border">
+        <Card className="min-h-0 flex-1 overflow-auto">
           <Table>
-            <TableHeader className="bg-muted/50 sticky top-0 z-10">
+            <TableHeader className="bg-card sticky top-0 z-10">
               <TableRow>
                 <TableHead>{t("asset:table.security")}</TableHead>
                 <TableHead>{t("asset:table.market")}</TableHead>
-                <TableHead className="text-right">{t("asset:table.quote")}</TableHead>
+                <TableHead className="text-end">{t("asset:table.quote")}</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -460,7 +463,7 @@ export function AssetsTable({
               ))}
             </TableBody>
           </Table>
-        </div>
+        </Card>
       </div>
     );
   }

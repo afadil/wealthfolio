@@ -2,14 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
-import {
-  Badge,
-  Card,
-  Input,
-  useAmountFormatting,
-  useNumberFormatting,
-  useDateFormatting,
-} from "@wealthfolio/ui";
+import { Badge, Card, Input, useAmountFormatting, useDateFormatting } from "@wealthfolio/ui";
 
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { formatOptionSubtitle, parseOccSymbol } from "@/lib/occ-symbol";
@@ -66,7 +59,6 @@ export function AssetsTableMobile({
   isRefetchingQuotes,
 }: AssetsTableMobileProps) {
   const formatting = useAmountFormatting();
-  const numberFormatting = useNumberFormatting();
   const dateFormatting = useDateFormatting();
   const { t } = useTranslation();
   const { settings } = useSettingsContext();
@@ -207,10 +199,11 @@ export function AssetsTableMobile({
           size="icon"
           className="relative size-10 flex-shrink-0"
           onClick={() => setIsFilterSheetOpen(true)}
+          aria-label={t("common:filter")}
         >
           <Icons.ListFilter className="h-4 w-4" />
           {hasActiveFilters && (
-            <span className="bg-destructive absolute right-0 top-0.5 h-2 w-2 rounded-full" />
+            <span className="bg-destructive absolute end-0 top-0.5 h-2 w-2 rounded-full" />
           )}
         </Button>
       </div>
@@ -222,7 +215,7 @@ export function AssetsTableMobile({
               <button
                 type="button"
                 onClick={() => navigate(`/holdings/${encodeURIComponent(asset.id)}`)}
-                className="hover:bg-muted/60 focus-visible:ring-ring flex flex-1 items-center gap-3 overflow-hidden rounded-md text-left transition"
+                className="hover:bg-muted/60 focus-visible:ring-ring flex flex-1 items-center gap-3 overflow-hidden rounded-md text-start transition"
               >
                 {(() => {
                   const rawSymbol = asset.displayCode ?? "";
@@ -231,7 +224,10 @@ export function AssetsTableMobile({
                     ? parsedOption.underlying
                     : (asset.displayCode ?? asset.name ?? t("asset:table.unknown"));
                   const subtitle = parsedOption
-                    ? formatOptionSubtitle(parsedOption, { ...numberFormatting, ...dateFormatting })
+                    ? formatOptionSubtitle(parsedOption, asset.quoteCcy, {
+                        ...formatting,
+                        ...dateFormatting,
+                      })
                     : (asset.name ?? "-");
                   const avatarSymbol = parsedOption ? parsedOption.underlying : rawSymbol;
                   return (
@@ -247,11 +243,11 @@ export function AssetsTableMobile({
                         <div className="flex items-center gap-2">
                           <p className="truncate font-semibold">{displaySymbol}</p>
                           {parsedOption ? (
-                            <Badge variant="secondary" className="text-[10px]">
+                            <Badge variant="secondary" className="text-2xs">
                               {t("asset:mobileTable.option")}
                             </Badge>
                           ) : null}
-                          <Badge variant="secondary" className="text-[10px] uppercase">
+                          <Badge variant="secondary" className="text-2xs uppercase">
                             {asset.quoteCcy}
                           </Badge>
                         </div>
@@ -263,7 +259,7 @@ export function AssetsTableMobile({
               </button>
 
               <div className="flex flex-shrink-0 items-center gap-2">
-                <div className="text-right text-sm">
+                <div className="text-end text-sm">
                   {(() => {
                     const snapshot = latestQuotes[asset.id];
                     const quote = snapshot?.quote;
@@ -278,12 +274,14 @@ export function AssetsTableMobile({
                             )}
                             {isStaleQuote(snapshot, asset) ? (
                               <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Icons.AlertTriangle
-                                    className="text-destructive h-3.5 w-3.5"
-                                    aria-label={t("asset:mobileTable.quote_behind_aria")}
-                                  />
-                                </TooltipTrigger>
+                                <TooltipTrigger
+                                  render={
+                                    <Icons.AlertTriangle
+                                      className="text-destructive h-3.5 w-3.5"
+                                      aria-label={t("asset:mobileTable.quote_behind_aria")}
+                                    />
+                                  }
+                                />
                                 <TooltipContent>
                                   {t("asset:mobileTable.quote_behind_tooltip")}
                                 </TooltipContent>
@@ -302,12 +300,14 @@ export function AssetsTableMobile({
                     return (
                       <div className="flex items-center justify-end gap-1">
                         <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Icons.AlertTriangle
-                              className="h-3.5 w-3.5 text-amber-500"
-                              aria-label={noQuoteReason}
-                            />
-                          </TooltipTrigger>
+                          <TooltipTrigger
+                            render={
+                              <Icons.AlertTriangle
+                                className="text-warning h-3.5 w-3.5"
+                                aria-label={noQuoteReason}
+                              />
+                            }
+                          />
                           <TooltipContent>{noQuoteReason}</TooltipContent>
                         </Tooltip>
                         <span className="text-muted-foreground text-xs">
@@ -319,14 +319,16 @@ export function AssetsTableMobile({
                 </div>
 
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="hover:bg-muted text-muted-foreground inline-flex h-9 w-9 items-center justify-center rounded-md border transition"
-                      aria-label={t("asset:mobileTable.open_actions")}
-                    >
-                      <Icons.MoreVertical className="h-4 w-4" />
-                    </button>
+                  <DropdownMenuTrigger
+                    render={
+                      <button
+                        type="button"
+                        className="hover:bg-muted text-muted-foreground inline-flex h-9 w-9 items-center justify-center rounded-md border transition"
+                        aria-label={t("asset:mobileTable.open_actions")}
+                      />
+                    }
+                  >
+                    <Icons.MoreVertical className="h-4 w-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
@@ -350,7 +352,7 @@ export function AssetsTableMobile({
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-destructive focus:text-destructive"
-                      onSelect={() => onDelete(asset)}
+                      onClick={() => onDelete(asset)}
                     >
                       {t("asset:mobileTable.delete")}
                     </DropdownMenuItem>
@@ -365,7 +367,7 @@ export function AssetsTableMobile({
       {/* Filter Sheet */}
       <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
         <SheetContent side="bottom" className="rounded-t-4xl mx-1 flex h-[70vh] flex-col">
-          <SheetHeader className="text-left">
+          <SheetHeader className="text-start">
             <SheetTitle>{t("asset:mobileTable.filter_options")}</SheetTitle>
           </SheetHeader>
           <ScrollArea className="flex-1 py-4">
@@ -428,7 +430,7 @@ export function AssetsTableMobile({
                           </div>
                           <span className="font-medium">{option.label}</span>
                         </div>
-                        <Badge variant="secondary" className="ml-auto">
+                        <Badge variant="secondary" className="ms-auto">
                           {count}
                         </Badge>
                       </button>
@@ -489,7 +491,7 @@ export function AssetsTableMobile({
                           </div>
                           <span className="font-medium uppercase">{mode}</span>
                         </div>
-                        <Badge variant="secondary" className="ml-auto">
+                        <Badge variant="secondary" className="ms-auto">
                           {count}
                         </Badge>
                       </button>
@@ -552,7 +554,7 @@ export function AssetsTableMobile({
                             {ASSET_KIND_DISPLAY_NAMES[kind] ?? kind}
                           </span>
                         </div>
-                        <Badge variant="secondary" className="ml-auto">
+                        <Badge variant="secondary" className="ms-auto">
                           {count}
                         </Badge>
                       </button>
@@ -622,7 +624,7 @@ export function AssetsTableMobile({
                           </div>
                           <span className="font-medium">{option.label}</span>
                         </div>
-                        <Badge variant="secondary" className="ml-auto">
+                        <Badge variant="secondary" className="ms-auto">
                           {count}
                         </Badge>
                       </button>
@@ -638,10 +640,8 @@ export function AssetsTableMobile({
                 {t("asset:mobileTable.reset_all")}
               </Button>
             )}
-            <SheetClose asChild>
-              <Button variant="default" className="flex-1">
-                {t("asset:mobileTable.apply")}
-              </Button>
+            <SheetClose render={<Button variant="default" className="flex-1" />}>
+              {t("asset:mobileTable.apply")}
             </SheetClose>
           </SheetFooter>
         </SheetContent>

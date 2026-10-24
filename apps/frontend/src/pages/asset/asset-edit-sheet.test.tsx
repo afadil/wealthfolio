@@ -259,3 +259,27 @@ describe("AssetEditSheet preferred provider hint", () => {
     expect(screen.getByText(/which provider to try first/i)).toBeInTheDocument();
   });
 });
+
+describe("AssetEditSheet automatic updates", () => {
+  it("says whether automatic updates are on from the trigger itself", () => {
+    const { unmount } = render(
+      <AssetEditSheet asset={buildAsset()} open onOpenChange={vi.fn()} defaultTab="market-data" />,
+    );
+    expect(screen.getByRole("button", { name: "Automatic Updates" })).toHaveAccessibleDescription(
+      "Prices sync automatically from market data providers.",
+    );
+    unmount();
+
+    render(
+      <AssetEditSheet
+        asset={buildAsset({ quoteMode: "MANUAL" })}
+        open
+        onOpenChange={vi.fn()}
+        defaultTab="market-data"
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Automatic Updates" })).toHaveAccessibleDescription(
+      "Automatic syncing is off. You manage prices manually.",
+    );
+  });
+});

@@ -5,7 +5,13 @@ import { QueryKeys } from "@/lib/query-keys";
 import { useQuery } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
-import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@wealthfolio/ui/components/ui/empty";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { SettingsHeader } from "../settings-header";
@@ -123,15 +129,17 @@ export default function AgentAccessPage() {
       <Separator />
 
       {loading ? null : isTauri && isMobile ? (
-        <EmptyPlaceholder>
-          <EmptyPlaceholder.Icon name="Brain" />
-          <EmptyPlaceholder.Title>
-            {t("settings:agentAccess.mobile_unavailable_title")}
-          </EmptyPlaceholder.Title>
-          <EmptyPlaceholder.Description>
-            {t("settings:agentAccess.mobile_unavailable_description")}
-          </EmptyPlaceholder.Description>
-        </EmptyPlaceholder>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Icons.Brain />
+            </EmptyMedia>
+            <EmptyTitle>{t("settings:agentAccess.mobile_unavailable_title")}</EmptyTitle>
+            <EmptyDescription>
+              {t("settings:agentAccess.mobile_unavailable_description")}
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : isTauri ? (
         <DesktopAgentAccess />
       ) : (

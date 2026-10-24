@@ -64,10 +64,10 @@ function RetirementAxisTick({
     return (
       <g transform={`translate(${tickX},${tickY})`}>
         <text textAnchor="middle" fill={CHART_COLORS.foreground}>
-          <tspan x={0} dy={16} fontSize={12} fontWeight={500}>
+          <tspan x={0} dy={16} fontSize="0.75rem" fontWeight={500}>
             {value}
           </tspan>
-          <tspan x={0} dy={18} fontSize={12} fontWeight={700}>
+          <tspan x={0} dy={18} fontSize="0.75rem" fontWeight={700}>
             {eventLabel}
           </tspan>
         </text>
@@ -77,7 +77,7 @@ function RetirementAxisTick({
 
   return (
     <g transform={`translate(${tickX},${tickY})`}>
-      <text textAnchor="middle" fill={CHART_COLORS.muted} fontSize={11}>
+      <text textAnchor="middle" fill={CHART_COLORS.muted} fontSize="0.6875rem">
         {value.replace(/^Age\s+/, "")}
       </text>
     </g>
@@ -103,7 +103,7 @@ function ChartCalloutLabel({ viewBox, amount, fill, dx = 10, dy = -5 }: ChartCal
 
   return (
     <text x={labelX} y={labelY} textAnchor="start" fill={fill}>
-      <tspan x={labelX} dy={0} fontSize={12} fontWeight={700}>
+      <tspan x={labelX} dy={0} fontSize="0.75rem" fontWeight={700}>
         {amount}
       </tspan>
     </text>
@@ -227,7 +227,7 @@ function RetirementChartTooltip({
         </span>
         <span
           className={`text-xs font-semibold tabular-nums ${
-            point.netChange >= 0 ? "text-green-600" : "text-red-500"
+            point.netChange >= 0 ? "text-success" : "text-destructive"
           }`}
         >
           {point.netChange >= 0 ? "+" : "-"}
@@ -364,7 +364,7 @@ export function RetirementChart({
             tickLine={false}
           />
           <YAxis
-            tick={{ fontSize: 10, fill: CHART_COLORS.muted }}
+            tick={{ fontSize: "0.6875rem", fill: CHART_COLORS.muted }}
             tickFormatter={(v: number) => formatting.formatCompactAmount(v, currency)}
             width={48}
             axisLine={false}
@@ -392,7 +392,7 @@ export function RetirementChart({
               label={{
                 value: t("goals:portfolio_chart.fi_reference", { age: projectedFireAge }),
                 position: "top",
-                fontSize: 10,
+                fontSize: "0.6875rem",
                 fill: "var(--success)",
                 dy: agesClose ? -12 : 0,
               }}

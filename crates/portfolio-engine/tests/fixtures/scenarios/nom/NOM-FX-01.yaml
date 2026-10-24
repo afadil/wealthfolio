@@ -75,7 +75,6 @@ expected_notes: >
   anchored at acquisition FX). Disposal sell-1: proceeds 1000, basis 1000,
   realized 0; proceeds_base 1400, cost_basis_base 1300, realized_pnl_base
   100, fx_rate_to_base 1.40. From 01-10 cash 1500 USD = 2100 CAD. TWR (CAD)
-  = 2100/1950 - 1 = 7.692308% (all of it on 01-08). LEGACY BEHAVIOR
-  (attribution): realized 100, fx_effect 0 and unrealized 0; the 50 CAD FX
-  gain on the 500 USD cash balance is not attributed, so the diagnostics
-  report "attribution incomplete, difference 50".
+  = 2100/1950 - 1 = 7.692308% (all of it on 01-08). Attribution: realized
+  100, cash fx_effect 50 and unrealized 0. Both account and portfolio
+  reconcile the 150 CAD gain, including FX on the 500 USD cash balance.

@@ -12,7 +12,7 @@ export function ConnectFeatures({ dashboard = false }: { dashboard?: boolean }) 
   const prefix = dashboard ? "connect:emptyState.features" : "auth:connect.features";
   return (
     <div className="@container w-full">
-      <ul className="@min-[756px]:grid-cols-3 grid grid-cols-1 gap-3">
+      <ul className="@min-[47.25rem]:grid-cols-3 grid grid-cols-1 gap-3">
         {features.map(({ key, icon: Icon }) => (
           <li
             key={key}

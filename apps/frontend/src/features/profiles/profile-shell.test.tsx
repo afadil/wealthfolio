@@ -99,9 +99,7 @@ it.each(["Lock Wealthfolio", "Switch profile"])(
       });
     mount();
     expect(await screen.findByText("Private portfolio")).toBeInTheDocument();
-    fireEvent.keyDown(screen.getByRole("button", { name: "Profile menu for Personal" }), {
-      key: "Enter",
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Profile menu for Personal" }));
     const item = await screen.findByRole("menuitem", { name: action });
     mocks.command.mockResolvedValue({ ...unlocked, session: null });
     fireEvent.click(item);
@@ -123,9 +121,7 @@ it.each([true, false])(
     expect(
       screen.queryByRole("heading", { name: "Who's using Wealthfolio?" }),
     ).not.toBeInTheDocument();
-    fireEvent.keyDown(screen.getByRole("button", { name: "Profile menu for Personal" }), {
-      key: "Enter",
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Profile menu for Personal" }));
     expect(await screen.findByRole("menuitem", { name: "Profile settings" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Add profile" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Switch profile" })).not.toBeInTheDocument();
@@ -275,9 +271,7 @@ it("prompts for the existing password when a migrated profile has a stale unlock
 });
 it("keeps the new recovery code visible after password setup revokes the session", async () => {
   mount();
-  fireEvent.keyDown(await screen.findByRole("button", { name: "Profile menu for Personal" }), {
-    key: "Enter",
-  });
+  fireEvent.click(await screen.findByRole("button", { name: "Profile menu for Personal" }));
   fireEvent.click(await screen.findByRole("menuitem", { name: "Profile settings" }));
   fireEvent.click(screen.getByRole("button", { name: "Enable password" }));
   fireEvent.change(screen.getByLabelText("New password"), {
@@ -309,9 +303,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 async function menuAction(name: string) {
-  fireEvent.keyDown(await screen.findByRole("button", { name: "Profile menu for Personal" }), {
-    key: "Enter",
-  });
+  fireEvent.click(await screen.findByRole("button", { name: "Profile menu for Personal" }));
   fireEvent.click(await screen.findByRole("menuitem", { name }));
 }
 it("does not show the chooser while the initial profile state is unresolved", async () => {
@@ -675,9 +667,7 @@ it("deletes the last profile and returns to an empty profile picker", async () =
   localStorage.setItem("profile:a:chart", "private preference");
   localStorage.setItem("profile:b:chart", "keep");
   mount();
-  fireEvent.keyDown(await screen.findByRole("button", { name: "Profile menu for Personal" }), {
-    key: "Enter",
-  });
+  fireEvent.click(await screen.findByRole("button", { name: "Profile menu for Personal" }));
   fireEvent.click(await screen.findByRole("menuitem", { name: "Profile settings" }));
   fireEvent.click(screen.getByRole("button", { name: "Delete profile" }));
   fireEvent.change(screen.getByLabelText("Type Personal to confirm"), {
@@ -903,6 +893,41 @@ it("uses native startup and lock events without polling", async () => {
   });
   expect(screen.queryByText("Private portfolio")).not.toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Who's using Wealthfolio?" })).toBeInTheDocument();
+});
+
+it("says why startup could not open the only profile", async () => {
+  mocks.isWeb = false;
+  const failure = "PROFILE_UNAVAILABLE: The profile credential store could not be accessed.";
+  mocks.command.mockResolvedValueOnce({ profiles: [profile], session: null, starting: true });
+  mount();
+  await act(async () => {});
+  mocks.command.mockResolvedValue({
+    profiles: [profile],
+    session: null,
+    starting: false,
+    autoOpenError: failure,
+  });
+  await act(async () => mocks.ready());
+  expect(screen.getByRole("heading", { name: "Who's using Wealthfolio?" })).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "We couldn’t access your saved sign-in details. Unlock your device and try again.",
+  );
+  expect(screen.queryByText("We couldn’t open Wealthfolio")).not.toBeInTheDocument();
+  const pending = deferred<void>();
+  mocks.command.mockImplementation((command) =>
+    command === "unlock_profile"
+      ? pending.promise
+      : Promise.resolve({ profiles: [profile], session: null, starting: false }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Personal" }));
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  await waitFor(() =>
+    expect(mocks.command).toHaveBeenCalledWith("unlock_profile", { profileId: "a", proof: null }),
+  );
+  await act(async () => pending.reject(new Error(failure)));
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "We couldn’t access your saved sign-in details. Unlock your device and try again.",
+  );
 });
 
 const profileStateReads = () =>
@@ -1147,9 +1172,7 @@ it.each([true, false])("adds a second profile directly from the menu (web: %s)",
   mocks.isWeb = isWeb;
   mount();
   await screen.findByText("Private portfolio");
-  fireEvent.keyDown(screen.getByRole("button", { name: "Profile menu for Personal" }), {
-    key: "Enter",
-  });
+  fireEvent.click(screen.getByRole("button", { name: "Profile menu for Personal" }));
   fireEvent.click(await screen.findByRole("menuitem", { name: "Add profile" }));
   expect(screen.queryByText("Private portfolio")).not.toBeInTheDocument();
   expect(mocks.command).toHaveBeenCalledWith("lock_profile", { preserveAuth: false });
@@ -1161,9 +1184,7 @@ it.each([true, false])("adds a second profile directly from the menu (web: %s)",
 it("does not open profile creation when closing the current profile fails", async () => {
   mount();
   await screen.findByText("Private portfolio");
-  fireEvent.keyDown(screen.getByRole("button", { name: "Profile menu for Personal" }), {
-    key: "Enter",
-  });
+  fireEvent.click(screen.getByRole("button", { name: "Profile menu for Personal" }));
   const add = await screen.findByRole("menuitem", { name: "Add profile" });
   mocks.command.mockRejectedValue(new Error("Unable to close profile"));
   fireEvent.click(add);
@@ -1356,9 +1377,7 @@ it.each(["Lock Wealthfolio", "Switch profile"])(
     });
     mount();
     await screen.findByText("Private portfolio");
-    fireEvent.keyDown(screen.getByRole("button", { name: "Profile menu for Personal" }), {
-      key: "Enter",
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Profile menu for Personal" }));
     const item = await screen.findByRole("menuitem", { name: action });
     mocks.command.mockRejectedValue(new TypeError("Failed to fetch"));
     fireEvent.click(item);
@@ -1388,9 +1407,7 @@ it.each([false, true])(
     mount();
     if (switching) {
       await screen.findByText("Private portfolio");
-      fireEvent.keyDown(screen.getByRole("button", { name: "Profile menu for Personal" }), {
-        key: "Enter",
-      });
+      fireEvent.click(screen.getByRole("button", { name: "Profile menu for Personal" }));
       mocks.command.mockResolvedValue(locked);
       fireEvent.click(await screen.findByRole("menuitem", { name: "Switch profile" }));
     }

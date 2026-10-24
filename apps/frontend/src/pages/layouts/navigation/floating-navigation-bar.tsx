@@ -151,36 +151,38 @@ export function FloatingNavigationBar({ navigation }: FloatingNavigationBarProps
             </Link>
             {hasMoreItems && (
               <DropdownMenu open={overflowOpen} onOpenChange={setOverflowOpen}>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    aria-label={t("common:layout.more_navigation")}
-                    className={baseButtonClass}
+                <DropdownMenuTrigger
+                  render={
+                    <button
+                      aria-label={t("common:layout.more_navigation")}
+                      className={baseButtonClass}
+                    />
+                  }
+                >
+                  {moreItems.some((item) => isPathActive(location.pathname, item.href)) && (
+                    <motion.div
+                      layoutId={`floating-nav-indicator-${uniqueId}`}
+                      className="absolute inset-0 -z-10 rounded-full border border-black/10 bg-black/5 shadow-sm dark:border-white/10 dark:bg-white/10"
+                      initial={false}
+                      transition={{
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 30,
+                      }}
+                    />
+                  )}
+                  <span
+                    className="relative flex size-7 shrink-0 items-center justify-center outline-none"
+                    aria-hidden="true"
                   >
-                    {moreItems.some((item) => isPathActive(location.pathname, item.href)) && (
-                      <motion.div
-                        layoutId={`floating-nav-indicator-${uniqueId}`}
-                        className="absolute inset-0 -z-10 rounded-full border border-black/10 bg-black/5 shadow-sm dark:border-white/10 dark:bg-white/10"
-                        initial={false}
-                        transition={{
-                          type: "spring",
-                          stiffness: 400,
-                          damping: 30,
-                        }}
-                      />
-                    )}
-                    <span
-                      className="relative flex size-7 shrink-0 items-center justify-center outline-none"
-                      aria-hidden="true"
-                    >
-                      <Icons.CirclesFour className="size-6" />
-                    </span>
-                  </button>
+                    <Icons.CirclesFour className="size-6" />
+                  </span>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   side="top"
                   align="end"
                   sideOffset={16}
-                  className="mb-0 mr-0 flex w-48 flex-col gap-1 border-0 bg-transparent p-0 shadow-none ring-0 ring-offset-0"
+                  className="mb-0 me-0 flex w-48 flex-col gap-1 border-0 bg-transparent p-0 shadow-none ring-0 ring-offset-0"
                 >
                   {moreItems.map((item) => {
                     const isActive = isPathActive(location.pathname, item.href);
@@ -198,7 +200,7 @@ export function FloatingNavigationBar({ navigation }: FloatingNavigationBarProps
                           <span className="flex size-6 shrink-0 items-center justify-center">
                             {renderIcon(item.icon)}
                           </span>
-                          <span className="truncate text-left">{item.title}</span>
+                          <span className="truncate text-start">{item.title}</span>
                         </Link>
                       </LiquidGlass>
                     );

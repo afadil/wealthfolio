@@ -256,7 +256,7 @@ function LinkedAssetBlock({
     <button
       type="button"
       onClick={() => navigate(`/holdings/${encodeURIComponent(asset.id)}`)}
-      className="bg-muted/50 hover:bg-muted mt-4 w-full rounded-lg p-3 text-left transition-colors"
+      className="bg-muted/50 hover:bg-muted mt-4 w-full rounded-lg p-3 text-start transition-colors"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
@@ -272,7 +272,7 @@ function LinkedAssetBlock({
         </div>
         <div className="flex shrink-0 items-center gap-1.5 text-sm font-medium tabular-nums">
           {moneyText(value)}
-          <Icons.ChevronRight className="text-muted-foreground size-4" />
+          <Icons.ChevronRight className="text-muted-foreground size-4 rtl:rotate-180" />
         </div>
       </div>
       {equity != null && securedDebt != null && (
@@ -340,14 +340,16 @@ function OverviewCard({
 function InfoTip({ text }: { text: string }) {
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          aria-label={text}
-          className="text-muted-foreground hover:text-foreground inline-flex"
-        >
-          <Icons.Info className="size-3.5" />
-        </button>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            aria-label={text}
+            className="text-muted-foreground hover:text-foreground inline-flex"
+          />
+        }
+      >
+        <Icons.Info className="size-3.5" />
       </TooltipTrigger>
       <TooltipContent className="max-w-64">{text}</TooltipContent>
     </Tooltip>
@@ -366,9 +368,9 @@ function Rows({ rows }: { rows: DetailRow[] }) {
         <div key={index}>
           <div className="flex items-start justify-between gap-4">
             <dt className="text-muted-foreground">{label}</dt>
-            <dd className="whitespace-nowrap text-right font-medium tabular-nums">{value}</dd>
+            <dd className="whitespace-nowrap text-end font-medium tabular-nums">{value}</dd>
           </div>
-          {note && <dd className="text-right text-xs">{note}</dd>}
+          {note && <dd className="text-end text-xs">{note}</dd>}
         </div>
       ))}
     </dl>

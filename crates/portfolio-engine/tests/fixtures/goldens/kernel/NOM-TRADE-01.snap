@@ -191,7 +191,7 @@ baseline:
             contributions: "6500"
             distributions: "0"
             fees: "26.75"
-            fx_effect: "0"
+            fx_effect: "413.25"
             income: "0"
             realized_pnl: "540.5"
             residual: "0"
@@ -203,7 +203,7 @@ baseline:
           method: timeWeighted
           period_end: 2025-01-16
           period_start: 2025-01-02
-          quality: partial
+          quality: ok
           returns:
             annualized_irr: "31.40196867"
             annualized_twr: ~
@@ -250,14 +250,14 @@ baseline:
             - date: 2025-01-16
               value: "0.14261538"
           summary:
-            amount: "513.75"
+            amount: "927"
             amount_status: complete
             basis: marketValue
             basis_status: notApplicable
             method: timeWeighted
             percent: "0.14261538"
             percent_status: complete
-            quality: partial
+            quality: ok
       tracking_mode: TRANSACTIONS
       valuations:
         - basis_status: notApplicable
@@ -567,7 +567,7 @@ baseline:
         contributions: "6500"
         distributions: "0"
         fees: "26.75"
-        fx_effect: "0"
+        fx_effect: "413.25"
         income: "0"
         realized_pnl: "540.5"
         residual: "0"
@@ -579,7 +579,7 @@ baseline:
       method: timeWeighted
       period_end: 2025-01-16
       period_start: 2025-01-02
-      quality: partial
+      quality: ok
       returns:
         annualized_irr: "31.40196867"
         annualized_twr: ~
@@ -626,13 +626,13 @@ baseline:
         - date: 2025-01-16
           value: "0.14261538"
       summary:
-        amount: "513.75"
+        amount: "927"
         amount_status: complete
         basis: marketValue
         basis_status: notApplicable
         method: timeWeighted
         percent: "0.14261538"
         percent_status: complete
-        quality: partial
+        quality: ok
   portfolio_flows: []
 scenario: NOM-TRADE-01

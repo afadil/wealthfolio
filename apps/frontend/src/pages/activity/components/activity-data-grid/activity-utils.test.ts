@@ -15,7 +15,7 @@ import {
   valuesAreEqual,
   withNewPairPartners,
 } from "./activity-utils";
-import type { LocalTransaction } from "./types";
+import { toLocalTransaction, type LocalTransaction } from "./types";
 
 // Helper to create mock account
 const createMockAccount = (overrides: Partial<Account> = {}): Account => ({
@@ -196,6 +196,142 @@ describe("activity-utils", () => {
     expect(updated.accountCurrency).toBe("USD");
     expect(updated.amount).toBe("5");
     expect(updated.currency).toBe(isNew ? "USD" : "EUR");
+  });
+
+  describe("symbol edited after a search pick", () => {
+    // Row fields as handleSymbolSelect sets them for AAPL picked from search.
+    const aaplPick: Partial<LocalTransaction> = {
+      assetSymbol: "AAPL",
+      exchangeMic: "XNAS",
+      assetQuoteMode: "MARKET",
+      instrumentType: "EQUITY",
+      pendingAssetName: "Apple Inc.",
+      pendingAssetKind: "INVESTMENT",
+      pendingQuoteCcy: "USD",
+      pendingInstrumentType: "EQUITY",
+      pendingProviderId: "YAHOO",
+      pendingProviderSymbol: "AAPL",
+      _instrumentTypeFromPick: true,
+    };
+    const pickedAapl = (overrides: Partial<LocalTransaction> = {}) =>
+      createMockTransaction({ ...aaplPick, ...overrides });
+    const resolver = createCurrencyResolver(new Map(), "USD");
+    const edit = (transaction: LocalTransaction, field: keyof LocalTransaction, value: string) =>
+      applyTransactionUpdate({
+        transaction,
+        field,
+        value,
+        accountLookup: new Map(),
+        assetCurrencyLookup: new Map(),
+        resolveTransactionCurrency: resolver,
+        fallbackCurrency: "USD",
+      });
+    const editSymbol = (transaction: LocalTransaction, value: string) =>
+      edit(transaction, "assetSymbol", value);
+    const savedAsset = (transaction: LocalTransaction) => {
+      const payload = buildSavePayload(
+        [transaction],
+        new Set([transaction.id]),
+        new Set(),
+        resolver,
+        new Map(),
+        new Map(),
+        "USD",
+      );
+      return (transaction.isNew ? payload.creates[0] : payload.updates[0]).asset;
+    };
+
+    it.each([
+      ["a new provider result", undefined],
+      ["an existing asset", "SEC:AAPL:XNAS"],
+    ])("sends a symbol pasted after a pick from %s with only the exchange", (_, pendingAssetId) => {
+      const row = editSymbol(
+        pickedAapl({ id: "temp-1", isNew: true, assetId: "", pendingAssetId }),
+        "ry",
+      );
+      expect(savedAsset(row)).toEqual({ symbol: "RY", exchangeMic: "XNAS" });
+    });
+
+    it("sends a saved row's picked id and type, but not the picked asset, with a pasted symbol", () => {
+      const row = editSymbol(
+        pickedAapl({
+          id: "existing-1",
+          isNew: false,
+          assetId: "OPT:AAPL250117C00150000",
+          pendingAssetId: "SEC:AAPL:XNAS",
+          _originalAssetSymbol: "AAPL250117C00150000",
+          _originalExchangeMic: "XNAS",
+          _originalInstrumentType: "OPTION",
+          _originalAssetId: "OPT:AAPL250117C00150000",
+        }),
+        "TD",
+      );
+      // The id and type main sends, so the server prices the update as on main.
+      // It then drops the id because it does not match TD.
+      expect(savedAsset(row)).toEqual({
+        id: "SEC:AAPL:XNAS",
+        symbol: "TD",
+        exchangeMic: "XNAS",
+        instrumentType: "EQUITY",
+      });
+    });
+
+    it("keeps an instrument type the user set on a saved row", () => {
+      const saved = createMockTransaction({
+        isNew: false,
+        assetSymbol: "BTC",
+        instrumentType: "CRYPTO",
+        _originalAssetSymbol: "BTC",
+        _originalInstrumentType: "CRYPTO",
+      });
+      const row = editSymbol(edit(saved, "instrumentType", "EQUITY"), "KO");
+      expect(row).toMatchObject({ instrumentType: "EQUITY", pendingInstrumentType: "EQUITY" });
+    });
+
+    it("drops an option pick's instrument type on a new row", () => {
+      const row = editSymbol(
+        pickedAapl({
+          isNew: true,
+          assetSymbol: "AAPL250117C00150000",
+          instrumentType: "OPTION",
+          pendingInstrumentType: "OPTION",
+        }),
+        "RY",
+      );
+      expect(row.instrumentType).toBeUndefined();
+      expect(row.pendingInstrumentType).toBeUndefined();
+    });
+
+    it("keeps an instrument type the user set after a pick on a new row", () => {
+      const row = editSymbol(edit(pickedAapl({ isNew: true }), "instrumentType", "OPTION"), "RY");
+      expect(row).toMatchObject({ instrumentType: "OPTION", pendingInstrumentType: "OPTION" });
+    });
+
+    it("keeps a duplicate's copied instrument type, but not one picked on it", () => {
+      // As handleDuplicate copies a saved option row.
+      const duplicate: LocalTransaction = {
+        ...toLocalTransaction(
+          createMockTransaction({ assetSymbol: "AAPL250117C00150000", instrumentType: "OPTION" }),
+        ),
+        id: "temp-duplicate",
+        isNew: true,
+      };
+      expect(editSymbol(duplicate, "AAPL250117C00160000").instrumentType).toBe("OPTION");
+
+      const row = editSymbol({ ...duplicate, ...aaplPick }, "MSFT");
+      expect(row.instrumentType).toBeUndefined();
+      expect(savedAsset(row)).toEqual({ symbol: "MSFT", exchangeMic: "XNAS" });
+    });
+
+    it("keeps the pick and the values around it when only the case changes", () => {
+      const picked = pickedAapl({ unitPrice: "190.5" });
+      expect({ ...editSymbol(picked, "aapl"), updatedAt: picked.updatedAt }).toEqual(picked);
+    });
+
+    it("keeps the activity's currency and price", () => {
+      const row = editSymbol(pickedAapl({ currency: "USD", unitPrice: "190.5" }), "RY");
+      expect(row).toMatchObject({ assetSymbol: "RY", currency: "USD", unitPrice: "190.5" });
+    });
   });
   describe("valuesAreEqual", () => {
     describe("numeric fields", () => {

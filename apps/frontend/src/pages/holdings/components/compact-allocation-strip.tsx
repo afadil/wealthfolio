@@ -175,37 +175,38 @@ export function CompactAllocationStrip({
             const isLast = index === processedCategories.length - 1;
 
             return (
-              <Tooltip key={category.id} delayDuration={100}>
-                <TooltipTrigger asChild>
-                  <div
-                    className={`h-full transition-opacity ${isEmpty ? "" : "cursor-pointer hover:opacity-80"}`}
-                    style={{
-                      width: isEmpty ? "1px" : `${category.percent}%`,
-                      backgroundColor: isEmpty ? "var(--color-base-200)" : category.color,
-                      opacity: isEmpty ? 0.5 : 1,
-                      // 1px separator via box-shadow (no extra DOM)
-                      boxShadow: isLast ? "none" : "inset -1px 0 0 var(--background)",
-                    }}
-                    onClick={() => !isEmpty && onSegmentClick?.(category.id, category.name)}
-                    role={isEmpty ? undefined : "button"}
-                    tabIndex={isEmpty ? -1 : 0}
-                    onKeyDown={(e) => {
-                      if (!isEmpty && (e.key === "Enter" || e.key === " ")) {
-                        onSegmentClick?.(category.id, category.name);
-                      }
-                    }}
-                  />
-                </TooltipTrigger>
+              <Tooltip key={category.id}>
+                <TooltipTrigger
+                  delay={100}
+                  render={
+                    <div
+                      className={`h-full transition-opacity ${isEmpty ? "" : "cursor-pointer hover:opacity-80"}`}
+                      style={{
+                        width: isEmpty ? "1px" : `${category.percent}%`,
+                        backgroundColor: isEmpty ? "var(--color-base-200)" : category.color,
+                        opacity: isEmpty ? 0.5 : 1,
+                        // 1px separator via box-shadow (no extra DOM)
+                        boxShadow: isLast ? "none" : "inset -1px 0 0 var(--background)",
+                      }}
+                      onClick={() => !isEmpty && onSegmentClick?.(category.id, category.name)}
+                      role={isEmpty ? undefined : "button"}
+                      tabIndex={isEmpty ? -1 : 0}
+                      onKeyDown={(e) => {
+                        if (!isEmpty && (e.key === "Enter" || e.key === " ")) {
+                          onSegmentClick?.(category.id, category.name);
+                        }
+                      }}
+                    />
+                  }
+                />
                 {!isEmpty && (
                   <TooltipContent side="top" align="center">
                     <div className="text-center">
-                      <span className="text-muted-foreground text-[0.70rem] uppercase">
-                        {category.name}
-                      </span>
+                      <span className="text-background/70 text-2xs uppercase">{category.name}</span>
                       <div className="font-medium">
                         {formatting.formatPercent(category.percent / 100)}
                       </div>
-                      <div className="text-muted-foreground text-xs">
+                      <div className="text-background/70 text-xs">
                         <PrivacyAmount value={category.value} currency={baseCurrency} />
                       </div>
                     </div>

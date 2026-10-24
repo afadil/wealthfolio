@@ -29,7 +29,11 @@ pub struct IncomeSummary {
     pub by_month: HashMap<String, Decimal>,
     pub by_type: HashMap<String, Decimal>,
     pub by_asset: HashMap<String, IncomeByAsset>,
+    /// Income per currency, in that currency.
     pub by_currency: HashMap<String, Decimal>,
+    /// Income per currency, converted to `currency`. Like the other converted
+    /// totals, it leaves out income without an exchange rate.
+    pub by_currency_base: HashMap<String, Decimal>,
     pub by_account: HashMap<String, IncomeByAccount>,
     pub total_income: Decimal,
     pub currency: String,
@@ -50,6 +54,7 @@ impl IncomeSummary {
             by_type: HashMap::new(),
             by_asset: HashMap::new(),
             by_currency: HashMap::new(),
+            by_currency_base: HashMap::new(),
             by_account: HashMap::new(),
             total_income: Decimal::ZERO,
             currency,
@@ -59,10 +64,11 @@ impl IncomeSummary {
         }
     }
 
-    pub fn add_income(&mut self, data: &IncomeData, converted_amount: Decimal) {
+    /// Counts converted income toward `month` (`YYYY-MM`).
+    pub fn add_income(&mut self, data: &IncomeData, month: &str, converted_amount: Decimal) {
         *self
             .by_month
-            .entry(data.date.to_string())
+            .entry(month.to_string())
             .or_insert_with(|| Decimal::ZERO) += &converted_amount;
         *self
             .by_type
@@ -82,18 +88,22 @@ impl IncomeSummary {
             .by_currency
             .entry(data.currency.clone())
             .or_insert_with(|| Decimal::ZERO) += &data.amount;
+        *self
+            .by_currency_base
+            .entry(data.currency.clone())
+            .or_insert_with(|| Decimal::ZERO) += &converted_amount;
         self.by_account
             .entry(data.account_id.clone())
             .and_modify(|entry| {
                 *entry
                     .by_month
-                    .entry(data.date.clone())
+                    .entry(month.to_string())
                     .or_insert(Decimal::ZERO) += converted_amount;
                 entry.total += converted_amount;
             })
             .or_insert_with(|| {
                 let mut by_month = HashMap::new();
-                by_month.insert(data.date.clone(), converted_amount);
+                by_month.insert(month.to_string(), converted_amount);
                 IncomeByAccount {
                     account_id: data.account_id.clone(),
                     account_name: data.account_name.clone(),

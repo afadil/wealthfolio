@@ -17,7 +17,7 @@ for (const width of [320, 1280]) {
           ? "Link a property to Home Mortgage"
           : "Immobilie mit Home Mortgage verknüpfen";
       if (width === 320) {
-        await card.getByRole("button", { name: linkText, exact: true }).click();
+        await card.getByRole("combobox", { name: linkText, exact: true }).click();
         await page.getByRole("dialog").getByRole("button", { name: "Home", exact: true }).click();
       } else {
         await card.getByRole("combobox").click();
@@ -58,7 +58,7 @@ for (const width of [320, 1280]) {
           ? "Add a property for Home Mortgage"
           : "Immobilie für Home Mortgage hinzufügen";
       if (width === 320) {
-        await card.getByRole("button", { name: linkText, exact: true }).click();
+        await card.getByRole("combobox", { name: linkText, exact: true }).click();
         await page.getByRole("dialog").getByRole("button", { name: addText, exact: true }).click();
       } else {
         await card.getByRole("combobox").click();

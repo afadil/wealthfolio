@@ -1,20 +1,18 @@
 id: PERF-ATTR-01
-title: Attribution reconciles within tolerance with an FX effect
+title: Attribution reconciles with investment and cash FX effects
 intent: >
   Base CAD. acc-1 is a CAD account trading a USD-quoted asset while USD/CAD
   drifts from 1.35 to 1.38; every attribution component is exercised:
   contributions, gross income with withholding tax, a standalone fee, trade
   fees on the buy and the sell (grossed up out of lot basis / disposal
   proceeds), realized P&L on a FIFO disposal and unrealized change. Legacy
-  only separates fx_effect when the ACCOUNT currency differs from base, so
-  acc-1 (CAD account, CAD base) reports fx_effect 0 with the position's FX
-  drift folded into unrealized P&L. acc-2 is a USD account holding the same
-  asset: there fx_effect = base unrealized change - local unrealized change x
-  end FX. In both accounts the unattributed FX drift of idle foreign cash
-  stays under the tolerance max(1, 0.2% x max(|delta|, |end value|)), so no
-  residual warning fires; the golden's `residual` field is always 0 (legacy
-  only surfaces the unreconciled delta as a warning when it exceeds
-  tolerance).
+  only separates investment fx_effect when the ACCOUNT currency differs
+  from base, so acc-1 (CAD account, CAD base) keeps the position's FX drift
+  folded into unrealized P&L. Cash FX is separately attributed by bucket.
+  acc-2 is a USD account holding the same asset: there investment fx_effect
+  = base unrealized change - local unrealized change x
+  end FX. Both accounts also include the FX drift of their cash buckets,
+  even when that amount falls below the reconciliation warning tolerance.
 policy:
   base_currency: CAD
   timezone: UTC
@@ -109,21 +107,16 @@ expected_notes: >
   10 x 1.36 = 13.6; fees 5 x 1.35 + 4 x 1.37 + 20 = 32.23; realized 109.42 +
   gross-up (sell fee 5.48 + disposed share of the buy fee 6.75 x 4/10 = 2.7)
   = 117.6; unrealized (1035 - 814.05) + remaining buy-fee gross-up 4.05 =
-  225; fx_effect 0 (account currency == base: the 18.09 of position FX
-  drift stays inside unrealized). Components sum to 2364.77 vs delta
-  2365.57: unreconciled 0.8 (USD cash drift) < tolerance 4.73, no warning,
-  residual field 0, summary amount 364.77.
+  225; fx_effect 0.8 (USD cash drift; the 18.09 of position FX stays
+  inside unrealized). Components sum to the ending value 2365.57, with
+  summary amount 365.57 and no unreconciled amount.
   acc-2: cash USD 100, lot buy-2 9 @ 100 (base 1215 at 1.35); values CAD
   1350 -> 1690.5 (100 x 1.38 + 1125 x 1.38); TWR = value_return =
   1690.5/1350 - 1 = 0.25222222; contributions 1350; unrealized = local change
-  225 USD x 1.38 = 310.5; fx_effect = (1552.5 - 1215) - 310.5 = 27;
-  components 1687.5 vs delta 1690.5: unreconciled 3 (cash drift) <
-  tolerance 3.381, no warning.
-  Portfolio (both, base CAD): fx_effect 27 (scoped pass: acc-1 contributes 0
-  because its account currency is the base), unrealized 535.5, realized
-  117.6, income 68, fees 32.23, taxes 13.6, contributions 3350; delta
-  4056.07 vs components 4052.27, unreconciled 3.8 < tolerance 8.11.
-  LEGACY BEHAVIOR (ledger candidates): fx_effect is an account-vs-base
-  quantity only (position-currency FX inside a base-currency account is
-  never separated), and idle foreign-cash FX drift is silently absorbed by
-  the tolerance rather than reported as an explicit unreconciled term (I8).
+  225 USD x 1.38 = 310.5; investment FX = (1552.5 - 1215) - 310.5 =
+  27, plus cash FX 3, for fx_effect 30. Components reconcile to 1690.5.
+  Portfolio (both, base CAD): fx_effect 30.8 (27 investment FX plus 3.8
+  cash FX), unrealized 535.5, realized 117.6, income 68, fees 32.23, taxes
+  13.6, contributions 3350. Components reconcile to 4056.07, with summary
+  gain 706.07. Position-currency FX inside a base-currency account stays
+  in unrealized; cash FX is attributed for every transaction account.

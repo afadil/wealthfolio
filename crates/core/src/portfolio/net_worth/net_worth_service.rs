@@ -19,6 +19,7 @@ use crate::constants::DECIMAL_PRECISION;
 use crate::errors::Result;
 use crate::fx::currency::normalize_amount;
 use crate::fx::FxServiceTrait;
+use crate::portfolio::coordinator::blocking;
 use crate::portfolio::snapshot::SnapshotServiceTrait;
 use crate::portfolio::valuation::{DailyAccountValuation, ValuationRepositoryTrait};
 use crate::quotes::QuoteServiceTrait;
@@ -30,6 +31,7 @@ use crate::utils::time_utils::{
 const STALENESS_THRESHOLD_DAYS: i64 = 90;
 
 /// Service for calculating net worth.
+#[derive(Clone)]
 pub struct NetWorthService {
     base_currency: Arc<RwLock<String>>,
     account_repository: Arc<dyn AccountRepositoryTrait>,
@@ -43,6 +45,7 @@ pub struct NetWorthService {
 }
 
 /// Where loan payments are read, and the settings time zone that dates them.
+#[derive(Clone)]
 struct LoanPaymentSource {
     repository: Arc<dyn AlternativeAssetRepositoryTrait>,
     timezone: Arc<RwLock<String>>,
@@ -99,7 +102,11 @@ impl NetWorthService {
             })
     }
 
-    fn loan_payments(&self, assets: &[&Asset]) -> Result<HashMap<String, Vec<LoanPayment>>> {
+    fn loan_payments(
+        &self,
+        assets: &[&Asset],
+        timezone: chrono_tz::Tz,
+    ) -> Result<HashMap<String, Vec<LoanPayment>>> {
         let Some(source) = &self.loan_payments else {
             return Ok(HashMap::new());
         };
@@ -108,12 +115,6 @@ impl NetWorthService {
             .filter(|asset| asset.kind == AssetKind::Liability)
             .map(|asset| asset.id.clone())
             .collect();
-        let timezone = parse_user_timezone_or_default(
-            &source
-                .timezone
-                .read()
-                .unwrap_or_else(|poisoned| poisoned.into_inner()),
-        );
         Ok(source
             .repository
             .loan_payments(&loan_ids)?
@@ -685,7 +686,7 @@ impl NetWorthServiceTrait for NetWorthService {
             .filter(|a| a.kind.is_alternative())
             .collect();
 
-        let mut loan_payments = self.loan_payments(&alternative_assets)?;
+        let mut loan_payments = self.loan_payments(&alternative_assets, self.timezone())?;
         let loan_ids: Vec<_> = alternative_assets
             .iter()
             .filter(|asset| asset.kind == AssetKind::Liability)
@@ -804,7 +805,10 @@ impl NetWorthServiceTrait for NetWorthService {
         })
     }
 
-    fn get_net_worth_history(
+    /// The history reads every account's stored valuations over the range, so
+    /// it runs off the async workers. The base currency and timezone are each
+    /// read once here, so the calculation uses the same values throughout.
+    async fn get_net_worth_history(
         &self,
         start_date: NaiveDate,
         end_date: NaiveDate,
@@ -814,7 +818,21 @@ impl NetWorthServiceTrait for NetWorthService {
             .read()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .clone();
+        let timezone = self.timezone();
+        let service = self.clone();
+        blocking(move || service.calculate_history(start_date, end_date, base_currency, timezone))
+            .await
+    }
+}
 
+impl NetWorthService {
+    fn calculate_history(
+        &self,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+        base_currency: String,
+        timezone: chrono_tz::Tz,
+    ) -> Result<Vec<NetWorthHistoryPoint>> {
         debug!(
             "Calculating net worth history from {} to {} in {}",
             start_date, end_date, base_currency
@@ -905,7 +923,7 @@ impl NetWorthServiceTrait for NetWorthService {
             end_date,
         )?;
 
-        let mut loan_payments = self.loan_payments(&alternative_assets)?;
+        let mut loan_payments = self.loan_payments(&alternative_assets, timezone)?;
         let loan_ids: Vec<_> = liability_symbols.iter().cloned().collect();
         let recorded_loan_dates = self.quote_service.get_quote_bounds_for_assets(&loan_ids)?;
         let mut loan_histories = Vec::new();
@@ -969,7 +987,7 @@ impl NetWorthServiceTrait for NetWorthService {
                 manual_loan_principal(
                     asset.metadata.as_ref(),
                     end_date,
-                    user_date_from_utc(asset.created_at.and_utc(), self.timezone()),
+                    user_date_from_utc(asset.created_at.and_utc(), timezone),
                 )
                 .map(|(date, value)| (*asset, date, value))
             })

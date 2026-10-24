@@ -2,6 +2,7 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import resourcesToBackend from "i18next-resources-to-backend";
 
+import { reactInterpolation } from "./interpolation";
 import { DEFAULT_LOCALE, DEFAULT_NAMESPACE, NAMESPACES, SUPPORTED_LOCALE_CODES } from "./locales";
 
 export const LANGUAGE_STORAGE_KEY = "wealthfolio-language";
@@ -40,10 +41,7 @@ i18n
     load: "currentOnly",
     ns: [...NAMESPACES],
     defaultNS: DEFAULT_NAMESPACE,
-    interpolation: {
-      // React already escapes values.
-      escapeValue: false,
-    },
+    interpolation: reactInterpolation(i18n),
     react: {
       useSuspense: true,
     },

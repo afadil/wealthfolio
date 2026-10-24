@@ -1,5 +1,7 @@
 import { ActivityType } from "@/lib/constants";
 import { render, screen } from "@/test/render";
+import userEvent from "@testing-library/user-event";
+import { DirectionProvider } from "@wealthfolio/ui";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ActivityTypePicker } from "./activity-type-picker";
@@ -27,4 +29,30 @@ describe("ActivityTypePicker reclassification types", () => {
       screen.getByTestId(`activity-type-${ActivityType.ADJUSTMENT.toLowerCase()}`),
     ).toBeVisible();
   });
+});
+
+describe("ActivityTypePicker grid keyboard", () => {
+  it.each([
+    ["ltr", "{ArrowRight}", "{ArrowLeft}"],
+    ["rtl", "{ArrowLeft}", "{ArrowRight}"],
+  ] as const)(
+    "moves to the next type with the arrow pointing forward (%s)",
+    async (direction, next, previous) => {
+      const user = userEvent.setup();
+      render(
+        <DirectionProvider direction={direction}>
+          <ActivityTypePicker onSelect={vi.fn()} />
+        </DirectionProvider>,
+      );
+      await user.click(screen.getByRole("button", { name: "Expand to show all types" }));
+      const grid = screen.getByRole("group", { name: "All activity types" });
+      const [first, second] = Array.from(grid.querySelectorAll("button"));
+
+      first.focus();
+      await user.keyboard(next);
+      expect(second).toHaveFocus();
+      await user.keyboard(previous);
+      expect(first).toHaveFocus();
+    },
+  );
 });

@@ -1,8 +1,9 @@
 import { useWealthfolioConnect } from "@/features/wealthfolio-connect";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { Spinner } from "@wealthfolio/ui";
 
 /**
  * Auth callback page that handles OAuth and magic link redirects.
@@ -48,7 +49,7 @@ export default function AuthCallbackPage() {
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col items-center justify-center">
       <div className="flex flex-col items-center gap-4">
-        <Icons.Spinner className="text-muted-foreground h-8 w-8 animate-spin" />
+        <Spinner className="text-muted-foreground h-8 w-8" />
         <p className="text-muted-foreground text-sm">
           {hasCheckedAuth && !isConnected
             ? t("connect:authCallback.processing")

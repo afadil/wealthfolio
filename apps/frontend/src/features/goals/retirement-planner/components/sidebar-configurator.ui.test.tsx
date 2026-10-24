@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { FormattingProvider } from "@wealthfolio/ui";
 import { TooltipProvider } from "@wealthfolio/ui/components/ui/tooltip";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_RETIREMENT_PLAN } from "../lib/plan-adapter";
 import type { RetirementPlan } from "../types";
 import { SidebarConfigurator } from "./sidebar-configurator";
@@ -24,6 +24,28 @@ function renderConfigurator(plan: RetirementPlan, onSavePlan: (plan: RetirementP
 function saveIncomeSection() {
   fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+it.each([undefined, {}])("adds distinct income streams without crypto APIs (%j)", (crypto) => {
+  vi.stubGlobal("crypto", crypto);
+  vi.spyOn(Date, "now").mockReturnValue(1234);
+  const onSavePlan = vi.fn<(plan: RetirementPlan) => void>();
+  renderConfigurator(structuredClone(DEFAULT_RETIREMENT_PLAN), onSavePlan);
+  fireEvent.click(screen.getByRole("button", { name: "Edit Retirement Income" }));
+  fireEvent.click(screen.getByRole("button", { name: "Add pension fund" }));
+  fireEvent.click(screen.getByRole("button", { name: "Add pension fund" }));
+  saveIncomeSection();
+
+  const streams = onSavePlan.mock.calls[0][0].incomeStreams;
+  expect(streams).toHaveLength(2);
+  expect(streams[0].id).toBeTruthy();
+  expect(streams[1].id).toBeTruthy();
+  expect(streams[1].id).not.toBe(streams[0].id);
+});
 
 describe("SidebarConfigurator pension fund returns", () => {
   it("leaves a newly added fund return unset so it inherits the plan net return", () => {

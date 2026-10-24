@@ -3,18 +3,20 @@
 use super::*;
 use serde_json::json;
 
-#[test]
-fn lifecycle_matches_independent_checkpoints_and_final_ledger() {
-    let fixtures: Value = serde_json::from_str(include_str!("fixtures.json")).unwrap();
-    let fixture = &fixtures["lifecycle"];
+/// Check every stage against the worksheet, with `events` giving each event
+/// name's entries: one event, or several recorded on the same day.
+fn check_stages(fixture: &Value, events: &Value, variant: &str) {
     for stage in fixture["stages"].as_array().unwrap() {
-        let id = stage["id"].as_str().unwrap();
+        let id = format!("{variant}/{}", stage["id"].as_str().unwrap());
         let mut metadata = fixture["metadata"].clone();
         metadata[LOAN_EVENTS_KEY] = stage["events"]
             .as_array()
             .unwrap()
             .iter()
-            .map(|key| fixture["events"][key.as_str().unwrap()].clone())
+            .flat_map(|key| match &events[key.as_str().unwrap()] {
+                Value::Array(entries) => entries.clone(),
+                event => vec![event.clone()],
+            })
             .collect();
         let request: LoanCalculationRequest = serde_json::from_value(json!({
             "metadata": metadata, "balances": stage["balances"], "asOf": stage["asOf"]
@@ -54,6 +56,13 @@ fn lifecycle_matches_independent_checkpoints_and_final_ledger() {
             }
         }
     }
+}
+
+#[test]
+fn lifecycle_matches_independent_checkpoints_and_final_ledger() {
+    let fixtures: Value = serde_json::from_str(include_str!("fixtures.json")).unwrap();
+    let fixture = &fixtures["lifecycle"];
+    check_stages(fixture, &fixture["events"], "renewals");
     let mut creation: LoanCalculationRequest = serde_json::from_value(json!({
         "metadata": fixture["metadata"], "balances": [], "asOf":"2025-01-01"
     }))
@@ -71,4 +80,34 @@ fn lifecycle_matches_independent_checkpoints_and_final_ledger() {
             .as_f64()
             .unwrap()
     );
+}
+
+#[test]
+fn rate_changes_reach_the_worksheet_checkpoints_of_the_same_renewal_terms() {
+    let fixtures: Value = serde_json::from_str(include_str!("fixtures.json")).unwrap();
+    let fixture = &fixtures["lifecycle"];
+    let renewal = |key: &str| &fixture["events"][key];
+    // A renewal's term end only sets the maturity; the ledger uses its rate and payment.
+    // The older renewal keeps the payment, as a rate change does when none is given.
+    assert!(renewal("olderRenewal").get("paymentAmount").is_none());
+    let mut events = fixture["events"].clone();
+    events["olderRenewal"] = json!({
+        "type": "rate_change",
+        "effectiveDate": renewal("olderRenewal")["effectiveDate"],
+        "annualRate": renewal("olderRenewal")["annualRate"],
+    });
+    // The later renewal sets a payment, as a rate change does with the letter's payment.
+    events["renewal"] = json!([
+        {
+            "type": "rate_change",
+            "effectiveDate": renewal("renewal")["effectiveDate"],
+            "annualRate": renewal("renewal")["annualRate"],
+        },
+        {
+            "type": "payment_change",
+            "effectiveDate": renewal("renewal")["effectiveDate"],
+            "paymentAmount": renewal("renewal")["paymentAmount"],
+        },
+    ]);
+    check_stages(fixture, &events, "rate changes");
 }

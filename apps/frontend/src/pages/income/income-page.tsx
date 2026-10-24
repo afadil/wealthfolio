@@ -6,7 +6,13 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@wealthfolio/ui/components/ui/chart";
-import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@wealthfolio/ui/components/ui/empty";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
@@ -95,7 +101,7 @@ export default function IncomePage() {
   // through loading, empty, populated and error states.
   const filters = (
     <>
-      <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden items-center gap-2 md:flex lg:right-4">
+      <div className="pointer-events-auto fixed end-2 top-4 z-20 hidden items-center gap-2 md:flex lg:end-4">
         <AccountScopeSelector value={accountFilter} onChange={setAccountScope} />
         <IncomePeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
       </div>
@@ -133,17 +139,19 @@ export default function IncomePage() {
     return (
       <>
         {filters}
-        <EmptyPlaceholder
-          className="mx-auto flex max-w-[420px] items-center justify-center pt-12"
-          icon={<Icons.DollarSign className="h-10 w-10" />}
-          title={t("income:no_income_data")}
-          description={t("income:no_income_data_desc")}
-        />
+        <Empty className="max-w-105 mx-auto flex items-center justify-center pt-12">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">{<Icons.DollarSign className="size-10" />}</EmptyMedia>
+            <EmptyTitle>{t("income:no_income_data")}</EmptyTitle>
+            <EmptyDescription>{t("income:no_income_data_desc")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       </>
     );
   }
 
-  const { totalIncome, currency, monthlyAverage, byType, byCurrency } = periodSummary;
+  const { totalIncome, currency, monthlyAverage, byType, byCurrency, byCurrencyBase } =
+    periodSummary;
   const dividendIncome = byType.DIVIDEND || 0;
   const interestIncome = byType.INTEREST || 0;
   const dividendPercentage = totalIncome > 0 ? (dividendIncome / totalIncome) * 100 : 0;
@@ -184,25 +192,40 @@ export default function IncomePage() {
     getPreviousPeriodData(month),
   ]);
 
+  // Compare the server-computed monthly averages. All Time has no previous period.
+  const previousPeriod =
+    selectedPeriod === "YTD"
+      ? "LAST_YEAR"
+      : selectedPeriod === "LAST_YEAR"
+        ? "TWO_YEARS_AGO"
+        : null;
   const previousMonthlyAverage =
-    previousMonthlyIncomeData.length > 0
-      ? previousMonthlyIncomeData.reduce((sum, [, value]) => {
-          const numericValue = Number(value) || 0;
-          return sum + numericValue;
-        }, 0) / previousMonthlyIncomeData.length
-      : 0;
+    Number(incomeData.find((summary) => summary.period === previousPeriod)?.monthlyAverage) || 0;
 
   const currentMonthlyAverageNumber = Number(monthlyAverage) || 0;
 
   const monthlyAverageChange =
     previousMonthlyAverage > 0
       ? (currentMonthlyAverageNumber - previousMonthlyAverage) / previousMonthlyAverage
-      : 0;
+      : null;
 
-  const currencyData = Object.entries(byCurrency).map(([currency, amount]) => ({
-    currency,
-    amount: Number(amount) || 0,
-  }));
+  // Shown instead of a change when the earlier period has nothing to compare
+  // with: no income, only income without an exchange rate, or an average that
+  // rounds to zero.
+  const noComparisonLabel =
+    selectedPeriod === "LAST_YEAR"
+      ? t("income:no_comparison_year_before")
+      : t("income:no_comparison_last_year");
+
+  // Only converted income gets a slice: income without an exchange rate has
+  // none, and a zero-sized slice would still add padding to the pie.
+  const currencyData = Object.entries(byCurrencyBase)
+    .map(([currency, baseAmount]) => ({
+      currency,
+      amount: Number(byCurrency[currency]) || 0,
+      baseAmount: Number(baseAmount) || 0,
+    }))
+    .filter(({ baseAmount }) => baseAmount > 0);
 
   return (
     <>
@@ -213,7 +236,7 @@ export default function IncomePage() {
           baseCurrency={currency}
         />
         <div className="grid gap-6 md:grid-cols-3">
-          <Card className="border-yellow-500/10 bg-yellow-500/10">
+          <Card className="border-warning/10 bg-warning/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
                 {selectedPeriod === "ALL"
@@ -239,16 +262,18 @@ export default function IncomePage() {
                       <div className="flex items-center text-xs">
                         <GainPercent
                           value={periodSummary.yoyGrowth}
-                          className="text-left text-xs"
+                          className="text-start text-xs"
                           animated={true}
                         />
-                        <span className="text-muted-foreground ml-2 text-xs">
+                        <span className="text-muted-foreground ms-2 text-xs">
                           {t("income:year_over_year")}
                         </span>
                       </div>
                     ) : (
                       <p className="text-muted-foreground text-xs">
-                        {t("income:cumulative_income")}
+                        {selectedPeriod === "ALL"
+                          ? t("income:cumulative_income")
+                          : noComparisonLabel}
                       </p>
                     )}
                   </div>
@@ -265,7 +290,7 @@ export default function IncomePage() {
                       },
                       {},
                     )}
-                    className="mx-auto aspect-square max-h-[62px]"
+                    className="max-h-15.5 mx-auto aspect-square"
                   >
                     <PieChart>
                       <ChartTooltip
@@ -273,11 +298,12 @@ export default function IncomePage() {
                         content={
                           <ChartTooltipContent
                             hideLabel
-                            // Each slice is an amount in its own currency.
-                            formatter={(value, name, entry) => {
-                              const color =
-                                (entry.payload as { fill?: string } | undefined)?.fill ??
-                                entry.color;
+                            // Slices are sized in the base currency; show each currency's own amount.
+                            formatter={(_value, name, entry) => {
+                              const slice = entry.payload as
+                                | { amount?: number; fill?: string }
+                                | undefined;
+                              const color = slice?.fill ?? entry.color;
                               return (
                                 <>
                                   <div
@@ -292,10 +318,12 @@ export default function IncomePage() {
                                   <div className="flex flex-1 items-center justify-between gap-2 leading-none">
                                     <span className="text-muted-foreground">{name}</span>
                                     <span className="text-foreground font-mono font-medium tabular-nums">
-                                      {amountFormatting.formatDecimalAmount(
-                                        Number(value),
-                                        String(name),
-                                      )}
+                                      {isBalanceHidden
+                                        ? "••••"
+                                        : amountFormatting.formatDecimalAmount(
+                                            Number(slice?.amount),
+                                            String(name),
+                                          )}
                                     </span>
                                   </div>
                                 </>
@@ -304,7 +332,12 @@ export default function IncomePage() {
                           />
                         }
                       />
-                      <Pie data={currencyData} dataKey="amount" nameKey="currency" paddingAngle={4}>
+                      <Pie
+                        data={currencyData}
+                        dataKey="baseAmount"
+                        nameKey="currency"
+                        paddingAngle={4}
+                      >
                         {currencyData.map((_entry, index) => (
                           <Cell key={`cell-${index}`} fill={`var(--chart-${index + 2})`} />
                         ))}
@@ -315,7 +348,7 @@ export default function IncomePage() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-yellow-500/10 bg-yellow-500/10">
+          <Card className="border-warning/10 bg-warning/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">{t("income:monthly_average")}</CardTitle>
               <Icons.DollarSign className="text-muted-foreground h-4 w-4" />
@@ -328,15 +361,23 @@ export default function IncomePage() {
                   isHidden={isBalanceHidden}
                 />
               </div>
-              <div className="flex items-center text-xs">
-                <GainPercent value={monthlyAverageChange} className="text-left text-xs" />
-                <span className="text-muted-foreground ml-2 text-xs">
-                  {t("income:since_last_period_label")}
-                </span>
-              </div>
+              {monthlyAverageChange !== null ? (
+                <div className="flex items-center text-xs">
+                  <GainPercent value={monthlyAverageChange} className="text-start text-xs" />
+                  <span className="text-muted-foreground ms-2 text-xs">
+                    {t("income:since_last_period_label")}
+                  </span>
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-xs">
+                  {selectedPeriod === "ALL"
+                    ? t("income:average_since_inception")
+                    : noComparisonLabel}
+                </p>
+              )}
             </CardContent>
           </Card>
-          <Card className="border-yellow-500/10 bg-yellow-500/10">
+          <Card className="border-warning/10 bg-warning/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">{t("income:income_sources")}</CardTitle>
               <Icons.PieChart className="text-muted-foreground h-4 w-4" />
@@ -416,12 +457,15 @@ export default function IncomePage() {
             </CardHeader>
             <CardContent className="flex-1 overflow-auto">
               {topDividendStocks.length === 0 ? (
-                <EmptyPlaceholder
-                  className="mx-auto flex h-[300px] max-w-[420px] items-center justify-center"
-                  icon={<Icons.DollarSign className="h-10 w-10" />}
-                  title={t("income:no_dividend_income_recorded")}
-                  description={t("income:no_dividend_sources_desc")}
-                />
+                <Empty className="h-75 max-w-105 mx-auto flex items-center justify-center">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      {<Icons.DollarSign className="size-10" />}
+                    </EmptyMedia>
+                    <EmptyTitle>{t("income:no_dividend_income_recorded")}</EmptyTitle>
+                    <EmptyDescription>{t("income:no_dividend_sources_desc")}</EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
               ) : (
                 <div className="space-y-6">
                   {/* Horizontal Bar Chart - Separated Bars */}
@@ -476,7 +520,7 @@ export default function IncomePage() {
                           >
                             {/* Tooltip */}
                             <div className="absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 transform group-hover:block">
-                              <div className="bg-popover text-popover-foreground min-w-[180px] rounded-lg border px-3 py-2 shadow-md">
+                              <div className="bg-popover text-popover-foreground min-w-45 rounded-lg border px-3 py-2 shadow-md">
                                 <div className="text-sm font-medium">{item.symbol}</div>
                                 <div className="text-muted-foreground text-xs">
                                   {item.companyName}
@@ -490,7 +534,7 @@ export default function IncomePage() {
                                   })}
                                 </div>
                                 {/* Tooltip arrow */}
-                                <div className="border-t-border absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 transform border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent"></div>
+                                <div className="border-t-border absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 transform border-e-4 border-s-4 border-t-4 border-e-transparent border-s-transparent"></div>
                               </div>
                             </div>
                           </div>
@@ -502,10 +546,12 @@ export default function IncomePage() {
                   {topDividendStocks.map((asset) => (
                     <div key={asset.assetId} className="flex items-center justify-between">
                       <div className="flex items-center">
-                        <Badge className="bg-primary mr-2 flex min-w-[55px] items-center justify-center rounded-sm text-xs">
+                        <Badge className="bg-primary me-2 flex min-w-[3.4375rem] items-center justify-center rounded-sm text-xs">
                           {asset.symbol}
                         </Badge>
-                        <span className="text-muted-foreground mr-16 text-xs">{asset.name}</span>
+                        <span className="text-muted-foreground me-16 text-xs">
+                          <bdi>{asset.name}</bdi>
+                        </span>
                       </div>
                       <div className="text-success text-sm">
                         <PrivacyAmount value={asset.income} currency={currency} />
@@ -530,12 +576,12 @@ function IncomeDashboardSkeleton() {
           {[...Array(3)].map((_, index) => (
             <Card key={index}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-4 w-[100px]" />
+                <Skeleton className="w-25 h-4" />
                 <Skeleton className="h-4 w-4" />
               </CardHeader>
               <CardContent>
-                <Skeleton className="h-8 w-[150px]" />
-                <Skeleton className="mt-2 h-4 w-[100px]" />
+                <Skeleton className="w-37.5 h-8" />
+                <Skeleton className="w-25 mt-2 h-4" />
               </CardContent>
             </Card>
           ))}
@@ -543,23 +589,23 @@ function IncomeDashboardSkeleton() {
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <Skeleton className="h-6 w-[150px]" />
-              <Skeleton className="h-4 w-[100px]" />
+              <Skeleton className="w-37.5 h-6" />
+              <Skeleton className="w-25 h-4" />
             </CardHeader>
             <CardContent>
-              <Skeleton className="h-[300px] w-full" />
+              <Skeleton className="h-75 w-full" />
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <Skeleton className="h-6 w-[200px]" />
+              <Skeleton className="w-50 h-6" />
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {[...Array(10)].map((_, index) => (
                   <div key={index} className="flex items-center justify-between">
-                    <Skeleton className="h-4 w-[100px]" />
-                    <Skeleton className="h-4 w-[80px]" />
+                    <Skeleton className="w-25 h-4" />
+                    <Skeleton className="h-4 w-20" />
                   </div>
                 ))}
               </div>

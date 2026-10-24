@@ -9,12 +9,13 @@ import { PrivacyAmount, Skeleton, useAmountFormatting, useNumberFormatting } fro
 
 import type { BudgetSnapshot } from "../../types/budget";
 import type { CategoryBreakdownRow, MonthBucket } from "../../types/report";
+import { badgeVariants } from "@wealthfolio/ui";
 
 // ─── shared chrome ────────────────────────────────────────────────────────
 
 const CARD_CLASS = "border-border bg-card shadow-xs rounded-xl border p-4 md:p-5";
 
-const LABEL_CLASS = "text-muted-foreground/70 text-[10px] font-semibold uppercase tracking-wide";
+const LABEL_CLASS = "text-muted-foreground/70 text-2xs font-semibold uppercase tracking-wide";
 
 function HeroSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -119,7 +120,7 @@ export const PeriodSummaryHero: FC<PeriodSummaryHeroProps> = ({
           </div>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
             {segments.slice(0, 4).map((s) => (
-              <span key={s.id} className="flex items-center gap-1.5 text-[11px]">
+              <span key={s.id} className="text-2xs flex items-center gap-1.5">
                 <span
                   className="block h-1.5 w-1.5 rounded-full"
                   style={{ backgroundColor: s.color }}
@@ -244,7 +245,7 @@ export const BudgetStatusHero: FC<BudgetStatusHeroProps> = ({
     return (
       <div className={CARD_CLASS}>
         <Skeleton className="h-3 w-32" />
-        <Skeleton className="mt-3 h-[88px] w-full" />
+        <Skeleton className="h-22 mt-3 w-full" />
         <Skeleton className="mt-3 h-4 w-2/3" />
       </div>
     );
@@ -288,7 +289,7 @@ export const BudgetStatusHero: FC<BudgetStatusHeroProps> = ({
           {numberFormatting.formatPercent(pct, { digits: 0 })}
         </div>
         <span
-          className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+          className="text-2xs rounded-full px-2 py-0.5 font-semibold uppercase tracking-wide"
           style={{ backgroundColor: `${fillColor}1F`, color: fillColor }}
         >
           {statusLabel}
@@ -313,13 +314,13 @@ export const BudgetStatusHero: FC<BudgetStatusHeroProps> = ({
         {/* Pace target tick — vertical line on the bar */}
         <div
           className="bg-foreground/60 absolute top-0 h-full w-px"
-          style={{ left: `${pacePct * 100}%` }}
+          style={{ insetInlineStart: `${pacePct * 100}%` }}
           title={t("spending:hero.paceTarget", { pct: Math.round(paceTarget * 100) })}
         />
       </div>
 
       {/* Compact stat row: remaining/over + forecast vs target */}
-      <div className="text-muted-foreground/80 mt-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-[11px]">
+      <div className="text-muted-foreground/80 text-2xs mt-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <span className={cn("tabular-nums", isOver ? "text-destructive" : "text-success")}>
           {isOver ? t("spending:hero.overBy") : t("spending:hero.remaining")}{" "}
           <span className="font-semibold">
@@ -336,7 +337,7 @@ export const BudgetStatusHero: FC<BudgetStatusHeroProps> = ({
             {isBalanceHidden ? "••••" : formatting.formatCompactAmount(forecast, currency)}
           </span>
           {forecast > 0 && (
-            <span className="ml-1">
+            <span className="ms-1">
               (
               {isBalanceHidden
                 ? "••••"
@@ -412,8 +413,8 @@ export const CashflowHero: FC<CashflowHeroProps> = ({ months, currency, isLoadin
         {totals.income > 0 && (
           <span
             className={cn(
-              "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-              totals.net >= 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive",
+              badgeVariants({ variant: totals.net >= 0 ? "success-subtle" : "destructive-subtle" }),
+              "text-2xs font-semibold uppercase tracking-wide",
             )}
           >
             {netLabel} {numberFormatting.formatPercent(Math.abs(totals.savingsRate), { digits: 0 })}
@@ -427,7 +428,7 @@ export const CashflowHero: FC<CashflowHeroProps> = ({ months, currency, isLoadin
       {/* Income / Spent proportion bars */}
       <div className="mt-4 space-y-1.5">
         <div className="flex items-center gap-2">
-          <span className="text-success w-20 shrink-0 text-[11px] font-semibold tabular-nums">
+          <span className="text-success text-2xs w-20 shrink-0 font-semibold tabular-nums">
             +{isBalanceHidden ? "••••" : formatting.formatCompactAmount(totals.income, currency)}
           </span>
           <div className="bg-foreground/10 h-1.5 flex-1 overflow-hidden rounded-full">
@@ -438,7 +439,7 @@ export const CashflowHero: FC<CashflowHeroProps> = ({ months, currency, isLoadin
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-destructive w-20 shrink-0 text-[11px] font-semibold tabular-nums">
+          <span className="text-destructive text-2xs w-20 shrink-0 font-semibold tabular-nums">
             −{isBalanceHidden ? "••••" : formatting.formatCompactAmount(totals.spent, currency)}
           </span>
           <div className="bg-foreground/10 h-1.5 flex-1 overflow-hidden rounded-full">
@@ -450,7 +451,7 @@ export const CashflowHero: FC<CashflowHeroProps> = ({ months, currency, isLoadin
         </div>
       </div>
 
-      <div className="text-muted-foreground/80 mt-3 text-[11px]">
+      <div className="text-muted-foreground/80 text-2xs mt-3">
         {t("spending:hero.avgNet")} ·{" "}
         <span
           className={cn(

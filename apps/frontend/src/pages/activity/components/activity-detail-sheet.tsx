@@ -1,6 +1,6 @@
 import { localizeActivitySubtypeName, localizeActivityTypeName } from "@/lib/activity-utils";
 import { ActivityStatus, ActivityType } from "@/lib/constants";
-import { formatOptionExpiration, parseOccSymbol } from "@/lib/occ-symbol";
+import { formatOptionExpiration, formatOptionSubtitle, parseOccSymbol } from "@/lib/occ-symbol";
 import type { ActivityDetails } from "@/lib/types";
 import {
   Badge,
@@ -13,6 +13,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
+  useAmountFormatting,
   useDateFormatting,
   useNumberFormatting,
 } from "@wealthfolio/ui";
@@ -66,7 +67,7 @@ function DetailRow({ label, value, icon }: DetailRowProps) {
         {icon}
         <span>{label}</span>
       </div>
-      <div className="text-right text-sm font-medium">{value}</div>
+      <div className="text-end text-sm font-medium">{value}</div>
     </div>
   );
 }
@@ -106,7 +107,7 @@ export function ActivityReviewReasons({
       title={t("activity:detail.needs_review")}
       icon={<Icons.AlertCircle className="text-warning h-4 w-4" />}
     >
-      <ul className="list-disc space-y-1 pl-5 text-sm">
+      <ul className="list-disc space-y-1 ps-5 text-sm">
         {reviewReasons.map((reason) => (
           <li key={reason}>{reason}</li>
         ))}
@@ -118,6 +119,7 @@ export function ActivityReviewReasons({
 export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDetailSheetProps) {
   const { t } = useTranslation();
   const numberFormatting = useNumberFormatting();
+  const amountFormatting = useAmountFormatting();
   const dateFormatting = useDateFormatting();
   const { isBalanceHidden } = useBalancePrivacy();
 
@@ -149,6 +151,8 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
   // Parse OCC symbol for option activities
   const isOption = activity.instrumentType === "OPTION";
   const parsedOption = isOption ? parseOccSymbol(activity.assetSymbol ?? "") : null;
+  // The strike is in the option's quote currency, which can differ from the activity's.
+  const optionCurrency = activity.assetQuoteCcy ?? activity.currency;
 
   // Format option expiration for display (YYYY-MM-DD → "Mar 29, 2025")
   const optionExpirationDisplay = parsedOption?.expiration
@@ -157,7 +161,7 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
+      <SheetContent side="inline-end" className="w-full overflow-y-auto sm:max-w-lg">
         <SheetHeader className="pb-4">
           <SheetTitle className="flex items-center gap-3">
             <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-full">
@@ -186,8 +190,10 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
                   <>
                     <div className="text-xl font-bold">{parsedOption.underlying}</div>
                     <div className="text-muted-foreground text-sm">
-                      {optionExpirationDisplay} ${parsedOption.strikePrice}{" "}
-                      {parsedOption.optionType}
+                      {formatOptionSubtitle(parsedOption, optionCurrency, {
+                        ...amountFormatting,
+                        ...dateFormatting,
+                      })}
                     </div>
                   </>
                 ) : (
@@ -204,8 +210,8 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
               <div className="flex flex-col items-end gap-2">
                 {statusConfig && <Badge variant={statusConfig.variant}>{statusLabel}</Badge>}
                 {activity.needsReview && (
-                  <Badge variant="outline" className="border-amber-500 text-amber-600">
-                    <Icons.AlertCircle className="mr-1 h-3 w-3" />
+                  <Badge variant="outline" className="border-warning text-warning">
+                    <Icons.AlertCircle className="me-1 h-3 w-3" />
                     {t("activity:detail.needs_review")}
                   </Badge>
                 )}
@@ -217,7 +223,7 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
                 <div className="text-muted-foreground text-xs">{t("activity:field_date")}</div>
                 <div className="font-medium">{formatShortDate(activity.date)}</div>
               </div>
-              <div className="text-right">
+              <div className="text-end">
                 <div className="text-muted-foreground text-xs">{t("activity:field_amount")}</div>
                 <div className="text-lg font-bold">
                   <StoredAmount activity={activity} isHidden={isBalanceHidden} />
@@ -261,9 +267,7 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
               />
               <DetailRow
                 label={t("activity:detail.strike_price")}
-                value={
-                  <PriceDisplay value={parsedOption.strikePrice} currency={activity.currency} />
-                }
+                value={<PriceDisplay value={parsedOption.strikePrice} currency={optionCurrency} />}
               />
               <DetailRow label={t("activity:detail.expiration")} value={optionExpirationDisplay} />
               <DetailRow label={t("activity:detail.occ_symbol")} value={activity.assetSymbol} />

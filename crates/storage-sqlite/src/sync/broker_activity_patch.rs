@@ -88,8 +88,19 @@ impl BrokerActivityPatchQueue {
         Self(Mutex::new(std::mem::take(&mut *pending)))
     }
 
+    /// Copy of the pending patches, to put back with `restore` when a
+    /// transaction that queued more of them rolls back.
+    pub(crate) fn snapshot(&self) -> Self {
+        let pending = self
+            .0
+            .lock()
+            .expect("pending broker activity patch lock poisoned");
+        Self(Mutex::new(pending.clone()))
+    }
+
     /// Restore the original database's edits after rolling back a replacement.
-    /// Call only while its writer is stopped.
+    /// Call only while its writer is stopped, or from the writer job whose
+    /// rolled-back transaction queued the edits being dropped.
     pub(crate) fn restore(&self, previous: Self) {
         *self
             .0

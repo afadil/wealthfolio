@@ -205,6 +205,25 @@ impl ScopedSecretStore {
         Ok(guard)
     }
 
+    /// A keyring call can wait on an unlock prompt, and the shared gate queues
+    /// every other profile's calls behind it. On a multi-thread runtime worker,
+    /// hand the worker's other tasks to another thread for the wait, so a few
+    /// waiting calls cannot occupy every worker.
+    fn admitted<T>(&self, call: impl FnOnce() -> crate::Result<T>) -> crate::Result<T> {
+        let admitted = || {
+            let _guard = self.admit()?;
+            call()
+        };
+        match tokio::runtime::Handle::try_current() {
+            // block_in_place panics on a current-thread runtime, and in a
+            // LocalSet, which no caller uses.
+            Ok(handle) if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread => {
+                tokio::task::block_in_place(admitted)
+            }
+            _ => admitted(),
+        }
+    }
+
     fn key(&self, key: &str) -> String {
         format!("{}{key}", self.prefix)
     }
@@ -212,16 +231,13 @@ impl ScopedSecretStore {
 
 impl SecretStore for ScopedSecretStore {
     fn get_secret(&self, key: &str) -> crate::Result<Option<String>> {
-        let _guard = self.admit()?;
-        self.inner.get_secret(&self.key(key))
+        self.admitted(|| self.inner.get_secret(&self.key(key)))
     }
     fn set_secret(&self, key: &str, value: &str) -> crate::Result<()> {
-        let _guard = self.admit()?;
-        self.inner.set_secret(&self.key(key), value)
+        self.admitted(|| self.inner.set_secret(&self.key(key), value))
     }
     fn delete_secret(&self, key: &str) -> crate::Result<()> {
-        let _guard = self.admit()?;
-        self.inner.delete_secret(&self.key(key))
+        self.admitted(|| self.inner.delete_secret(&self.key(key)))
     }
 }
 

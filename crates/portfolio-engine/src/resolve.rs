@@ -202,9 +202,10 @@ impl FxResolver<'_> {
     }
 }
 
-/// Legacy validation: three alphabetic characters.
+/// Legacy validation, as core's dated FX lookup: a non-empty alphabetic code,
+/// of any length (USDT, FDUSD).
 fn valid_code(code: &str) -> bool {
-    code.len() == 3 && code.chars().all(|c| c.is_alphabetic())
+    !code.is_empty() && code.chars().all(|c| c.is_alphabetic())
 }
 
 #[cfg(test)]
@@ -282,6 +283,29 @@ mod tests {
         assert_eq!(fx.rate("GBP", "GBp", day(2)), Some(dec!(100)));
         assert_eq!(fx.rate("XYZ", "USD", day(2)), None);
         assert_eq!(fx.rate("", "USD", day(2)), None);
+    }
+
+    #[test]
+    fn codes_that_are_not_three_letters_resolve_from_their_observations() {
+        let surface = FxSurface::from_observations(&[
+            observation("USDT", "USD", 2, dec!(1.01)),
+            observation("USD", "FDUSD", 2, dec!(0.99)),
+            observation("A/B", "C", 2, dec!(2)),
+        ]);
+        let policy = policy();
+        let fx = FxResolver {
+            surface: &surface,
+            policy: &policy,
+        };
+        assert_eq!(fx.rate("USDT", "USD", day(2)), Some(dec!(1.01)));
+        assert_eq!(fx.rate("USD", "USDT", day(2)), Some(dec!(1) / dec!(1.01)));
+        assert_eq!(
+            fx.rate("USDT", "FDUSD", day(2)),
+            Some(dec!(1.01) * dec!(0.99))
+        );
+        assert_eq!(fx.rate("USDC", "USD", day(2)), None);
+        // Core rejects codes that aren't alphabetic; history agrees with it.
+        assert_eq!(fx.rate("A/B", "C", day(2)), None);
     }
 }
 

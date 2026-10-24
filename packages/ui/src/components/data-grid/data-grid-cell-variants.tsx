@@ -13,7 +13,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "../ui/command";
-import { Popover, PopoverAnchor, PopoverContent } from "../ui/popover";
+import { Popover, PopoverContent } from "../ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Skeleton } from "../ui/skeleton";
 import { Textarea } from "../ui/textarea";
@@ -32,10 +32,6 @@ import { DataGridCellWrapper } from "./data-grid-cell-wrapper";
 import type { DataGridCellProps, FileCellData, SymbolSearchResult } from "./data-grid-types";
 import { getCellKey, getLineCount } from "./data-grid-utils";
 import { useDateFormatting, useLocalizationSettings, useNumberFormatting } from "../formatting-provider";
-
-function preventEscapeDuringComposition(event: KeyboardEvent) {
-  if (isKeyboardEventComposing(event)) event.preventDefault();
-}
 
 export function ShortTextCell<TData>({
   cell,
@@ -106,7 +102,7 @@ export function ShortTextCell<TData>({
             });
           }
           tableMeta?.onCellEditingStop?.({
-            direction: event.shiftKey ? "left" : "right",
+            direction: event.shiftKey ? "previous" : "next",
           });
         } else if (event.key === "Escape") {
           event.preventDefault();
@@ -256,15 +252,14 @@ export function LongTextCell<TData>({
     [tableMeta, value, initialValue, rowIndex, columnId, readOnly],
   );
 
-  const onOpenAutoFocus: NonNullable<React.ComponentProps<typeof PopoverContent>["onOpenAutoFocus"]> =
-    React.useCallback((event) => {
-      event.preventDefault();
-      if (textareaRef.current) {
-        textareaRef.current.focus();
-        const length = textareaRef.current.value.length;
-        textareaRef.current.setSelectionRange(length, length);
-      }
-    }, []);
+  const initialFocus = React.useCallback(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const length = textarea.value.length;
+      textarea.setSelectionRange(length, length);
+    }
+    return textarea;
+  }, []);
 
   const onBlur = React.useCallback(() => {
     // Immediately save any pending changes on blur
@@ -301,7 +296,7 @@ export function LongTextCell<TData>({
           tableMeta?.onDataUpdate?.({ rowIndex, columnId, value });
         }
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
         return;
       }
@@ -313,36 +308,35 @@ export function LongTextCell<TData>({
 
   return (
     <Popover open={isEditing} onOpenChange={onOpenChange}>
-      <PopoverAnchor asChild>
-        <DataGridCellWrapper<TData>
-          ref={containerRef}
-          cell={cell}
-          tableMeta={tableMeta}
-          rowIndex={rowIndex}
-          columnId={columnId}
-          rowHeight={rowHeight}
-          isEditing={isEditing}
-          isFocused={isFocused}
-          isSelected={isSelected}
-          isSearchMatch={isSearchMatch}
-          isActiveSearchMatch={isActiveSearchMatch}
-          readOnly={readOnly}
-          cellState={cellState}
-        >
-          <span data-slot="grid-cell-content">{value}</span>
-        </DataGridCellWrapper>
-      </PopoverAnchor>
+      <DataGridCellWrapper<TData>
+        ref={containerRef}
+        cell={cell}
+        tableMeta={tableMeta}
+        rowIndex={rowIndex}
+        columnId={columnId}
+        rowHeight={rowHeight}
+        isEditing={isEditing}
+        isFocused={isFocused}
+        isSelected={isSelected}
+        isSearchMatch={isSearchMatch}
+        isActiveSearchMatch={isActiveSearchMatch}
+        readOnly={readOnly}
+        cellState={cellState}
+      >
+        <span data-slot="grid-cell-content">{value}</span>
+      </DataGridCellWrapper>
       <PopoverContent
+        anchor={containerRef}
         data-grid-cell-editor=""
         align="start"
         side="bottom"
         sideOffset={sideOffset}
-        className="w-[400px] rounded-none p-0"
-        onOpenAutoFocus={onOpenAutoFocus}
+        className="w-100 rounded-none p-0"
+        initialFocus={initialFocus}
       >
         <Textarea
           placeholder={t("ui:dataGrid.enterText", "Enter text...")}
-          className="max-h-[300px] min-h-[150px] resize-none overflow-y-auto rounded-none border-0 shadow-none focus-visible:ring-0"
+          className="max-h-75 min-h-37.5 resize-none overflow-y-auto rounded-none border-0 shadow-none focus-visible:outline-none"
           ref={textareaRef}
           value={value}
           onBlur={onBlur}
@@ -456,7 +450,7 @@ export function NumberCell<TData>({
             tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: parsed.value });
           }
           tableMeta?.onCellEditingStop?.({
-            direction: event.shiftKey ? "left" : "right",
+            direction: event.shiftKey ? "previous" : "next",
           });
         } else if (event.key === "Escape") {
           event.preventDefault();
@@ -660,7 +654,7 @@ export function UrlCell<TData>({
             });
           }
           tableMeta?.onCellEditingStop?.({
-            direction: event.shiftKey ? "left" : "right",
+            direction: event.shiftKey ? "previous" : "next",
           });
         } else if (event.key === "Escape") {
           event.preventDefault();
@@ -835,7 +829,7 @@ export function CheckboxCell<TData>({
       } else if (isFocused && event.key === "Tab") {
         event.preventDefault();
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -857,11 +851,11 @@ export function CheckboxCell<TData>({
     event.stopPropagation();
   }, []);
 
-  const onCheckboxMouseDown = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+  const onCheckboxMouseDown = React.useCallback((event: React.MouseEvent) => {
     event.stopPropagation();
   }, []);
 
-  const onCheckboxDoubleClick = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+  const onCheckboxDoubleClick = React.useCallback((event: React.MouseEvent) => {
     event.stopPropagation();
   }, []);
 
@@ -897,7 +891,7 @@ export function CheckboxCell<TData>({
   );
 }
 
-// Special value for empty selection (Radix Select requires non-empty string values)
+// Special value for the empty choice: a select treats an empty string as no selection
 const EMPTY_SELECT_VALUE = "__EMPTY__";
 
 export function SelectCell<TData>({
@@ -941,8 +935,8 @@ export function SelectCell<TData>({
   }
 
   const onValueChange = React.useCallback(
-    (newValue: string) => {
-      if (readOnly) return;
+    (newValue: string | null) => {
+      if (readOnly || newValue === null) return;
       // Convert empty placeholder back to empty string
       const actualValue = newValue === EMPTY_SELECT_VALUE ? "" : newValue;
       setValue(actualValue);
@@ -972,7 +966,7 @@ export function SelectCell<TData>({
       } else if (!isEditing && isFocused && event.key === "Tab") {
         event.preventDefault();
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -999,8 +993,9 @@ export function SelectCell<TData>({
     );
   };
 
-  // Use placeholder value for Radix Select when value is empty
+  // Use placeholder value for the Select when value is empty
   const selectValue = value || (allowEmpty ? EMPTY_SELECT_VALUE : "");
+  const selectItems = allowEmpty ? [{ value: EMPTY_SELECT_VALUE, label: emptyLabel }, ...options] : options;
 
   return (
     <DataGridCellWrapper<TData>
@@ -1020,8 +1015,14 @@ export function SelectCell<TData>({
       onKeyDown={onWrapperKeyDown}
     >
       {isEditing ? (
-        <Select value={selectValue} onValueChange={onValueChange} open={isEditing} onOpenChange={onOpenChange}>
-          <SelectTrigger className="size-full h-auto items-start border-none p-0 shadow-none focus-visible:ring-0 dark:bg-transparent [&_svg]:hidden">
+        <Select
+          value={selectValue}
+          items={selectItems}
+          onValueChange={onValueChange}
+          open={isEditing}
+          onOpenChange={onOpenChange}
+        >
+          <SelectTrigger className="size-full h-auto items-start border-none p-0 shadow-none focus-visible:outline-none dark:bg-transparent [&_svg]:hidden">
             {displayLabel ? (
               <Badge variant="secondary" className="whitespace-pre-wrap px-1.5 text-xs">
                 <SelectValue />
@@ -1036,7 +1037,7 @@ export function SelectCell<TData>({
             align="start"
             alignOffset={-8}
             sideOffset={-8}
-            className="min-w-[calc(var(--radix-select-trigger-width)+16px)]"
+            className="min-w-[calc(var(--anchor-width)+1rem)]"
           >
             {allowEmpty && (
               <SelectItem value={EMPTY_SELECT_VALUE} className="text-muted-foreground">
@@ -1084,6 +1085,7 @@ export function MultiSelectCell<TData>({
   const [searchValue, setSearchValue] = React.useState("");
   const containerRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const anchorRef = React.useRef<HTMLDivElement>(null);
   const cellOpts = cell.column.columnDef.meta?.cell;
   const options = cellOpts?.variant === "multi-select" ? cellOpts.options : [];
   const sideOffset = -(containerRef.current?.clientHeight ?? 0);
@@ -1147,12 +1149,6 @@ export function MultiSelectCell<TData>({
     [tableMeta, rowIndex, columnId, readOnly],
   );
 
-  const onOpenAutoFocus: NonNullable<React.ComponentProps<typeof PopoverContent>["onOpenAutoFocus"]> =
-    React.useCallback((event) => {
-      event.preventDefault();
-      inputRef.current?.focus();
-    }, []);
-
   const onWrapperKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (isKeyboardEventComposing(event.nativeEvent)) return;
@@ -1166,7 +1162,7 @@ export function MultiSelectCell<TData>({
         event.preventDefault();
         setSearchValue("");
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -1187,11 +1183,6 @@ export function MultiSelectCell<TData>({
         if (lastValue) {
           removeValue(lastValue);
         }
-      }
-      // Prevent escape from propagating to close the popover immediately
-      // Let the command handle it first
-      if (event.key === "Escape") {
-        event.stopPropagation();
       }
     },
     [searchValue, selectedValues, removeValue],
@@ -1229,16 +1220,14 @@ export function MultiSelectCell<TData>({
     >
       {isEditing ? (
         <Popover open={isEditing} onOpenChange={onOpenChange}>
-          <PopoverAnchor asChild>
-            <div className="absolute inset-0" />
-          </PopoverAnchor>
+          <div ref={anchorRef} className="absolute inset-0" />
           <PopoverContent
+            anchor={anchorRef}
             data-grid-cell-editor=""
             align="start"
             sideOffset={sideOffset}
-            className="w-[300px] rounded-none p-0"
-            onOpenAutoFocus={onOpenAutoFocus}
-            onEscapeKeyDown={preventEscapeDuringComposition}
+            className="w-75 rounded-none p-0"
+            initialFocus={inputRef}
           >
             <Command className="**:data-[slot=command-input-wrapper]:h-auto **:data-[slot=command-input-wrapper]:border-none **:data-[slot=command-input-wrapper]:p-0 [&_[data-slot=command-input-wrapper]_svg]:hidden">
               <div className="flex min-h-9 flex-wrap items-center gap-1 border-b px-3 py-1.5">
@@ -1251,6 +1240,7 @@ export function MultiSelectCell<TData>({
                       {label}
                       <button
                         type="button"
+                        aria-label={t("ui:remove", "Remove {{label}}", { label })}
                         onClick={(event) => removeValue(value, event)}
                         onPointerDown={(event) => {
                           event.preventDefault();
@@ -1273,7 +1263,7 @@ export function MultiSelectCell<TData>({
               </div>
               <CommandList className="max-h-full">
                 <CommandEmpty>{t("ui:dataGrid.noOptionsFound", "No options found.")}</CommandEmpty>
-                <CommandGroup className="max-h-[300px] scroll-py-1 overflow-y-auto overflow-x-hidden">
+                <CommandGroup className="max-h-75 scroll-py-1 overflow-y-auto overflow-x-hidden">
                   {options.map((option) => {
                     const isSelected = selectedValues.includes(option.value);
 
@@ -1343,6 +1333,7 @@ export function DateCell<TData>({
   const initialValue = cell.getValue() as string;
   const [value, setValue] = React.useState(initialValue ?? "");
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const anchorRef = React.useRef<HTMLSpanElement>(null);
 
   const prevInitialValueRef = React.useRef(initialValue);
   if (initialValue !== prevInitialValueRef.current) {
@@ -1384,7 +1375,7 @@ export function DateCell<TData>({
       } else if (!isEditing && isFocused && event.key === "Tab") {
         event.preventDefault();
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -1409,13 +1400,17 @@ export function DateCell<TData>({
       onKeyDown={onWrapperKeyDown}
     >
       <Popover open={isEditing} onOpenChange={onOpenChange}>
-        <PopoverAnchor asChild>
-          <span data-slot="grid-cell-content">
-            {value ? formatting.formatCalendarDate(value, { dateStyle: "short" }) : ""}
-          </span>
-        </PopoverAnchor>
+        <span ref={anchorRef} data-slot="grid-cell-content">
+          {value ? formatting.formatCalendarDate(value, { dateStyle: "short" }) : ""}
+        </span>
         {isEditing && (
-          <PopoverContent data-grid-cell-editor="" align="start" alignOffset={-8} className="w-auto p-0">
+          <PopoverContent
+            anchor={anchorRef}
+            data-grid-cell-editor=""
+            align="start"
+            alignOffset={-8}
+            className="w-auto p-0"
+          >
             <Calendar
               autoFocus
               captionLayout="dropdown"
@@ -1570,7 +1565,7 @@ export function DateInputCell<TData>({
             tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: date });
           }
           tableMeta?.onCellEditingStop?.({
-            direction: event.shiftKey ? "left" : "right",
+            direction: event.shiftKey ? "previous" : "next",
           });
         } else if (event.key === "Escape") {
           event.preventDefault();
@@ -1580,7 +1575,7 @@ export function DateInputCell<TData>({
       } else if (isFocused && event.key === "Tab") {
         event.preventDefault();
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -1755,7 +1750,7 @@ export function DateTimeCell<TData>({
             tableMeta?.onDataUpdate?.({ rowIndex, columnId, value: date });
           }
           tableMeta?.onCellEditingStop?.({
-            direction: event.shiftKey ? "left" : "right",
+            direction: event.shiftKey ? "previous" : "next",
           });
         } else if (event.key === "Escape") {
           event.preventDefault();
@@ -1765,7 +1760,7 @@ export function DateTimeCell<TData>({
       } else if (isFocused && event.key === "Tab") {
         event.preventDefault();
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -1875,6 +1870,7 @@ export function FileCell<TData>({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const dropzoneRef = React.useRef<HTMLDivElement>(null);
+  const anchorRef = React.useRef<HTMLDivElement>(null);
   const cellOpts = cell.column.columnDef.meta?.cell;
   const sideOffset = -(containerRef.current?.clientHeight ?? 0);
 
@@ -2254,21 +2250,6 @@ export function FileCell<TData>({
     [tableMeta, rowIndex, columnId, readOnly],
   );
 
-  const onEscapeKeyDown: NonNullable<React.ComponentProps<typeof PopoverContent>["onEscapeKeyDown"]> =
-    React.useCallback((event) => {
-      // Prevent the escape key from propagating to the data grid's keyboard handler
-      // which would call blurCell() and remove focus from the cell
-      event.stopPropagation();
-    }, []);
-
-  const onOpenAutoFocus: NonNullable<React.ComponentProps<typeof PopoverContent>["onOpenAutoFocus"]> =
-    React.useCallback((event) => {
-      event.preventDefault();
-      queueMicrotask(() => {
-        dropzoneRef.current?.focus();
-      });
-    }, []);
-
   const onWrapperKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (isEditing) {
@@ -2287,7 +2268,7 @@ export function FileCell<TData>({
       } else if (!isEditing && isFocused && event.key === "Tab") {
         event.preventDefault();
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -2342,16 +2323,14 @@ export function FileCell<TData>({
     >
       {isEditing ? (
         <Popover open={isEditing} onOpenChange={onOpenChange}>
-          <PopoverAnchor asChild>
-            <div className="absolute inset-0" />
-          </PopoverAnchor>
+          <div ref={anchorRef} className="absolute inset-0" />
           <PopoverContent
+            anchor={anchorRef}
             data-grid-cell-editor=""
             align="start"
             sideOffset={sideOffset}
-            className="w-[400px] rounded-none p-0"
-            onEscapeKeyDown={onEscapeKeyDown}
-            onOpenAutoFocus={onOpenAutoFocus}
+            className="w-100 rounded-none p-0"
+            initialFocus={dropzoneRef}
           >
             <div className="flex flex-col gap-2 p-3">
               <span id={labelId} className="sr-only">
@@ -2367,7 +2346,7 @@ export function FileCell<TData>({
                 data-invalid={error ? "" : undefined}
                 data-disabled={isPending ? "" : undefined}
                 tabIndex={isDragging || isPending ? -1 : 0}
-                className="hover:bg-accent/30 focus-visible:border-ring/50 data-dragging:border-primary/30 data-invalid:border-destructive data-dragging:bg-accent/30 data-invalid:ring-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed p-6 outline-none transition-colors"
+                className="hover:bg-accent/30 focus-visible:outline-solid focus-visible:outline-ring data-dragging:border-primary/30 data-invalid:border-destructive data-dragging:bg-accent/30 data-invalid:ring-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed p-6 outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
                 ref={dropzoneRef}
                 onClick={onDropzoneClick}
                 onDragEnter={onDropzoneDragEnter}
@@ -2427,7 +2406,7 @@ export function FileCell<TData>({
                       {t("ui:dataGrid.clearAll", "Clear all")}
                     </Button>
                   </div>
-                  <div className="max-h-[200px] space-y-1 overflow-y-auto">
+                  <div className="max-h-50 space-y-1 overflow-y-auto">
                     {files.map((file) => {
                       const FileIcon = getFileIcon(file.type);
                       const isFileUploading = uploadingFiles.has(file.id);
@@ -2456,6 +2435,7 @@ export function FileCell<TData>({
                             variant="ghost"
                             size="icon"
                             className="size-5 rounded-sm"
+                            aria-label={t("ui:remove", "Remove {{label}}", { label: file.name })}
                             onClick={() => removeFile(file.id)}
                             disabled={isPending}
                           >
@@ -2498,7 +2478,7 @@ export function FileCell<TData>({
                 {React.createElement(getFileIcon(file.type), {
                   className: "size-3 shrink-0",
                 })}
-                <span className="max-w-[100px] truncate">{file.name}</span>
+                <span className="max-w-25 truncate">{file.name}</span>
               </Badge>
             );
           })}
@@ -2550,6 +2530,7 @@ export function SymbolCell<TData>({
   const [isError, setIsError] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const anchorRef = React.useRef<HTMLSpanElement>(null);
   const cellOpts = cell.column.columnDef.meta?.cell;
   const symbolCellOpts = cellOpts?.variant === "symbol" ? cellOpts : null;
   const onSearch = symbolCellOpts?.onSearch;
@@ -2659,12 +2640,6 @@ export function SymbolCell<TData>({
     [tableMeta, rowIndex, columnId, readOnly, value],
   );
 
-  const onOpenAutoFocus: NonNullable<React.ComponentProps<typeof PopoverContent>["onOpenAutoFocus"]> =
-    React.useCallback((event) => {
-      event.preventDefault();
-      inputRef.current?.focus();
-    }, []);
-
   const onWrapperKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (isKeyboardEventComposing(event.nativeEvent)) return;
@@ -2678,7 +2653,7 @@ export function SymbolCell<TData>({
       } else if (!isEditing && isFocused && event.key === "Tab") {
         event.preventDefault();
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -2703,7 +2678,7 @@ export function SymbolCell<TData>({
         setSearchQuery("");
         setOptions([]);
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       } else if (event.key === "Enter" && searchQuery.trim() && options.length === 0) {
         event.preventDefault();
@@ -2741,22 +2716,28 @@ export function SymbolCell<TData>({
       onKeyDown={onWrapperKeyDown}
     >
       <Popover open={isEditing && !disabled} onOpenChange={onOpenChange}>
-        <PopoverAnchor asChild>
-          <span data-slot="grid-cell-content" className={cn(!value && "text-muted-foreground")}>
-            {disabled ? value || "—" : value}
-            {value && displayContext ? (
-              <span className="text-muted-foreground ml-1 text-xs">({displayContext})</span>
-            ) : null}
-          </span>
-        </PopoverAnchor>
+        {/* A symbol reads in its own direction, so a long one keeps its start visible when
+            clipped. In a right-to-left grid it still sits on the column's (right) side;
+            Chrome has no text-align: match-parent. */}
+        <span
+          ref={anchorRef}
+          data-slot="grid-cell-content"
+          dir="auto"
+          className={cn("rtl:text-right", !value && "text-muted-foreground")}
+        >
+          {disabled ? value || "—" : value}
+          {value && displayContext ? (
+            <span className="text-muted-foreground ms-1 text-xs">({displayContext})</span>
+          ) : null}
+        </span>
         {isEditing && !disabled && (
           <PopoverContent
+            anchor={anchorRef}
             data-grid-cell-editor=""
             align="start"
             sideOffset={sideOffset}
-            className="w-[280px] rounded-none p-0"
-            onOpenAutoFocus={onOpenAutoFocus}
-            onEscapeKeyDown={preventEscapeDuringComposition}
+            className="w-70 rounded-none p-0"
+            initialFocus={inputRef}
           >
             <Command shouldFilter={false}>
               <CommandInput
@@ -2860,6 +2841,7 @@ export function CurrencyCell<TData>({
   const [searchQuery, setSearchQuery] = React.useState("");
   const containerRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const anchorRef = React.useRef<HTMLSpanElement>(null);
   const sideOffset = -(containerRef.current?.clientHeight ?? 0);
 
   const prevInitialValueRef = React.useRef(initialValue);
@@ -2900,12 +2882,6 @@ export function CurrencyCell<TData>({
     [tableMeta, rowIndex, columnId, readOnly],
   );
 
-  const onOpenAutoFocus: NonNullable<React.ComponentProps<typeof PopoverContent>["onOpenAutoFocus"]> =
-    React.useCallback((event) => {
-      event.preventDefault();
-      inputRef.current?.focus();
-    }, []);
-
   const onWrapperKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (isKeyboardEventComposing(event.nativeEvent)) return;
@@ -2918,7 +2894,7 @@ export function CurrencyCell<TData>({
       } else if (!isEditing && isFocused && event.key === "Tab") {
         event.preventDefault();
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -2941,7 +2917,7 @@ export function CurrencyCell<TData>({
         event.preventDefault();
         setSearchQuery("");
         tableMeta?.onCellEditingStop?.({
-          direction: event.shiftKey ? "left" : "right",
+          direction: event.shiftKey ? "previous" : "next",
         });
       }
     },
@@ -2966,19 +2942,17 @@ export function CurrencyCell<TData>({
       onKeyDown={onWrapperKeyDown}
     >
       <Popover open={isEditing} onOpenChange={onOpenChange}>
-        <PopoverAnchor asChild>
-          <span data-slot="grid-cell-content" className={cn(!value && "text-muted-foreground")}>
-            {value || t("ui:dataGrid.currency", "Currency")}
-          </span>
-        </PopoverAnchor>
+        <span ref={anchorRef} data-slot="grid-cell-content" className={cn(!value && "text-muted-foreground")}>
+          {value || t("ui:dataGrid.currency", "Currency")}
+        </span>
         {isEditing && (
           <PopoverContent
+            anchor={anchorRef}
             data-grid-cell-editor=""
             align="start"
             sideOffset={sideOffset}
-            className="w-[280px] rounded-none p-0"
-            onOpenAutoFocus={onOpenAutoFocus}
-            onEscapeKeyDown={preventEscapeDuringComposition}
+            className="w-70 rounded-none p-0"
+            initialFocus={inputRef}
           >
             <Command shouldFilter={false}>
               <CommandInput
@@ -2990,7 +2964,7 @@ export function CurrencyCell<TData>({
               />
               <CommandList>
                 <CommandEmpty>{t("ui:dataGrid.noCurrencyFound", "No currency found.")}</CommandEmpty>
-                <CommandGroup className="max-h-[300px] overflow-y-auto">
+                <CommandGroup className="max-h-75 overflow-y-auto">
                   {filteredCurrencies.map((currency) => (
                     <CommandItem
                       key={currency.value}

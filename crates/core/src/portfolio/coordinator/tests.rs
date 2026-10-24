@@ -2488,22 +2488,19 @@ async fn read_differences(
     let disposal_rows: Vec<_> = reference.disposals.values().flatten().cloned().collect();
     let disposals = rows::stored_disposals(&disposal_rows);
     let range = reference.resolved.range();
-    let inputs = engine::MeasureInputs {
-        effects: engine::effects(
-            &engine::Resolved {
-                facts: &reference.resolved.facts,
-                ledger: &reference.resolved.ledger,
-                surfaces: &reference.resolved.surfaces,
-                range,
-            },
-            &disposals,
-            &lots,
-            &reference.rejected,
-        ),
-        series: &series,
-        lots: &lots,
-        disposals: &disposals,
-    };
+    let inputs = engine::measure_inputs(
+        &engine::Resolved {
+            facts: &reference.resolved.facts,
+            ledger: &reference.resolved.ledger,
+            surfaces: &reference.resolved.surfaces,
+            range,
+        },
+        &series,
+        &lots,
+        &disposals,
+        &reference.rejected,
+        engine::MeasureProfile::Full,
+    );
     let mut found = Vec::new();
     let mut compare = |what: String,
                        read: crate::errors::Result<

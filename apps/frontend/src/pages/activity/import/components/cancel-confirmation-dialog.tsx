@@ -48,7 +48,7 @@ export function CancelConfirmationDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
-            <Icons.AlertTriangle className="h-5 w-5 text-amber-500" />
+            <Icons.AlertTriangle className="text-warning h-5 w-5" />
             {resolvedTitle}
           </AlertDialogTitle>
           <AlertDialogDescription>{resolvedDescription}</AlertDialogDescription>
@@ -56,7 +56,7 @@ export function CancelConfirmationDialog({
         <AlertDialogFooter>
           <AlertDialogCancel>{t("activity:import.dialog.continueImporting")}</AlertDialogCancel>
           <Button variant="destructive" onClick={handleConfirm}>
-            <Icons.X className="mr-2 h-4 w-4" />
+            <Icons.X className="me-2 h-4 w-4" />
             {t("activity:import.dialog.cancelImport")}
           </Button>
         </AlertDialogFooter>

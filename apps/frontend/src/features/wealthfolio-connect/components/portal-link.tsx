@@ -1,5 +1,6 @@
+import { cn } from "@/lib/utils";
+import { buttonVariants } from "@wealthfolio/ui";
 import { ExternalLink } from "@/components/external-link";
-import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import {
   Tooltip,
@@ -19,20 +20,22 @@ export function PortalLink({ href, label }: PortalLinkProps) {
   const hint = t("connect:opensInBrowser");
 
   return (
-    <TooltipProvider delayDuration={300}>
+    <TooltipProvider delay={300}>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-foreground size-11 shrink-0 p-0 sm:h-8 sm:w-auto sm:px-3"
-            asChild
-          >
-            <ExternalLink href={href} aria-label={`${label} — ${hint}`}>
-              <span className="hidden sm:inline">{label}</span>
-              <Icons.ExternalLink className="size-4" aria-hidden="true" />
-            </ExternalLink>
-          </Button>
+        <TooltipTrigger
+          render={
+            <ExternalLink
+              href={href}
+              aria-label={`${label} — ${hint}`}
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "sm" }),
+                "text-muted-foreground hover:text-foreground size-11 shrink-0 p-0 sm:h-8 sm:w-auto sm:px-3",
+              )}
+            />
+          }
+        >
+          <span className="hidden sm:inline">{label}</span>
+          <Icons.ExternalLink className="size-4" aria-hidden="true" />
         </TooltipTrigger>
         <TooltipContent>{hint}</TooltipContent>
       </Tooltip>

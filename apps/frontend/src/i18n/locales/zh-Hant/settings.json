@@ -47,6 +47,7 @@
   "nav_about_subtitle": "關於 Wealthfolio",
   "general_page_description": "管理應用程式的一般設定與偏好。",
   "currency_select_error": "請選取基準幣別。",
+  "currency_code_error": "請輸入有效的 3 碼幣別代碼，例如 USD。",
   "currency_title": "基準幣別",
   "currency_description": "選取投資組合的基準幣別。",
   "currency_save_button": "儲存幣別",
@@ -1047,7 +1048,9 @@
     "review_first_rows_one": "檢查 CSV 資料的第一列",
     "import_quotes_count_one": "匯入 {{count}} 筆報價",
     "imported_count_one": "已匯入 {{count}} 筆",
-    "failed_count_one": "{{count}} 筆失敗"
+    "failed_count_one": "{{count}} 筆失敗",
+    "priority_decrease": "減少優先順序數值",
+    "priority_increase": "增加優先順序數值"
   },
   "addon_permission_none_detected": "未偵測到資料存取權限。此擴充功能對系統的存取權限似乎很少。",
   "addon_permission_list_title": "權限",

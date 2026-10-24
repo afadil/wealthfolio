@@ -23,4 +23,6 @@ pub mod trace;
 // under the full `eval` feature (`test-utils` alone gives you the schema +
 // trace types without the runner / loader).
 #[cfg(feature = "eval")]
+pub mod report;
+#[cfg(feature = "eval")]
 pub mod runner;

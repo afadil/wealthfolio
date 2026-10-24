@@ -21,7 +21,17 @@
   "search_accounts": "Konten durchsuchen…",
   "no_accounts_found": "Keine Konten gefunden.",
   "holdings": "Bestände",
-  "click_to_update_cash_balance": "Klicken, um den Barbestand zu aktualisieren",
+  "balance_edit": {
+    "title": "Barbestand anpassen",
+    "description": "Passen Sie jeweils eine Währung an. Die Differenz wird als Einzahlung oder Auszahlung in dieser Währung erfasst.",
+    "current_balance": "Aktueller Bestand",
+    "new_balance": "Neuer Bestand",
+    "no_change": "Keine Bestandsänderung",
+    "unavailable": "Barbestände sind nicht verfügbar. Warten Sie, bis sie geladen sind, oder aktualisieren Sie die Seite.",
+    "invalid_amount": "Geben Sie einen gültigen Bestand von null oder mehr ein.",
+    "success": "Bestand aktualisiert",
+    "error": "Fehler beim Aktualisieren des Bestands. Bitte versuchen Sie es erneut."
+  },
   "investments": "Wertpapiere",
   "net_contribution": "Nettoeinzahlungen",
   "cost_basis": "Einstand",

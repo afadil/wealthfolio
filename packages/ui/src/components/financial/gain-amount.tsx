@@ -33,11 +33,13 @@ export function GainAmount({
   ...props
 }: GainAmountProps) {
   const { isBalanceHidden } = useBalancePrivacy();
-  const locale = useAmountFormatting().currencyLocale(currency);
+  const amountFormatting = useAmountFormatting();
+  const locale = amountFormatting.currencyLocale(currency);
   const quoteUnit = getQuoteUnitCurrency(currency);
   const validCurrency = !quoteUnit && isValidCurrencyCode(currency);
   const useCurrencyStyle = displayCurrency && validCurrency;
-  const fractionDigits = displayDecimal ? 2 : 0;
+  // Match formatAmount: quote units keep two decimals, currencies use their minor units.
+  const fractionDigits = !displayDecimal ? 0 : quoteUnit ? 2 : amountFormatting.currencyFractionDigits(currency);
   const displayValue = normalizeDisplayAmount(value, fractionDigits);
 
   // Dynamic import for NumberFlow to avoid SSR issues
@@ -59,7 +61,7 @@ export function GainAmount({
   const suffix = displayCurrency && quoteUnit ? quoteUnit.symbol : "";
 
   return (
-    <div className={cn("flex flex-col items-end text-right text-sm", className)} {...props}>
+    <div className={cn("flex flex-col items-end text-end text-sm", className)} {...props}>
       <div
         className={cn(
           "flex items-center",

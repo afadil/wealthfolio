@@ -12,6 +12,7 @@ import {
   Button,
   GainAmount,
   Icons,
+  useAmountFormatting,
   useNumberFormatting,
   useDateFormatting,
 } from "@wealthfolio/ui";
@@ -50,7 +51,7 @@ function HoldingRow({
   showName,
   onClick,
 }: HoldingRowProps) {
-  const numberFormatting = useNumberFormatting();
+  const amountFormatting = useAmountFormatting();
   const dateFormatting = useDateFormatting();
   const formatting = useNumberFormatting();
   const { t } = useTranslation();
@@ -60,7 +61,10 @@ function HoldingRow({
   const nameLabel = holding.instrument?.name?.trim() || symbolLabel;
   const title = showName ? nameLabel : symbolLabel;
   const subtitle = parsedOption
-    ? formatOptionSubtitle(parsedOption, { ...numberFormatting, ...dateFormatting })
+    ? formatOptionSubtitle(parsedOption, holding.instrument?.currency ?? holding.localCurrency, {
+        ...amountFormatting,
+        ...dateFormatting,
+      })
     : t("dashboard:holdings.shares", {
         // Force the plural form when hidden so the label does not leak a quantity of exactly 1.
         count: isHidden ? 0 : (holding.quantity ?? 0),
@@ -120,7 +124,7 @@ function HoldingRow({
           <HoldingPerformancePercent
             value={gainPercent}
             variant="badge"
-            className="min-w-[60px] justify-center text-center text-xs"
+            className="min-w-15 justify-center text-center text-xs"
           />
         </div>
       </div>
@@ -155,7 +159,7 @@ function StackedAvatars({ holdings, totalRemaining, onClick }: StackedAvatarsPro
           return (
             <div
               key={holding.id}
-              className={cn("relative", index > 0 && "-ml-2")}
+              className={cn("relative", index > 0 && "-ms-2")}
               style={{ zIndex: displayedHoldings.length - index }}
             >
               <TickerAvatar
@@ -174,7 +178,7 @@ function StackedAvatars({ holdings, totalRemaining, onClick }: StackedAvatarsPro
           ? t("dashboard:holdings.more_holdings", { count: totalRemaining })
           : t("dashboard:holdings.more", { count: totalRemaining })}
       </span>
-      <Icons.ChevronRight className="text-muted-foreground ml-auto h-3 w-3" />
+      <Icons.ChevronRight className="text-muted-foreground ms-auto h-3 w-3 rtl:rotate-180" />
     </div>
   );
 }
@@ -182,7 +186,7 @@ function StackedAvatars({ holdings, totalRemaining, onClick }: StackedAvatarsPro
 function TopHoldingsSkeleton() {
   const { t } = useTranslation();
   return (
-    <DashboardCard title={t("dashboard:holdings.title")} elevated>
+    <DashboardCard title={t("dashboard:holdings.title")}>
       {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className="border-border border-b py-3 last:border-0">
           <div className="flex items-center justify-between">
@@ -197,7 +201,7 @@ function TopHoldingsSkeleton() {
               <Skeleton className="h-3.5 w-24" />
               <div className="flex items-center gap-2">
                 <Skeleton className="h-3 w-16" />
-                <Skeleton className="h-5 w-[60px] rounded-md" />
+                <Skeleton className="w-15 h-5 rounded-md" />
               </div>
             </div>
           </div>
@@ -210,7 +214,7 @@ function TopHoldingsSkeleton() {
 function TopHoldingsEmptyState() {
   const { t } = useTranslation();
   return (
-    <DashboardCard title={t("dashboard:holdings.title")} elevated>
+    <DashboardCard title={t("dashboard:holdings.title")}>
       <div className="py-2 text-center">
         <p className="text-sm">{t("dashboard:holdings.no_holdings")}</p>
         <Link
@@ -218,7 +222,7 @@ function TopHoldingsEmptyState() {
           className="text-muted-foreground hover:text-foreground mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
         >
           {t("dashboard:holdings.add_first_transaction")}
-          <Icons.ChevronRight className="h-3 w-3" />
+          <Icons.ChevronRight className="h-3 w-3 rtl:rotate-180" />
         </Link>
       </div>
     </DashboardCard>
@@ -297,22 +301,24 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
   return (
     <DashboardCard
       title={t("dashboard:holdings.title")}
-      elevated
       action={
         <div className="flex items-center gap-1">
           <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:bg-success/10 h-8 w-8 p-0"
-              >
-                <Icons.ListFilter className="h-4 w-4" />
-              </Button>
+            <PopoverTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:bg-success-subtle h-8 w-8 p-0"
+                  aria-label={t("common:filter")}
+                />
+              }
+            >
+              <Icons.ListFilter className="h-4 w-4" />
             </PopoverTrigger>
             <PopoverContent
               align="end"
-              className="border-border/50 bg-card min-w-[200px] rounded-2xl border p-2 shadow-lg backdrop-blur-xl"
+              className="border-border/50 bg-card min-w-50 rounded-2xl border p-2 shadow-lg backdrop-blur-xl"
             >
               <p className="text-muted-foreground px-2 py-1.5 text-xs font-medium uppercase tracking-wider">
                 {t("dashboard:holdings.filter_show")}
@@ -399,11 +405,11 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
           <Button
             variant="ghost"
             size="sm"
-            className="text-muted-foreground hover:bg-success/10 text-xs"
+            className="text-muted-foreground hover:bg-success-subtle text-xs"
             onClick={() => navigate("/holdings")}
           >
             {t("dashboard:view_all")}
-            <Icons.ChevronRight className="ml-1 h-3 w-3" />
+            <Icons.ChevronRight className="ms-1 h-3 w-3 rtl:rotate-180" />
           </Button>
         </div>
       }

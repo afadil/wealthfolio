@@ -10,6 +10,7 @@ import {
   TimeFieldProps,
   TimeField as TimeFieldRac,
   TimeValue as TimeValueRac,
+  useLocale,
 } from "react-aria-components";
 
 import { cn } from "../../lib/utils";
@@ -45,7 +46,7 @@ function DateSegment({ className, ...props }: DateSegmentProps) {
 }
 
 const dateInputStyle =
-  "relative inline-flex h-input-height w-full items-center overflow-hidden whitespace-nowrap rounded-md border border-input bg-input-bg dark:bg-input/30 px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none data-focus-within:border-ring data-focus-within:ring-ring/50 data-focus-within:ring-[3px] data-focus-within:has-aria-invalid:ring-destructive/20 dark:data-focus-within:has-aria-invalid:ring-destructive/40 data-focus-within:has-aria-invalid:border-destructive";
+  "relative inline-flex h-input-height w-full items-center overflow-hidden whitespace-nowrap rounded-md border border-input bg-input-bg dark:bg-input/30 px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none data-focus-within:outline-solid data-focus-within:outline-2 data-focus-within:outline-offset-2 data-focus-within:outline-ring data-focus-within:has-aria-invalid:outline-destructive data-focus-within:has-aria-invalid:border-destructive";
 
 interface DateInputProps extends DateInputPropsRac {
   className?: string;
@@ -53,8 +54,13 @@ interface DateInputProps extends DateInputPropsRac {
 }
 
 function DateInput({ className, unstyled = false, ...props }: Omit<DateInputProps, "children">) {
+  // react-aria moves between segments in its locale's direction, so the field
+  // lays out in that direction too; in a right-to-left page a Latin-script
+  // date keeps its left-to-right order instead of reversing under the arrows.
+  const { direction } = useLocale();
   return (
     <DateInputRac
+      dir={direction}
       className={composeRenderProps(className, (className) => cn(!unstyled && dateInputStyle, className))}
       {...props}
     >

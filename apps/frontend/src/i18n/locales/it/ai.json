@@ -31,7 +31,8 @@
     "addModels": "Aggiungi modelli..."
   },
   "provider": {
-    "noProvidersConfigured": "Nessun provider configurato"
+    "noProvidersConfigured": "Nessun provider configurato",
+    "label": "Provider IA"
   },
   "reasoning": {
     "thinking": "Sto pensando...",
@@ -128,6 +129,7 @@
   "tools": {
     "calling": "Chiamata di {{toolName}} in corso...",
     "cancelled": "{{toolName}} annullato",
+    "notUsed": "Strumento non utilizzato: {{toolName}}",
     "used": "Strumento utilizzato: {{toolName}}"
   },
   "accounts": {

@@ -110,6 +110,7 @@
     "description": "口座を選択すると、期間ごとのパフォーマンスを比較できます。"
   },
   "attribution": {
+    "partial_data": "一部のデータが不完全",
     "title": "要因分析",
     "close": "要因分析を閉じる",
     "period_gain_loss": "期間損益",

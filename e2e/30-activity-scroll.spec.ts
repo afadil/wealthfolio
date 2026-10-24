@@ -62,7 +62,14 @@ async function scrollNearBottom(container: Locator) {
       behavior: "instant",
     });
   });
-  const offset = await container.evaluate((element) => element.scrollTop);
+  // Let the browser finish layout and scroll anchoring before recording the
+  // starting position; the preservation check starts before the tab click.
+  const offset = await container.evaluate(
+    (element) =>
+      new Promise<number>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve(element.scrollTop)));
+      }),
+  );
   expect(offset).toBeGreaterThan(100);
   return offset;
 }
@@ -105,10 +112,14 @@ for (const context of ["asset", "account"] as const) {
     ).toBeVisible();
     const container = page.locator("[data-page-scroll-container]");
     const offset = await scrollNearBottom(container);
-    await activities.click();
+    // Keep the real response pending long enough to observe the loading layout.
+    await page.route("**/api/v1/activities/search", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      await route.continue();
+    });
+    await Promise.all([expectScrollPreserved(container, offset), activities.click()]);
     await expect(page).toHaveURL(/tab=activities/);
     await expect(page.getByRole("columnheader", { name: "Date" })).toBeVisible();
-    await expectScrollPreserved(container, offset);
     await expect(page.getByRole("cell", { name: "Buy", exact: true })).toBeVisible();
   });
 }

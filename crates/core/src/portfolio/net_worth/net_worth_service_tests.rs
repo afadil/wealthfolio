@@ -707,11 +707,16 @@ impl FxServiceTrait for MockFxService {
 
 struct MockValuationRepository {
     valuations: Vec<DailyAccountValuation>,
+    /// Threads that read an account's history.
+    readers: std::sync::Mutex<Vec<std::thread::ThreadId>>,
 }
 
 impl MockValuationRepository {
     fn new(valuations: Vec<DailyAccountValuation>) -> Self {
-        Self { valuations }
+        Self {
+            valuations,
+            readers: std::sync::Mutex::new(Vec::new()),
+        }
     }
 }
 
@@ -732,6 +737,10 @@ impl ValuationRepositoryTrait for MockValuationRepository {
         start_date: Option<NaiveDate>,
         end_date: Option<NaiveDate>,
     ) -> Result<Vec<DailyAccountValuation>> {
+        self.readers
+            .lock()
+            .unwrap()
+            .push(std::thread::current().id());
         let filtered: Vec<_> = self
             .valuations
             .iter()
@@ -1395,7 +1404,7 @@ async fn test_credit_card_multi_currency_nets_before_liability_split() {
     assert_eq!(result.net_worth, dec!(-300));
     assert_eq!(get_category_value(&result, "cash"), Decimal::ZERO);
 
-    let history = service.get_net_worth_history(date, date).unwrap();
+    let history = service.get_net_worth_history(date, date).await.unwrap();
     assert_eq!(history.len(), 1);
     assert_eq!(history[0].total_assets, Decimal::ZERO);
     assert_eq!(history[0].total_liabilities, dec!(300));
@@ -1762,8 +1771,8 @@ async fn test_no_quote_falls_back_to_cost_basis() {
 // Net Worth History Tests
 // ============================================================================
 
-#[test]
-fn test_history_basic_portfolio_with_alt_assets() {
+#[tokio::test]
+async fn test_history_basic_portfolio_with_alt_assets() {
     // Setup: Portfolio + Property + Liability over 5 days
     let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
     let d2 = NaiveDate::from_ymd_opt(2024, 1, 2).unwrap();
@@ -1804,7 +1813,7 @@ fn test_history_basic_portfolio_with_alt_assets() {
         valuations,
     );
 
-    let history = service.get_net_worth_history(d1, d5).unwrap();
+    let history = service.get_net_worth_history(d1, d5).await.unwrap();
 
     assert_eq!(history.len(), 5, "Should have 5 data points");
 
@@ -1848,8 +1857,8 @@ fn test_history_basic_portfolio_with_alt_assets() {
     assert_eq!(total_gain, dec!(10000));
 }
 
-#[test]
-fn test_history_portfolio_only_no_alt_assets() {
+#[tokio::test]
+async fn test_history_portfolio_only_no_alt_assets() {
     let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
     let d2 = NaiveDate::from_ymd_opt(2024, 1, 2).unwrap();
     let d3 = NaiveDate::from_ymd_opt(2024, 1, 3).unwrap();
@@ -1868,7 +1877,7 @@ fn test_history_portfolio_only_no_alt_assets() {
         valuations,
     );
 
-    let history = service.get_net_worth_history(d1, d3).unwrap();
+    let history = service.get_net_worth_history(d1, d3).await.unwrap();
 
     assert_eq!(history.len(), 3);
     assert_eq!(history[0].portfolio_value, dec!(50000));
@@ -1879,8 +1888,8 @@ fn test_history_portfolio_only_no_alt_assets() {
     assert_eq!(history[2].net_worth, dec!(52000));
 }
 
-#[test]
-fn test_history_credit_card_balance_is_split_to_liabilities() {
+#[tokio::test]
+async fn test_history_credit_card_balance_is_split_to_liabilities() {
     let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
 
     let valuations = vec![
@@ -1898,7 +1907,7 @@ fn test_history_credit_card_balance_is_split_to_liabilities() {
         valuations,
     );
 
-    let history = service.get_net_worth_history(d1, d1).unwrap();
+    let history = service.get_net_worth_history(d1, d1).await.unwrap();
 
     assert_eq!(history.len(), 1);
     assert_eq!(history[0].portfolio_value, dec!(100000));
@@ -1912,8 +1921,8 @@ fn test_history_credit_card_balance_is_split_to_liabilities() {
     );
 }
 
-#[test]
-fn test_history_credit_card_balance_before_first_portfolio_date_is_seeded() {
+#[tokio::test]
+async fn test_history_credit_card_balance_before_first_portfolio_date_is_seeded() {
     let start = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
     let card_date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
     let first_portfolio_date = NaiveDate::from_ymd_opt(2024, 2, 1).unwrap();
@@ -1935,6 +1944,7 @@ fn test_history_credit_card_balance_before_first_portfolio_date_is_seeded() {
 
     let history = service
         .get_net_worth_history(start, first_portfolio_date)
+        .await
         .unwrap();
 
     assert_eq!(history.len(), 1);
@@ -1944,8 +1954,8 @@ fn test_history_credit_card_balance_before_first_portfolio_date_is_seeded() {
     assert_eq!(history[0].net_worth, dec!(99500));
 }
 
-#[test]
-fn test_history_credit_card_without_total_stays_liability_only() {
+#[tokio::test]
+async fn test_history_credit_card_without_total_stays_liability_only() {
     let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
 
     let account = create_test_account("card1", "CREDIT_CARD", "USD");
@@ -1954,7 +1964,7 @@ fn test_history_credit_card_without_total_stays_liability_only() {
     let service =
         create_net_worth_service_with_valuations(vec![account], vec![], vec![], vec![], valuations);
 
-    let history = service.get_net_worth_history(d1, d1).unwrap();
+    let history = service.get_net_worth_history(d1, d1).await.unwrap();
 
     assert_eq!(history.len(), 1);
     assert_eq!(history[0].total_assets, Decimal::ZERO);
@@ -1962,8 +1972,8 @@ fn test_history_credit_card_without_total_stays_liability_only() {
     assert_eq!(history[0].net_worth, dec!(-500));
 }
 
-#[test]
-fn test_history_credit_card_positive_balance_without_total_is_cash_asset() {
+#[tokio::test]
+async fn test_history_credit_card_positive_balance_without_total_is_cash_asset() {
     let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
 
     let account = create_test_account("card1", "CREDIT_CARD", "USD");
@@ -1972,7 +1982,7 @@ fn test_history_credit_card_positive_balance_without_total_is_cash_asset() {
     let service =
         create_net_worth_service_with_valuations(vec![account], vec![], vec![], vec![], valuations);
 
-    let history = service.get_net_worth_history(d1, d1).unwrap();
+    let history = service.get_net_worth_history(d1, d1).await.unwrap();
 
     assert_eq!(history.len(), 1);
     assert_eq!(history[0].total_assets, dec!(25));
@@ -1980,8 +1990,8 @@ fn test_history_credit_card_positive_balance_without_total_is_cash_asset() {
     assert_eq!(history[0].net_worth, dec!(25));
 }
 
-#[test]
-fn test_history_credit_card_liability_carries_forward_between_dates() {
+#[tokio::test]
+async fn test_history_credit_card_liability_carries_forward_between_dates() {
     let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
     let d2 = NaiveDate::from_ymd_opt(2024, 1, 2).unwrap();
     let d3 = NaiveDate::from_ymd_opt(2024, 1, 3).unwrap();
@@ -2006,7 +2016,7 @@ fn test_history_credit_card_liability_carries_forward_between_dates() {
         valuations,
     );
 
-    let history = service.get_net_worth_history(d1, d3).unwrap();
+    let history = service.get_net_worth_history(d1, d3).await.unwrap();
 
     assert_eq!(history.len(), 3);
 
@@ -2026,8 +2036,8 @@ fn test_history_credit_card_liability_carries_forward_between_dates() {
     assert_eq!(history[2].net_worth, dec!(98800));
 }
 
-#[test]
-fn test_history_mixed_securities_cash_and_credit_card() {
+#[tokio::test]
+async fn test_history_mixed_securities_cash_and_credit_card() {
     let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
 
     // Securities ($100K) + cash ($5K) both count toward portfolio_value; the
@@ -2049,7 +2059,7 @@ fn test_history_mixed_securities_cash_and_credit_card() {
         valuations,
     );
 
-    let history = service.get_net_worth_history(d1, d1).unwrap();
+    let history = service.get_net_worth_history(d1, d1).await.unwrap();
 
     assert_eq!(history.len(), 1);
     assert_eq!(history[0].portfolio_value, dec!(105000));
@@ -2064,8 +2074,9 @@ fn test_history_mixed_securities_cash_and_credit_card() {
     );
 }
 
-#[test]
-fn test_history_alt_asset_quote_after_range_start_before_first_portfolio_date_seeds_first_point() {
+#[tokio::test]
+async fn test_history_alt_asset_quote_after_range_start_before_first_portfolio_date_seeds_first_point(
+) {
     let start = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
     let quote_date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
     let first_portfolio_date = NaiveDate::from_ymd_opt(2024, 2, 1).unwrap();
@@ -2093,6 +2104,7 @@ fn test_history_alt_asset_quote_after_range_start_before_first_portfolio_date_se
 
     let history = service
         .get_net_worth_history(start, first_portfolio_date)
+        .await
         .unwrap();
 
     assert_eq!(history.len(), 1);
@@ -2102,8 +2114,8 @@ fn test_history_alt_asset_quote_after_range_start_before_first_portfolio_date_se
     assert_eq!(history[0].net_worth, dec!(550000));
 }
 
-#[test]
-fn test_history_includes_closed_non_archived_accounts() {
+#[tokio::test]
+async fn test_history_includes_closed_non_archived_accounts() {
     let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
     let closed_account =
         create_test_account_with_archive_state("closed-1", "SECURITIES", "USD", false, false);
@@ -2119,15 +2131,15 @@ fn test_history_includes_closed_non_archived_accounts() {
         vec![valuation],
     );
 
-    let history = service.get_net_worth_history(d1, d1).unwrap();
+    let history = service.get_net_worth_history(d1, d1).await.unwrap();
 
     assert_eq!(history.len(), 1);
     assert_eq!(history[0].portfolio_value, dec!(50000));
     assert_eq!(history[0].net_worth, dec!(50000));
 }
 
-#[test]
-fn test_history_alt_assets_only_no_portfolio() {
+#[tokio::test]
+async fn test_history_alt_assets_only_no_portfolio() {
     // Edge case: user only has alternative assets, no portfolio
     let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
     let d2 = NaiveDate::from_ymd_opt(2024, 1, 2).unwrap();
@@ -2146,7 +2158,7 @@ fn test_history_alt_assets_only_no_portfolio() {
         vec![], // No portfolio valuations
     );
 
-    let history = service.get_net_worth_history(d1, d2).unwrap();
+    let history = service.get_net_worth_history(d1, d2).await.unwrap();
 
     assert_eq!(history.len(), 2);
     assert_eq!(history[0].portfolio_value, Decimal::ZERO);
@@ -2158,8 +2170,8 @@ fn test_history_alt_assets_only_no_portfolio() {
     assert_eq!(history[1].net_worth, dec!(410000));
 }
 
-#[test]
-fn test_history_forward_fill_alt_assets() {
+#[tokio::test]
+async fn test_history_forward_fill_alt_assets() {
     // Alt asset has quote on day 1 and day 5 only
     // Days 2-4 should forward-fill from day 1
     let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
@@ -2192,7 +2204,7 @@ fn test_history_forward_fill_alt_assets() {
         valuations,
     );
 
-    let history = service.get_net_worth_history(d1, d5).unwrap();
+    let history = service.get_net_worth_history(d1, d5).await.unwrap();
 
     assert_eq!(history.len(), 5);
 
@@ -2205,8 +2217,8 @@ fn test_history_forward_fill_alt_assets() {
     assert_eq!(history[4].alternative_assets_value, dec!(210000));
 }
 
-#[test]
-fn test_history_starts_from_first_portfolio_date() {
+#[tokio::test]
+async fn test_history_starts_from_first_portfolio_date() {
     // Alt assets have data before portfolio starts
     // History should only start from first portfolio date
     let d_before = NaiveDate::from_ymd_opt(2023, 12, 1).unwrap();
@@ -2235,7 +2247,7 @@ fn test_history_starts_from_first_portfolio_date() {
     );
 
     // Query includes d_before, but history should start from d1
-    let history = service.get_net_worth_history(d_before, d2).unwrap();
+    let history = service.get_net_worth_history(d_before, d2).await.unwrap();
 
     // Should only have 2 points (d1 and d2), not 3
     assert_eq!(history.len(), 2);
@@ -2247,8 +2259,8 @@ fn test_history_starts_from_first_portfolio_date() {
     assert_eq!(history[0].net_worth, dec!(350000));
 }
 
-#[test]
-fn test_history_empty_range() {
+#[tokio::test]
+async fn test_history_empty_range() {
     // Query range before any data exists
     let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
     let d2 = NaiveDate::from_ymd_opt(2024, 1, 5).unwrap();
@@ -2260,13 +2272,13 @@ fn test_history_empty_range() {
         create_net_worth_service_with_valuations(vec![], vec![], vec![], vec![], valuations);
 
     // Query before any data
-    let history = service.get_net_worth_history(d1, d2).unwrap();
+    let history = service.get_net_worth_history(d1, d2).await.unwrap();
 
     assert!(history.is_empty(), "Should return empty history");
 }
 
-#[test]
-fn test_history_single_day() {
+#[tokio::test]
+async fn test_history_single_day() {
     let d1 = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
 
     let valuations = vec![create_total_valuation(d1, dec!(100000), dec!(90000))];
@@ -2282,7 +2294,7 @@ fn test_history_single_day() {
         valuations,
     );
 
-    let history = service.get_net_worth_history(d1, d1).unwrap();
+    let history = service.get_net_worth_history(d1, d1).await.unwrap();
 
     assert_eq!(history.len(), 1);
     assert_eq!(history[0].date, d1);
@@ -2292,8 +2304,8 @@ fn test_history_single_day() {
     assert_eq!(history[0].net_contribution, dec!(90000));
 }
 
-#[test]
-fn test_history_liability_reduction_is_positive_gain() {
+#[tokio::test]
+async fn test_history_liability_reduction_is_positive_gain() {
     // Test that paying down debt shows as positive contribution to net worth
     let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
     let d2 = NaiveDate::from_ymd_opt(2024, 1, 31).unwrap();
@@ -2317,7 +2329,7 @@ fn test_history_liability_reduction_is_positive_gain() {
         valuations,
     );
 
-    let history = service.get_net_worth_history(d1, d2).unwrap();
+    let history = service.get_net_worth_history(d1, d2).await.unwrap();
 
     assert_eq!(history.len(), 2);
 
@@ -2332,8 +2344,8 @@ fn test_history_liability_reduction_is_positive_gain() {
     assert_eq!(liability_reduction, dec!(5000));
 }
 
-#[test]
-fn test_history_contribution_adjusted_gain() {
+#[tokio::test]
+async fn test_history_contribution_adjusted_gain() {
     // Verify that deposits don't count as gain
     let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
     let d2 = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
@@ -2349,7 +2361,7 @@ fn test_history_contribution_adjusted_gain() {
     let service =
         create_net_worth_service_with_valuations(vec![], vec![], vec![], vec![], valuations);
 
-    let history = service.get_net_worth_history(d1, d2).unwrap();
+    let history = service.get_net_worth_history(d1, d2).await.unwrap();
 
     assert_eq!(history.len(), 2);
 
@@ -2366,8 +2378,8 @@ fn test_history_contribution_adjusted_gain() {
     assert_eq!(portfolio_gain, dec!(5000));
 }
 
-#[test]
-fn test_history_multiple_alt_assets() {
+#[tokio::test]
+async fn test_history_multiple_alt_assets() {
     // Multiple alternative assets, each with different update schedules
     let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
     let d2 = NaiveDate::from_ymd_opt(2024, 1, 2).unwrap();
@@ -2402,7 +2414,7 @@ fn test_history_multiple_alt_assets() {
         valuations,
     );
 
-    let history = service.get_net_worth_history(d1, d3).unwrap();
+    let history = service.get_net_worth_history(d1, d3).await.unwrap();
 
     assert_eq!(history.len(), 3);
 
@@ -2433,6 +2445,49 @@ fn test_history_multiple_alt_assets() {
     assert_eq!(
         history[2].breakdown.get("preciousMetals"),
         Some(&dec!(5500))
+    );
+}
+
+/// The history reads every account's stored rows. `#[tokio::test]` runs a
+/// current-thread runtime, which polls tasks on the test's thread, so a read
+/// there would hold the runtime (and a synchronous desktop command would hold
+/// the UI thread).
+#[tokio::test]
+async fn test_history_reads_valuations_off_the_async_worker() {
+    let d1 = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+    let account_repo = Arc::new(MockAccountRepository::new(vec![create_test_account(
+        "account-1",
+        account_types::SECURITIES,
+        "USD",
+    )]));
+    let valuations = Arc::new(MockValuationRepository::new(vec![create_total_valuation(
+        d1,
+        dec!(100),
+        dec!(100),
+    )]));
+    let service = NetWorthService::new(
+        Arc::new(RwLock::new("USD".to_string())),
+        account_repo.clone(),
+        Arc::new(MockAssetRepository::new(vec![])),
+        Arc::new(SnapshotService::new(
+            Arc::new(RwLock::new("UTC".to_string())),
+            account_repo,
+            Arc::new(MockSnapshotRepository::new(vec![])),
+            Arc::new(InMemoryActivityRepository::new(Vec::new(), HashSet::new())),
+        )),
+        Arc::new(MockMarketDataRepository::new(vec![])),
+        valuations.clone(),
+        Arc::new(MockFxService::new("USD")),
+    );
+
+    let history = service.get_net_worth_history(d1, d1).await.unwrap();
+
+    assert_eq!(history.len(), 1);
+    let readers = valuations.readers.lock().unwrap();
+    assert!(!readers.is_empty(), "the history must read valuations");
+    assert!(
+        !readers.contains(&std::thread::current().id()),
+        "the history read valuations on the async worker"
     );
 }
 
@@ -2708,7 +2763,7 @@ async fn automated_loan_net_worth_and_history_use_the_same_as_of_balance() {
         )],
     );
     let current = service.get_net_worth(end).await.unwrap();
-    let history = service.get_net_worth_history(start, end).unwrap();
+    let history = service.get_net_worth_history(start, end).await.unwrap();
     assert_eq!(current.liabilities.total, dec!(700));
     assert_eq!(history.last().unwrap().total_liabilities, dec!(700));
     assert_eq!(
@@ -2754,6 +2809,7 @@ async fn loan_history_before_first_confirmation_matches_point_in_time() {
     assert_eq!(
         service
             .get_net_worth_history(start, as_of)
+            .await
             .unwrap()
             .last()
             .unwrap()
@@ -2846,7 +2902,7 @@ async fn tagged_loan_payments_count_in_net_worth_and_its_history() {
     );
     // The same figures as a recorded extra repayment of 200 on April 15.
     let current = service.get_net_worth(end).await.unwrap();
-    let history = service.get_net_worth_history(start, end).unwrap();
+    let history = service.get_net_worth_history(start, end).await.unwrap();
     assert_eq!(current.liabilities.total, dec!(700));
     assert_eq!(history.last().unwrap().total_liabilities, dec!(700));
 }
@@ -2881,12 +2937,16 @@ async fn manual_mortgage_with_a_recorded_balance_does_not_backfill_original_prin
         }
         let earlier = service
             .get_net_worth_history(origin, before_confirmation)
+            .await
             .unwrap();
         assert!(!earlier.is_empty());
         assert!(earlier
             .iter()
             .all(|point| point.total_liabilities.is_zero()));
-        let history = service.get_net_worth_history(origin, confirmation).unwrap();
+        let history = service
+            .get_net_worth_history(origin, confirmation)
+            .await
+            .unwrap();
         assert_eq!(history.first().unwrap().net_worth, dec!(500000));
         assert_eq!(history.last().unwrap().net_worth, dec!(500000) - balance);
         for point in history {
@@ -2932,7 +2992,7 @@ async fn manual_loan_principal_matches_net_worth_history_and_dated_quotes() {
                 .total,
             dec!(0)
         );
-        let history = service.get_net_worth_history(origin, end).unwrap();
+        let history = service.get_net_worth_history(origin, end).await.unwrap();
         assert_eq!(
             history.first().unwrap().date,
             if recorded.is_some() {
@@ -2971,6 +3031,7 @@ async fn manual_loan_principal_matches_net_worth_history_and_dated_quotes() {
         let after_origin = origin + chrono::Days::new(2);
         let before_confirmation = service
             .get_net_worth_history(after_origin, after_origin)
+            .await
             .unwrap();
         if recorded.is_some() {
             assert!(before_confirmation.is_empty());
@@ -3023,7 +3084,7 @@ async fn undated_manual_principal_keeps_its_creation_anchor_as_today_advances() 
         let instant: chrono::DateTime<Utc> = now.parse().unwrap();
         crate::utils::clock::set_frozen(instant);
         let today = instant.date_naive();
-        let history = service.get_net_worth_history(created, today).unwrap();
+        let history = service.get_net_worth_history(created, today).await.unwrap();
         assert_eq!(history.first().unwrap().date, created);
         assert_eq!(history.last().unwrap().date, today);
         for point in history {
@@ -3033,7 +3094,10 @@ async fn undated_manual_principal_keeps_its_creation_anchor_as_today_advances() 
         // A range beginning after creation must retain debt on its first point,
         // rather than introducing the same drop again on each new current day.
         let yesterday = today.pred_opt().unwrap();
-        let recent = service.get_net_worth_history(yesterday, today).unwrap();
+        let recent = service
+            .get_net_worth_history(yesterday, today)
+            .await
+            .unwrap();
         assert_eq!(recent.first().unwrap().date, yesterday);
         assert_eq!(recent.first().unwrap().total_liabilities, dec!(9000));
         assert_eq!(
@@ -3061,7 +3125,7 @@ async fn manual_principal_history_revalues_foreign_currency_on_each_date() {
         .collect();
     let service =
         create_net_worth_service_with_fx(vec![], vec![asset], vec![], vec![], vec![], Arc::new(fx));
-    let history = service.get_net_worth_history(origin, end).unwrap();
+    let history = service.get_net_worth_history(origin, end).await.unwrap();
     assert_eq!(history.first().unwrap().total_liabilities, dec!(75));
     assert_eq!(history.last().unwrap().total_liabilities, dec!(80));
     for point in history {
@@ -3112,6 +3176,7 @@ async fn undated_manual_principal_uses_the_settings_timezone() {
     assert_eq!(
         service
             .get_net_worth_history(created, created)
+            .await
             .unwrap()
             .last()
             .unwrap()

@@ -309,6 +309,8 @@
     "screenshot_alt": "Schermata {{number}}",
     "downloading_update": "Download dell'aggiornamento in corso...",
     "installing_update": "Installazione dell'aggiornamento in corso...",
+    "update_external_flatpak": "Questa copia di Wealthfolio è stata installata con Flatpak. Aggiornala con Flatpak o con il tuo centro software.",
+    "update_external_package_manager": "Questa installazione non può essere aggiornata da Wealthfolio. Aggiornala nello stesso modo in cui l'hai installata.",
     "update_failed": "Aggiornamento non riuscito. Riprova.",
     "remind_me_later": "Ricordamelo più tardi",
     "view_changelog": "Visualizza changelog",
@@ -520,5 +522,9 @@
       "rebind": "Ricollega Wealthfolio Connect per confermare l’account e il nucleo familiare di questo profilo.",
       "cooldown_many": "Troppi tentativi. Riprova tra {{count}} secondi."
     }
-  }
+  },
+  "remove": "Rimuovi",
+  "remove_item": "Rimuovi {{name}}",
+  "actions_for": "Azioni per {{name}}",
+  "settings_for": "Impostazioni di {{name}}"
 }

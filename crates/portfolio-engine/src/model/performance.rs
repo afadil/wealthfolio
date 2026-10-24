@@ -259,6 +259,10 @@ pub enum QualityNote {
     ScopedFxSkippedRange {
         account: String,
     },
+    CashFxUnavailable {
+        account: String,
+        date: NaiveDate,
+    },
     ExternalMarkerIgnored {
         group: String,
     },
@@ -347,6 +351,7 @@ impl fmt::Display for QualityNote {
             RealizedSkippedAcquisitionFx { disposal } => write!(f, "Realized P&L attribution skipped for disposal {disposal} because acquisition FX conversion was unavailable."),
             ScopedFxSkippedRate { account } => write!(f, "Scoped FX attribution skipped for account {account} because its end-date FX rate is unavailable."),
             ScopedFxSkippedRange { account } => write!(f, "Scoped FX attribution skipped for account {account} because its converted movement is outside the supported range."),
+            CashFxUnavailable { account, date } => write!(f, "Cash FX attribution is incomplete for account {account} on {date} because its exposure or valuation rate is unavailable."),
             ExternalMarkerIgnored { group } => write!(f, "Transfer group {group} ignored external transfer metadata because the valid pair is internal to the selected scope."),
             MixedScope => f.write_str("This scope mixes transaction-mode and holdings-mode accounts, so TWR and IRR are unavailable. The return is a value return over account-level components."),
             MixedTwrNotApplicable => f.write_str("TWR unavailable for mixed transaction and holdings scopes."),

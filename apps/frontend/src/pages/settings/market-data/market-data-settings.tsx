@@ -45,7 +45,7 @@ import { QueryKeys } from "@/lib/query-keys";
 import type { Asset } from "@/lib/types";
 import type { CustomProviderWithSources } from "@/lib/types/custom-provider";
 import { cn } from "@/lib/utils";
-import { ActionConfirm, useDateFormatting } from "@wealthfolio/ui";
+import { ActionConfirm, useDateFormatting, Spinner } from "@wealthfolio/ui";
 import {
   Collapsible,
   CollapsibleContent,
@@ -70,6 +70,7 @@ import {
   useSetApiKey,
   useUpdateMarketDataProviderSettings,
 } from "./use-market-data-settings";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 
 interface ProviderSettingsProps {
   provider: MarketDataProviderSetting;
@@ -197,34 +198,34 @@ function ProviderSettings({
             <div className="flex items-center gap-2">
               <span className="font-medium">{provider.name}</span>
               {provider.capabilities?.coverage && (
-                <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
+                <Badge variant="secondary" className="text-2xs h-5 px-1.5 font-normal">
                   {provider.capabilities.coverage}
                 </Badge>
               )}
               {provider.enabled && provider.requiresApiKey && !provider.hasApiKey && (
-                <Badge
-                  variant="outline"
-                  className="border-warning/20 bg-warning/10 text-warning shrink-0 text-xs"
-                >
-                  <Icons.AlertTriangle className="mr-1 h-3 w-3" />
+                <Badge variant="warning-subtle" className="shrink-0">
+                  <Icons.AlertTriangle className="me-1 h-3 w-3" />
                   {t("settings:market_data_page.api_key_required")}
                 </Badge>
               )}
               {provider.assetCount > 0 && (
-                <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
+                <Badge variant="secondary" className="text-2xs h-5 px-1.5 font-normal">
                   {t("settings:market_data_page.assets_count", { count: provider.assetCount })}
                 </Badge>
               )}
               {provider.errorCount > 0 && (
                 <Popover>
-                  <PopoverTrigger asChild>
-                    <Badge
-                      variant="outline"
-                      className="border-destructive/20 bg-destructive/10 text-destructive hover:bg-destructive/20 shrink-0 cursor-pointer text-xs"
-                    >
-                      <Icons.XCircle className="mr-1 h-3 w-3" />
-                      {t("settings:market_data_page.errors_count", { count: provider.errorCount })}
-                    </Badge>
+                  <PopoverTrigger
+                    nativeButton={false}
+                    render={
+                      <Badge
+                        variant="destructive-subtle"
+                        className="hover:bg-destructive-subtle/70 shrink-0 cursor-pointer"
+                      />
+                    }
+                  >
+                    <Icons.XCircle className="me-1 h-3 w-3" />
+                    {t("settings:market_data_page.errors_count", { count: provider.errorCount })}
                   </PopoverTrigger>
                   <PopoverContent className="w-80 p-0" align="start">
                     <div className="border-b px-3 py-2">
@@ -243,7 +244,7 @@ function ProviderSettings({
                           {provider.uniqueErrors.map((error, index) => (
                             <li
                               key={index}
-                              className="bg-destructive/5 text-destructive rounded-md p-2 text-xs"
+                              className="bg-destructive-subtle text-destructive-subtle-foreground rounded-md p-2 text-xs"
                             >
                               {error}
                             </li>
@@ -271,7 +272,7 @@ function ProviderSettings({
                   return (
                     <span
                       key={feature}
-                      className="text-muted-foreground inline-flex items-center gap-1 text-[11px]"
+                      className="text-muted-foreground text-2xs inline-flex items-center gap-1"
                     >
                       {icon}
                       {label}
@@ -284,20 +285,24 @@ function ProviderSettings({
 
           {/* Controls */}
           <div className="flex shrink-0 items-center gap-2">
-            <CollapsibleTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-foreground h-8 w-8"
-              >
-                <Icons.Settings className="h-4 w-4" />
-              </Button>
+            <CollapsibleTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-foreground h-8 w-8"
+                  aria-label={t("common:settings_for", { name: provider.name })}
+                />
+              }
+            >
+              <Icons.Settings className="h-4 w-4" />
             </CollapsibleTrigger>
             <Switch
               id={`${provider.id}-enabled`}
+              aria-label={provider.name}
               checked={provider.enabled}
               onCheckedChange={(checked) => onUpdate({ enabled: checked })}
-              className="data-[state=checked]:bg-success"
+              className="data-checked:bg-success"
             />
           </div>
         </div>
@@ -350,7 +355,7 @@ function ProviderSettings({
                             <Badge
                               key={feature}
                               variant="secondary"
-                              className="h-5 px-1.5 text-[10px] font-normal"
+                              className="text-2xs h-5 px-1.5 font-normal"
                             >
                               {feature}
                             </Badge>
@@ -424,7 +429,7 @@ function ProviderSettings({
                           }
                         >
                           {isLoadingKey ? (
-                            <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+                            <Spinner className="h-3.5 w-3.5" />
                           ) : showApiKey ? (
                             <Icons.EyeOff className="h-3.5 w-3.5" />
                           ) : (
@@ -451,7 +456,8 @@ function ProviderSettings({
                       <Button
                         variant="outline"
                         size="icon"
-                        className="h-7 w-7 rounded-r-none"
+                        className="h-7 w-7 rounded-e-none"
+                        aria-label={t("settings:market_data_page.priority_decrease")}
                         onClick={() => {
                           const newVal = Math.max(1, (priorityValue ?? 1) - 1);
                           onPriorityChange(String(newVal));
@@ -466,7 +472,8 @@ function ProviderSettings({
                       <Button
                         variant="outline"
                         size="icon"
-                        className="h-7 w-7 rounded-l-none"
+                        className="h-7 w-7 rounded-s-none"
+                        aria-label={t("settings:market_data_page.priority_increase")}
                         onClick={() => {
                           const newVal = (priorityValue ?? 1) + 1;
                           onPriorityChange(String(newVal));
@@ -476,7 +483,7 @@ function ProviderSettings({
                         <Icons.PlusCircle className="h-3 w-3" />
                       </Button>
                     </div>
-                    <span className="text-muted-foreground text-[10px]">
+                    <span className="text-muted-foreground text-2xs">
                       {t("settings:market_data_page.priority_hint")}
                     </span>
                   </div>
@@ -489,15 +496,15 @@ function ProviderSettings({
                     {provider.errorCount > 0 ? (
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <Icons.XCircle className="h-4 w-4 text-red-500" />
-                          <span className="text-xs font-medium text-red-500">
+                          <Icons.XCircle className="text-destructive h-4 w-4" />
+                          <span className="text-destructive text-xs font-medium">
                             {t("settings:market_data_page.assets_with_errors", {
                               count: provider.errorCount,
                             })}
                           </span>
                         </div>
                         {provider.lastSyncError && (
-                          <p className="bg-destructive/10 text-destructive rounded-md p-2 text-xs">
+                          <p className="bg-destructive-subtle text-destructive-subtle-foreground rounded-md p-2 text-xs">
                             {provider.lastSyncError}
                           </p>
                         )}
@@ -518,7 +525,7 @@ function ProviderSettings({
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <Icons.CheckCircle className="h-4 w-4 text-green-500" />
+                        <Icons.CheckCircle className="text-success h-4 w-4" />
                         <span className="text-muted-foreground text-xs">
                           {provider.lastSyncedAt
                             ? t("settings:market_data_page.last_sync", {
@@ -574,14 +581,14 @@ function CustomProviderCard({
           <div className="flex items-center gap-2">
             <span className="font-medium">{provider.name}</span>
             {!provider.enabled && (
-              <Badge variant="outline" className="h-5 px-1.5 text-[10px] font-normal">
+              <Badge variant="outline" className="text-2xs h-5 px-1.5 font-normal">
                 {t("settings:market_data_page.disabled")}
               </Badge>
             )}
             {servesAsFallback(provider) && (
               <Badge
                 variant="outline"
-                className="border-warning/40 text-warning h-5 px-1.5 text-[10px] font-normal"
+                className="border-warning/40 text-warning text-2xs h-5 px-1.5 font-normal"
                 title={t("settings:market_data_page.fallback_badge_hint")}
               >
                 {t("settings:market_data_page.fallback_badge")}
@@ -593,19 +600,19 @@ function CustomProviderCard({
           )}
           <div className="mt-1 flex flex-wrap items-center gap-2">
             {latestSource && (
-              <span className="text-muted-foreground inline-flex items-center gap-1 text-[11px]">
+              <span className="text-muted-foreground text-2xs inline-flex items-center gap-1">
                 <Icons.Activity2 className="h-3 w-3" />
                 {latestSource.format.toUpperCase()}
               </span>
             )}
             {historicalSource && (
-              <span className="text-muted-foreground inline-flex items-center gap-1 text-[11px]">
+              <span className="text-muted-foreground text-2xs inline-flex items-center gap-1">
                 <Icons.Clock className="h-3 w-3" />
                 {t("settings:market_data_page.historical")}
               </span>
             )}
             {usedBy > 0 && (
-              <span className="text-muted-foreground text-[11px]">
+              <span className="text-muted-foreground text-2xs">
                 {t("settings:market_data_page.custom_used_by", { count: usedBy })}
               </span>
             )}
@@ -615,31 +622,35 @@ function CustomProviderCard({
         <div className="flex shrink-0 items-center gap-2">
           <Switch
             id={`${provider.id}-enabled`}
+            aria-label={provider.name}
             checked={provider.enabled}
             onCheckedChange={onToggleEnabled}
             disabled={isToggling}
-            className="data-[state=checked]:bg-success"
+            className="data-checked:bg-success"
           />
           <Button
             variant="ghost"
             size="icon"
             className="text-muted-foreground hover:text-foreground h-8 w-8"
             onClick={onEdit}
+            aria-label={t("settings:market_data_page.edit_custom_provider")}
           >
             <Icons.Pencil className="h-4 w-4" />
           </Button>
           {deleteBlockerCount(usage) > 0 ? (
             // The backend refuses to delete a provider securities still use; say which.
             <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-destructive h-8 w-8"
-                  aria-label={t("settings:common_delete")}
-                >
-                  <Icons.Trash className="h-4 w-4" />
-                </Button>
+              <PopoverTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-destructive h-8 w-8"
+                    aria-label={t("settings:common_delete")}
+                  />
+                }
+              >
+                <Icons.Trash className="h-4 w-4" />
               </PopoverTrigger>
               <PopoverContent className="w-80 space-y-3" align="end">
                 <h4 className="font-medium leading-none">
@@ -862,26 +873,26 @@ export default function MarketDataSettingsPage() {
           text={t("settings:market_data_page.subtitle")}
         />
         <Separator />
-        <div className="border-destructive/20 bg-destructive/5 rounded-lg border p-6">
-          <div className="flex items-start gap-3">
-            <Icons.XCircle className="text-destructive mt-0.5 h-5 w-5 shrink-0" />
-            <div className="space-y-2">
-              <h3 className="text-destructive font-medium">
-                {t("settings:market_data_page.load_error_title")}
-              </h3>
-              <p className="text-muted-foreground text-sm">{error.message}</p>
+        <Alert variant="destructive" className="p-6">
+          <Icons.XCircle className="size-5" />
+          <AlertTitle role="heading" aria-level={3}>
+            {t("settings:market_data_page.load_error_title")}
+          </AlertTitle>
+          <AlertDescription>
+            {error.message}
+            <div className="mt-4">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => window.location.reload()}
-                className="mt-2"
+                className="text-foreground"
               >
-                <Icons.Refresh className="mr-2 h-4 w-4" />
+                <Icons.Refresh className="me-2 h-4 w-4" />
                 {t("settings:market_data_page.retry")}
               </Button>
             </div>
-          </div>
-        </div>
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -895,23 +906,25 @@ export default function MarketDataSettingsPage() {
       >
         <div className="flex items-center gap-2">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-10 w-10 px-0 sm:h-9 sm:w-auto sm:px-3"
-                aria-label={t("settings:market_data_page.history_menu")}
-              >
-                {isRecalculating ? (
-                  <Icons.Spinner className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Icons.History className="h-4 w-4" />
-                )}
-                <span className="hidden sm:inline">
-                  {t("settings:market_data_page.history_menu")}
-                </span>
-                <Icons.ChevronDown className="hidden h-4 w-4 sm:block" />
-              </Button>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-10 w-10 px-0 sm:h-9 sm:w-auto sm:px-3"
+                  aria-label={t("settings:market_data_page.history_menu")}
+                />
+              }
+            >
+              {isRecalculating ? (
+                <Spinner className="h-4 w-4" />
+              ) : (
+                <Icons.History className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">
+                {t("settings:market_data_page.history_menu")}
+              </span>
+              <Icons.ChevronDown className="hidden h-4 w-4 sm:block" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80">
               <HistoryMenuItem
@@ -923,13 +936,13 @@ export default function MarketDataSettingsPage() {
                 )}
                 description={t("settings:market_data_page.rebuild_history_description")}
                 disabled={isRecalculating}
-                onSelect={() => setRebuildConfirmOpen(true)}
+                onClick={() => setRebuildConfirmOpen(true)}
               />
               <HistoryMenuItem
                 icon={<Icons.Import />}
                 title={t("settings:market_data_page.import_prices_csv")}
                 description={t("settings:market_data_page.import_prices_csv_description")}
-                onSelect={() => navigate("/settings/market-data/import")}
+                onClick={() => navigate("/settings/market-data/import")}
               />
               <DropdownMenuSeparator />
               <HistoryMenuItem
@@ -937,7 +950,7 @@ export default function MarketDataSettingsPage() {
                 icon={<Icons.RotateCcw />}
                 title={t("settings:market_data_page.reset_history_menu")}
                 description={t("settings:market_data_page.reset_history_description")}
-                onSelect={() => setResetHistoryOpen(true)}
+                onClick={() => setResetHistoryOpen(true)}
               />
             </DropdownMenuContent>
           </DropdownMenu>
@@ -948,11 +961,7 @@ export default function MarketDataSettingsPage() {
             onClick={() => updatePortfolio()}
             aria-label={t("settings:market_data_page.update_aria")}
           >
-            {isUpdating ? (
-              <Icons.Spinner className="h-4 w-4 animate-spin" />
-            ) : (
-              <Icons.Refresh className="h-4 w-4" />
-            )}
+            {isUpdating ? <Spinner className="h-4 w-4" /> : <Icons.Refresh className="h-4 w-4" />}
           </Button>
 
           <Button
@@ -962,9 +971,9 @@ export default function MarketDataSettingsPage() {
             onClick={() => updatePortfolio()}
           >
             {isUpdating ? (
-              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+              <Spinner className="me-2 h-4 w-4" />
             ) : (
-              <Icons.Refresh className="mr-2 h-4 w-4" />
+              <Icons.Refresh className="me-2 h-4 w-4" />
             )}
             {t("settings:market_data_page.update")}
           </Button>
@@ -1026,7 +1035,7 @@ export default function MarketDataSettingsPage() {
             <TabsTrigger value="builtin">
               {t("settings:market_data_page.tab_builtin")}
               {builtinProviders.filter((p) => p.enabled).length > 0 && (
-                <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-[10px] font-normal">
+                <Badge variant="secondary" className="text-2xs ms-1.5 h-5 px-1.5 font-normal">
                   {builtinProviders.filter((p) => p.enabled).length}
                 </Badge>
               )}
@@ -1034,7 +1043,7 @@ export default function MarketDataSettingsPage() {
             <TabsTrigger value="custom">
               {t("settings:market_data_page.tab_custom")}
               {customProviders.filter((p) => p.enabled).length > 0 && (
-                <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-[10px] font-normal">
+                <Badge variant="secondary" className="text-2xs ms-1.5 h-5 px-1.5 font-normal">
                   {customProviders.filter((p) => p.enabled).length}
                 </Badge>
               )}
@@ -1079,41 +1088,37 @@ export default function MarketDataSettingsPage() {
 
         <TabsContent value="custom" className="mt-4">
           {customScraperErrors && customScraperErrors.errorCount > 0 && (
-            <div className="border-destructive/20 bg-destructive/5 mb-3 rounded-lg border p-3">
-              <div className="flex items-start gap-2">
-                <Icons.XCircle className="text-destructive mt-0.5 h-4 w-4 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-destructive text-sm font-medium">
-                    {t("settings:market_data_page.assets_failed_to_sync", {
-                      count: customScraperErrors.errorCount,
-                    })}
-                  </p>
-                  {customScraperErrors.uniqueErrors?.map((err, i) => {
-                    // Strip boilerplate prefix, keep just the actionable message
-                    // Error format: "...CUSTOM_SCRAPER: [provider-id] actual message"
-                    const lastIdx = err.lastIndexOf("CUSTOM_SCRAPER: ");
-                    let msg = lastIdx >= 0 ? err.slice(lastIdx + "CUSTOM_SCRAPER: ".length) : err;
-                    // Extract [provider-id] prefix and resolve to provider name
-                    let providerLabel = "";
-                    const bracketMatch = /^\[([^\]]+)\]\s*/.exec(msg);
-                    if (bracketMatch) {
-                      const code = bracketMatch[1];
-                      const cp = customProviders.find((p) => p.id === code);
-                      providerLabel = cp?.name ?? code;
-                      msg = msg.slice(bracketMatch[0].length);
-                    }
-                    return (
-                      <p key={i} className="text-destructive/80 mt-1 break-all text-xs">
-                        {providerLabel && (
-                          <span className="text-destructive font-medium">{providerLabel}: </span>
-                        )}
-                        {msg}
-                      </p>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+            <Alert variant="destructive" className="mb-3 p-3">
+              <Icons.XCircle />
+              <AlertTitle>
+                {t("settings:market_data_page.assets_failed_to_sync", {
+                  count: customScraperErrors.errorCount,
+                })}
+              </AlertTitle>
+              <AlertDescription className="min-w-0">
+                {customScraperErrors.uniqueErrors?.map((err, i) => {
+                  // Strip boilerplate prefix, keep just the actionable message
+                  // Error format: "...CUSTOM_SCRAPER: [provider-id] actual message"
+                  const lastIdx = err.lastIndexOf("CUSTOM_SCRAPER: ");
+                  let msg = lastIdx >= 0 ? err.slice(lastIdx + "CUSTOM_SCRAPER: ".length) : err;
+                  // Extract [provider-id] prefix and resolve to provider name
+                  let providerLabel = "";
+                  const bracketMatch = /^\[([^\]]+)\]\s*/.exec(msg);
+                  if (bracketMatch) {
+                    const code = bracketMatch[1];
+                    const cp = customProviders.find((p) => p.id === code);
+                    providerLabel = cp?.name ?? code;
+                    msg = msg.slice(bracketMatch[0].length);
+                  }
+                  return (
+                    <p key={i} className="mt-1 break-all text-xs">
+                      {providerLabel && <span className="font-medium">{providerLabel}: </span>}
+                      {msg}
+                    </p>
+                  );
+                })}
+              </AlertDescription>
+            </Alert>
           )}
           {customProviders.length === 0 ? (
             <div className="rounded-lg border border-dashed p-6 text-center">
