@@ -2,7 +2,7 @@ import { profilePreferenceKey } from "@/hooks/use-persistent-state";
 import { usesLegacyPreferences } from "@/features/profiles/session";
 import { formatOptionSubtitle, parseOccSymbol } from "@/lib/occ-symbol";
 import { safeDivide } from "@/lib/utils";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef, HeaderContext } from "@tanstack/react-table";
 import {
   Badge,
   GainPercent,
@@ -171,6 +171,7 @@ export const HoldingsTable = ({
         amountFormatting,
         dateFormatting,
         navigate,
+        baseCurrency,
         onClassify,
       ).filter((column) => {
         if (!("id" in column) || column.id == null) return false;
@@ -186,6 +187,7 @@ export const HoldingsTable = ({
       amountFormatting,
       dateFormatting,
       navigate,
+      baseCurrency,
       onClassify,
       isClosedView,
     ],
@@ -315,6 +317,31 @@ export const HoldingsTable = ({
 
 export default HoldingsTable;
 
+// Totals sum each holding's base-currency value whatever the display toggle shows:
+// local values in different currencies cannot be added together.
+const totalsFooter = (
+  selector: (holding: Holding) => number | null | undefined,
+  config: { baseCurrency: string | undefined; isHidden: boolean; colorFormat?: boolean },
+) =>
+  function TotalsFooterCell({ table }: HeaderContext<Holding, unknown>) {
+    const total = table
+      .getFilteredRowModel()
+      .rows.reduce((sum, row) => sum + (selector(row.original) ?? 0), 0);
+    return (
+      <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+        <AmountDisplay
+          value={total}
+          currency={config.baseCurrency ?? ""}
+          colorFormat={config.colorFormat}
+          isHidden={config.isHidden}
+        />
+        {config.baseCurrency ? (
+          <div className="text-muted-foreground text-xs">{config.baseCurrency}</div>
+        ) : null}
+      </div>
+    );
+  };
+
 const getColumns = (
   t: TFunction,
   isHidden: boolean,
@@ -323,6 +350,7 @@ const getColumns = (
   amountFormatting: Pick<FormattingApi, "formatPrice">,
   dateFormatting: Pick<FormattingApi, "formatCalendarDate">,
   navigate: NavigateFunction,
+  baseCurrency: string | undefined,
   onClassify?: (holding: Holding) => void,
 ): ColumnDef<Holding>[] => [
   {
@@ -425,11 +453,13 @@ const getColumns = (
       const underlyingMatch = parsed?.underlying.toLowerCase().includes(lowerSearch);
       return !!(symbolMatch || nameMatch || idMatch || underlyingMatch);
     },
+    footer: () => <span className="font-medium">{t("holdings:total")}</span>,
     enableHiding: false,
   },
   {
     id: "closedCostBasis",
     accessorFn: (row) => getDisposedCostBasis(row)?.base ?? 0,
+    footer: totalsFooter((row) => getDisposedCostBasis(row)?.base, { baseCurrency, isHidden }),
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader
@@ -464,6 +494,7 @@ const getColumns = (
   {
     id: "saleProceeds",
     accessorFn: (row) => getClosingCashFlow(row)?.base ?? 0,
+    footer: totalsFooter((row) => getClosingCashFlow(row)?.base, { baseCurrency, isHidden }),
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader
@@ -498,6 +529,11 @@ const getColumns = (
   {
     id: "closedRealizedPnl",
     accessorFn: (row) => row.realizedGain?.base ?? 0,
+    footer: totalsFooter((row) => row.realizedGain?.base, {
+      baseCurrency,
+      isHidden,
+      colorFormat: true,
+    }),
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader
@@ -692,6 +728,10 @@ const getColumns = (
   {
     id: "bookValue",
     accessorFn: (row) => row.costBasis?.local ?? 0,
+    footer: totalsFooter(
+      (row) => (isCashHolding(row) || isClosedPosition(row) ? 0 : row.costBasis?.base),
+      { baseCurrency, isHidden },
+    ),
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader
@@ -727,6 +767,10 @@ const getColumns = (
   {
     id: "marketValue",
     accessorFn: (row) => row.marketValue.base ?? 0,
+    footer: totalsFooter((row) => (isClosedPosition(row) ? 0 : row.marketValue.base), {
+      baseCurrency,
+      isHidden,
+    }),
     enableHiding: false,
     header: ({ column }) => (
       <DataTableColumnHeader
@@ -775,6 +819,19 @@ const getColumns = (
   {
     id: "weight",
     accessorFn: (row) => row.weight ?? 0,
+    footer: ({ table }) => {
+      const total = table
+        .getFilteredRowModel()
+        .rows.reduce(
+          (sum, row) => sum + (isClosedPosition(row.original) ? 0 : (row.original.weight ?? 0)),
+          0,
+        );
+      return (
+        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+          <span className="font-medium tabular-nums">{formatting.formatPercent(total)}</span>
+        </div>
+      );
+    },
     enableHiding: true,
     enableSorting: true,
     header: ({ column }) => (
@@ -803,6 +860,11 @@ const getColumns = (
   {
     id: "totalPnl",
     accessorFn: (row) => row.totalGain?.base ?? 0,
+    footer: totalsFooter((row) => (isCashHolding(row) ? 0 : row.totalGain?.base), {
+      baseCurrency,
+      isHidden,
+      colorFormat: true,
+    }),
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader
@@ -848,6 +910,10 @@ const getColumns = (
   {
     id: "totalReturn",
     accessorFn: (row) => row.totalReturn?.base ?? row.totalGain?.base ?? 0,
+    footer: totalsFooter(
+      (row) => (isCashHolding(row) ? 0 : (row.totalReturn?.base ?? row.totalGain?.base)),
+      { baseCurrency, isHidden, colorFormat: true },
+    ),
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader
@@ -888,6 +954,10 @@ const getColumns = (
   {
     id: "dayPnl",
     accessorFn: (row) => row.dayChange?.base ?? 0,
+    footer: totalsFooter(
+      (row) => (isCashHolding(row) || isClosedPosition(row) ? 0 : row.dayChange?.base),
+      { baseCurrency, isHidden, colorFormat: true },
+    ),
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader
@@ -925,6 +995,10 @@ const getColumns = (
   {
     id: "unrealizedPnl",
     accessorFn: (row) => row.unrealizedGain?.base ?? 0,
+    footer: totalsFooter(
+      (row) => (isCashHolding(row) || isClosedPosition(row) ? 0 : row.unrealizedGain?.base),
+      { baseCurrency, isHidden, colorFormat: true },
+    ),
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader
@@ -965,6 +1039,11 @@ const getColumns = (
   {
     id: "realizedPnl",
     accessorFn: (row) => row.realizedGain?.base ?? 0,
+    footer: totalsFooter((row) => (isCashHolding(row) ? 0 : row.realizedGain?.base), {
+      baseCurrency,
+      isHidden,
+      colorFormat: true,
+    }),
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader
@@ -1005,6 +1084,11 @@ const getColumns = (
   {
     id: "income",
     accessorFn: (row) => row.income?.base ?? 0,
+    footer: totalsFooter((row) => (isCashHolding(row) ? 0 : row.income?.base), {
+      baseCurrency,
+      isHidden,
+      colorFormat: true,
+    }),
     enableHiding: true,
     header: ({ column }) => (
       <DataTableColumnHeader className="justify-end" column={column} title={t("holdings:income")} />
